@@ -173,7 +173,14 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Property<Guid>("FloorId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Model3dId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<int>("Number")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PlanSlot")
                         .HasColumnType("integer");
 
                     b.Property<decimal>("Price")
@@ -202,7 +209,14 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.HasIndex("FloorId", "Number")
                         .IsUnique();
 
-                    b.ToTable("Apartments", (string)null);
+                    b.HasIndex("FloorId", "PlanSlot")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Apartments_FloorId_PlanSlot");
+
+                    b.ToTable("Apartments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Apartments_PlanSlot", "\"PlanSlot\" BETWEEN 0 AND 7");
+                        });
                 });
 
             modelBuilder.Entity("Sitora.Domain.Entities.AppUser", b =>

@@ -37,7 +37,9 @@ public record ApartmentResponse(
     decimal PricePerM2,
     decimal Price,
     Currency Currency,
-    ApartmentStatus Status);
+    ApartmentStatus Status,
+    int PlanSlot,
+    string? Model3dId);
 
 public record SaveBuildingRequest(
     string NameRu,
@@ -52,9 +54,10 @@ public record CreateFloorRequest(Guid BuildingId, int Number, string? PlanImageU
 
 public record UpdateFloorRequest(int Number, string? PlanImageUrl);
 
-public record CreateApartmentRequest(Guid FloorId, int Number, int Rooms, decimal Area, decimal PricePerM2);
+// PlanSlot — позиция на плане этажа (0–7), Model3dId — объект квартиры в 3D-модели (необязательно).
+public record CreateApartmentRequest(Guid FloorId, int Number, int Rooms, decimal Area, decimal PricePerM2, int PlanSlot, string? Model3dId = null);
 
-public record UpdateApartmentRequest(int Number, int Rooms, decimal Area, decimal PricePerM2);
+public record UpdateApartmentRequest(int Number, int Rooms, decimal Area, decimal PricePerM2, int PlanSlot, string? Model3dId = null);
 
 public record SetOnRequestRequest(bool OnRequest);
 

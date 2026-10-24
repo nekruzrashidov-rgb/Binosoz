@@ -8,7 +8,16 @@ public class Apartment : BaseEntity
     public Guid FloorId { get; set; }
     public Floor Floor { get; set; } = null!;
 
+    public const int MaxPlanSlot = 7;
+    public const int Model3dIdMaxLength = 100;
+
     public int Number { get; set; }
+
+    // Позиция квартиры на плане этажа (0–7): по ней сайт находит квартиру на плане и в 3D-модели.
+    public int PlanSlot { get; set; }
+
+    // Идентификатор объекта квартиры в 3D-модели дома; появляется, когда модель готова.
+    public string? Model3dId { get; set; }
 
     // 0 — студия.
     public int Rooms { get; set; }

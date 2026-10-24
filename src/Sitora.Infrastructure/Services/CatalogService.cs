@@ -8,6 +8,7 @@ using Sitora.Domain.Enums;
 using Sitora.Domain.Exceptions;
 using Sitora.Domain.Interfaces;
 using Sitora.Infrastructure.Data;
+using Sitora.Infrastructure.Data.Configurations;
 
 namespace Sitora.Infrastructure.Services;
 
@@ -143,11 +144,18 @@ public class CatalogService(
         if (!await db.Floors.AnyAsync(f => f.Id == request.FloorId, ct))
             throw new NotFoundException(FloorNotFound);
 
-        var apartment = new Apartment { FloorId = request.FloorId, Number = request.Number, Rooms = request.Rooms };
+        var apartment = new Apartment
+        {
+            FloorId = request.FloorId,
+            Number = request.Number,
+            Rooms = request.Rooms,
+            PlanSlot = request.PlanSlot,
+            Model3dId = EmptyToNull(request.Model3dId)
+        };
         apartment.SetPricing(request.Area, request.PricePerM2);
         db.Apartments.Add(apartment);
         audit.Record(nameof(Apartment), apartment.Id, "Created", null, Snapshot(apartment));
-        await SaveAsync($"Квартира №{request.Number} уже есть на этом этаже", ct);
+        await SaveApartmentAsync(request.Number, request.PlanSlot, ct);
         return await GetApartmentAsync(apartment.Id, ct);
     }
 
@@ -158,9 +166,11 @@ public class CatalogService(
         var before = Snapshot(apartment);
         apartment.Number = request.Number;
         apartment.Rooms = request.Rooms;
+        apartment.PlanSlot = request.PlanSlot;
+        apartment.Model3dId = EmptyToNull(request.Model3dId);
         apartment.SetPricing(request.Area, request.PricePerM2);
         audit.Record(nameof(Apartment), apartment.Id, "Updated", before, Snapshot(apartment));
-        await SaveAsync($"Квартира №{request.Number} уже есть на этом этаже", ct);
+        await SaveApartmentAsync(request.Number, request.PlanSlot, ct);
         return await GetApartmentAsync(id, ct);
     }
 
@@ -203,6 +213,23 @@ public class CatalogService(
         cache.Invalidate();
     }
 
+    // У квартиры два уникальных правила на этаже: номер и позиция на плане.
+    private async Task SaveApartmentAsync(int number, int planSlot, CancellationToken ct)
+    {
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException e) when (e.IsUniqueViolation())
+        {
+            throw new ConflictException(e.ViolatedConstraint() == ApartmentConfiguration.PlanSlotIndex
+                ? $"Позиция {planSlot} на плане этого этажа уже занята другой квартирой"
+                : $"Квартира №{number} уже есть на этом этаже");
+        }
+
+        cache.Invalidate();
+    }
+
     private static void EnsureFloorNumber(Building building, int number)
     {
         if (number < Floor.CommercialFloorNumber || number > building.FloorsCount)
@@ -225,7 +252,8 @@ public class CatalogService(
     private static object Snapshot(Building b) =>
         new { b.NameRu, b.NameTg, b.Address, b.FloorsCount, b.DescriptionRu, b.DescriptionTg, b.ModelUrl };
 
-    private static object Snapshot(Apartment a) => new { a.Number, a.Rooms, a.Area, a.PricePerM2, a.Price, a.Currency, a.Status };
+    private static object Snapshot(Apartment a) =>
+        new { a.Number, a.Rooms, a.Area, a.PricePerM2, a.Price, a.Currency, a.Status, a.PlanSlot, a.Model3dId };
 
     private static Expression<Func<Building, BuildingResponse>> ToBuildingResponse(bool tg) => b => new BuildingResponse(
         b.Id,
@@ -261,5 +289,7 @@ public class CatalogService(
         a.PricePerM2,
         a.Price,
         a.Currency,
-        a.Status);
+        a.Status,
+        a.PlanSlot,
+        a.Model3dId);
 }

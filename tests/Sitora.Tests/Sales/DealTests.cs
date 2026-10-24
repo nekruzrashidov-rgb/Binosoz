@@ -28,7 +28,7 @@ public class DealTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFactor
 
         var content = await factory.CreateContentClientAsync();
         var update = await content.PutAsJsonAsync($"/api/v1/apartments/{apartmentId}",
-            new UpdateApartmentRequest(apartment.Number, apartment.Rooms, apartment.Area, apartment.PricePerM2 + 1000m));
+            new UpdateApartmentRequest(apartment.Number, apartment.Rooms, apartment.Area, apartment.PricePerM2 + 1000m, apartment.PlanSlot));
         update.EnsureSuccessStatusCode();
 
         var reloaded = await manager.GetFromJsonAsync<DealResponse>($"/api/v1/deals/{deal.Id}", TestJson.Options);

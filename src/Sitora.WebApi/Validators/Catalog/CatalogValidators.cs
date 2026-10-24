@@ -1,5 +1,6 @@
 using FluentValidation;
 using Sitora.Domain.DTOs.Catalog;
+using Sitora.Domain.Entities;
 
 namespace Sitora.WebApi.Validators.Catalog;
 
@@ -46,7 +47,8 @@ public class CreateApartmentRequestValidator : AbstractValidator<CreateApartment
     public CreateApartmentRequestValidator()
     {
         RuleFor(x => x.FloorId).NotEmpty().WithMessage("Укажите этаж");
-        Include(new ApartmentFieldsValidator<CreateApartmentRequest>(x => x.Number, x => x.Rooms, x => x.Area, x => x.PricePerM2));
+        Include(new ApartmentFieldsValidator<CreateApartmentRequest>(
+            x => x.Number, x => x.Rooms, x => x.Area, x => x.PricePerM2, x => x.PlanSlot, x => x.Model3dId));
     }
 }
 
@@ -54,7 +56,8 @@ public class UpdateApartmentRequestValidator : AbstractValidator<UpdateApartment
 {
     public UpdateApartmentRequestValidator()
     {
-        Include(new ApartmentFieldsValidator<UpdateApartmentRequest>(x => x.Number, x => x.Rooms, x => x.Area, x => x.PricePerM2));
+        Include(new ApartmentFieldsValidator<UpdateApartmentRequest>(
+            x => x.Number, x => x.Rooms, x => x.Area, x => x.PricePerM2, x => x.PlanSlot, x => x.Model3dId));
     }
 }
 
@@ -64,11 +67,17 @@ public class ApartmentFieldsValidator<T> : AbstractValidator<T>
         System.Linq.Expressions.Expression<Func<T, int>> number,
         System.Linq.Expressions.Expression<Func<T, int>> rooms,
         System.Linq.Expressions.Expression<Func<T, decimal>> area,
-        System.Linq.Expressions.Expression<Func<T, decimal>> pricePerM2)
+        System.Linq.Expressions.Expression<Func<T, decimal>> pricePerM2,
+        System.Linq.Expressions.Expression<Func<T, int>> planSlot,
+        System.Linq.Expressions.Expression<Func<T, string?>> model3dId)
     {
         RuleFor(number).InclusiveBetween(1, 99999).WithMessage("Номер квартиры должен быть от 1 до 99999");
         RuleFor(rooms).InclusiveBetween(0, 10).WithMessage("Комнат должно быть от 0 (студия) до 10");
         RuleFor(area).GreaterThan(0).LessThanOrEqualTo(1000).WithMessage("Площадь должна быть больше 0 и не больше 1000 м²");
         RuleFor(pricePerM2).GreaterThan(0).LessThanOrEqualTo(10_000_000).WithMessage("Цена за м² должна быть больше нуля");
+        RuleFor(planSlot).InclusiveBetween(0, Apartment.MaxPlanSlot)
+            .WithMessage($"Позиция на плане этажа должна быть от 0 до {Apartment.MaxPlanSlot}");
+        RuleFor(model3dId).MaximumLength(Apartment.Model3dIdMaxLength)
+            .WithMessage($"ID в 3D-модели не длиннее {Apartment.Model3dIdMaxLength} символов");
     }
 }

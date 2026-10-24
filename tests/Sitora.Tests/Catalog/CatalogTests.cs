@@ -42,6 +42,11 @@ public class CatalogTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
         Assert.Equal(apartments.Count(a => a.Status == ApartmentStatus.Free), building.FreeApartments);
         Assert.Contains(apartments, a => a.Status == ApartmentStatus.Free);
         Assert.Contains(apartments, a => a.Status == ApartmentStatus.Sold);
+
+        // Позиции на плане: по порядку номеров на этаже, 0–7, без повторов.
+        Assert.All(apartments.GroupBy(a => a.FloorNumber), floor =>
+            Assert.Equal(Enumerable.Range(0, 8), floor.OrderBy(a => a.Number).Select(a => a.PlanSlot)));
+        Assert.All(apartments, a => Assert.Null(a.Model3dId));
     }
 
     [Theory]
@@ -165,19 +170,32 @@ public class CatalogTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
         var duplicateFloor = await client.PostAsJsonAsync("/api/v1/floors", new CreateFloorRequest(building.Id, 2, null));
         Assert.Equal(HttpStatusCode.Conflict, duplicateFloor.StatusCode);
 
-        var apartmentResponse = await client.PostAsJsonAsync("/api/v1/apartments", new CreateApartmentRequest(floor.Id, 201, 2, 50.5m, 10000m));
+        var apartmentResponse = await client.PostAsJsonAsync("/api/v1/apartments", new CreateApartmentRequest(floor.Id, 201, 2, 50.5m, 10000m, 0));
         Assert.Equal(HttpStatusCode.Created, apartmentResponse.StatusCode);
         var apartment = await ReadAsync<ApartmentResponse>(apartmentResponse);
         Assert.Equal(505000m, apartment.Price);
         Assert.Equal(ApartmentStatus.Free, apartment.Status);
 
-        var duplicateApartment = await client.PostAsJsonAsync("/api/v1/apartments", new CreateApartmentRequest(floor.Id, 201, 1, 40m, 10000m));
+        var duplicateApartment = await client.PostAsJsonAsync("/api/v1/apartments", new CreateApartmentRequest(floor.Id, 201, 1, 40m, 10000m, 1));
         Assert.Equal(HttpStatusCode.Conflict, duplicateApartment.StatusCode);
+        Assert.Contains("Квартира №201 уже есть", await duplicateApartment.Content.ReadAsStringAsync());
+
+        var occupiedSlot = await client.PostAsJsonAsync("/api/v1/apartments", new CreateApartmentRequest(floor.Id, 202, 1, 40m, 10000m, 0));
+        Assert.Equal(HttpStatusCode.Conflict, occupiedSlot.StatusCode);
+        Assert.Contains("Позиция 0 на плане этого этажа уже занята", await occupiedSlot.Content.ReadAsStringAsync());
+
+        var badSlot = await client.PostAsJsonAsync("/api/v1/apartments", new CreateApartmentRequest(floor.Id, 203, 1, 40m, 10000m, 8));
+        Assert.Equal(HttpStatusCode.BadRequest, badSlot.StatusCode);
+        Assert.Contains("от 0 до 7", await badSlot.Content.ReadAsStringAsync());
+
+        var withModel = await ReadAsync<ApartmentResponse>(await client.PostAsJsonAsync("/api/v1/apartments",
+            new CreateApartmentRequest(floor.Id, 204, 1, 40m, 10000m, 3, "SR-F2-A204")));
+        Assert.Equal((3, "SR-F2-A204"), (withModel.PlanSlot, withModel.Model3dId));
 
         var floors = await GetAsync<PagedResult<FloorResponse>>($"/api/v1/buildings/{building.Id}/floors");
         var savedFloor = Assert.Single(floors.Items);
-        Assert.Equal(1, savedFloor.TotalApartments);
-        Assert.Equal(1, savedFloor.FreeApartments);
+        Assert.Equal(2, savedFloor.TotalApartments);
+        Assert.Equal(2, savedFloor.FreeApartments);
     }
 
     [Fact]
@@ -189,12 +207,13 @@ public class CatalogTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
         // Первый запрос кладёт квартиру в кэш.
         await GetAsync<ApartmentResponse>($"/api/v1/apartments/{apartment.Id}");
 
-        var update = await client.PutAsJsonAsync($"/api/v1/apartments/{apartment.Id}", new UpdateApartmentRequest(apartment.Number, 3, 60m, 12000m));
+        var update = await client.PutAsJsonAsync($"/api/v1/apartments/{apartment.Id}", new UpdateApartmentRequest(apartment.Number, 3, 60m, 12000m, apartment.PlanSlot, "SR-model-1"));
         Assert.Equal(HttpStatusCode.OK, update.StatusCode);
 
         var reloaded = await GetAsync<ApartmentResponse>($"/api/v1/apartments/{apartment.Id}");
         Assert.Equal(720000m, reloaded.Price);
         Assert.Equal(3, reloaded.Rooms);
+        Assert.Equal("SR-model-1", reloaded.Model3dId);
 
         var entry = await factory.WithDbAsync(db => db.AuditLogs.SingleAsync(a => a.EntityId == apartment.Id && a.Action == "Updated"));
         Assert.NotNull(entry.UserId);
@@ -244,7 +263,7 @@ public class CatalogTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
     {
         var building = await ReadAsync<BuildingResponse>(await client.PostAsJsonAsync("/api/v1/buildings", NewBuilding(buildingName)));
         var floor = await ReadAsync<FloorResponse>(await client.PostAsJsonAsync("/api/v1/floors", new CreateFloorRequest(building.Id, 1, null)));
-        return await ReadAsync<ApartmentResponse>(await client.PostAsJsonAsync("/api/v1/apartments", new CreateApartmentRequest(floor.Id, 101, 2, 50m, 10000m)));
+        return await ReadAsync<ApartmentResponse>(await client.PostAsJsonAsync("/api/v1/apartments", new CreateApartmentRequest(floor.Id, 101, 2, 50m, 10000m, 0)));
     }
 
     private async Task<BuildingResponse> GetSeededBuildingAsync()

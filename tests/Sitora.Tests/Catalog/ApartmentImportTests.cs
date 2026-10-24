@@ -17,18 +17,19 @@ public class ApartmentImportTests(SitoraApiFactory factory) : IClassFixture<Sito
         var buildingId = await CreateBuildingAsync(client, "Импорт");
 
         var first = await client.PostAsync($"/api/v1/apartments/import?buildingId={buildingId}", Excel(
-            [1, 101, 1, 40, 9000],
-            [1, 102, 2, 60.5, 9000],
-            [2, 201, 0, 30, 9500]));
+            [1, 101, 1, 40, 9000, 0, "SR-101"],
+            [1, 102, 2, 60.5, 9000, 1],
+            [2, 201, 0, 30, 9500, 0]));
 
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         var firstResult = await first.Content.ReadFromJsonAsync<ImportResult>(TestJson.Options);
         Assert.Equal((3, 0), (firstResult!.Created, firstResult.Updated));
 
+        // Пустой столбец G не стирает уже заданный ID в 3D-модели.
         var second = await client.PostAsync($"/api/v1/apartments/import?buildingId={buildingId}", Excel(
-            [1, 101, 1, 40, 9900],
-            [1, 102, 2, 60.5, 9000],
-            [1, 103, 3, 80, 9000]));
+            [1, 101, 1, 40, 9900, 0],
+            [1, 102, 2, 60.5, 9000, 1],
+            [1, 103, 3, 80, 9000, 2, "SR-103"]));
 
         var secondResult = await second.Content.ReadFromJsonAsync<ImportResult>(TestJson.Options);
         Assert.Equal((1, 1), (secondResult!.Created, secondResult.Updated));
@@ -36,12 +37,44 @@ public class ApartmentImportTests(SitoraApiFactory factory) : IClassFixture<Sito
         var apartments = await factory.WithDbAsync(db => db.Apartments
             .Where(a => a.Floor.BuildingId == buildingId)
             .OrderBy(a => a.Number)
-            .Select(a => new { a.Number, a.Price, FloorNumber = a.Floor.Number })
+            .Select(a => new { a.Number, a.Price, FloorNumber = a.Floor.Number, a.PlanSlot, a.Model3dId })
             .ToListAsync());
         Assert.Equal([101, 102, 103, 201], apartments.Select(a => a.Number));
         Assert.Equal(396000m, apartments[0].Price);
         Assert.Equal(544500m, apartments[1].Price);
         Assert.Equal(2, apartments[3].FloorNumber);
+        Assert.Equal([0, 1, 2, 0], apartments.Select(a => a.PlanSlot));
+        Assert.Equal(["SR-101", null, "SR-103", null], apartments.Select(a => a.Model3dId));
+    }
+
+    [Fact]
+    public async Task Import_RejectsOccupiedOrDuplicatePlanSlots()
+    {
+        var client = await factory.CreateContentClientAsync();
+        var buildingId = await CreateBuildingAsync(client, "Импорт позиций");
+        (await client.PostAsync($"/api/v1/apartments/import?buildingId={buildingId}", Excel(
+            [1, 101, 1, 40, 9000, 0],
+            [1, 102, 1, 40, 9000, 1]))).EnsureSuccessStatusCode();
+
+        var response = await client.PostAsync($"/api/v1/apartments/import?buildingId={buildingId}", Excel(
+            [1, 103, 1, 40, 9000, 0],
+            [1, 104, 1, 40, 9000, 5],
+            [1, 105, 1, 40, 9000, 5],
+            [1, 106, 1, 40, 9000, 9],
+            [1, 102, 1, 40, 9000, 3]));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        var result = await response.Content.ReadFromJsonAsync<ImportResult>(TestJson.Options);
+        Assert.Equal([2, 4, 5], result!.Errors.Select(e => e.Row));
+        Assert.Contains("уже занята квартирой №101", result.Errors[0].Message);
+        Assert.Contains("уже занята выше в файле", result.Errors[1].Message);
+        Assert.Contains("от 0 до 7", result.Errors[2].Message);
+
+        // Квартира 102 переезжает на позицию 3, а её прежняя позиция 1 освобождается — это допустимо.
+        var move = await client.PostAsync($"/api/v1/apartments/import?buildingId={buildingId}", Excel(
+            [1, 102, 1, 40, 9000, 3],
+            [1, 103, 1, 40, 9000, 1]));
+        Assert.Equal(HttpStatusCode.OK, move.StatusCode);
     }
 
     [Fact]
@@ -51,10 +84,10 @@ public class ApartmentImportTests(SitoraApiFactory factory) : IClassFixture<Sito
         var buildingId = await CreateBuildingAsync(client, "Импорт с ошибками");
 
         var response = await client.PostAsync($"/api/v1/apartments/import?buildingId={buildingId}", Excel(
-            [1, 101, 1, 40, 9000],
-            [9, 901, 1, 40, 9000],
-            [1, 102, 1, "сорок", 9000],
-            [1, 101, 2, 50, 9000]));
+            [1, 101, 1, 40, 9000, 0],
+            [9, 901, 1, 40, 9000, 0],
+            [1, 102, 1, "сорок", 9000, 1],
+            [1, 101, 2, 50, 9000, 2]));
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
         var result = await response.Content.ReadFromJsonAsync<ImportResult>(TestJson.Options);
@@ -86,7 +119,7 @@ public class ApartmentImportTests(SitoraApiFactory factory) : IClassFixture<Sito
         var buildingId = await CreateBuildingAsync(content, "Импорт менеджером");
         var manager = await factory.CreateManagerClientAsync();
 
-        var response = await manager.PostAsync($"/api/v1/apartments/import?buildingId={buildingId}", Excel([1, 101, 1, 40, 9000]));
+        var response = await manager.PostAsync($"/api/v1/apartments/import?buildingId={buildingId}", Excel([1, 101, 1, 40, 9000, 0]));
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -102,7 +135,7 @@ public class ApartmentImportTests(SitoraApiFactory factory) : IClassFixture<Sito
     {
         using var workbook = new XLWorkbook();
         var sheet = workbook.AddWorksheet("Квартиры");
-        string[] headers = ["Этаж", "Номер", "Комнат", "Площадь", "Цена за м²"];
+        string[] headers = ["Этаж", "Номер", "Комнат", "Площадь", "Цена за м²", "Позиция на плане", "ID в 3D-модели"];
         for (var col = 0; col < headers.Length; col++)
             sheet.Cell(1, col + 1).Value = headers[col];
         for (var row = 0; row < rows.Length; row++)

@@ -49,7 +49,12 @@ public static class CatalogSeeder
             for (var position = 1; position <= Layout.Length; position++)
             {
                 var (rooms, area) = Layout[position - 1];
-                var apartment = new Apartment { Number = ApartmentNumber(floorNumber, position), Rooms = rooms };
+                var apartment = new Apartment
+                {
+                    Number = ApartmentNumber(floorNumber, position),
+                    Rooms = rooms,
+                    PlanSlot = position - 1
+                };
                 apartment.SetPricing(area, PricePerM2(floorNumber));
 
                 var roll = random.NextDouble();
