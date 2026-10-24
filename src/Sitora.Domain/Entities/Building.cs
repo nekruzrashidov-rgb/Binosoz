@@ -8,7 +8,8 @@ public class Building : BaseEntity
 
     // Число жилых этажей; коммерческий этаж 0 сюда не входит.
     public int FloorsCount { get; set; }
-    public string? Description { get; set; }
+    public string? DescriptionRu { get; set; }
+    public string? DescriptionTg { get; set; }
     public string? ModelUrl { get; set; }
 
     public List<Floor> Floors { get; set; } = [];

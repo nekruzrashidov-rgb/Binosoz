@@ -11,7 +11,8 @@ public class SaveBuildingRequestValidator : AbstractValidator<SaveBuildingReques
         RuleFor(x => x.NameTg).NotEmpty().WithMessage("Укажите название на таджикском").MaximumLength(200);
         RuleFor(x => x.Address).NotEmpty().WithMessage("Укажите адрес").MaximumLength(300);
         RuleFor(x => x.FloorsCount).InclusiveBetween(1, 100).WithMessage("Этажность должна быть от 1 до 100");
-        RuleFor(x => x.Description).MaximumLength(4000);
+        RuleFor(x => x.DescriptionRu).MaximumLength(4000).WithMessage("Описание на русском не длиннее 4000 символов");
+        RuleFor(x => x.DescriptionTg).MaximumLength(4000).WithMessage("Описание на таджикском не длиннее 4000 символов");
         RuleFor(x => x.ModelUrl).MaximumLength(500)
             .Must(BeAbsoluteUrl).When(x => !string.IsNullOrWhiteSpace(x.ModelUrl))
             .WithMessage("Ссылка на 3D-модель должна быть полным адресом http(s)");

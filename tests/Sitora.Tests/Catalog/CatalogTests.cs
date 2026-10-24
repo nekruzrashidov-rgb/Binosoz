@@ -110,6 +110,30 @@ public class CatalogTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
     }
 
     [Fact]
+    public async Task BuildingDescription_DependsOnAcceptLanguage_WithRussianFallback()
+    {
+        var client = await factory.CreateContentClientAsync();
+        var both = await ReadAsync<BuildingResponse>(await client.PostAsJsonAsync("/api/v1/buildings",
+            NewBuilding("Описание на двух языках") with { DescriptionRu = "Описание по-русски", DescriptionTg = "Тавсиф (тест)" }));
+        var ruOnly = await ReadAsync<BuildingResponse>(await client.PostAsJsonAsync("/api/v1/buildings",
+            NewBuilding("Описание только по-русски") with { DescriptionRu = "Только русский текст" }));
+
+        Assert.Equal(("Описание по-русски", "Тавсиф (тест)"), (both.DescriptionRu, both.DescriptionTg));
+        Assert.Equal("Тавсиф (тест)", (await GetInTajikAsync(both.Id)).Description);
+        Assert.Equal("Описание по-русски", (await GetAsync<BuildingResponse>($"/api/v1/buildings/{both.Id}")).Description);
+
+        // Без таджикского перевода показываем русский текст, а не пустоту.
+        var fallback = await GetInTajikAsync(ruOnly.Id);
+        Assert.Equal("Только русский текст", fallback.Description);
+        Assert.Null(fallback.DescriptionTg);
+
+        var updated = await ReadAsync<BuildingResponse>(await client.PutAsJsonAsync($"/api/v1/buildings/{ruOnly.Id}",
+            NewBuilding("Описание только по-русски") with { DescriptionRu = "Только русский текст", DescriptionTg = "Перевод добавлен" }));
+        Assert.Equal("Перевод добавлен", updated.DescriptionTg);
+        Assert.Equal("Перевод добавлен", (await GetInTajikAsync(ruOnly.Id)).Description);
+    }
+
+    [Fact]
     public async Task BuildingName_DependsOnAcceptLanguage()
     {
         var client = await factory.CreateContentClientAsync();
@@ -236,6 +260,13 @@ public class CatalogTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
             .Select(a => a.Id)
             .SingleAsync());
         return await GetAsync<ApartmentResponse>($"/api/v1/apartments/{id}");
+    }
+
+    private async Task<BuildingResponse> GetInTajikAsync(Guid buildingId)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/buildings/{buildingId}");
+        request.Headers.AcceptLanguage.ParseAdd("tg");
+        return await ReadAsync<BuildingResponse>(await _guest.SendAsync(request));
     }
 
     private async Task<T> GetAsync<T>(string url) => (await _guest.GetFromJsonAsync<T>(url, TestJson.Options))!;

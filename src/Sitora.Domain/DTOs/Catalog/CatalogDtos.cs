@@ -2,6 +2,7 @@ using Sitora.Domain.Enums;
 
 namespace Sitora.Domain.DTOs.Catalog;
 
+// Name и Description — на языке запроса (Accept-Language), для tg без перевода описания — русский текст.
 public record BuildingResponse(
     Guid Id,
     string Name,
@@ -10,6 +11,8 @@ public record BuildingResponse(
     string Address,
     int FloorsCount,
     string? Description,
+    string? DescriptionRu,
+    string? DescriptionTg,
     string? ModelUrl,
     int TotalApartments,
     int FreeApartments);
@@ -41,8 +44,9 @@ public record SaveBuildingRequest(
     string NameTg,
     string Address,
     int FloorsCount,
-    string? Description,
-    string? ModelUrl);
+    string? DescriptionRu,
+    string? ModelUrl,
+    string? DescriptionTg = null);
 
 public record CreateFloorRequest(Guid BuildingId, int Number, string? PlanImageUrl);
 

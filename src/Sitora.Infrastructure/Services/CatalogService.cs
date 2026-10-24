@@ -215,11 +215,15 @@ public class CatalogService(
         building.NameTg = request.NameTg.Trim();
         building.Address = request.Address.Trim();
         building.FloorsCount = request.FloorsCount;
-        building.Description = request.Description?.Trim();
+        building.DescriptionRu = EmptyToNull(request.DescriptionRu);
+        building.DescriptionTg = EmptyToNull(request.DescriptionTg);
         building.ModelUrl = request.ModelUrl?.Trim();
     }
 
-    private static object Snapshot(Building b) => new { b.NameRu, b.NameTg, b.Address, b.FloorsCount, b.Description, b.ModelUrl };
+    private static string? EmptyToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static object Snapshot(Building b) =>
+        new { b.NameRu, b.NameTg, b.Address, b.FloorsCount, b.DescriptionRu, b.DescriptionTg, b.ModelUrl };
 
     private static object Snapshot(Apartment a) => new { a.Number, a.Rooms, a.Area, a.PricePerM2, a.Price, a.Currency, a.Status };
 
@@ -230,7 +234,9 @@ public class CatalogService(
         b.NameTg,
         b.Address,
         b.FloorsCount,
-        b.Description,
+        tg ? b.DescriptionTg ?? b.DescriptionRu : b.DescriptionRu,
+        b.DescriptionRu,
+        b.DescriptionTg,
         b.ModelUrl,
         b.Floors.SelectMany(f => f.Apartments).Count(),
         b.Floors.SelectMany(f => f.Apartments).Count(a => a.Status == ApartmentStatus.Free));

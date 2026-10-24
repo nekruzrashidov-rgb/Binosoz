@@ -402,7 +402,11 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Description")
+                    b.Property<string>("DescriptionRu")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("DescriptionTg")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
