@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sitora
+      POSTGRES_USER: sitora
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Задайте POSTGRES_PASSWORD в файле .env}
+    # В образах PostgreSQL 18 том монтируется в /var/lib/postgresql, а не в /data.
+    volumes:
+      - pgdata:/var/lib/postgresql
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sitora -d sitora"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  webapi:
+    build:
+      context: .
+      dockerfile: src/Sitora.WebApi/Dockerfile
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ConnectionStrings__Default: Host=db;Port=5432;Database=sitora;Username=sitora;Password=${POSTGRES_PASSWORD}
+      Jwt__Key: ${JWT_KEY:?Задайте JWT_KEY в файле .env}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SEED_MANAGER_PASSWORD: ${SEED_MANAGER_PASSWORD:-}
+      SEED_ACCOUNTANT_PASSWORD: ${SEED_ACCOUNTANT_PASSWORD:-}
+      SEED_CONTENT_PASSWORD: ${SEED_CONTENT_PASSWORD:-}
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
