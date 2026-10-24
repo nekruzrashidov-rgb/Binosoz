@@ -91,6 +91,7 @@ Caddy сам получает сертификат HTTPS. Бэкап — `./scri
 | `Cors__AllowedOrigins__0`, `__1`, … | адреса фронтендов, которым разрешён CORS |
 | `ForwardedHeaders__Enabled` | `true`, только если API стоит за своим обратным прокси (в prod-compose это Caddy) |
 | `RateLimiting__LoginPerMinute`, `__SmsPerHour`, `__PublicFormsPerHour` | лимиты на один IP (по умолчанию 10, 20, 30) |
+| `RateLimiting__AnonymousPerMinute`, `__UserPerMinute` | общий лимит: гостю на IP и вошедшему на пользователя (по умолчанию 300 и 600) |
 | `Storage__RootPath` | папка для документов и фото (по умолчанию `./storage`, в Docker — том `files`) |
 | `Hangfire__ServerEnabled` | `false` выключает фоновые задачи в этом экземпляре |
 | `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` | первый администратор в любом окружении, если админов ещё нет (в Production создаётся командой `--migrate`) |

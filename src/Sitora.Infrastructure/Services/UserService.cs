@@ -78,6 +78,13 @@ public class UserService(
         audit.Record(nameof(AppUser), user.Id, request.IsActive ? "Unblocked" : "Blocked", before, new { user.IsActive });
         await db.SaveChangesAsync(ct);
 
+        // Разблокировка снимает и временную блокировку входа после неудачных попыток.
+        if (request.IsActive)
+        {
+            await userManager.SetLockoutEndDateAsync(user, null);
+            await userManager.ResetAccessFailedCountAsync(user);
+        }
+
         // Заблокированный пользователь сразу теряет все refresh-токены.
         if (!request.IsActive)
         {

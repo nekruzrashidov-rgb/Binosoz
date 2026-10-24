@@ -22,6 +22,8 @@ public class LowRateLimitFactory : SitoraApiFactory
         builder.UseSetting("RateLimiting:LoginPerMinute", "3");
         builder.UseSetting("RateLimiting:SmsPerHour", "2");
         builder.UseSetting("RateLimiting:PublicFormsPerHour", "2");
+        builder.UseSetting("RateLimiting:AnonymousPerMinute", "20");
+        builder.UseSetting("RateLimiting:UserPerMinute", "1000");
         builder.ConfigureTestServices(services => services.AddSingleton<IStartupFilter, TestClientIpFilter>());
     }
 
@@ -66,6 +68,25 @@ public class RateLimitTests(LowRateLimitFactory factory) : IClassFixture<LowRate
         // Другой IP считается отдельно.
         var other = await factory.CreateClientWithIp("10.0.0.2").PostAsJsonAsync("/api/v1/auth/login", request);
         Assert.Equal(HttpStatusCode.Unauthorized, other.StatusCode);
+    }
+
+    [Fact]
+    public async Task GeneralLimit_AppliesToGuestsPerIp_AndToUsersSeparately_ButNotToHealth()
+    {
+        var guest = factory.CreateClientWithIp("10.0.3.1");
+        for (var i = 0; i < 20; i++)
+            Assert.Equal(HttpStatusCode.OK, (await guest.GetAsync("/api/v1/buildings")).StatusCode);
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await guest.GetAsync("/api/v1/buildings")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await guest.GetAsync("/health/ready")).StatusCode);
+
+        // Сотрудник с того же IP считается по своей учётной записи, а не по IP.
+        var staff = factory.CreateClientWithIp("10.0.3.2");
+        var login = await staff.PostAsJsonAsync("/api/v1/auth/login", new LoginRequest(SitoraApiFactory.ManagerEmail, factory.ManagerPassword));
+        var token = (await login.Content.ReadFromJsonAsync<AuthResponse>())!.AccessToken;
+        var manager = factory.CreateClientWithIp("10.0.3.1");
+        manager.DefaultRequestHeaders.Authorization = new("Bearer", token);
+        Assert.Equal(HttpStatusCode.OK, (await manager.GetAsync("/api/v1/buildings")).StatusCode);
     }
 
     [Fact]

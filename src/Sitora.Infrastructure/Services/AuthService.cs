@@ -1,8 +1,11 @@
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Sitora.Domain.Common;
 using Sitora.Domain.DTOs.Auth;
 using Sitora.Domain.Entities;
@@ -19,10 +22,13 @@ public class AuthService(
     UserManager<AppUser> userManager,
     JwtTokenService tokens,
     ISmsSender sms,
+    IMemoryCache cache,
+    IOptions<IdentityOptions> identityOptions,
     TimeProvider timeProvider,
     ILogger<AuthService> logger) : IAuthService
 {
     private const string InvalidCredentials = "Неверная почта или пароль";
+    private const string LockedOut = "Слишком много неудачных попыток входа, попробуйте позже";
     private const string InvalidRefreshToken = "Сессия истекла, войдите заново";
     private const string InvalidSmsCode = "Неверный или устаревший код";
     public const int MaxSmsCodesPerHour = 5;
@@ -113,12 +119,13 @@ public class AuthService(
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken ct = default)
     {
-        var user = await userManager.FindByEmailAsync(request.Email.Trim());
+        var email = request.Email.Trim();
+        var user = await userManager.FindByEmailAsync(email);
         if (user is null || !user.IsActive)
-            throw new UnauthorizedException(InvalidCredentials);
+            throw UnknownAccountFailure(email, request.Password);
 
         if (await userManager.IsLockedOutAsync(user))
-            throw new UnauthorizedException("Слишком много неудачных попыток входа, попробуйте позже");
+            throw new UnauthorizedException(LockedOut);
 
         if (!await userManager.CheckPasswordAsync(user, request.Password))
         {
@@ -131,6 +138,29 @@ public class AuthService(
         logger.LogInformation("Пользователь {UserId} вошёл в систему", user.Id);
         return await IssueTokensAsync(user, ct);
     }
+
+    // Для несуществующей или отключённой почты ведём такой же счётчик ошибок, как Identity для настоящей,
+    // и так же тратим время на проверку пароля: иначе по ответу или по задержке можно узнать, кто сотрудник.
+    private UnauthorizedException UnknownAccountFailure(string email, string password)
+    {
+        userManager.PasswordHasher.VerifyHashedPassword(DummyUser, DummyPasswordHash.Value, password);
+
+        var lockout = identityOptions.Value.Lockout;
+        var failures = cache.GetOrCreate("login-failures:" + email.ToUpperInvariant(), entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = lockout.DefaultLockoutTimeSpan;
+            return new StrongBox<int>();
+        })!;
+        if (failures.Value >= lockout.MaxFailedAccessAttempts)
+            return new UnauthorizedException(LockedOut);
+
+        Interlocked.Increment(ref failures.Value);
+        return new UnauthorizedException(InvalidCredentials);
+    }
+
+    private static readonly AppUser DummyUser = new();
+    private static readonly Lazy<string> DummyPasswordHash =
+        new(() => new PasswordHasher<AppUser>().HashPassword(DummyUser, Guid.NewGuid().ToString()));
 
     public async Task<AuthResponse> RefreshAsync(RefreshRequest request, CancellationToken ct = default)
     {

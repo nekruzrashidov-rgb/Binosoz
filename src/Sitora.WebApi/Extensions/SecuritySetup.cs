@@ -14,6 +14,11 @@ public class RateLimitSettings
     public int LoginPerMinute { get; set; } = 10;
     public int SmsPerHour { get; set; } = 20;
     public int PublicFormsPerHour { get; set; } = 30;
+
+    // Общий лимит на все запросы: гости — на IP, вошедшие — на пользователя
+    // (сотрудники за одним офисным IP не мешают друг другу).
+    public int AnonymousPerMinute { get; set; } = 300;
+    public int UserPerMinute { get; set; } = 600;
 }
 
 public static class RateLimitPolicies
@@ -61,6 +66,19 @@ public static class SecuritySetup
                 context.User.Identity?.IsAuthenticated == true
                     ? RateLimitPartition.GetNoLimiter("staff")
                     : PerIp(context, s => s.PublicFormsPerHour, TimeSpan.FromHours(1)));
+
+            // Общий лимит действует вместе с политиками выше; проверки здоровья не ограничиваем.
+            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+            {
+                if (context.Request.Path.StartsWithSegments("/health"))
+                    return RateLimitPartition.GetNoLimiter("health");
+
+                var settings = context.RequestServices.GetRequiredService<IOptions<RateLimitSettings>>().Value;
+                var userId = context.User.FindFirst(Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames.Sub)?.Value;
+                return userId is not null
+                    ? FixedWindow("user:" + userId, settings.UserPerMinute, TimeSpan.FromMinutes(1))
+                    : FixedWindow("ip:" + ClientIp(context), settings.AnonymousPerMinute, TimeSpan.FromMinutes(1));
+            });
         });
 
         return services;
@@ -99,12 +117,16 @@ public static class SecuritySetup
     private static RateLimitPartition<string> PerIp(HttpContext context, Func<RateLimitSettings, int> limit, TimeSpan window)
     {
         var settings = context.RequestServices.GetRequiredService<IOptions<RateLimitSettings>>().Value;
-        var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-        return RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions
+        return FixedWindow(ClientIp(context), limit(settings), window);
+    }
+
+    private static RateLimitPartition<string> FixedWindow(string key, int permitLimit, TimeSpan window) =>
+        RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = limit(settings),
+            PermitLimit = permitLimit,
             Window = window,
             QueueLimit = 0
         });
-    }
+
+    private static string ClientIp(HttpContext context) => context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 }

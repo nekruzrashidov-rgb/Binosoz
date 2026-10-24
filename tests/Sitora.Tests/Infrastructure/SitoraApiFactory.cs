@@ -123,6 +123,8 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("RateLimiting:LoginPerMinute", "1000000");
         builder.UseSetting("RateLimiting:SmsPerHour", "1000000");
         builder.UseSetting("RateLimiting:PublicFormsPerHour", "1000000");
+        builder.UseSetting("RateLimiting:AnonymousPerMinute", "1000000");
+        builder.UseSetting("RateLimiting:UserPerMinute", "1000000");
         builder.ConfigureTestServices(services => services.AddSingleton<ISmsSender>(Sms));
     }
 
