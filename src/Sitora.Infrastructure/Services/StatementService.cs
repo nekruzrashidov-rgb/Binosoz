@@ -9,18 +9,18 @@ namespace Sitora.Infrastructure.Services;
 // Акт сверки на дату: всё считается по графику и платежам не позже этой даты.
 public class StatementService(AppDbContext db, IPdfGenerator pdf, TimeProvider timeProvider)
 {
+    // Шапка документов по сделке (акт сверки, график).
+    public Task<DealHeader> GetDealHeaderAsync(Guid dealId, CancellationToken ct) =>
+        db.Deals.AsNoTracking()
+            .Where(d => d.Id == dealId)
+            .Select(d => new DealHeader(d.Id, d.Apartment.Floor.Building.NameRu, d.Apartment.Floor.Number,
+                d.Apartment.Number, d.Customer.FullName))
+            .SingleAsync(ct);
+
     public async Task<StatementData> BuildAsync(Guid dealId, DateOnly asOf, CancellationToken ct)
     {
-        var deal = await db.Deals.AsNoTracking()
-            .Where(d => d.Id == dealId)
-            .Select(d => new
-            {
-                d.Id, d.Currency, d.Customer.FullName,
-                Building = d.Apartment.Floor.Building.NameRu,
-                Floor = d.Apartment.Floor.Number,
-                Apartment = d.Apartment.Number
-            })
-            .SingleAsync(ct);
+        var deal = await GetDealHeaderAsync(dealId, ct);
+        var currency = await db.Deals.Where(d => d.Id == dealId).Select(d => d.Currency).SingleAsync(ct);
 
         var plan = await db.PaymentPlans.AsNoTracking().Include(p => p.Items)
                        .FirstOrDefaultAsync(p => p.DealId == dealId, ct)
@@ -38,12 +38,12 @@ public class StatementService(AppDbContext db, IPdfGenerator pdf, TimeProvider t
         return new StatementData(
             asOf,
             timeProvider.GetUtcNow().UtcDateTime,
-            deal.Building,
-            deal.Floor,
-            deal.Apartment,
-            deal.FullName,
-            deal.Id,
-            deal.Currency,
+            deal.BuildingName,
+            deal.FloorNumber,
+            deal.ApartmentNumber,
+            deal.CustomerName,
+            deal.DealId,
+            currency,
             plan.Total,
             accrued,
             paid,
@@ -53,4 +53,10 @@ public class StatementService(AppDbContext db, IPdfGenerator pdf, TimeProvider t
     }
 
     public byte[] Render(StatementData data) => pdf.RenderStatement(data);
+
+    public async Task<byte[]> RenderScheduleAsync(Guid dealId, ScheduleResponse schedule, DateOnly asOf, CancellationToken ct)
+    {
+        var header = await GetDealHeaderAsync(dealId, ct);
+        return pdf.RenderSchedule(new ScheduleDocumentData(header, schedule, asOf, timeProvider.GetUtcNow().UtcDateTime));
+    }
 }

@@ -104,6 +104,13 @@ public class PaymentService(
             plan.DownPaymentPct, plan.Months, plan.PaymentDay, plan.StartDate, items, payments, equivalent);
     }
 
+    public async Task<byte[]> GetSchedulePdfAsync(Guid dealId, CancellationToken ct = default)
+    {
+        // GetScheduleAsync сам проверяет, что сделка своя.
+        var schedule = await GetScheduleAsync(dealId, ct);
+        return await statements.RenderScheduleAsync(dealId, schedule, Today, ct);
+    }
+
     // Перевод суммы из валюты договора во вторую валюту; null, если курса USD ещё нет.
     private static Func<decimal, decimal>? EquivalentConverter(Currency dealCurrency, RateResponse? usdRate)
     {

@@ -23,4 +23,5 @@ public interface IFileStorage
 public interface IPdfGenerator
 {
     byte[] RenderStatement(StatementData data);
+    byte[] RenderSchedule(ScheduleDocumentData data);
 }

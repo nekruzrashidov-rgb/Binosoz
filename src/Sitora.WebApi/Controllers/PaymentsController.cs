@@ -24,6 +24,14 @@ public class PaymentsController(IPaymentService payments) : ControllerBase
     public Task<ScheduleResponse> Schedule(Guid dealId, CancellationToken ct) =>
         payments.GetScheduleAsync(dealId, ct);
 
+    /// <summary>График платежей в PDF; при наличии курса — с оценочным эквивалентом во второй валюте.</summary>
+    [HttpGet("deals/{dealId:guid}/schedule.pdf")]
+    [Authorize(Roles = Roles.DealViewers)]
+    [Produces("application/pdf")]
+    [ProducesResponseType<FileContentResult>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> SchedulePdf(Guid dealId, CancellationToken ct) =>
+        File(await payments.GetSchedulePdfAsync(dealId, ct), "application/pdf", "grafik-platezhey.pdf");
+
     [HttpPost("deals/{dealId:guid}/payments")]
     [Authorize(Roles = Roles.Accounting)]
     [ProducesResponseType<PaymentResponse>(StatusCodes.Status201Created)]

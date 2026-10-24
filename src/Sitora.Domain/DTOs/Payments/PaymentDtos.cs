@@ -69,6 +69,11 @@ public record SetRateRequest(DateOnly Date, Currency Currency, decimal RateToTjs
 
 public record StatementPayment(DateOnly PaidAt, decimal Amount, Currency Currency, decimal? RateUsed, decimal AmountInDealCurrency, bool IsReversal);
 
+public record DealHeader(Guid DealId, string BuildingName, int FloorNumber, int ApartmentNumber, string CustomerName);
+
+// Данные PDF графика платежей: шапка сделки и тот же график, что отдаёт GET /deals/{id}/schedule.
+public record ScheduleDocumentData(DealHeader Deal, ScheduleResponse Schedule, DateOnly AsOf, DateTime GeneratedAtUtc);
+
 // Данные акта сверки на дату; по ним строится PDF.
 public record StatementData(
     DateOnly AsOf,

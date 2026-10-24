@@ -111,7 +111,7 @@ Caddy сам получает сертификат HTTPS. Бэкап — `./scri
 | `GET /crm/summary`, `/crm/pipeline` | Manager, Admin |
 | `GET /me/deals` | покупатель |
 | `POST /deals/{id}/plan` | Manager, Admin |
-| `GET /deals/{id}/schedule`, `/deals/{id}/statement.pdf?date=…` | владелец сделки, Manager, Accountant, Admin |
+| `GET /deals/{id}/schedule`, `/deals/{id}/schedule.pdf`, `/deals/{id}/statement.pdf?date=…` | владелец сделки, Manager, Accountant, Admin |
 | `POST /deals/{id}/payments`, `/payments/{id}/reverse` | Accountant, Admin |
 | `GET /rates/current` | все |
 | `PUT /rates` | Accountant, Admin |
