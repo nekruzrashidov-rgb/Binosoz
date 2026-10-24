@@ -7,4 +7,5 @@ public interface IUserService
 {
     Task<PagedResult<UserResponse>> GetAsync(int page, int pageSize, CancellationToken ct = default);
     Task<UserResponse> CreateAsync(CreateUserRequest request, CancellationToken ct = default);
+    Task<UserResponse> SetStatusAsync(Guid id, SetUserStatusRequest request, CancellationToken ct = default);
 }

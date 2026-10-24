@@ -29,6 +29,8 @@ public static class DatabaseInitializer
         var db = provider.GetRequiredService<AppDbContext>();
         await db.Database.MigrateAsync();
         await SeedRolesAsync(provider.GetRequiredService<RoleManager<IdentityRole<Guid>>>());
+        await BootstrapAdminAsync(provider.GetRequiredService<UserManager<AppUser>>(),
+            provider.GetRequiredService<IConfiguration>(), logger);
 
         if (provider.GetRequiredService<IHostEnvironment>().IsDevelopment())
         {
@@ -52,6 +54,26 @@ public static class DatabaseInitializer
             if (!await roleManager.RoleExistsAsync(role))
                 await roleManager.CreateAsync(new IdentityRole<Guid>(role));
         }
+    }
+
+    // Первый администратор в любом окружении: создаётся, только пока в базе нет ни одного админа.
+    // После первого запуска переменные BOOTSTRAP_ADMIN_* можно убрать из .env.
+    private static async Task BootstrapAdminAsync(UserManager<AppUser> userManager, IConfiguration configuration, ILogger logger)
+    {
+        var email = configuration["BOOTSTRAP_ADMIN_EMAIL"];
+        var password = configuration["BOOTSTRAP_ADMIN_PASSWORD"];
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+            return;
+        if ((await userManager.GetUsersInRoleAsync(RoleNames.Admin)).Count > 0)
+            return;
+
+        var user = new AppUser { UserName = email, Email = email, EmailConfirmed = true, FullName = "Администратор" };
+        var result = await userManager.CreateAsync(user, password);
+        if (!result.Succeeded)
+            throw new InvalidOperationException("Не удалось создать первого администратора: " +
+                                                string.Join("; ", result.Errors.Select(e => e.Description)));
+        await userManager.AddToRoleAsync(user, RoleNames.Admin);
+        logger.LogInformation("Создан первый администратор {Email}", email);
     }
 
     private static async Task SeedDevelopmentUsersAsync(UserManager<AppUser> userManager, IConfiguration configuration, ILogger logger)

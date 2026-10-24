@@ -24,6 +24,7 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public const string ManagerEmail = "manager@sitora.local";
     public const string ContentEmail = "content@sitora.local";
     public const string AccountantEmail = "accountant@sitora.local";
+    public const string AllowedOrigin = "https://sitora.test";
 
     static SitoraApiFactory()
     {
@@ -116,6 +117,12 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("SEED_ACCOUNTANT_PASSWORD", AccountantPassword);
         builder.UseSetting("Encryption:Key", _encryptionKey);
         builder.UseSetting("Storage:RootPath", _storagePath);
+        builder.UseSetting("Cors:AllowedOrigins:0", AllowedOrigin);
+        // Все запросы TestServer идут «с одного IP», поэтому лимиты для обычных тестов снимаем;
+        // сами лимиты проверяет RateLimitTests со своей фабрикой.
+        builder.UseSetting("RateLimiting:LoginPerMinute", "1000000");
+        builder.UseSetting("RateLimiting:SmsPerHour", "1000000");
+        builder.UseSetting("RateLimiting:PublicFormsPerHour", "1000000");
         builder.ConfigureTestServices(services => services.AddSingleton<ISmsSender>(Sms));
     }
 

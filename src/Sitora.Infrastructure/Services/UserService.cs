@@ -11,7 +11,12 @@ using Sitora.Infrastructure.Data;
 
 namespace Sitora.Infrastructure.Services;
 
-public class UserService(AppDbContext db, UserManager<AppUser> userManager, IAuditService audit) : IUserService
+public class UserService(
+    AppDbContext db,
+    UserManager<AppUser> userManager,
+    ICurrentUser currentUser,
+    IAuditService audit,
+    TimeProvider timeProvider) : IUserService
 {
     private static readonly string[] StaffRoles = [RoleNames.Admin, RoleNames.Manager, RoleNames.Accountant, RoleNames.Content];
 
@@ -59,5 +64,29 @@ public class UserService(AppDbContext db, UserManager<AppUser> userManager, IAud
         await db.SaveChangesAsync(ct);
 
         return new UserResponse(user.Id, user.Email, user.PhoneNumber, user.FullName, [request.Role], user.IsActive, user.CreatedAt);
+    }
+
+    public async Task<UserResponse> SetStatusAsync(Guid id, SetUserStatusRequest request, CancellationToken ct = default)
+    {
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == id, ct)
+            ?? throw new NotFoundException("Пользователь не найден");
+        if (!request.IsActive && currentUser.UserId == id)
+            throw new BusinessRuleException("Нельзя заблокировать самого себя");
+
+        var before = new { user.IsActive };
+        user.IsActive = request.IsActive;
+        audit.Record(nameof(AppUser), user.Id, request.IsActive ? "Unblocked" : "Blocked", before, new { user.IsActive });
+        await db.SaveChangesAsync(ct);
+
+        // Заблокированный пользователь сразу теряет все refresh-токены.
+        if (!request.IsActive)
+        {
+            var now = timeProvider.GetUtcNow().UtcDateTime;
+            await db.RefreshTokens.Where(t => t.UserId == id && t.RevokedAt == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, now), ct);
+        }
+
+        var roles = await userManager.GetRolesAsync(user);
+        return new UserResponse(user.Id, user.Email, user.PhoneNumber, user.FullName, roles.ToList(), user.IsActive, user.CreatedAt);
     }
 }

@@ -1,0 +1,5 @@
+# Скрипты и конфиги для Linux-сервера всегда с LF, иначе bash и Caddy их не прочитают.
+*.sh text eol=lf
+Caddyfile text eol=lf
+*.yml text eol=lf
+Dockerfile text eol=lf

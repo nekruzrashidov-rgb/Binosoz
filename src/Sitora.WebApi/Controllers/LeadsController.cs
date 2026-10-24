@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Sitora.WebApi.Extensions;
 using Sitora.Domain.DTOs.Common;
 using Sitora.Domain.DTOs.Sales;
 using Sitora.Domain.Enums;
@@ -15,6 +17,7 @@ public class LeadsController(ILeadService leads) : ControllerBase
     /// <summary>Заявка с сайта; вход не нужен.</summary>
     [HttpPost]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.PublicForms)]
     [ProducesResponseType<LeadResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<LeadResponse>> Create(CreateLeadRequest request, CancellationToken ct)

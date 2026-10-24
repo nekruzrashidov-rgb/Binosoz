@@ -21,4 +21,10 @@ public class UsersController(IUserService users) : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<UserResponse>> Create(CreateUserRequest request, CancellationToken ct) =>
         StatusCode(StatusCodes.Status201Created, await users.CreateAsync(request, ct));
+
+    /// <summary>Заблокировать или разблокировать пользователя; при блокировке отзываются все его сессии.</summary>
+    [HttpPatch("{id:guid}/status")]
+    [ProducesResponseType<UserResponse>(StatusCodes.Status200OK)]
+    public Task<UserResponse> SetStatus(Guid id, SetUserStatusRequest request, CancellationToken ct) =>
+        users.SetStatusAsync(id, request, ct);
 }

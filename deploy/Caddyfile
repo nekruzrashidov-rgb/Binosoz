@@ -1,0 +1,16 @@
+# Caddy получает и продлевает сертификат Let's Encrypt для API_DOMAIN сам,
+# перенаправляет HTTP на HTTPS и проксирует запросы (включая WebSocket для /hubs) в API.
+{$API_DOMAIN} {
+	encode zstd gzip
+
+	request_body {
+		max_size 25MB
+	}
+
+	reverse_proxy webapi:8080
+
+	log {
+		output stdout
+		format json
+	}
+}

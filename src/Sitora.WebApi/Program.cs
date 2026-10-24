@@ -19,6 +19,7 @@ using Sitora.WebApi.Hubs;
 using Sitora.WebApi.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
 
 builder.Services.AddSerilog((services, logger) => logger
     .ReadFrom.Configuration(builder.Configuration)
@@ -77,6 +78,17 @@ if (builder.Configuration.GetValue("Hangfire:ServerEnabled", true))
 
 builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>();
 
+builder.Services.AddSitoraRateLimiting();
+builder.Services.AddSitoraCors();
+var forwardedHeadersEnabled = builder.Configuration.GetValue("ForwardedHeaders:Enabled", false);
+if (forwardedHeadersEnabled)
+    builder.Services.AddSitoraForwardedHeaders();
+if (builder.Environment.IsProduction())
+{
+    builder.Services.AddHsts(options => options.MaxAge = TimeSpan.FromDays(365));
+    builder.Services.AddHttpsRedirection(options => options.HttpsPort = 443);
+}
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -96,9 +108,19 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
+if (forwardedHeadersEnabled)
+    app.UseForwardedHeaders();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseSerilogRequestLogging();
+
+// В продакшене TLS завершает обратный прокси; приложение только требует HTTPS и шлёт HSTS.
+if (app.Environment.IsProduction())
+{
+    app.UseHsts();
+    app.UseHttpsRedirection();
+}
 
 app.UseRequestLocalization(options => options
     .SetDefaultCulture("ru")
@@ -111,8 +133,10 @@ if (!app.Environment.IsProduction())
     app.UseSwaggerUI();
 }
 
+app.UseCors(SecuritySetup.CorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");

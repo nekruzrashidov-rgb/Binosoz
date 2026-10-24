@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Sitora.WebApi.Extensions;
 using Sitora.Domain.DTOs.Sales;
 using Sitora.Domain.Interfaces;
 
@@ -13,6 +15,7 @@ public class BookingsController(IBookingService bookings) : ControllerBase
     /// <summary>Бронь на 48 часов. Гость указывает имя и телефон, менеджер может указать клиента.</summary>
     [HttpPost("apartments/{apartmentId:guid}/bookings")]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.PublicForms)]
     [ProducesResponseType<BookingResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<BookingResponse>> Create(Guid apartmentId, CreateBookingRequest request, CancellationToken ct)
