@@ -121,8 +121,16 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
+var migrateOnly = args.Contains(DatabaseInitializer.MigrateCommand);
+var missingSettings = RequiredSettings.Missing(app.Configuration, migrateOnly, app.Environment.IsDevelopment());
+if (missingSettings.Count > 0)
+{
+    app.Logger.LogCritical("{Reason}", RequiredSettings.Message(missingSettings));
+    return 1;
+}
+
 // Режим команды при деплое: применить миграции, создать роли и первого админа и выйти, не поднимая сервер.
-if (args.Contains(DatabaseInitializer.MigrateCommand))
+if (migrateOnly)
 {
     await app.Services.InitializeDatabaseAsync();
     app.Logger.LogInformation("Миграции применены, база готова");
