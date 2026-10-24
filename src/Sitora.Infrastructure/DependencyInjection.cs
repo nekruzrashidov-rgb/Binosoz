@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Sitora.Domain.Entities;
 using Sitora.Domain.Interfaces;
 using Sitora.Infrastructure.Data;
+using Sitora.Infrastructure.Integrations;
 using Sitora.Infrastructure.Security;
 using Sitora.Infrastructure.Services;
 
@@ -42,8 +43,17 @@ public static class DependencyInjection
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        services.AddMemoryCache();
+        services.AddSingleton<CatalogCache>();
+
         services.AddScoped<JwtTokenService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IAuditService, AuditService>();
+        services.AddScoped<ApartmentImporter>();
+        services.AddScoped<ICatalogService, CatalogService>();
+        services.AddScoped<ILeadService, LeadService>();
+
+        services.AddScoped<INotificationSender, TelegramNotificationSender>();
 
         return services;
     }

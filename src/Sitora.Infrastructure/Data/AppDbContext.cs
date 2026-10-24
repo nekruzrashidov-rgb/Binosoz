@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Sitora.Domain.Entities;
+using Sitora.Domain.Enums;
 
 namespace Sitora.Infrastructure.Data;
 
@@ -9,6 +10,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider t
     : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>(options)
 {
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<Building> Buildings => Set<Building>();
+    public DbSet<Floor> Floors => Set<Floor>();
+    public DbSet<Apartment> Apartments => Set<Apartment>();
+    public DbSet<Lead> Leads => Set<Lead>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -28,6 +35,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider t
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         configurationBuilder.Properties<decimal>().HavePrecision(18, 2);
+
+        // Перечисления храним строками: так данные читаются в SQL и работают частичные индексы по статусу.
+        configurationBuilder.Properties<ApartmentStatus>().HaveConversion<string>().HaveMaxLength(32);
+        configurationBuilder.Properties<Currency>().HaveConversion<string>().HaveMaxLength(3);
+        configurationBuilder.Properties<LeadStatus>().HaveConversion<string>().HaveMaxLength(32);
+        configurationBuilder.Properties<LeadSource>().HaveConversion<string>().HaveMaxLength(32);
     }
 
     public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)

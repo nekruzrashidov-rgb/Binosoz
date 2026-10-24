@@ -60,6 +60,22 @@ dotnet test
 
 В docker-compose эти значения берутся из `.env` (`POSTGRES_PASSWORD`, `JWT_KEY`, `SEED_*`).
 
+## Что уже есть в API
+
+| Метод и путь | Доступ |
+| --- | --- |
+| `POST /api/v1/auth/login`, `/refresh`, `/logout`, `GET /auth/me` | все / вошедшие |
+| `GET /api/v1/buildings`, `/buildings/{id}`, `/buildings/{id}/floors` | гость |
+| `GET /api/v1/floors/{id}/apartments`, `/apartments/{id}` | гость |
+| `POST`, `PUT /api/v1/buildings`, `/floors`, `/apartments` | Content, Admin |
+| `PATCH /api/v1/apartments/{id}/on-request` | Content, Admin |
+| `POST /api/v1/apartments/import?buildingId=…` (файл `.xlsx`) | Content, Admin |
+| `POST /api/v1/leads` | гость |
+
+Формат Excel для импорта: первая строка — заголовки, столбцы A–E: этаж, номер квартиры, комнат (0 — студия), площадь, цена за м².
+
+В Development сидер создаёт дом «Sitora Residence»: коммерческий этаж 0 и 16 жилых этажей по 8 квартир.
+
 ## Структура
 
 ```

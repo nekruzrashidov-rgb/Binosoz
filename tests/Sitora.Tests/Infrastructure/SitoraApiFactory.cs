@@ -1,7 +1,12 @@
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
+using Sitora.Domain.DTOs.Auth;
+using Sitora.Infrastructure.Data;
 using Testcontainers.PostgreSql;
 
 namespace Sitora.Tests.Infrastructure;
@@ -13,10 +18,31 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public const string AdminEmail = "admin@sitora.local";
     public const string ManagerEmail = "manager@sitora.local";
+    public const string ContentEmail = "content@sitora.local";
 
     // Тестовые пароли генерируются на каждый прогон и нигде не хранятся.
     public string AdminPassword { get; } = GeneratePassword();
     public string ManagerPassword { get; } = GeneratePassword();
+    public string ContentPassword { get; } = GeneratePassword();
+
+    public Task<HttpClient> CreateManagerClientAsync() => CreateClientForAsync(ManagerEmail, ManagerPassword);
+    public Task<HttpClient> CreateContentClientAsync() => CreateClientForAsync(ContentEmail, ContentPassword);
+
+    public async Task<HttpClient> CreateClientForAsync(string email, string password)
+    {
+        var client = CreateClient();
+        var response = await client.PostAsJsonAsync("/api/v1/auth/login", new LoginRequest(email, password));
+        response.EnsureSuccessStatusCode();
+        var auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
+        return client;
+    }
+
+    public async Task<T> WithDbAsync<T>(Func<AppDbContext, Task<T>> action)
+    {
+        using var scope = Services.CreateScope();
+        return await action(scope.ServiceProvider.GetRequiredService<AppDbContext>());
+    }
 
     private readonly string _jwtKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
     private PostgreSqlContainer? _container;
@@ -48,6 +74,7 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Jwt:Key", _jwtKey);
         builder.UseSetting("SEED_ADMIN_PASSWORD", AdminPassword);
         builder.UseSetting("SEED_MANAGER_PASSWORD", ManagerPassword);
+        builder.UseSetting("SEED_CONTENT_PASSWORD", ContentPassword);
     }
 
     async Task IAsyncLifetime.DisposeAsync()

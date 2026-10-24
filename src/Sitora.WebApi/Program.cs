@@ -8,10 +8,12 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Serilog;
 using SharpGrip.FluentValidation.AutoValidation.Mvc.Extensions;
+using Sitora.Domain.Interfaces;
 using Sitora.Infrastructure;
 using Sitora.Infrastructure.Data;
 using Sitora.Infrastructure.Data.Seed;
 using Sitora.Infrastructure.Security;
+using Sitora.WebApi.Extensions;
 using Sitora.WebApi.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -22,6 +24,8 @@ builder.Services.AddSerilog((services, logger) => logger
     .Enrich.FromLogContext());
 
 builder.Services.AddInfrastructure();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 
 builder.Services.AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));

@@ -25,7 +25,8 @@ public static class DatabaseInitializer
         var provider = scope.ServiceProvider;
         var logger = provider.GetRequiredService<ILoggerFactory>().CreateLogger(nameof(DatabaseInitializer));
 
-        await provider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+        var db = provider.GetRequiredService<AppDbContext>();
+        await db.Database.MigrateAsync();
         await SeedRolesAsync(provider.GetRequiredService<RoleManager<IdentityRole<Guid>>>());
 
         if (provider.GetRequiredService<IHostEnvironment>().IsDevelopment())
@@ -34,6 +35,7 @@ public static class DatabaseInitializer
                 provider.GetRequiredService<UserManager<AppUser>>(),
                 provider.GetRequiredService<IConfiguration>(),
                 logger);
+            await CatalogSeeder.SeedAsync(db, logger);
         }
     }
 
