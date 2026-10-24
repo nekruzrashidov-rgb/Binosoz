@@ -39,7 +39,7 @@ export SEED_ADMIN_PASSWORD="<пароль админа>"
 dotnet run --project src/Sitora.WebApi
 ```
 
-Миграции применяются при старте. Новая миграция:
+В Development и Staging миграции применяются при старте API. В Production — только отдельной командой `dotnet Sitora.WebApi.dll --migrate` (в prod-compose это сервис `migrate`); без неё API не стартует. Новая миграция:
 
 ```bash
 dotnet tool restore
@@ -85,7 +85,8 @@ Caddy сам получает сертификат HTTPS. Бэкап — `./scri
 | `RateLimiting__LoginPerMinute`, `__SmsPerHour`, `__PublicFormsPerHour` | лимиты на один IP (по умолчанию 10, 20, 30) |
 | `Storage__RootPath` | папка для документов и фото (по умолчанию `./storage`, в Docker — том `files`) |
 | `Hangfire__ServerEnabled` | `false` выключает фоновые задачи в этом экземпляре |
-| `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` | первый администратор в любом окружении, если админов ещё нет |
+| `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` | первый администратор в любом окружении, если админов ещё нет (в Production создаётся командой `--migrate`) |
+| `Database__MigrateOnStartup` | применять миграции при старте API; по умолчанию `true`, в Production `false` |
 | `SEED_ADMIN_PASSWORD`, `SEED_MANAGER_PASSWORD`, `SEED_ACCOUNTANT_PASSWORD`, `SEED_CONTENT_PASSWORD` | пароли пользователей сидера (только Development) |
 
 В docker-compose эти значения берутся из `.env`; образец — [.env.example](.env.example).
@@ -138,7 +139,7 @@ Caddy сам получает сертификат HTTPS. Бэкап — `./scri
 - **Выданный access-токен** заблокированного пользователя действует до 15 минут; refresh-токены отзываются сразу.
 - **Нет** смены и сброса пароля сотрудниками, дашборда Hangfire, онлайн-оплаты, мобильного приложения и нескольких застройщиков (последние три — вне MVP по ТЗ).
 - Телефоны принимаются только таджикские (`+992`), валюты договора — TJS и USD.
-- Миграции применяются автоматически при старте API; перед обновлением в продакшене делайте бэкап (см. DEPLOY.md).
+- Миграции в продакшене применяются отдельной командой при деплое; отменить их можно только восстановлением из бэкапа, поэтому перед обновлением делайте бэкап (см. DEPLOY.md).
 
 ## Структура
 

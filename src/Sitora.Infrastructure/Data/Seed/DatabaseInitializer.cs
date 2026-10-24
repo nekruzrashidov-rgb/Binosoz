@@ -20,6 +20,26 @@ public static class DatabaseInitializer
         ("content@sitora.local", "Контент-менеджер", RoleNames.Content, "SEED_CONTENT_PASSWORD")
     ];
 
+    public const string MigrateCommand = "--migrate";
+
+    // Обычный старт без миграций (Production): база должна быть уже обновлена командой --migrate.
+    // Падаем сразу и понятно, а не на первом запросе к несуществующей таблице.
+    public static async Task EnsureDatabaseUpToDateAsync(this IServiceProvider services)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        if (!await db.Database.CanConnectAsync())
+            throw new InvalidOperationException(
+                $"Нет подключения к базе или она ещё не создана. Примените миграции: dotnet Sitora.WebApi.dll {MigrateCommand}");
+
+        var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
+        if (pending.Count > 0)
+            throw new InvalidOperationException(
+                $"В базе есть неприменённые миграции ({string.Join(", ", pending)}). " +
+                $"Примените их: dotnet Sitora.WebApi.dll {MigrateCommand}");
+    }
+
     public static async Task InitializeDatabaseAsync(this IServiceProvider services)
     {
         await using var scope = services.CreateAsyncScope();

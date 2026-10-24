@@ -20,10 +20,27 @@ services:
       timeout: 5s
       retries: 10
 
-  webapi:
+  # Отдельная команда деплоя: применяет миграции, создаёт роли и первого админа и завершается.
+  # API в Production миграции сам не применяет и без неё не стартует.
+  migrate:
     build:
       context: .
       dockerfile: src/Sitora.WebApi/Dockerfile
+    image: sitora-webapi:latest
+    command: ["--migrate"]
+    restart: "no"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: Host=db;Port=5432;Database=sitora;Username=sitora;Password=${POSTGRES_PASSWORD}
+      Jwt__Key: ${JWT_KEY:?Задайте JWT_KEY в файле .env}
+      Encryption__Key: ${ENCRYPTION_KEY:?Задайте ENCRYPTION_KEY в файле .env}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  webapi:
     image: sitora-webapi:latest
     restart: unless-stopped
     environment:
@@ -36,13 +53,13 @@ services:
       Cors__AllowedOrigins__1: ${CRM_ORIGIN:-}
       # API доступен только через Caddy, поэтому заголовкам X-Forwarded-* можно доверять.
       ForwardedHeaders__Enabled: "true"
-      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
-      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
     volumes:
       - files:/app/storage
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   caddy:
     image: caddy:2

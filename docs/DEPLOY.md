@@ -69,17 +69,24 @@ chmod 600 .env
 
 ## 3. Запуск
 
+Сначала соберите образ и примените миграции отдельной командой. Сервис `migrate` применяет миграции, создаёт роли и первого администратора (из `BOOTSTRAP_ADMIN_*`), после чего завершается:
+
 ```bash
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml build migrate
+docker compose -f docker-compose.prod.yml run --rm migrate
+```
+
+Затем запустите всё остальное:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.prod.yml ps
 docker compose -f docker-compose.prod.yml logs -f webapi
 ```
 
-При старте API применяет миграции и создаёт первого администратора. После первого успешного входа удалите строки `BOOTSTRAP_ADMIN_*` из `.env` и перезапустите API:
+`up` тоже запускает `migrate` перед API и стартует API только после его успешного завершения. Сам API в Production миграции не применяет: если база не обновлена, он не стартует и пишет в лог команду, которую нужно выполнить.
 
-```bash
-docker compose -f docker-compose.prod.yml up -d webapi
-```
+После первого успешного входа администратора удалите строки `BOOTSTRAP_ADMIN_*` из `.env`. Повторно админ всё равно не создаётся, пока в базе есть хотя бы один.
 
 ## 4. Проверка после деплоя
 
@@ -134,11 +141,13 @@ cd /opt/sitora
 cd /opt/sitora
 ./scripts/backup.sh
 git pull
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml build migrate
+docker compose -f docker-compose.prod.yml run --rm migrate
+docker compose -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.prod.yml logs -f webapi
 ```
 
-Миграции применяются автоматически при старте API, поэтому бэкап перед обновлением обязателен.
+Если `migrate` завершился с ошибкой, API продолжает работать на старой версии. Разберитесь с ошибкой по выводу команды, прежде чем запускать `up`. Бэкап перед обновлением обязателен: миграцию нельзя отменить без восстановления базы.
 
 ## 8. Откат
 

@@ -128,6 +128,8 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public FakeSmsSender Sms { get; } = new();
 
+    public string ConnectionString => _connectionString;
+
     // Входит как покупатель с этим телефоном через SMS-код.
     public async Task<HttpClient> CreateCustomerClientAsync(string phone)
     {

@@ -86,6 +86,8 @@ public class ProductionFactory : SitoraApiFactory
     {
         base.ConfigureWebHost(builder);
         builder.UseEnvironment("Production");
+        // В Production API сам миграции не применяет; тесту нужна готовая база.
+        builder.UseSetting("Database:MigrateOnStartup", "true");
     }
 }
 

@@ -108,6 +108,14 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
+// Режим команды при деплое: применить миграции, создать роли и первого админа и выйти, не поднимая сервер.
+if (args.Contains(DatabaseInitializer.MigrateCommand))
+{
+    await app.Services.InitializeDatabaseAsync();
+    app.Logger.LogInformation("Миграции применены, база готова");
+    return;
+}
+
 if (forwardedHeadersEnabled)
     app.UseForwardedHeaders();
 app.UseExceptionHandler();
@@ -142,7 +150,11 @@ app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
 app.MapHealthChecks("/health");
 
-await app.Services.InitializeDatabaseAsync();
+// В Production миграции применяются только отдельной командой --migrate (сервис migrate в docker-compose.prod.yml).
+if (app.Configuration.GetValue("Database:MigrateOnStartup", !app.Environment.IsProduction()))
+    await app.Services.InitializeDatabaseAsync();
+else
+    await app.Services.EnsureDatabaseUpToDateAsync();
 app.Services.ScheduleRecurringJobs();
 
 app.Run();
