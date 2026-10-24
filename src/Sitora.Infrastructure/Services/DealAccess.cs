@@ -19,4 +19,18 @@ public class DealAccess(AppDbContext db, ICurrentUser currentUser)
 
         return Task.FromResult(false);
     }
+
+    // Ход стройки видят сотрудники (включая контент-менеджера) и покупатели со сделкой в этом доме.
+    public Task<bool> CanViewBuildingProgressAsync(Guid buildingId, CancellationToken ct)
+    {
+        if (currentUser.IsDealStaff || currentUser.IsInRole(RoleNames.Content))
+            return db.Buildings.AnyAsync(b => b.Id == buildingId, ct);
+
+        if (currentUser.IsInRole(RoleNames.Customer) && currentUser.UserId is { } userId)
+            return db.Deals.AnyAsync(d => d.Customer.UserId == userId
+                                          && d.Stage != DealStage.Cancelled
+                                          && d.Apartment.Floor.BuildingId == buildingId, ct);
+
+        return Task.FromResult(false);
+    }
 }

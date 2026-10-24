@@ -15,6 +15,7 @@ using Sitora.Infrastructure.Data;
 using Sitora.Infrastructure.Data.Seed;
 using Sitora.Infrastructure.Security;
 using Sitora.WebApi.Extensions;
+using Sitora.WebApi.Hubs;
 using Sitora.WebApi.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,7 +27,10 @@ builder.Services.AddSerilog((services, logger) => logger
 
 builder.Services.AddInfrastructure();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<HubCaller>();
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
+builder.Services.AddSignalR();
+builder.Services.AddScoped<IChatNotifier, SignalRChatNotifier>();
 
 builder.Services.AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
@@ -51,6 +55,18 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
             NameClaimType = JwtRegisteredClaimNames.Name,
             RoleClaimType = JwtTokenService.RoleClaimType,
             ClockSkew = TimeSpan.FromSeconds(30)
+        };
+        // Браузер не умеет ставить заголовок Authorization для WebSocket, поэтому для хабов
+        // токен принимается и из строки запроса (access_token).
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var token = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(token) && context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                    context.Token = token;
+                return Task.CompletedTask;
+            }
         };
     });
 builder.Services.AddAuthorization();
@@ -99,6 +115,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<ChatHub>("/hubs/chat");
 app.MapHealthChecks("/health");
 
 await app.Services.InitializeDatabaseAsync();

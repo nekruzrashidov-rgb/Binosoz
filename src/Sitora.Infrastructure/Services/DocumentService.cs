@@ -19,16 +19,6 @@ public class DocumentService(
 {
     public const long MaxFileSize = 20 * 1024 * 1024;
 
-    // Разрешённые форматы и первые байты файла: расширение одно ничего не гарантирует.
-    private static readonly Dictionary<string, (string ContentType, byte[] Signature)> AllowedTypes = new(StringComparer.OrdinalIgnoreCase)
-    {
-        [".pdf"] = ("application/pdf", "%PDF"u8.ToArray()),
-        [".png"] = ("image/png", [0x89, 0x50, 0x4E, 0x47]),
-        [".jpg"] = ("image/jpeg", [0xFF, 0xD8, 0xFF]),
-        [".jpeg"] = ("image/jpeg", [0xFF, 0xD8, 0xFF]),
-        [".docx"] = ("application/vnd.openxmlformats-officedocument.wordprocessingml.document", [0x50, 0x4B, 0x03, 0x04])
-    };
-
     public async Task<IReadOnlyList<DocumentResponse>> GetAsync(Guid dealId, CancellationToken ct = default)
     {
         if (!await access.CanViewAsync(dealId, ct))
@@ -45,30 +35,22 @@ public class DocumentService(
     {
         if (!await access.CanViewAsync(dealId, ct))
             throw new NotFoundException("Сделка не найдена");
-        if (request.Length is <= 0 or > MaxFileSize)
-            throw new BusinessRuleException($"Размер файла должен быть от 1 байта до {MaxFileSize / 1024 / 1024} МБ");
 
-        var extension = Path.GetExtension(request.FileName);
-        if (!AllowedTypes.TryGetValue(extension, out var type))
-            throw new BusinessRuleException("Допустимые форматы: PDF, PNG, JPG, DOCX");
-
-        using var buffer = new MemoryStream();
-        await request.Content.CopyToAsync(buffer, ct);
-        if (!buffer.GetBuffer().AsSpan(0, (int)buffer.Length).StartsWith(type.Signature))
-            throw new BusinessRuleException("Содержимое файла не соответствует его расширению");
-        buffer.Position = 0;
+        var (buffer, contentType, extension) = await FileTypes.ReadCheckedAsync(FileTypes.Documents,
+            request.FileName, request.Length, request.Content, MaxFileSize, "PDF, PNG, JPG, DOCX", ct);
+        await using var _ = buffer;
 
         var document = new Document
         {
             DealId = dealId,
             Type = request.Type,
             FileName = SafeFileName(request.FileName),
-            ContentType = type.ContentType,
+            ContentType = contentType,
             SizeBytes = buffer.Length,
             SignedAt = request.SignedAt,
             UploadedById = currentUser.UserId
         };
-        document.FileKey = $"documents/{dealId:N}/{document.Id:N}{extension.ToLowerInvariant()}";
+        document.FileKey = $"documents/{dealId:N}/{document.Id:N}{extension}";
 
         await storage.SaveAsync(document.FileKey, buffer, ct);
         db.Documents.Add(document);

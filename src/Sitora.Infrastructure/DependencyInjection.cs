@@ -66,6 +66,8 @@ public static class DependencyInjection
         services.AddScoped<StatementService>();
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<IDocumentService, DocumentService>();
+        services.AddScoped<IConstructionService, ConstructionService>();
+        services.AddScoped<IChatService, ChatService>();
 
         services.AddScoped<INotificationSender, TelegramNotificationSender>();
         services.AddSingleton<ISmsSender, SmsSender>();

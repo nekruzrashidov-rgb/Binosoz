@@ -1,12 +1,22 @@
+using System.Security.Claims;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Sitora.Domain.Interfaces;
 
 namespace Sitora.WebApi.Extensions;
 
-public class HttpCurrentUser(IHttpContextAccessor accessor) : ICurrentUser
+// Пользователь вызова хаба SignalR. Хаб кладёт сюда Context.User,
+// потому что HttpContext соединения в вызовах хаба надёжно не доступен.
+public class HubCaller
 {
-    public Guid? UserId =>
-        Guid.TryParse(accessor.HttpContext?.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value, out var id) ? id : null;
+    public ClaimsPrincipal? Principal { get; set; }
+}
 
-    public bool IsInRole(string role) => accessor.HttpContext?.User.IsInRole(role) ?? false;
+public class HttpCurrentUser(IHttpContextAccessor accessor, HubCaller hubCaller) : ICurrentUser
+{
+    private ClaimsPrincipal? Principal => hubCaller.Principal ?? accessor.HttpContext?.User;
+
+    public Guid? UserId =>
+        Guid.TryParse(Principal?.FindFirst(JwtRegisteredClaimNames.Sub)?.Value, out var id) ? id : null;
+
+    public bool IsInRole(string role) => Principal?.IsInRole(role) ?? false;
 }

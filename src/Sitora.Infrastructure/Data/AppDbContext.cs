@@ -25,6 +25,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider t
     public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
     public DbSet<Document> Documents => Set<Document>();
     public DbSet<SmsCode> SmsCodes => Set<SmsCode>();
+    public DbSet<ConstructionStage> ConstructionStages => Set<ConstructionStage>();
+    public DbSet<ConstructionPhoto> ConstructionPhotos => Set<ConstructionPhoto>();
+    public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

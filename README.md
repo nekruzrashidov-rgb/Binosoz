@@ -93,6 +93,13 @@ dotnet test
 | `GET /api/v1/deals/{id}/documents`, `/documents/{id}/download` | владелец сделки, Manager, Accountant, Admin |
 | `POST /api/v1/deals/{id}/documents` (файл) | Manager, Accountant, Admin |
 
+| `GET /api/v1/buildings/{id}/stages`, `/construction/photos/{id}` | покупатель со сделкой в доме, сотрудники |
+| `POST /api/v1/buildings/{id}/stages`, `PUT /stages/{id}`, `POST /stages/{id}/photos` | Content, Admin |
+| `GET`, `POST /api/v1/deals/{id}/messages` | владелец сделки, Manager, Accountant, Admin |
+| SignalR `/hubs/chat` | владелец сделки, Manager, Accountant, Admin |
+
+Чат в реальном времени: подключитесь к `/hubs/chat` (JWT в заголовке или в `?access_token=`), вызовите `JoinDeal(dealId)` и слушайте событие `messageReceived`. Отправка — `SendMessage(dealId, text)` в хабе или `POST /deals/{id}/messages`.
+
 Покупатель входит так: `sms/send` с телефоном → код приходит в SMS (пока заглушка: код виден в логе API) → `sms/verify` с кодом.
 Для чужой сделки любой из адресов `/deals/{id}/…` отвечает 404.
 
@@ -100,7 +107,7 @@ dotnet test
 
 Формат Excel для импорта: первая строка — заголовки, столбцы A–E: этаж, номер квартиры, комнат (0 — студия), площадь, цена за м².
 
-В Development сидер создаёт дом «Sitora Residence» (коммерческий этаж 0 и 16 жилых этажей по 8 квартир), 10 выдуманных клиентов, 5 сделок на этапах от «Заявки» до «Оплаты» (у сделки на «Оплате» — график и три платежа) и 2 брони с сайта. Курс USD сидер не создаёт: его вводит бухгалтер через `PUT /api/v1/rates`.
+В Development сидер создаёт дом «Sitora Residence» (коммерческий этаж 0 и 16 жилых этажей по 8 квартир), 10 выдуманных клиентов, 5 сделок на этапах от «Заявки» до «Оплаты» (у сделки на «Оплате» — график и три платежа), 2 брони с сайта и 8 этапов стройки. Курс USD сидер не создаёт: его вводит бухгалтер через `PUT /api/v1/rates`.
 
 ## Структура
 

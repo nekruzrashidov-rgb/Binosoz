@@ -431,6 +431,119 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.ToTable("Buildings", (string)null);
                 });
 
+            modelBuilder.Entity("Sitora.Domain.Entities.ChatMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DealId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("FromCustomer")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SenderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SenderId");
+
+                    b.HasIndex("DealId", "CreatedAt");
+
+                    b.ToTable("ChatMessages", (string)null);
+                });
+
+            modelBuilder.Entity("Sitora.Domain.Entities.ConstructionPhoto", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Caption")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FileKey")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<Guid>("StageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("TakenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StageId", "TakenAt");
+
+                    b.ToTable("ConstructionPhotos", (string)null);
+                });
+
+            modelBuilder.Entity("Sitora.Domain.Entities.ConstructionStage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BuildingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("Percent")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BuildingId", "SortOrder");
+
+                    b.ToTable("ConstructionStages", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ConstructionStages_Percent", "\"Percent\" BETWEEN 0 AND 100");
+                        });
+                });
+
             modelBuilder.Entity("Sitora.Domain.Entities.Customer", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1060,6 +1173,47 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Navigation("Lead");
                 });
 
+            modelBuilder.Entity("Sitora.Domain.Entities.ChatMessage", b =>
+                {
+                    b.HasOne("Sitora.Domain.Entities.Deal", "Deal")
+                        .WithMany()
+                        .HasForeignKey("DealId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sitora.Domain.Entities.AppUser", "Sender")
+                        .WithMany()
+                        .HasForeignKey("SenderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Deal");
+
+                    b.Navigation("Sender");
+                });
+
+            modelBuilder.Entity("Sitora.Domain.Entities.ConstructionPhoto", b =>
+                {
+                    b.HasOne("Sitora.Domain.Entities.ConstructionStage", "Stage")
+                        .WithMany("Photos")
+                        .HasForeignKey("StageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Stage");
+                });
+
+            modelBuilder.Entity("Sitora.Domain.Entities.ConstructionStage", b =>
+                {
+                    b.HasOne("Sitora.Domain.Entities.Building", "Building")
+                        .WithMany()
+                        .HasForeignKey("BuildingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Building");
+                });
+
             modelBuilder.Entity("Sitora.Domain.Entities.Customer", b =>
                 {
                     b.HasOne("Sitora.Domain.Entities.AppUser", "User")
@@ -1210,6 +1364,11 @@ namespace Sitora.Infrastructure.Data.Migrations
             modelBuilder.Entity("Sitora.Domain.Entities.Building", b =>
                 {
                     b.Navigation("Floors");
+                });
+
+            modelBuilder.Entity("Sitora.Domain.Entities.ConstructionStage", b =>
+                {
+                    b.Navigation("Photos");
                 });
 
             modelBuilder.Entity("Sitora.Domain.Entities.Customer", b =>

@@ -41,6 +41,7 @@ public static class DatabaseInitializer
                 provider.GetRequiredService<EncryptionService>(),
                 provider.GetRequiredService<TimeProvider>(),
                 logger);
+            await ConstructionSeeder.SeedAsync(db);
         }
     }
 
