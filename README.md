@@ -60,6 +60,14 @@ export SITORA_TEST_DB="Host=localhost;Port=5432;Username=postgres;Password=..."
 dotnet test
 ```
 
+## CI
+
+[.github/workflows/ci.yml](.github/workflows/ci.yml) запускается на push в `main` и на pull request:
+- задача «Сборка и тесты» — сборка с `--warnaserror` и все тесты, PostgreSQL 18 поднимает Testcontainers;
+- задача «Docker-образ и compose» — сборка образа по `Dockerfile` и проверка обоих compose-файлов.
+
+Workflow ещё ни разу не запускался: у репозитория пока нет удалённого репозитория на GitHub.
+
 ## Продакшен
 
 Коротко: VPS с Docker, A-запись домена на сервер, `.env` по образцу и

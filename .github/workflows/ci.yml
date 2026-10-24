@@ -1,0 +1,68 @@
+# Сборка, тесты и проверка Docker-образа на каждый push в main и на каждый pull request.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Сборка и тесты
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Восстановление пакетов
+        run: dotnet restore
+
+      - name: Сборка
+        run: dotnet build --configuration Release --no-restore --warnaserror
+
+      # PostgreSQL 18 для тестов поднимает Testcontainers: Docker на раннере GitHub уже есть.
+      - name: Тесты
+        run: >
+          dotnet test --configuration Release --no-build
+          --logger "trx;LogFileName=results.trx"
+          --results-directory test-results
+
+      - name: Результаты тестов
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results
+
+  docker:
+    name: Docker-образ и compose
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Сборка образа (без публикации)
+        run: docker build --file src/Sitora.WebApi/Dockerfile --tag sitora-webapi:ci .
+
+      # Значения-заглушки нужны только для разбора файлов: compose требует обязательные переменные.
+      - name: Проверка compose-файлов
+        env:
+          POSTGRES_PASSWORD: ci
+          JWT_KEY: ci
+          ENCRYPTION_KEY: ci
+          API_DOMAIN: api.example.test
+          SITE_ORIGIN: https://example.test
+        run: |
+          docker compose -f docker-compose.yml config --quiet
+          docker compose -f docker-compose.prod.yml config --quiet
