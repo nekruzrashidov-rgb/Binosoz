@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Sitora.Domain.Entities;
 using Sitora.Domain.Enums;
+using Sitora.Infrastructure.Security;
 
 namespace Sitora.Infrastructure.Data.Seed;
 
@@ -36,6 +37,10 @@ public static class DatabaseInitializer
                 provider.GetRequiredService<IConfiguration>(),
                 logger);
             await CatalogSeeder.SeedAsync(db, logger);
+            await SalesSeeder.SeedAsync(db,
+                provider.GetRequiredService<EncryptionService>(),
+                provider.GetRequiredService<TimeProvider>(),
+                logger);
         }
     }
 

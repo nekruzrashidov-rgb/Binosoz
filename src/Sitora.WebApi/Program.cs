@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Serialization;
 using FluentValidation;
+using Hangfire;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -54,6 +55,10 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
     });
 builder.Services.AddAuthorization();
 
+// В тестах сервер фоновых задач выключают (Hangfire__ServerEnabled=false) и запускают задачи вручную.
+if (builder.Configuration.GetValue("Hangfire:ServerEnabled", true))
+    builder.Services.AddHangfireServer();
+
 builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>();
 
 builder.Services.AddEndpointsApiExplorer();
@@ -97,6 +102,7 @@ app.MapControllers();
 app.MapHealthChecks("/health");
 
 await app.Services.InitializeDatabaseAsync();
+app.Services.ScheduleRecurringJobs();
 
 app.Run();
 

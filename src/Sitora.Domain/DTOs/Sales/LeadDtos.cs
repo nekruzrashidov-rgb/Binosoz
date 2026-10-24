@@ -4,6 +4,9 @@ namespace Sitora.Domain.DTOs.Sales;
 
 public record CreateLeadRequest(string Name, string Phone, Guid? ApartmentId, LeadSource? Source, string? Comment);
 
+// null в поле — значение не меняется.
+public record UpdateLeadRequest(LeadStatus? Status, Guid? ManagerId, string? Comment);
+
 public record LeadResponse(
     Guid Id,
     string Name,

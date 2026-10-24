@@ -68,6 +68,13 @@ public class Apartment : BaseEntity
         Status = ApartmentStatus.Sold;
     }
 
+    // Сделка вернулась с этапа «Договор» назад: квартира снова только забронирована.
+    public void RevertSale()
+    {
+        EnsureStatus(ApartmentStatus.Sold, "Квартира не продана");
+        Status = ApartmentStatus.Booked;
+    }
+
     private void EnsureStatus(ApartmentStatus expected, string message)
     {
         if (Status != expected)

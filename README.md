@@ -24,6 +24,7 @@ curl http://localhost:8080/health
 ```bash
 export ConnectionStrings__Default="Host=localhost;Port=5432;Database=sitora;Username=...;Password=..."
 export Jwt__Key="<не короче 32 символов>"
+export Encryption__Key="<32 байта в base64>"
 export SEED_ADMIN_PASSWORD="<пароль админа>"
 dotnet run --project src/Sitora.WebApi
 ```
@@ -55,6 +56,8 @@ dotnet test
 | --- | --- |
 | `ConnectionStrings__Default` | строка подключения к PostgreSQL |
 | `Jwt__Key` | ключ подписи JWT, не короче 32 символов |
+| `Encryption__Key` | ключ шифрования паспортных данных, 32 байта в base64 (`openssl rand -base64 32`) |
+| `Hangfire__ServerEnabled` | `false` выключает фоновые задачи в этом экземпляре (по умолчанию включены) |
 | `ASPNETCORE_ENVIRONMENT` | `Development`, `Staging` или `Production` |
 | `SEED_ADMIN_PASSWORD`, `SEED_MANAGER_PASSWORD`, `SEED_ACCOUNTANT_PASSWORD`, `SEED_CONTENT_PASSWORD` | пароли пользователей сидера (только Development) |
 
@@ -71,10 +74,19 @@ dotnet test
 | `PATCH /api/v1/apartments/{id}/on-request` | Content, Admin |
 | `POST /api/v1/apartments/import?buildingId=…` (файл `.xlsx`) | Content, Admin |
 | `POST /api/v1/leads` | гость |
+| `GET /api/v1/leads`, `PATCH /leads/{id}` | Manager, Admin |
+| `POST /api/v1/apartments/{id}/bookings` | гость (имя и телефон), Manager (клиент) |
+| `POST /api/v1/bookings/{id}/extend`, `/bookings/{id}/cancel` | Manager, Admin |
+| `GET`, `POST /api/v1/customers`, `GET /customers/{id}` | Manager, Admin |
+| `GET`, `POST /api/v1/deals`, `GET /deals/{id}`, `PATCH /deals/{id}/stage` | Manager, Admin |
+| `GET /api/v1/crm/summary`, `/crm/pipeline` | Manager, Admin |
+| `GET /api/v1/audit` | Admin |
+
+Бронь живёт 48 часов; фоновая задача Hangfire раз в 5 минут снимает просроченные брони.
 
 Формат Excel для импорта: первая строка — заголовки, столбцы A–E: этаж, номер квартиры, комнат (0 — студия), площадь, цена за м².
 
-В Development сидер создаёт дом «Sitora Residence»: коммерческий этаж 0 и 16 жилых этажей по 8 квартир.
+В Development сидер создаёт дом «Sitora Residence» (коммерческий этаж 0 и 16 жилых этажей по 8 квартир), 10 выдуманных клиентов, 5 сделок на этапах от «Заявки» до «Оплаты» и 2 брони с сайта.
 
 ## Структура
 

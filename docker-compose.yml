@@ -26,6 +26,7 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ConnectionStrings__Default: Host=db;Port=5432;Database=sitora;Username=sitora;Password=${POSTGRES_PASSWORD}
       Jwt__Key: ${JWT_KEY:?Задайте JWT_KEY в файле .env}
+      Encryption__Key: ${ENCRYPTION_KEY:?Задайте ENCRYPTION_KEY в файле .env}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
       SEED_MANAGER_PASSWORD: ${SEED_MANAGER_PASSWORD:-}
       SEED_ACCOUNTANT_PASSWORD: ${SEED_ACCOUNTANT_PASSWORD:-}

@@ -4,8 +4,10 @@ using System.Security.Cryptography;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Sitora.Domain.DTOs.Auth;
+using Sitora.Domain.Enums;
 using Sitora.Infrastructure.Data;
 using Testcontainers.PostgreSql;
 
@@ -19,14 +21,47 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public const string AdminEmail = "admin@sitora.local";
     public const string ManagerEmail = "manager@sitora.local";
     public const string ContentEmail = "content@sitora.local";
+    public const string AccountantEmail = "accountant@sitora.local";
 
-    // Тестовые пароли генерируются на каждый прогон и нигде не хранятся.
+    static SitoraApiFactory()
+    {
+        // Program читает этот флаг до сборки хоста, поэтому задаём его переменной окружения.
+        // Фоновые задачи в тестах запускаются вручную.
+        Environment.SetEnvironmentVariable("Hangfire__ServerEnabled", "false");
+    }
+
+    // Тестовые пароли и ключи генерируются на каждый прогон и нигде не хранятся.
     public string AdminPassword { get; } = GeneratePassword();
     public string ManagerPassword { get; } = GeneratePassword();
     public string ContentPassword { get; } = GeneratePassword();
+    public string AccountantPassword { get; } = GeneratePassword();
 
+    public Task<HttpClient> CreateAdminClientAsync() => CreateClientForAsync(AdminEmail, AdminPassword);
     public Task<HttpClient> CreateManagerClientAsync() => CreateClientForAsync(ManagerEmail, ManagerPassword);
     public Task<HttpClient> CreateContentClientAsync() => CreateClientForAsync(ContentEmail, ContentPassword);
+    public Task<HttpClient> CreateAccountantClientAsync() => CreateClientForAsync(AccountantEmail, AccountantPassword);
+
+    // Свободная квартира из сидера, на которую нет открытой сделки.
+    public Task<Guid> FindFreeApartmentAsync() => WithDbAsync(db => db.Apartments
+        .Where(a => a.Status == ApartmentStatus.Free
+                    && !db.Deals.Any(d => d.ApartmentId == a.Id && d.Stage != DealStage.Cancelled))
+        .OrderBy(a => a.Floor.Number).ThenBy(a => a.Number)
+        .Select(a => a.Id)
+        .FirstAsync());
+
+    public static string RandomPhone() => "+99277" + Random.Shared.Next(1_000_000, 9_999_999);
+
+    public async Task WithDbAsync(Func<AppDbContext, Task> action)
+    {
+        using var scope = Services.CreateScope();
+        await action(scope.ServiceProvider.GetRequiredService<AppDbContext>());
+    }
+
+    public async Task WithServiceAsync<TService>(Func<TService, Task> action) where TService : notnull
+    {
+        using var scope = Services.CreateScope();
+        await action(scope.ServiceProvider.GetRequiredService<TService>());
+    }
 
     public async Task<HttpClient> CreateClientForAsync(string email, string password)
     {
@@ -45,6 +80,7 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     }
 
     private readonly string _jwtKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
+    private readonly string _encryptionKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
     private PostgreSqlContainer? _container;
     private string? _serverConnectionString;
     private string _connectionString = string.Empty;
@@ -75,6 +111,8 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("SEED_ADMIN_PASSWORD", AdminPassword);
         builder.UseSetting("SEED_MANAGER_PASSWORD", ManagerPassword);
         builder.UseSetting("SEED_CONTENT_PASSWORD", ContentPassword);
+        builder.UseSetting("SEED_ACCOUNTANT_PASSWORD", AccountantPassword);
+        builder.UseSetting("Encryption:Key", _encryptionKey);
     }
 
     async Task IAsyncLifetime.DisposeAsync()

@@ -1,3 +1,5 @@
+using Hangfire;
+using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -6,6 +8,7 @@ using Sitora.Domain.Entities;
 using Sitora.Domain.Interfaces;
 using Sitora.Infrastructure.Data;
 using Sitora.Infrastructure.Integrations;
+using Sitora.Infrastructure.Jobs;
 using Sitora.Infrastructure.Security;
 using Sitora.Infrastructure.Services;
 
@@ -19,13 +22,7 @@ public static class DependencyInjection
 
         // Строку подключения читаем при создании контекста, а не при регистрации,
         // чтобы её можно было подменить в тестах и окружениях.
-        services.AddDbContext<AppDbContext>((sp, options) =>
-        {
-            var connectionString = sp.GetRequiredService<IConfiguration>().GetConnectionString("Default");
-            if (string.IsNullOrWhiteSpace(connectionString))
-                throw new InvalidOperationException("Не задана строка подключения (переменная окружения ConnectionStrings__Default)");
-            options.UseNpgsql(connectionString);
-        });
+        services.AddDbContext<AppDbContext>((sp, options) => options.UseNpgsql(GetConnectionString(sp)));
 
         services.AddIdentityCore<AppUser>(options =>
             {
@@ -42,9 +39,14 @@ public static class DependencyInjection
             .BindConfiguration(JwtOptions.SectionName)
             .ValidateDataAnnotations()
             .ValidateOnStart();
+        services.AddOptions<EncryptionOptions>()
+            .BindConfiguration(EncryptionOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
         services.AddMemoryCache();
         services.AddSingleton<CatalogCache>();
+        services.AddSingleton<EncryptionService>();
 
         services.AddScoped<JwtTokenService>();
         services.AddScoped<IAuthService, AuthService>();
@@ -52,9 +54,34 @@ public static class DependencyInjection
         services.AddScoped<ApartmentImporter>();
         services.AddScoped<ICatalogService, CatalogService>();
         services.AddScoped<ILeadService, LeadService>();
+        services.AddScoped<IBookingService, BookingService>();
+        services.AddScoped<ICustomerService, CustomerService>();
+        services.AddScoped<IDealService, DealService>();
+        services.AddScoped<ICrmService, CrmService>();
 
         services.AddScoped<INotificationSender, TelegramNotificationSender>();
 
+        services.AddHangfire((sp, config) => config
+            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UsePostgreSqlStorage(options => options.UseNpgsqlConnection(GetConnectionString(sp))));
+        services.AddScoped<ExpireBookingsJob>();
+
         return services;
+    }
+
+    public static void ScheduleRecurringJobs(this IServiceProvider services)
+    {
+        var jobs = services.GetRequiredService<IRecurringJobManager>();
+        jobs.AddOrUpdate<ExpireBookingsJob>(ExpireBookingsJob.Id, job => job.RunAsync(CancellationToken.None), ExpireBookingsJob.Schedule);
+    }
+
+    private static string GetConnectionString(IServiceProvider sp)
+    {
+        var connectionString = sp.GetRequiredService<IConfiguration>().GetConnectionString("Default");
+        if (string.IsNullOrWhiteSpace(connectionString))
+            throw new InvalidOperationException("Не задана строка подключения (переменная окружения ConnectionStrings__Default)");
+        return connectionString;
     }
 }

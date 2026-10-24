@@ -16,6 +16,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider t
     public DbSet<Lead> Leads => Set<Lead>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<Booking> Bookings => Set<Booking>();
+    public DbSet<Deal> Deals => Set<Deal>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -41,6 +44,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider t
         configurationBuilder.Properties<Currency>().HaveConversion<string>().HaveMaxLength(3);
         configurationBuilder.Properties<LeadStatus>().HaveConversion<string>().HaveMaxLength(32);
         configurationBuilder.Properties<LeadSource>().HaveConversion<string>().HaveMaxLength(32);
+        configurationBuilder.Properties<BookingStatus>().HaveConversion<string>().HaveMaxLength(32);
+        configurationBuilder.Properties<DealStage>().HaveConversion<string>().HaveMaxLength(32);
     }
 
     public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
