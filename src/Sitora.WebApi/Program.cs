@@ -152,9 +152,23 @@ app.MapHealthChecks("/health");
 
 // В Production миграции применяются только отдельной командой --migrate (сервис migrate в docker-compose.prod.yml).
 if (app.Configuration.GetValue("Database:MigrateOnStartup", !app.Environment.IsProduction()))
+{
     await app.Services.InitializeDatabaseAsync();
+}
 else
-    await app.Services.EnsureDatabaseUpToDateAsync();
+{
+    try
+    {
+        await app.Services.EnsureDatabaseUpToDateAsync();
+    }
+    catch (InvalidOperationException e)
+    {
+        // Одна понятная запись в лог контейнера вместо стека необработанного исключения.
+        app.Logger.LogCritical("{Reason}", e.Message);
+        Environment.ExitCode = 1;
+        return;
+    }
+}
 app.Services.ScheduleRecurringJobs();
 
 app.Run();
