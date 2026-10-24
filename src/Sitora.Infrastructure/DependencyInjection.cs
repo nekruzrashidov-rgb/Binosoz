@@ -85,6 +85,8 @@ public static class DependencyInjection
             .UsePostgreSqlStorage(options => options.UseNpgsqlConnection(GetConnectionString(sp))));
         services.AddScoped<ExpireBookingsJob>();
         services.AddScoped<UpdateRatesJob>();
+        services.AddScoped<HealthAlertJob>();
+        services.AddSingleton<HealthAlertState>();
 
         return services;
     }
@@ -94,6 +96,7 @@ public static class DependencyInjection
         var jobs = services.GetRequiredService<IRecurringJobManager>();
         jobs.AddOrUpdate<ExpireBookingsJob>(ExpireBookingsJob.Id, job => job.RunAsync(CancellationToken.None), ExpireBookingsJob.Schedule);
         jobs.AddOrUpdate<UpdateRatesJob>(UpdateRatesJob.Id, job => job.RunAsync(CancellationToken.None), UpdateRatesJob.Schedule);
+        jobs.AddOrUpdate<HealthAlertJob>(HealthAlertJob.Id, job => job.RunAsync(CancellationToken.None), HealthAlertJob.Schedule);
     }
 
     private static string GetConnectionString(IServiceProvider sp)

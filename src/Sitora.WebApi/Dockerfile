@@ -18,6 +18,6 @@ ENV ASPNETCORE_ENVIRONMENT=Production
 ENV Storage__RootPath=/app/storage
 EXPOSE 8080
 COPY --from=build /app/publish .
-RUN mkdir -p /app/storage && chown $APP_UID /app/storage
+RUN mkdir -p /app/storage /app/logs && chown $APP_UID /app/storage /app/logs
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Sitora.WebApi.dll"]

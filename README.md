@@ -132,6 +132,7 @@ Caddy сам получает сертификат HTTPS. Бэкап — `./scri
 | `POST /buildings/{id}/stages`, `PUT /stages/{id}`, `POST /stages/{id}/photos` | Content, Admin |
 | `GET`, `POST /deals/{id}/messages`; SignalR `/hubs/chat` | владелец сделки, Manager, Accountant, Admin |
 | `GET /audit`, `GET`, `POST /users`, `PATCH /users/{id}/status` | Admin |
+| `GET /health/live`, `/health/ready` (и `/health`) — без префикса `/api/v1` | все |
 
 - Для чужой сделки любой из адресов `/deals/{id}/…` отвечает 404, как для несуществующей.
 - Покупатель входит так: `sms/send` с телефоном → код в SMS → `sms/verify` с кодом. Пока SMS — заглушка: в Development код виден в логе API.

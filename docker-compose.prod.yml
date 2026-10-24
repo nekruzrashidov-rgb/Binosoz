@@ -55,6 +55,15 @@ services:
       ForwardedHeaders__Enabled: "true"
     volumes:
       - files:/app/storage
+      # JSON-логи по дням, хранятся 14 дней (Serilog, appsettings.Production.json).
+      - logs:/app/logs
+    # В образе нет curl: проверку делает сам API в режиме --healthcheck (запрос к /health/live).
+    healthcheck:
+      test: ["CMD", "dotnet", "Sitora.WebApi.dll", "--healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     depends_on:
       db:
         condition: service_healthy
@@ -75,10 +84,12 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - webapi
+      webapi:
+        condition: service_healthy
 
 volumes:
   pgdata:
   files:
+  logs:
   caddy_data:
   caddy_config:

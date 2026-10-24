@@ -119,7 +119,7 @@ public class AuthTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFactor
         var response = await _client.GetAsync("/health");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal("Healthy", await response.Content.ReadAsStringAsync());
+        Assert.Contains("\"status\":\"Healthy\"", await response.Content.ReadAsStringAsync());
     }
 
     [Fact]

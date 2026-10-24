@@ -91,14 +91,14 @@ docker compose -f docker-compose.prod.yml logs -f webapi
 ## 4. Проверка после деплоя
 
 ```bash
-curl -i https://api.sitora.tj/health
+curl -i https://api.sitora.tj/health/ready
 curl -I http://api.sitora.tj/health
 curl -i https://api.sitora.tj/api/v1/buildings
 ```
 
 Ожидаемый результат:
 
-1. Первая команда отвечает `200` и `Healthy`.
+1. Первая команда отвечает `200` и JSON с `"status":"Healthy"` у `database`, `storage` и `background-jobs`.
 2. Вторая — редиректом на `https://`.
 3. Третья — `200`, а в заголовках есть `Strict-Transport-Security`.
 4. `https://api.sitora.tj/swagger` отвечает 404: в продакшене Swagger выключен.
@@ -161,8 +161,15 @@ docker compose -f docker-compose.prod.yml up -d --build
 
 Если новая версия успела применить миграцию, которая несовместима со старым кодом, восстановите базу из бэкапа, сделанного перед обновлением (раздел 6).
 
+## Мониторинг
+
+- `GET /health/live` — процесс отвечает. По нему docker проверяет контейнер (`docker compose ps` показывает `healthy`), и Caddy ждёт его перед стартом.
+- `GET /health/ready` (и `/health`) — база, запись в хранилище файлов, сервер фоновых задач. Ответ: JSON со статусом каждой проверки; при проблеме с базой или файлами — 503, при остановленных фоновых задачах — `Degraded` с кодом 200.
+- Раз в 5 минут API сам проверяет `ready` и при смене состояния («не работает» / «снова работает») шлёт уведомление в канал менеджеров через `INotificationSender`. Пока Telegram — заглушка, сообщения видны только в логе и в таблице `Notifications`.
+- Если API упал целиком, он сам ни о чём не сообщит. Поэтому нужна внешняя проверка `https://api.sitora.tj/health/ready` раз в 1–5 минут — сервисом мониторинга доступности или cron-задачей на другом сервере.
+
 ## Полезное
 
-- Логи API — JSON в stdout: `docker compose -f docker-compose.prod.yml logs --since 1h webapi`. Ротацию логов docker настраивают в `/etc/docker/daemon.json` (`"log-opts": {"max-size": "50m", "max-file": "5"}`).
+- Логи API — JSON. Они идут в stdout (`docker compose -f docker-compose.prod.yml logs --since 1h webapi`) и в файлы `/app/logs/sitora-ГГГГММДД.log` на томе `logs`: новый файл каждый день или при 100 МБ, хранятся 14 файлов. Посмотреть: `docker compose -f docker-compose.prod.yml exec webapi ls /app/logs`. В каждой записи о запросе есть `ClientIp` и `UserId`; запросы к `/health` в обычный лог не пишутся. Ротацию логов stdout настраивают в `/etc/docker/daemon.json` (`"log-opts": {"max-size": "50m", "max-file": "5"}`).
 - Подключиться к базе: `docker compose -f docker-compose.prod.yml exec db psql -U sitora -d sitora`.
 - Статус фоновых задач: в логах API (снятие броней каждые 5 минут, курс — раз в день в 10:00 по Душанбе).

@@ -13,10 +13,17 @@ using Sitora.Domain.Interfaces;
 using Sitora.Infrastructure;
 using Sitora.Infrastructure.Data;
 using Sitora.Infrastructure.Data.Seed;
+using Sitora.Infrastructure.Health;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Serilog.Events;
 using Sitora.Infrastructure.Security;
 using Sitora.WebApi.Extensions;
 using Sitora.WebApi.Hubs;
 using Sitora.WebApi.Middleware;
+
+// Проверка контейнера: опросить уже запущенный API и выйти, не поднимая второй экземпляр.
+if (args.Contains(HealthProbe.Command))
+    return await HealthProbe.RunAsync();
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
@@ -73,10 +80,16 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
 builder.Services.AddAuthorization();
 
 // В тестах сервер фоновых задач выключают (Hangfire__ServerEnabled=false) и запускают задачи вручную.
-if (builder.Configuration.GetValue("Hangfire:ServerEnabled", true))
+var hangfireServerEnabled = builder.Configuration.GetValue("Hangfire:ServerEnabled", true);
+if (hangfireServerEnabled)
     builder.Services.AddHangfireServer();
 
-builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>();
+var healthChecks = builder.Services.AddHealthChecks()
+    .AddDbContextCheck<AppDbContext>("database", tags: [HealthTags.Ready])
+    .AddCheck<StorageHealthCheck>("storage", tags: [HealthTags.Ready]);
+// Сервер фоновых задач проверяем там, где он запущен; его отказ не мешает отвечать на запросы — Degraded.
+if (hangfireServerEnabled)
+    healthChecks.AddCheck<BackgroundJobsHealthCheck>("background-jobs", HealthStatus.Degraded, [HealthTags.Ready]);
 
 builder.Services.AddSitoraRateLimiting();
 builder.Services.AddSitoraCors();
@@ -113,7 +126,7 @@ if (args.Contains(DatabaseInitializer.MigrateCommand))
 {
     await app.Services.InitializeDatabaseAsync();
     app.Logger.LogInformation("Миграции применены, база готова");
-    return;
+    return 0;
 }
 
 if (forwardedHeadersEnabled)
@@ -121,13 +134,30 @@ if (forwardedHeadersEnabled)
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseMiddleware<SecurityHeadersMiddleware>();
-app.UseSerilogRequestLogging();
+app.UseSerilogRequestLogging(options =>
+{
+    // IP клиента (после X-Forwarded-For) и пользователь — в каждой записи о запросе.
+    options.EnrichDiagnosticContext = (diagnostics, http) =>
+    {
+        diagnostics.Set("ClientIp", http.Connection.RemoteIpAddress?.ToString());
+        diagnostics.Set("UserId", http.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value);
+    };
+    // Проверки здоровья идут каждые 30 секунд — в обычный лог их не пишем, ошибки пишем всегда.
+    options.GetLevel = (http, _, exception) =>
+        exception is not null || http.Response.StatusCode >= 500 ? LogEventLevel.Error
+        : http.Request.Path.StartsWithSegments("/health") ? LogEventLevel.Verbose
+        : LogEventLevel.Information;
+});
 
 // В продакшене TLS завершает обратный прокси; приложение только требует HTTPS и шлёт HSTS.
+// /health не перенаправляется: его опрашивают изнутри сети docker по HTTP.
 if (app.Environment.IsProduction())
 {
-    app.UseHsts();
-    app.UseHttpsRedirection();
+    app.UseWhen(http => !http.Request.Path.StartsWithSegments("/health"), branch =>
+    {
+        branch.UseHsts();
+        branch.UseHttpsRedirection();
+    });
 }
 
 app.UseRequestLocalization(options => options
@@ -148,7 +178,7 @@ app.UseRateLimiter();
 
 app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
-app.MapHealthChecks("/health");
+app.MapSitoraHealthChecks();
 
 // В Production миграции применяются только отдельной командой --migrate (сервис migrate в docker-compose.prod.yml).
 if (app.Configuration.GetValue("Database:MigrateOnStartup", !app.Environment.IsProduction()))
@@ -165,12 +195,12 @@ else
     {
         // Одна понятная запись в лог контейнера вместо стека необработанного исключения.
         app.Logger.LogCritical("{Reason}", e.Message);
-        Environment.ExitCode = 1;
-        return;
+        return 1;
     }
 }
 app.Services.ScheduleRecurringJobs();
 
 app.Run();
+return 0;
 
 public partial class Program;
