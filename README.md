@@ -121,6 +121,8 @@ Caddy сам получает сертификат HTTPS. Бэкап — `./scri
 | `POST /deals/{id}/plan` | Manager, Admin |
 | `GET /deals/{id}/schedule`, `/deals/{id}/schedule.pdf`, `/deals/{id}/statement.pdf?date=…` | владелец сделки, Manager, Accountant, Admin |
 | `POST /deals/{id}/payments`, `/payments/{id}/reverse` | Accountant, Admin |
+| `GET /reports/payments?from=&to=`, `/reports/payments.xlsx` — поступления за период | Accountant, Admin |
+| `GET /reports/debts?asOf=`, `/reports/debts.xlsx` — задолженность на дату | Accountant, Admin |
 | `GET /rates/current` | все |
 | `PUT /rates` | Accountant, Admin |
 | `GET /deals/{id}/documents`, `/documents/{id}/download` (подписанная ссылка на 15 минут) | владелец сделки, Manager, Accountant, Admin |
