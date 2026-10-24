@@ -31,13 +31,17 @@ curl http://localhost:8080/health
 
 Нужны .NET 10 SDK и PostgreSQL 18.
 
+Секреты для Development удобнее один раз положить в user secrets (хранятся в профиле пользователя, вне репозитория). После этого `dotnet run` работает в любом окне без переменных окружения:
+
 ```bash
-export ConnectionStrings__Default="Host=localhost;Port=5432;Database=sitora;Username=...;Password=..."
-export Jwt__Key="<не короче 32 символов>"
-export Encryption__Key="<32 байта в base64>"
-export SEED_ADMIN_PASSWORD="<пароль админа>"
+dotnet user-secrets set "ConnectionStrings:Default" "Host=localhost;Port=5432;Database=sitora;Username=...;Password=..." --project src/Sitora.WebApi
+dotnet user-secrets set "Jwt:Key" "<не короче 32 символов>" --project src/Sitora.WebApi
+dotnet user-secrets set "Encryption:Key" "<32 байта в base64>" --project src/Sitora.WebApi
+dotnet user-secrets set "SEED_ADMIN_PASSWORD" "<пароль админа>" --project src/Sitora.WebApi
 dotnet run --project src/Sitora.WebApi
 ```
+
+Вместо user secrets можно задать те же значения переменными окружения (`ConnectionStrings__Default`, `Jwt__Key`, `Encryption__Key`, `SEED_ADMIN_PASSWORD`). В Staging и Production user secrets не читаются — только переменные окружения.
 
 В Development и Staging миграции применяются при старте API. В Production — только отдельной командой `dotnet Sitora.WebApi.dll --migrate` (в prod-compose это сервис `migrate`); без неё API не стартует. Новая миграция:
 

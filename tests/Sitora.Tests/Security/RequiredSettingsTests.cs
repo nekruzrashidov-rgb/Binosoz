@@ -6,8 +6,9 @@ public class RequiredSettingsTests
 {
     private static readonly string[] Secrets = ["ConnectionStrings__Default", "Jwt__Key", "Encryption__Key"];
 
+    // Не Development: там API берёт секреты ещё и из user secrets машины, и тест зависел бы от них.
     [Theory]
-    [InlineData("Development", new string[0], "ConnectionStrings__Default, Jwt__Key, Encryption__Key")]
+    [InlineData("Staging", new string[0], "ConnectionStrings__Default, Jwt__Key, Encryption__Key")]
     [InlineData("Production", new[] { "--migrate" }, "ConnectionStrings__Default")]
     public async Task MissingSecrets_AreListedInOneLine_AndApiExitsWithCode1(string environment, string[] args, string expectedList)
     {
