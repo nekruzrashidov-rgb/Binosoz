@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Sitora.Domain.Common;
 using Sitora.Domain.Entities;
 using Sitora.Domain.Enums;
 using Sitora.Infrastructure.Security;
+using Sitora.Infrastructure.Services;
 
 namespace Sitora.Infrastructure.Data.Seed;
 
@@ -57,6 +59,7 @@ public static class SalesSeeder
             .Take(DealStages.Length + SiteBookings.Length)
             .ToListAsync();
 
+        var now = timeProvider.GetUtcNow().UtcDateTime;
         for (var i = 0; i < DealStages.Length && i < apartments.Count; i++)
         {
             var deal = new Deal { ApartmentId = apartments[i].Id, CustomerId = customers[i].Id, ManagerId = managerId.Value };
@@ -64,9 +67,11 @@ public static class SalesSeeder
             if (DealStages[i] != DealStage.Lead)
                 deal.ChangeStage(DealStages[i], null, apartments[i]);
             db.Deals.Add(deal);
+
+            if (DealStages[i] == DealStage.Payment)
+                AddPlanWithPayments(db, deal, DushanbeTime.Today(now));
         }
 
-        var now = timeProvider.GetUtcNow().UtcDateTime;
         for (var i = 0; i < SiteBookings.Length && DealStages.Length + i < apartments.Count; i++)
         {
             var apartment = apartments[DealStages.Length + i];
@@ -85,5 +90,38 @@ public static class SalesSeeder
         await db.SaveChangesAsync();
         logger.LogInformation("Созданы клиенты ({Customers}), сделки ({Deals}) и брони с сайта ({Bookings})",
             customers.Count, Math.Min(DealStages.Length, apartments.Count), SiteBookings.Length);
+    }
+
+    // График 30% / 24 месяца, начатый три месяца назад; оплачены взнос и два месячных платежа.
+    private static void AddPlanWithPayments(AppDbContext db, Deal deal, DateOnly today)
+    {
+        var start = today.AddMonths(-3);
+        var plan = new PaymentPlan
+        {
+            DealId = deal.Id,
+            DownPaymentPct = 30,
+            Months = 24,
+            PaymentDay = 10,
+            StartDate = start,
+            Items = PaymentScheduleCalculator.Build(deal.FinalPrice, 30, 24, 10, start)
+        };
+
+        var paidItems = plan.Items.OrderBy(i => i.DueDate).Take(3).ToList();
+        foreach (var item in paidItems)
+        {
+            db.Payments.Add(new Payment
+            {
+                DealId = deal.Id,
+                Amount = item.AmountDue,
+                Currency = Currency.TJS,
+                AmountInDealCurrency = item.AmountDue,
+                AmountTjs = item.AmountDue,
+                PaidAt = item.DueDate,
+                Method = item.Kind == ScheduleItemKind.DownPayment ? PaymentMethod.BankTransfer : PaymentMethod.Cash
+            });
+        }
+
+        plan.ApplyPayments(paidItems.Sum(i => i.AmountDue));
+        db.PaymentPlans.Add(plan);
     }
 }

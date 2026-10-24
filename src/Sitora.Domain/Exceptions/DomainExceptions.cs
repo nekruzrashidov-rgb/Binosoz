@@ -11,3 +11,5 @@ public class ForbiddenException(string message = "Недостаточно пр�
 public class BusinessRuleException(string message) : DomainException(message);
 
 public class UnauthorizedException(string message) : DomainException(message);
+
+public class TooManyRequestsException(string message) : DomainException(message);

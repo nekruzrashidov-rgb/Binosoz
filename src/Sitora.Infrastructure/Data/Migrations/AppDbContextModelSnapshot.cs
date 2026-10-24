@@ -275,7 +275,9 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("NormalizedEmail")
-                        .HasDatabaseName("EmailIndex");
+                        .IsUnique()
+                        .HasDatabaseName("EmailIndex")
+                        .HasFilter("\"NormalizedEmail\" IS NOT NULL");
 
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()
@@ -543,6 +545,94 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.ToTable("Deals", (string)null);
                 });
 
+            modelBuilder.Entity("Sitora.Domain.Entities.Document", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DealId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FileKey")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<DateTime?>("SignedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UploadedById")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DealId");
+
+                    b.ToTable("Documents", (string)null);
+                });
+
+            modelBuilder.Entity("Sitora.Domain.Entities.ExchangeRate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("RateToTjs")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Currency", "Date")
+                        .IsUnique();
+
+                    b.ToTable("ExchangeRates", (string)null);
+                });
+
             modelBuilder.Entity("Sitora.Domain.Entities.Floor", b =>
                 {
                     b.Property<Guid>("Id")
@@ -661,6 +751,150 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.ToTable("Notifications", (string)null);
                 });
 
+            modelBuilder.Entity("Sitora.Domain.Entities.Payment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("AmountInDealCurrency")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("AmountTjs")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<Guid>("DealId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateOnly>("PaidAt")
+                        .HasColumnType("date");
+
+                    b.Property<decimal?>("RateUsed")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<Guid?>("ReversalOfId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReversalOfId")
+                        .IsUnique()
+                        .HasFilter("\"ReversalOfId\" IS NOT NULL");
+
+                    b.HasIndex("DealId", "PaidAt");
+
+                    b.ToTable("Payments", (string)null);
+                });
+
+            modelBuilder.Entity("Sitora.Domain.Entities.PaymentPlan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DealId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("DownPaymentPct")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<int>("Months")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PaymentDay")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DealId")
+                        .IsUnique();
+
+                    b.ToTable("PaymentPlans", (string)null);
+                });
+
+            modelBuilder.Entity("Sitora.Domain.Entities.PaymentScheduleItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AmountDue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("AmountPaid")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("DueDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid>("PlanId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlanId", "DueDate");
+
+                    b.ToTable("PaymentScheduleItems", (string)null);
+                });
+
             modelBuilder.Entity("Sitora.Domain.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -699,6 +933,44 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("RefreshTokens", (string)null);
+                });
+
+            modelBuilder.Entity("Sitora.Domain.Entities.SmsCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Phone", "CreatedAt");
+
+                    b.ToTable("SmsCodes", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
@@ -832,6 +1104,17 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Navigation("Manager");
                 });
 
+            modelBuilder.Entity("Sitora.Domain.Entities.Document", b =>
+                {
+                    b.HasOne("Sitora.Domain.Entities.Deal", "Deal")
+                        .WithMany()
+                        .HasForeignKey("DealId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Deal");
+                });
+
             modelBuilder.Entity("Sitora.Domain.Entities.Floor", b =>
                 {
                     b.HasOne("Sitora.Domain.Entities.Building", "Building")
@@ -868,6 +1151,46 @@ namespace Sitora.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade);
                 });
 
+            modelBuilder.Entity("Sitora.Domain.Entities.Payment", b =>
+                {
+                    b.HasOne("Sitora.Domain.Entities.Deal", "Deal")
+                        .WithMany()
+                        .HasForeignKey("DealId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sitora.Domain.Entities.Payment", "ReversalOf")
+                        .WithMany()
+                        .HasForeignKey("ReversalOfId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Deal");
+
+                    b.Navigation("ReversalOf");
+                });
+
+            modelBuilder.Entity("Sitora.Domain.Entities.PaymentPlan", b =>
+                {
+                    b.HasOne("Sitora.Domain.Entities.Deal", "Deal")
+                        .WithOne()
+                        .HasForeignKey("Sitora.Domain.Entities.PaymentPlan", "DealId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Deal");
+                });
+
+            modelBuilder.Entity("Sitora.Domain.Entities.PaymentScheduleItem", b =>
+                {
+                    b.HasOne("Sitora.Domain.Entities.PaymentPlan", "Plan")
+                        .WithMany("Items")
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Plan");
+                });
+
             modelBuilder.Entity("Sitora.Domain.Entities.RefreshToken", b =>
                 {
                     b.HasOne("Sitora.Domain.Entities.AppUser", "User")
@@ -897,6 +1220,11 @@ namespace Sitora.Infrastructure.Data.Migrations
             modelBuilder.Entity("Sitora.Domain.Entities.Floor", b =>
                 {
                     b.Navigation("Apartments");
+                });
+
+            modelBuilder.Entity("Sitora.Domain.Entities.PaymentPlan", b =>
+                {
+                    b.Navigation("Items");
                 });
 #pragma warning restore 612, 618
         }

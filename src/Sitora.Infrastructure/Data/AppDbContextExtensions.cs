@@ -15,4 +15,14 @@ public static class AppDbContextExtensions
             .ToListAsync(ct);
         return rows.SingleOrDefault() ?? throw new NotFoundException("Квартира не найдена");
     }
+
+    // Платежи и сторно по одной сделке выполняются по очереди: иначе распределение по графику
+    // посчиталось бы от устаревшей суммы оплат.
+    public static async Task<Deal> LockDealAsync(this AppDbContext db, Guid dealId, CancellationToken ct)
+    {
+        var rows = await db.Deals
+            .FromSql($"SELECT * FROM \"Deals\" WHERE \"Id\" = {dealId} FOR UPDATE")
+            .ToListAsync(ct);
+        return rows.SingleOrDefault() ?? throw new NotFoundException("Сделка не найдена");
+    }
 }

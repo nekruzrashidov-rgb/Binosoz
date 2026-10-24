@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Sitora.Domain.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -113,11 +115,33 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("SEED_CONTENT_PASSWORD", ContentPassword);
         builder.UseSetting("SEED_ACCOUNTANT_PASSWORD", AccountantPassword);
         builder.UseSetting("Encryption:Key", _encryptionKey);
+        builder.UseSetting("Storage:RootPath", _storagePath);
+        builder.ConfigureTestServices(services => services.AddSingleton<ISmsSender>(Sms));
     }
+
+    public FakeSmsSender Sms { get; } = new();
+
+    // Входит как покупатель с этим телефоном через SMS-код.
+    public async Task<HttpClient> CreateCustomerClientAsync(string phone)
+    {
+        var client = CreateClient();
+        var sent = await client.PostAsJsonAsync("/api/v1/auth/sms/send", new SmsSendRequest(phone));
+        sent.EnsureSuccessStatusCode();
+        var response = await client.PostAsJsonAsync("/api/v1/auth/sms/verify", new SmsVerifyRequest(phone, Sms.LastCode(phone)!));
+        response.EnsureSuccessStatusCode();
+        var auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
+        return client;
+    }
+
+    private readonly string _storagePath = Path.Combine(Path.GetTempPath(), "sitora-tests", Guid.NewGuid().ToString("N"));
 
     async Task IAsyncLifetime.DisposeAsync()
     {
         await base.DisposeAsync();
+
+        if (Directory.Exists(_storagePath))
+            Directory.Delete(_storagePath, recursive: true);
 
         if (_container is not null)
             await _container.DisposeAsync();

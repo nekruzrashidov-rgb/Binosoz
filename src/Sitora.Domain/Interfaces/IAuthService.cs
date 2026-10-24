@@ -8,4 +8,7 @@ public interface IAuthService
     Task<AuthResponse> RefreshAsync(RefreshRequest request, CancellationToken ct = default);
     Task LogoutAsync(LogoutRequest request, CancellationToken ct = default);
     Task<CurrentUserResponse> GetCurrentUserAsync(Guid userId, CancellationToken ct = default);
+
+    Task<SmsSendResponse> SendSmsCodeAsync(SmsSendRequest request, CancellationToken ct = default);
+    Task<AuthResponse> VerifySmsCodeAsync(SmsVerifyRequest request, CancellationToken ct = default);
 }

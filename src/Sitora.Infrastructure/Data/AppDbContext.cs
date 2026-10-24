@@ -19,6 +19,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider t
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<Deal> Deals => Set<Deal>();
+    public DbSet<PaymentPlan> PaymentPlans => Set<PaymentPlan>();
+    public DbSet<PaymentScheduleItem> PaymentScheduleItems => Set<PaymentScheduleItem>();
+    public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
+    public DbSet<Document> Documents => Set<Document>();
+    public DbSet<SmsCode> SmsCodes => Set<SmsCode>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -46,6 +52,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider t
         configurationBuilder.Properties<LeadSource>().HaveConversion<string>().HaveMaxLength(32);
         configurationBuilder.Properties<BookingStatus>().HaveConversion<string>().HaveMaxLength(32);
         configurationBuilder.Properties<DealStage>().HaveConversion<string>().HaveMaxLength(32);
+        configurationBuilder.Properties<PaymentMethod>().HaveConversion<string>().HaveMaxLength(32);
+        configurationBuilder.Properties<ScheduleItemKind>().HaveConversion<string>().HaveMaxLength(32);
+        configurationBuilder.Properties<ScheduleItemStatus>().HaveConversion<string>().HaveMaxLength(32);
+        configurationBuilder.Properties<RateSource>().HaveConversion<string>().HaveMaxLength(32);
+        configurationBuilder.Properties<DocumentType>().HaveConversion<string>().HaveMaxLength(32);
     }
 
     public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)

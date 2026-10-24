@@ -26,13 +26,15 @@ public static class DependencyInjection
 
         services.AddIdentityCore<AppUser>(options =>
             {
-                options.User.RequireUniqueEmail = true;
+                // У покупателей нет почты; уникальность почты сотрудников держит индекс EmailIndex.
+                options.User.RequireUniqueEmail = false;
                 options.Password.RequiredLength = 8;
                 options.Password.RequireNonAlphanumeric = false;
                 options.Lockout.MaxFailedAccessAttempts = 5;
                 options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
             })
             .AddRoles<IdentityRole<Guid>>()
+            .AddErrorDescriber<RussianIdentityErrorDescriber>()
             .AddEntityFrameworkStores<AppDbContext>();
 
         services.AddOptions<JwtOptions>()
@@ -58,8 +60,18 @@ public static class DependencyInjection
         services.AddScoped<ICustomerService, CustomerService>();
         services.AddScoped<IDealService, DealService>();
         services.AddScoped<ICrmService, CrmService>();
+        services.AddScoped<IUserService, UserService>();
+        services.AddScoped<DealAccess>();
+        services.AddScoped<IExchangeRateService, ExchangeRateService>();
+        services.AddScoped<StatementService>();
+        services.AddScoped<IPaymentService, PaymentService>();
+        services.AddScoped<IDocumentService, DocumentService>();
 
         services.AddScoped<INotificationSender, TelegramNotificationSender>();
+        services.AddSingleton<ISmsSender, SmsSender>();
+        services.AddSingleton<IRateProvider, NbtRateProvider>();
+        services.AddSingleton<IFileStorage, LocalFileStorage>();
+        services.AddSingleton<IPdfGenerator, QuestPdfGenerator>();
 
         services.AddHangfire((sp, config) => config
             .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
@@ -67,6 +79,7 @@ public static class DependencyInjection
             .UseRecommendedSerializerSettings()
             .UsePostgreSqlStorage(options => options.UseNpgsqlConnection(GetConnectionString(sp))));
         services.AddScoped<ExpireBookingsJob>();
+        services.AddScoped<UpdateRatesJob>();
 
         return services;
     }
@@ -75,6 +88,7 @@ public static class DependencyInjection
     {
         var jobs = services.GetRequiredService<IRecurringJobManager>();
         jobs.AddOrUpdate<ExpireBookingsJob>(ExpireBookingsJob.Id, job => job.RunAsync(CancellationToken.None), ExpireBookingsJob.Schedule);
+        jobs.AddOrUpdate<UpdateRatesJob>(UpdateRatesJob.Id, job => job.RunAsync(CancellationToken.None), UpdateRatesJob.Schedule);
     }
 
     private static string GetConnectionString(IServiceProvider sp)

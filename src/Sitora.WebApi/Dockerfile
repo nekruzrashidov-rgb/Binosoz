@@ -13,7 +13,9 @@ RUN dotnet publish src/Sitora.WebApi/Sitora.WebApi.csproj -c Release -o /app/pub
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 ENV ASPNETCORE_HTTP_PORTS=8080
+ENV Storage__RootPath=/app/storage
 EXPOSE 8080
 COPY --from=build /app/publish .
+RUN mkdir -p /app/storage && chown $APP_UID /app/storage
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Sitora.WebApi.dll"]

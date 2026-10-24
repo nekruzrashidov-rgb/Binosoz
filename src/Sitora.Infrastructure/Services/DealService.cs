@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using Sitora.Domain.Common;
 using Sitora.Domain.DTOs.Common;
 using Sitora.Domain.DTOs.Sales;
 using Sitora.Domain.Entities;
@@ -14,6 +15,8 @@ public class DealService(
     AppDbContext db,
     ICurrentUser currentUser,
     IAuditService audit,
+    IExchangeRateService rates,
+    TimeProvider timeProvider,
     CatalogCache cache) : IDealService
 {
     private const string DealNotFound = "Сделка не найдена";
@@ -40,11 +43,27 @@ public class DealService(
         await db.Deals.AsNoTracking().Where(d => d.Id == id).Select(ToResponse).FirstOrDefaultAsync(ct)
         ?? throw new NotFoundException(DealNotFound);
 
+    public async Task<IReadOnlyList<DealResponse>> GetMyDealsAsync(CancellationToken ct = default)
+    {
+        var userId = currentUser.UserId ?? throw new UnauthorizedException("Требуется вход");
+        return await db.Deals.AsNoTracking()
+            .Where(d => d.Customer.UserId == userId)
+            .OrderByDescending(d => d.CreatedAt)
+            .Select(ToResponse)
+            .ToListAsync(ct);
+    }
+
     public async Task<DealResponse> CreateAsync(CreateDealRequest request, CancellationToken ct = default)
     {
         var currency = request.Currency ?? Currency.TJS;
-        if (currency != Currency.TJS)
-            throw new BusinessRuleException("Сделки в долларах пока не поддерживаются");
+        // Цена в каталоге в сомони; для договора в USD она пересчитывается по курсу на сегодня
+        // и округляется до целого доллара.
+        decimal? usdRate = null;
+        if (currency == Currency.USD)
+        {
+            usdRate = await rates.GetRateOnAsync(Currency.USD, DushanbeTime.Today(timeProvider.GetUtcNow().UtcDateTime), ct)
+                ?? throw new BusinessRuleException("Нет курса USD. Бухгалтер должен ввести курс, прежде чем оформлять сделку в долларах");
+        }
 
         var target = request.Stage ?? DealStage.Lead;
         if (target is DealStage.Completed or DealStage.Cancelled)
@@ -68,7 +87,10 @@ public class DealService(
                 throw new ConflictException(OpenDealExists);
 
             deal = new Deal { ApartmentId = apartment.Id, CustomerId = customer.Id, ManagerId = managerId };
-            deal.SetPrice(apartment.Price, currency, request.Discount ?? 0, request.DiscountReason);
+            var price = usdRate is { } rate
+                ? Math.Round(apartment.Price / rate, 0, MidpointRounding.AwayFromZero)
+                : apartment.Price;
+            deal.SetPrice(price, currency, request.Discount ?? 0, request.DiscountReason);
             db.Deals.Add(deal);
 
             // Бронь клиента на эту квартиру переходит в сделку, и сделка начинается не раньше этапа «Бронь».

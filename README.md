@@ -57,6 +57,7 @@ dotnet test
 | `ConnectionStrings__Default` | строка подключения к PostgreSQL |
 | `Jwt__Key` | ключ подписи JWT, не короче 32 символов |
 | `Encryption__Key` | ключ шифрования паспортных данных, 32 байта в base64 (`openssl rand -base64 32`) |
+| `Storage__RootPath` | папка для загруженных документов (по умолчанию `./storage`, в Docker — том `files`) |
 | `Hangfire__ServerEnabled` | `false` выключает фоновые задачи в этом экземпляре (по умолчанию включены) |
 | `ASPNETCORE_ENVIRONMENT` | `Development`, `Staging` или `Production` |
 | `SEED_ADMIN_PASSWORD`, `SEED_MANAGER_PASSWORD`, `SEED_ACCOUNTANT_PASSWORD`, `SEED_CONTENT_PASSWORD` | пароли пользователей сидера (только Development) |
@@ -81,12 +82,25 @@ dotnet test
 | `GET`, `POST /api/v1/deals`, `GET /deals/{id}`, `PATCH /deals/{id}/stage` | Manager, Admin |
 | `GET /api/v1/crm/summary`, `/crm/pipeline` | Manager, Admin |
 | `GET /api/v1/audit` | Admin |
+| `GET`, `POST /api/v1/users` | Admin |
+| `POST /api/v1/auth/sms/send`, `/auth/sms/verify` | покупатель (вход по коду из SMS) |
+| `GET /api/v1/me/deals` | покупатель |
+| `POST /api/v1/deals/{id}/plan` | Manager, Admin |
+| `GET /api/v1/deals/{id}/schedule`, `/deals/{id}/statement.pdf?date=…` | владелец сделки, Manager, Accountant, Admin |
+| `POST /api/v1/deals/{id}/payments`, `/payments/{id}/reverse` | Accountant, Admin |
+| `GET /api/v1/rates/current` | все |
+| `PUT /api/v1/rates` | Accountant, Admin |
+| `GET /api/v1/deals/{id}/documents`, `/documents/{id}/download` | владелец сделки, Manager, Accountant, Admin |
+| `POST /api/v1/deals/{id}/documents` (файл) | Manager, Accountant, Admin |
+
+Покупатель входит так: `sms/send` с телефоном → код приходит в SMS (пока заглушка: код виден в логе API) → `sms/verify` с кодом.
+Для чужой сделки любой из адресов `/deals/{id}/…` отвечает 404.
 
 Бронь живёт 48 часов; фоновая задача Hangfire раз в 5 минут снимает просроченные брони.
 
 Формат Excel для импорта: первая строка — заголовки, столбцы A–E: этаж, номер квартиры, комнат (0 — студия), площадь, цена за м².
 
-В Development сидер создаёт дом «Sitora Residence» (коммерческий этаж 0 и 16 жилых этажей по 8 квартир), 10 выдуманных клиентов, 5 сделок на этапах от «Заявки» до «Оплаты» и 2 брони с сайта.
+В Development сидер создаёт дом «Sitora Residence» (коммерческий этаж 0 и 16 жилых этажей по 8 квартир), 10 выдуманных клиентов, 5 сделок на этапах от «Заявки» до «Оплаты» (у сделки на «Оплате» — график и три платежа) и 2 брони с сайта. Курс USD сидер не создаёт: его вводит бухгалтер через `PUT /api/v1/rates`.
 
 ## Структура
 

@@ -34,6 +34,21 @@ public class AuthController(IAuthService auth) : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Код для входа покупателя. Ответ одинаковый для любого номера; не больше 5 кодов в час.</summary>
+    [HttpPost("sms/send")]
+    [AllowAnonymous]
+    [ProducesResponseType<SmsSendResponse>(StatusCodes.Status202Accepted)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
+    public async Task<ActionResult<SmsSendResponse>> SendSms(SmsSendRequest request, CancellationToken ct) =>
+        Accepted(await auth.SendSmsCodeAsync(request, ct));
+
+    [HttpPost("sms/verify")]
+    [AllowAnonymous]
+    [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    public Task<AuthResponse> VerifySms(SmsVerifyRequest request, CancellationToken ct) =>
+        auth.VerifySmsCodeAsync(request, ct);
+
     [HttpGet("me")]
     [Authorize]
     [ProducesResponseType<CurrentUserResponse>(StatusCodes.Status200OK)]
