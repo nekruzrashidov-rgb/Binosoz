@@ -23,6 +23,10 @@ public class PaymentTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
         Assert.Equal(deal.Price, schedule.Remaining);
         // График начат два месяца назад: взнос и первый месяц уже просрочены.
         Assert.True(schedule.Overdue > 0);
+
+        // Курс в этой базе не вводили — эквивалента в долларах нет.
+        Assert.Null(schedule.Equivalent);
+        Assert.All(schedule.Items, i => Assert.Null(i.AmountDueEquivalent));
     }
 
     [Fact]

@@ -4,6 +4,7 @@ namespace Sitora.Domain.DTOs.Payments;
 
 public record CreatePlanRequest(decimal DownPaymentPct, int Months, int PaymentDay, DateOnly StartDate);
 
+// Суммы в валюте договора; *Equivalent — во второй валюте по текущему курсу (null, если курса нет).
 public record ScheduleItemResponse(
     Guid Id,
     ScheduleItemKind Kind,
@@ -11,7 +12,22 @@ public record ScheduleItemResponse(
     decimal AmountDue,
     decimal AmountPaid,
     ScheduleItemStatus Status,
-    bool IsOverdue);
+    bool IsOverdue,
+    decimal? AmountDueEquivalent,
+    decimal? AmountPaidEquivalent);
+
+// Оценочный эквивалент графика во второй валюте (TJS ↔ USD) по текущему курсу.
+// К оплате принимается сумма по курсу на дату оплаты, поэтому эти цифры только для ориентира.
+public record ScheduleEquivalent(
+    Currency Currency,
+    decimal Rate,
+    DateOnly RateDate,
+    bool IsEstimate,
+    string Note,
+    decimal Total,
+    decimal Paid,
+    decimal Remaining,
+    decimal Overdue);
 
 public record ScheduleResponse(
     Guid DealId,
@@ -25,7 +41,8 @@ public record ScheduleResponse(
     int PaymentDay,
     DateOnly StartDate,
     IReadOnlyList<ScheduleItemResponse> Items,
-    IReadOnlyList<PaymentResponse> Payments);
+    IReadOnlyList<PaymentResponse> Payments,
+    ScheduleEquivalent? Equivalent);
 
 public record CreatePaymentRequest(decimal Amount, Currency Currency, DateOnly PaidAt, PaymentMethod Method, string? Comment);
 

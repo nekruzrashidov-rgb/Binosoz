@@ -75,15 +75,44 @@ public class PaymentService(
         var payments = await LoadPaymentsAsync(dealId, ct);
 
         var today = Today;
+        var usdRate = await rates.FindCurrentAsync(Currency.USD, ct);
+        var toEquivalent = EquivalentConverter(currency, usdRate);
+
         var paid = payments.Sum(p => p.AmountInDealCurrency);
         var items = plan.Items.OrderBy(i => i.DueDate).ThenBy(i => i.Kind)
             .Select(i => new ScheduleItemResponse(i.Id, i.Kind, i.DueDate, i.AmountDue, i.AmountPaid, i.Status,
-                i.DueDate < today && i.Status != ScheduleItemStatus.Paid))
+                i.DueDate < today && i.Status != ScheduleItemStatus.Paid,
+                toEquivalent?.Invoke(i.AmountDue), toEquivalent?.Invoke(i.AmountPaid)))
             .ToList();
         var overdue = items.Where(i => i.IsOverdue).Sum(i => i.AmountDue - i.AmountPaid);
+        var remaining = plan.Total - paid;
 
-        return new ScheduleResponse(dealId, currency, plan.Total, paid, plan.Total - paid, overdue,
-            plan.DownPaymentPct, plan.Months, plan.PaymentDay, plan.StartDate, items, payments);
+        ScheduleEquivalent? equivalent = null;
+        if (toEquivalent is not null && usdRate is not null)
+        {
+            equivalent = new ScheduleEquivalent(
+                currency == Currency.USD ? Currency.TJS : Currency.USD,
+                usdRate.RateToTjs,
+                usdRate.Date,
+                IsEstimate: true,
+                $"Оценочно: по курсу {usdRate.RateToTjs:0.0000} TJS за 1 USD на {usdRate.Date:dd.MM.yyyy}. " +
+                "Платёж пересчитывается по курсу на дату оплаты.",
+                toEquivalent(plan.Total), toEquivalent(paid), toEquivalent(remaining), toEquivalent(overdue));
+        }
+
+        return new ScheduleResponse(dealId, currency, plan.Total, paid, remaining, overdue,
+            plan.DownPaymentPct, plan.Months, plan.PaymentDay, plan.StartDate, items, payments, equivalent);
+    }
+
+    // Перевод суммы из валюты договора во вторую валюту; null, если курса USD ещё нет.
+    private static Func<decimal, decimal>? EquivalentConverter(Currency dealCurrency, RateResponse? usdRate)
+    {
+        if (usdRate is null)
+            return null;
+        var rate = usdRate.RateToTjs;
+        return dealCurrency == Currency.USD
+            ? amount => Math.Round(amount * rate, 2, MidpointRounding.AwayFromZero)
+            : amount => Math.Round(amount / rate, 2, MidpointRounding.AwayFromZero);
     }
 
     public async Task<PaymentResponse> AddPaymentAsync(Guid dealId, CreatePaymentRequest request, CancellationToken ct = default)

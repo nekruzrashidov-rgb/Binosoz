@@ -94,13 +94,15 @@ public class ExchangeRateTests(SitoraApiFactory factory) : IClassFixture<SitoraA
         Assert.Equal(before, await factory.WithDbAsync(db => db.ExchangeRates.CountAsync()));
     }
 
-    private static async Task SetRateAsync(HttpClient accountant, DateOnly date, decimal rate)
+    internal static async Task SetRateAsync(HttpClient accountant, DateOnly date, decimal rate)
     {
         var response = await accountant.PutAsJsonAsync("/api/v1/rates", new SetRateRequest(date, Currency.USD, rate), TestJson.Options);
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
     }
 
-    private async Task<HttpResponseMessage> CreateUsdDealResponseAsync()
+    private Task<HttpResponseMessage> CreateUsdDealResponseAsync() => CreateUsdDealResponseAsync(factory);
+
+    internal static async Task<HttpResponseMessage> CreateUsdDealResponseAsync(SitoraApiFactory factory)
     {
         var manager = await factory.CreateManagerClientAsync();
         var customer = await TestScenarios.ReadAsync<CustomerResponse>(await manager.PostAsJsonAsync("/api/v1/customers",

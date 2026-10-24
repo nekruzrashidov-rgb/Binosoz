@@ -20,13 +20,17 @@ public class ExchangeRateService(
     public async Task<RateResponse> GetCurrentAsync(Currency currency, CancellationToken ct = default)
     {
         EnsureForeign(currency);
+        return await FindCurrentAsync(currency, ct) ?? throw new NotFoundException("Курс ещё не задан");
+    }
+
+    public Task<RateResponse?> FindCurrentAsync(Currency currency, CancellationToken ct = default)
+    {
         var today = DushanbeTime.Today(timeProvider.GetUtcNow().UtcDateTime);
-        return await db.ExchangeRates.AsNoTracking()
-                   .Where(r => r.Currency == currency && r.Date <= today)
-                   .OrderByDescending(r => r.Date)
-                   .Select(r => new RateResponse(r.Date, r.Currency, r.RateToTjs, r.Source))
-                   .FirstOrDefaultAsync(ct)
-               ?? throw new NotFoundException("Курс ещё не задан");
+        return db.ExchangeRates.AsNoTracking()
+            .Where(r => r.Currency == currency && r.Date <= today)
+            .OrderByDescending(r => r.Date)
+            .Select(r => new RateResponse(r.Date, r.Currency, r.RateToTjs, r.Source))
+            .FirstOrDefaultAsync(ct);
     }
 
     public async Task<RateResponse> SetAsync(SetRateRequest request, CancellationToken ct = default)
