@@ -4,6 +4,7 @@ using Sitora.Domain.Entities;
 using Sitora.Domain.Exceptions;
 using Sitora.Domain.Interfaces;
 using Sitora.Infrastructure.Data;
+using Sitora.Infrastructure.Security;
 
 namespace Sitora.Infrastructure.Services;
 
@@ -11,11 +12,11 @@ public class ConstructionService(
     AppDbContext db,
     DealAccess access,
     IFileStorage storage,
+    FileLinkSigner links,
     IAuditService audit,
     TimeProvider timeProvider) : IConstructionService
 {
     public const long MaxPhotoSize = 10 * 1024 * 1024;
-    public const string PhotoUrlPrefix = "/api/v1/construction/photos/";
 
     public async Task<BuildingProgressResponse> GetStagesAsync(Guid buildingId, CancellationToken ct = default)
     {
@@ -91,18 +92,6 @@ public class ConstructionService(
         return ToResponse(photo);
     }
 
-    public async Task<PhotoFile> GetPhotoAsync(Guid photoId, CancellationToken ct = default)
-    {
-        var photo = await db.ConstructionPhotos.AsNoTracking()
-            .Where(p => p.Id == photoId)
-            .Select(p => new { p.FileKey, p.ContentType, p.Stage.BuildingId })
-            .FirstOrDefaultAsync(ct);
-        if (photo is null || !await access.CanViewBuildingProgressAsync(photo.BuildingId, ct))
-            throw new NotFoundException("Фото не найдено");
-
-        return new PhotoFile(photo.ContentType, await storage.OpenReadAsync(photo.FileKey, ct));
-    }
-
     private static void Apply(ConstructionStage stage, SaveStageRequest request)
     {
         if (request.Percent is < 0 or > 100)
@@ -114,10 +103,11 @@ public class ConstructionService(
 
     private static object Snapshot(ConstructionStage s) => new { s.Name, s.Percent, s.SortOrder };
 
-    private static StageResponse ToResponse(ConstructionStage s) =>
+    private StageResponse ToResponse(ConstructionStage s) =>
         new(s.Id, s.BuildingId, s.Name, s.Percent, s.SortOrder, s.UpdatedAt,
             s.Photos.OrderByDescending(p => p.TakenAt).Select(ToResponse).ToList());
 
-    private static PhotoResponse ToResponse(ConstructionPhoto p) =>
-        new(p.Id, p.StageId, PhotoUrlPrefix + p.Id, p.Caption, p.TakenAt);
+    // Ссылку на фото выдаём только тому, кто прошёл проверку доступа к ходу стройки.
+    private PhotoResponse ToResponse(ConstructionPhoto p) =>
+        new(p.Id, p.StageId, links.CreateLink(FileLinkKind.Photo, p.Id).Url, p.Caption, p.TakenAt);
 }

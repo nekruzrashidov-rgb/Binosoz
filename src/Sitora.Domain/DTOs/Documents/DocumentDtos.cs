@@ -13,5 +13,3 @@ public record DocumentResponse(
     long SizeBytes,
     DateTime? SignedAt,
     DateTime CreatedAt);
-
-public record DocumentFile(string FileName, string ContentType, Stream Content);

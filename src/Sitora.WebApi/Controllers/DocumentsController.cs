@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Sitora.Domain.DTOs.Common;
 using Sitora.Domain.DTOs.Documents;
 using Sitora.Domain.Enums;
 using Sitora.Domain.Interfaces;
@@ -33,13 +34,11 @@ public class DocumentsController(IDocumentService documents) : ControllerBase
         return StatusCode(StatusCodes.Status201Created, document);
     }
 
+    /// <summary>Подписанная ссылка на скачивание документа, действует 15 минут.</summary>
     [HttpGet("documents/{id:guid}/download")]
     [Authorize(Roles = Roles.DealViewers)]
-    [ProducesResponseType<FileStreamResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType<FileLinkResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Download(Guid id, CancellationToken ct)
-    {
-        var document = await documents.DownloadAsync(id, ct);
-        return File(document.Content, document.ContentType, document.FileName);
-    }
+    public Task<FileLinkResponse> Download(Guid id, CancellationToken ct) =>
+        documents.CreateDownloadLinkAsync(id, ct);
 }

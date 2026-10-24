@@ -67,6 +67,8 @@ public static class DependencyInjection
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<IDocumentService, DocumentService>();
         services.AddScoped<IConstructionService, ConstructionService>();
+        services.AddSingleton<FileLinkSigner>();
+        services.AddScoped<IFileLinkService, FileLinkService>();
         services.AddScoped<IChatService, ChatService>();
 
         services.AddScoped<INotificationSender, TelegramNotificationSender>();

@@ -46,13 +46,4 @@ public class ConstructionController(IConstructionService construction) : Control
         var photo = await construction.AddPhotoAsync(stageId, new UploadPhotoRequest(file.FileName, file.Length, stream, caption, takenAt), ct);
         return StatusCode(StatusCodes.Status201Created, photo);
     }
-
-    [HttpGet("construction/photos/{photoId:guid}")]
-    [Authorize(Roles = ProgressViewers)]
-    [ProducesResponseType<FileStreamResult>(StatusCodes.Status200OK)]
-    public async Task<IActionResult> Photo(Guid photoId, CancellationToken ct)
-    {
-        var photo = await construction.GetPhotoAsync(photoId, ct);
-        return File(photo.Content, photo.ContentType);
-    }
 }

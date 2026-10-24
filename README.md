@@ -123,9 +123,10 @@ Caddy сам получает сертификат HTTPS. Бэкап — `./scri
 | `POST /deals/{id}/payments`, `/payments/{id}/reverse` | Accountant, Admin |
 | `GET /rates/current` | все |
 | `PUT /rates` | Accountant, Admin |
-| `GET /deals/{id}/documents`, `/documents/{id}/download` | владелец сделки, Manager, Accountant, Admin |
+| `GET /deals/{id}/documents`, `/documents/{id}/download` (подписанная ссылка на 15 минут) | владелец сделки, Manager, Accountant, Admin |
+| `GET /files?token=…` — скачивание по подписанной ссылке | любой, у кого есть действующая ссылка |
 | `POST /deals/{id}/documents` (файл) | Manager, Accountant, Admin |
-| `GET /buildings/{id}/stages`, `/construction/photos/{id}` | покупатель со сделкой в доме, сотрудники |
+| `GET /buildings/{id}/stages` (фото — подписанными ссылками на 15 минут) | покупатель со сделкой в доме, сотрудники |
 | `POST /buildings/{id}/stages`, `PUT /stages/{id}`, `POST /stages/{id}/photos` | Content, Admin |
 | `GET`, `POST /deals/{id}/messages`; SignalR `/hubs/chat` | владелец сделки, Manager, Accountant, Admin |
 | `GET /audit`, `GET`, `POST /users`, `PATCH /users/{id}/status` | Admin |

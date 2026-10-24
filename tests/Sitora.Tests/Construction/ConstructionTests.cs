@@ -62,18 +62,23 @@ public class ConstructionTests(SitoraApiFactory factory) : IClassFixture<SitoraA
 
         var photo = await TestScenarios.ReadAsync<PhotoResponse>(await content.PostAsync(
             $"/api/v1/stages/{stage.Id}/photos", PhotoForm(PngBytes, "двор.png", "Детская площадка")));
-        Assert.Equal($"/api/v1/construction/photos/{photo.Id}", photo.Url);
+        Assert.StartsWith("/api/v1/files?token=", photo.Url);
 
         var deal = await TestScenarios.CreateDealAsync(factory);
         var customer = await factory.CreateCustomerClientAsync(deal.Phone);
         var progress = await customer.GetFromJsonAsync<BuildingProgressResponse>($"/api/v1/buildings/{buildingId}/stages", TestJson.Options);
-        var seen = progress!.Stages.Single(s => s.Id == stage.Id);
-        Assert.Equal("Детская площадка", Assert.Single(seen.Photos).Caption);
+        var seen = Assert.Single(progress!.Stages.Single(s => s.Id == stage.Id).Photos);
+        Assert.Equal("Детская площадка", seen.Caption);
 
-        var image = await customer.GetAsync(photo.Url);
+        // Ссылку из ответа можно поставить прямо в <img src>: браузер откроет её без JWT, картинкой, а не скачиванием.
+        var image = await factory.CreateClient().GetAsync(seen.Url);
         Assert.Equal(HttpStatusCode.OK, image.StatusCode);
         Assert.Equal("image/png", image.Content.Headers.ContentType?.MediaType);
+        Assert.Null(image.Content.Headers.ContentDisposition);
         Assert.Equal(PngBytes, await image.Content.ReadAsByteArrayAsync());
+
+        // Старого адреса фото под JWT больше нет — файлы отдаются только по подписанным ссылкам.
+        Assert.Equal(HttpStatusCode.NotFound, (await customer.GetAsync($"/api/v1/construction/photos/{photo.Id}")).StatusCode);
     }
 
     [Fact]

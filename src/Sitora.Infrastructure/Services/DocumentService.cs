@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Sitora.Domain.DTOs.Common;
 using Sitora.Domain.DTOs.Documents;
 using Sitora.Domain.Entities;
 using Sitora.Domain.Exceptions;
 using Sitora.Domain.Interfaces;
 using Sitora.Infrastructure.Data;
+using Sitora.Infrastructure.Security;
 
 namespace Sitora.Infrastructure.Services;
 
@@ -12,6 +14,7 @@ public class DocumentService(
     AppDbContext db,
     DealAccess access,
     IFileStorage storage,
+    FileLinkSigner links,
     ICurrentUser currentUser,
     IAuditService audit,
     INotificationSender notifications,
@@ -71,14 +74,13 @@ public class DocumentService(
             document.SizeBytes, document.SignedAt, document.CreatedAt);
     }
 
-    public async Task<DocumentFile> DownloadAsync(Guid documentId, CancellationToken ct = default)
+    public async Task<FileLinkResponse> CreateDownloadLinkAsync(Guid documentId, CancellationToken ct = default)
     {
-        var document = await db.Documents.AsNoTracking().FirstOrDefaultAsync(d => d.Id == documentId, ct);
-        if (document is null || !await access.CanViewAsync(document.DealId, ct))
+        var dealId = await db.Documents.Where(d => d.Id == documentId).Select(d => (Guid?)d.DealId).FirstOrDefaultAsync(ct);
+        if (dealId is null || !await access.CanViewAsync(dealId.Value, ct))
             throw new NotFoundException("Документ не найден");
 
-        var stream = await storage.OpenReadAsync(document.FileKey, ct);
-        return new DocumentFile(document.FileName, document.ContentType, stream);
+        return links.CreateLink(FileLinkKind.Document, documentId);
     }
 
     private async Task NotifyCustomerAsync(Guid dealId, string text, CancellationToken ct)
