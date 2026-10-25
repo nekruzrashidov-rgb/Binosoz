@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Sitora.Domain.Entities;
@@ -22,6 +23,7 @@ public static class CatalogSeeder
 
     public static int ApartmentNumber(int floor, int position) => floor * 100 + position;
 
+    [SuppressMessage("Security", "CA5394", Justification = "Генератор с фиксированным зерном нужен для одинаковых статусов квартир при каждом запуске; к безопасности отношения не имеет.")]
     public static async Task SeedAsync(AppDbContext db, ILogger logger)
     {
         if (await db.Buildings.AnyAsync())

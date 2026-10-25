@@ -163,7 +163,10 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             NpgsqlConnection.ClearAllPools();
             await using var connection = new NpgsqlConnection(_serverConnectionString);
             await connection.OpenAsync();
+            // Имя базы для DROP DATABASE параметром не передать; оно сгенерировано выше (sitora_test_ + Guid), ввода пользователя здесь нет.
+#pragma warning disable CA2100
             await using var command = new NpgsqlCommand($"DROP DATABASE IF EXISTS \"{database}\" WITH (FORCE)", connection);
+#pragma warning restore CA2100
             await command.ExecuteNonQueryAsync();
         }
     }

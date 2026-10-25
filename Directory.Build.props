@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <!-- Все правила безопасности встроенных анализаторов .NET (группа Security) — как предупреждения.
+         CI собирает с флагом warnaserror, поэтому новая находка ломает сборку. -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisModeSecurity>All</AnalysisModeSecurity>
+  </PropertyGroup>
+</Project>
