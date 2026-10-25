@@ -188,6 +188,10 @@ app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
 app.MapSitoraHealthChecks();
 
+// Вне Production корень сайта ведёт на Swagger, чтобы после dotnet run не видеть пустой 404.
+if (!app.Environment.IsProduction())
+    app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
+
 // В Production миграции применяются только отдельной командой --migrate (сервис migrate в docker-compose.prod.yml).
 if (app.Configuration.GetValue("Database:MigrateOnStartup", !app.Environment.IsProduction()))
 {

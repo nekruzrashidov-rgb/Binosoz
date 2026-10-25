@@ -117,6 +117,7 @@ public class ProductionTests(ProductionFactory factory) : IClassFixture<Producti
         Assert.Contains("max-age=31536000", secure.Headers.GetValues("Strict-Transport-Security").Single());
 
         Assert.Equal(HttpStatusCode.NotFound, (await https.GetAsync("/swagger/v1/swagger.json")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await https.GetAsync("/")).StatusCode);
     }
 }
 
