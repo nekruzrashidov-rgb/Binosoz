@@ -9,7 +9,7 @@
 - Проверка безопасности: [docs/SECURITY.md](docs/SECURITY.md)
 
 Стек: .NET 10, ASP.NET Core Web API, PostgreSQL 18, EF Core, Identity + JWT, Hangfire, SignalR, QuestPDF, Serilog.
-Фронтенд (сайт, кабинет, CRM) — в [frontend/](frontend/README.md).
+Фронтенд (сайт, кабинет, CRM; чистый JavaScript без сборки) — в [web/](web/README.md). Контракт API и сверка с фронтендом — [docs/API_CONTRACT.md](docs/API_CONTRACT.md). Прежний React-фронтенд и прочее неиспользуемое — в `_old/`.
 
 ## API и фронтенд одной командой (Windows)
 
@@ -19,7 +19,7 @@
 .\run.cmd
 ```
 
-Скрипт открывает API в отдельном окне «Sitora API» (если он ещё не запущен), ждёт, пока API ответит, ставит пакеты фронтенда при первом запуске и открывает сайт в браузере (http://localhost:5173). Нужны .NET 10 SDK, Node.js, локальный PostgreSQL и секреты в user secrets (раздел «Переменные окружения»). Остановить фронтенд — Ctrl+C, API — закрыть его окно.
+Скрипт открывает API в отдельном окне «Sitora API» (если он ещё не запущен), ждёт, пока API ответит, раздаёт папку `web/` статик-сервером `scripts/serve-web.mjs` и открывает сайт в браузере (http://localhost:5500). Нужны .NET 10 SDK, Node.js, локальный PostgreSQL и секреты в user secrets (раздел «Переменные окружения»). Остановить сайт — Ctrl+C, API — закрыть его окно.
 
 ## Запуск для разработки за 3 команды
 
