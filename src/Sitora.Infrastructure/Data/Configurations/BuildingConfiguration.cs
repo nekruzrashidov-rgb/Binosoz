@@ -15,5 +15,7 @@ public class BuildingConfiguration : IEntityTypeConfiguration<Building>
         builder.Property(b => b.DescriptionRu).HasMaxLength(4000);
         builder.Property(b => b.DescriptionTg).HasMaxLength(4000);
         builder.Property(b => b.ModelUrl).HasMaxLength(500);
+        builder.HasOne(b => b.Organization).WithMany(o => o.Buildings)
+            .HasForeignKey(b => b.OrganizationId).OnDelete(DeleteBehavior.Restrict);
     }
 }

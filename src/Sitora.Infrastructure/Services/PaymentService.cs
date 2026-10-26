@@ -75,7 +75,7 @@ public class PaymentService(
         var payments = await LoadPaymentsAsync(dealId, ct);
 
         var today = Today;
-        var usdRate = await rates.FindCurrentAsync(Currency.USD, ct);
+        var usdRate = await rates.FindCurrentAsync(Currency.USD, await db.OrganizationOfDealAsync(dealId, ct), ct);
         var toEquivalent = EquivalentConverter(currency, usdRate);
 
         var paid = payments.Sum(p => p.AmountInDealCurrency);
@@ -136,7 +136,8 @@ public class PaymentService(
                 throw new BusinessRuleException("Дата оплаты не может быть в будущем");
 
             var plan = await LoadPlanAsync(dealId, ct);
-            var (rateUsed, inDealCurrency, inTjs) = await ConvertAsync(deal.Currency, request.Currency, request.Amount, request.PaidAt, ct);
+            var (rateUsed, inDealCurrency, inTjs) = await ConvertAsync(deal.Currency, request.Currency, request.Amount, request.PaidAt,
+                await db.OrganizationOfDealAsync(dealId, ct), ct);
 
             var paidBefore = await PaidTotalAsync(dealId, ct);
             if (paidBefore + inDealCurrency > plan.Total)
@@ -237,12 +238,12 @@ public class PaymentService(
 
     // Возвращает курс платежа, сумму в валюте договора и в сомони.
     private async Task<(decimal? Rate, decimal InDealCurrency, decimal InTjs)> ConvertAsync(
-        Currency dealCurrency, Currency paymentCurrency, decimal amount, DateOnly paidAt, CancellationToken ct)
+        Currency dealCurrency, Currency paymentCurrency, decimal amount, DateOnly paidAt, Guid organizationId, CancellationToken ct)
     {
         if (dealCurrency == Currency.TJS && paymentCurrency == Currency.TJS)
             return (null, amount, amount);
 
-        var rate = await rates.GetRateOnAsync(Currency.USD, paidAt, ct)
+        var rate = await rates.GetRateOnAsync(Currency.USD, paidAt, organizationId, ct)
             ?? throw new BusinessRuleException($"Нет курса USD на {paidAt:dd.MM.yyyy}. Сначала введите курс");
 
         return (dealCurrency, paymentCurrency) switch

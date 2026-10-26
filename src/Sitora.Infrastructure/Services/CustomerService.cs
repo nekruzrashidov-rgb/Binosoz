@@ -11,7 +11,7 @@ using Sitora.Infrastructure.Security;
 
 namespace Sitora.Infrastructure.Services;
 
-public class CustomerService(AppDbContext db, EncryptionService encryption, IAuditService audit) : ICustomerService
+public class CustomerService(AppDbContext db, EncryptionService encryption, IAuditService audit, ICurrentUser currentUser) : ICustomerService
 {
     public async Task<PagedResult<CustomerListItem>> GetAsync(string? search, int page, int pageSize, CancellationToken ct = default)
     {
@@ -45,12 +45,27 @@ public class CustomerService(AppDbContext db, EncryptionService encryption, IAud
     {
         var phone = PhoneNumber.Normalize(request.Phone)
             ?? throw new BusinessRuleException("Неверный номер телефона");
+        string? email = null;
+        if (!string.IsNullOrWhiteSpace(request.Email))
+            email = EmailAddress.Normalize(request.Email) ?? throw new BusinessRuleException("Неверный адрес почты");
+
+        var organizationId = currentUser.OrganizationId
+            ?? throw new BusinessRuleException("Выберите организацию: войдите как её владелец");
+
+        // Дом клиента: указанный (если он доступен сотруднику) или единственный дом сотрудника.
+        Guid? homeBuildingId = request.BuildingId ?? (currentUser.BuildingIds is [var single] ? single : null);
+        if (homeBuildingId is { } buildingId && !await db.Buildings.AnyAsync(b => b.Id == buildingId, ct))
+            throw new NotFoundException("Дом не найден");
+        if (homeBuildingId is null && currentUser.BuildingIds is { Count: > 1 })
+            throw new BusinessRuleException("Укажите дом, в котором заводите клиента");
 
         var customer = new Customer
         {
+            OrganizationId = organizationId,
+            HomeBuildingId = homeBuildingId,
             FullName = request.FullName.Trim(),
             Phone = phone,
-            Email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim(),
+            Email = email,
             PassportDataEncrypted = encryption.Encrypt(request.PassportData?.Trim())
         };
         db.Customers.Add(customer);
@@ -68,7 +83,8 @@ public class CustomerService(AppDbContext db, EncryptionService encryption, IAud
         }
         catch (DbUpdateException e) when (e.IsUniqueViolation())
         {
-            throw new ConflictException("Клиент с таким телефоном уже есть");
+            // Телефон уникален в пределах застройщика; клиента из чужого дома этот сотрудник может не видеть.
+            throw new ConflictException("Клиент с таким телефоном уже есть у этого застройщика");
         }
 
         return ToResponse(customer);

@@ -11,10 +11,12 @@ namespace Sitora.WebApi.Controllers;
 [Produces("application/json")]
 public class BuildingsController(ICatalogService catalog) : ControllerBase
 {
+    /// <summary>Дома для публичного сайта; organization — slug застройщика, чтобы показать только его дома.</summary>
     [HttpGet]
     [AllowAnonymous]
-    public Task<PagedResult<BuildingResponse>> List(int page = 1, int pageSize = PageRequest.DefaultPageSize, CancellationToken ct = default) =>
-        catalog.GetBuildingsAsync(page, pageSize, ct);
+    public Task<PagedResult<BuildingResponse>> List(int page = 1, int pageSize = PageRequest.DefaultPageSize,
+        string? organization = null, CancellationToken ct = default) =>
+        catalog.GetBuildingsAsync(page, pageSize, organization, ct);
 
     [HttpGet("{id:guid}")]
     [AllowAnonymous]
@@ -30,8 +32,9 @@ public class BuildingsController(ICatalogService catalog) : ControllerBase
     public Task<PagedResult<FloorResponse>> Floors(Guid id, int page = 1, int pageSize = PageRequest.DefaultPageSize, CancellationToken ct = default) =>
         catalog.GetFloorsAsync(id, page, pageSize, ct);
 
+    /// <summary>Новый дом в организации владельца; админ объекта и контент-менеджер дома не создают.</summary>
     [HttpPost]
-    [Authorize(Roles = Roles.CatalogEditors)]
+    [Authorize(Roles = Roles.OrganizationLeaders)]
     [ProducesResponseType<BuildingResponse>(StatusCodes.Status201Created)]
     public async Task<ActionResult<BuildingResponse>> Create(SaveBuildingRequest request, CancellationToken ct)
     {

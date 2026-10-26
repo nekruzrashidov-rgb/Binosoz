@@ -85,7 +85,7 @@ public class CatalogTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
     }
 
     [Fact]
-    public async Task CreateBuilding_RequiresContentOrAdmin()
+    public async Task CreateBuilding_OnlyOwner()
     {
         var request = NewBuilding("Права");
 
@@ -97,14 +97,14 @@ public class CatalogTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
 
         Assert.Equal(HttpStatusCode.Unauthorized, guest.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, manager.StatusCode);
-        Assert.Equal(HttpStatusCode.Created, content.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, content.StatusCode);
         Assert.Equal(HttpStatusCode.Created, admin.StatusCode);
     }
 
     [Fact]
     public async Task CreateBuilding_InvalidRequest_Returns400()
     {
-        var client = await factory.CreateContentClientAsync();
+        var client = await factory.CreateAdminClientAsync();
 
         var response = await client.PostAsJsonAsync("/api/v1/buildings", NewBuilding("") with { FloorsCount = 0 });
 
@@ -117,7 +117,7 @@ public class CatalogTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
     [Fact]
     public async Task BuildingDescription_DependsOnAcceptLanguage_WithRussianFallback()
     {
-        var client = await factory.CreateContentClientAsync();
+        var client = await factory.CreateAdminClientAsync();
         var both = await ReadAsync<BuildingResponse>(await client.PostAsJsonAsync("/api/v1/buildings",
             NewBuilding("Описание на двух языках") with { DescriptionRu = "Описание по-русски", DescriptionTg = "Тавсиф (тест)" }));
         var ruOnly = await ReadAsync<BuildingResponse>(await client.PostAsJsonAsync("/api/v1/buildings",
@@ -141,7 +141,7 @@ public class CatalogTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
     [Fact]
     public async Task BuildingName_DependsOnAcceptLanguage()
     {
-        var client = await factory.CreateContentClientAsync();
+        var client = await factory.CreateAdminClientAsync();
         var created = await ReadAsync<BuildingResponse>(await client.PostAsJsonAsync("/api/v1/buildings",
             NewBuilding("Дом у реки") with { NameTg = "Хонаи назди дарё" }));
 
@@ -158,7 +158,7 @@ public class CatalogTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
     public async Task ContentCrud_ChecksFloorRangeAndDuplicates_AndComputesPrice()
     {
         var client = await factory.CreateContentClientAsync();
-        var building = await ReadAsync<BuildingResponse>(await client.PostAsJsonAsync("/api/v1/buildings", NewBuilding("CRUD")));
+        var building = await ReadAsync<BuildingResponse>(await (await factory.CreateAdminClientAsync()).PostAsJsonAsync("/api/v1/buildings", NewBuilding("CRUD")));
 
         var floorResponse = await client.PostAsJsonAsync("/api/v1/floors", new CreateFloorRequest(building.Id, 2, null));
         Assert.Equal(HttpStatusCode.Created, floorResponse.StatusCode);
@@ -259,9 +259,10 @@ public class CatalogTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
     private static SaveBuildingRequest NewBuilding(string name) =>
         new(name, name, "г. Душанбе, тест", 5, null, null);
 
-    private static async Task<ApartmentResponse> CreateApartmentAsync(HttpClient client, string buildingName)
+    private async Task<ApartmentResponse> CreateApartmentAsync(HttpClient client, string buildingName)
     {
-        var building = await ReadAsync<BuildingResponse>(await client.PostAsJsonAsync("/api/v1/buildings", NewBuilding(buildingName)));
+        // Дом создаёт владелец, этаж и квартиру — переданный клиент (контент-менеджер).
+        var building = await ReadAsync<BuildingResponse>(await (await factory.CreateAdminClientAsync()).PostAsJsonAsync("/api/v1/buildings", NewBuilding(buildingName)));
         var floor = await ReadAsync<FloorResponse>(await client.PostAsJsonAsync("/api/v1/floors", new CreateFloorRequest(building.Id, 1, null)));
         return await ReadAsync<ApartmentResponse>(await client.PostAsJsonAsync("/api/v1/apartments", new CreateApartmentRequest(floor.Id, 101, 2, 50m, 10000m, 0)));
     }

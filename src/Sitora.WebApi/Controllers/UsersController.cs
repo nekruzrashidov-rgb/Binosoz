@@ -8,7 +8,7 @@ namespace Sitora.WebApi.Controllers;
 
 [ApiController]
 [Route("api/v1/users")]
-[Authorize(Roles = Roles.Admin)]
+[Authorize(Roles = Roles.Leaders)]
 [Produces("application/json")]
 public class UsersController(IUserService users) : ControllerBase
 {
@@ -27,4 +27,11 @@ public class UsersController(IUserService users) : ControllerBase
     [ProducesResponseType<UserResponse>(StatusCodes.Status200OK)]
     public Task<UserResponse> SetStatus(Guid id, SetUserStatusRequest request, CancellationToken ct) =>
         users.SetStatusAsync(id, request, ct);
+
+    /// <summary>Дома сотрудника (пусто — все дома организации, у админа объекта ровно один). Его сессии отзываются.</summary>
+    [HttpPut("{id:guid}/buildings")]
+    [Authorize(Roles = Roles.OrganizationLeaders)]
+    [ProducesResponseType<UserResponse>(StatusCodes.Status200OK)]
+    public Task<UserResponse> SetBuildings(Guid id, SetUserBuildingsRequest request, CancellationToken ct) =>
+        users.SetBuildingsAsync(id, request, ct);
 }

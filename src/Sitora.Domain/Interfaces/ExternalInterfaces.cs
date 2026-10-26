@@ -7,6 +7,13 @@ public interface ISmsSender
     Task SendAsync(string phone, string text, CancellationToken ct = default);
 }
 
+public record EmailMessage(string To, string Subject, string Text);
+
+public interface IEmailSender
+{
+    Task SendAsync(EmailMessage message, CancellationToken ct = default);
+}
+
 public interface IRateProvider
 {
     // Официальный курс USD к сомони от НБТ на дату; null, если получить не удалось.

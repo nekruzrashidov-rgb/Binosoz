@@ -5,7 +5,8 @@ namespace Sitora.Domain.Interfaces;
 
 public interface ICatalogService
 {
-    Task<PagedResult<BuildingResponse>> GetBuildingsAsync(int page, int pageSize, CancellationToken ct = default);
+    // organization — slug застройщика (публичный сайт одного застройщика); null — все дома.
+    Task<PagedResult<BuildingResponse>> GetBuildingsAsync(int page, int pageSize, string? organization = null, CancellationToken ct = default);
     Task<BuildingResponse> GetBuildingAsync(Guid id, CancellationToken ct = default);
     Task<PagedResult<FloorResponse>> GetFloorsAsync(Guid buildingId, int page, int pageSize, CancellationToken ct = default);
     Task<PagedResult<ApartmentResponse>> GetApartmentsAsync(Guid floorId, int page, int pageSize, CancellationToken ct = default);

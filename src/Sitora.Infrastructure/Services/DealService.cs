@@ -56,12 +56,13 @@ public class DealService(
     public async Task<DealResponse> CreateAsync(CreateDealRequest request, CancellationToken ct = default)
     {
         var currency = request.Currency ?? Currency.TJS;
+        var organizationId = await db.OrganizationOfApartmentAsync(request.ApartmentId, ct);
         // Цена в каталоге в сомони; для договора в USD она пересчитывается по курсу на сегодня
         // и округляется до целого доллара.
         decimal? usdRate = null;
         if (currency == Currency.USD)
         {
-            usdRate = await rates.GetRateOnAsync(Currency.USD, DushanbeTime.Today(timeProvider.GetUtcNow().UtcDateTime), ct)
+            usdRate = await rates.GetRateOnAsync(Currency.USD, DushanbeTime.Today(timeProvider.GetUtcNow().UtcDateTime), organizationId, ct)
                 ?? throw new BusinessRuleException("Нет курса USD. Бухгалтер должен ввести курс, прежде чем оформлять сделку в долларах");
         }
 
@@ -81,6 +82,9 @@ public class DealService(
 
             var customer = await db.Customers.FirstOrDefaultAsync(c => c.Id == request.CustomerId, ct)
                 ?? throw new NotFoundException("Клиент не найден");
+            // Сотрудника фильтры и так держат в одной организации; это правило — для создателя платформы.
+            if (customer.OrganizationId != organizationId)
+                throw new BusinessRuleException("Клиент и квартира принадлежат разным застройщикам");
             if (apartment.Status == ApartmentStatus.Sold)
                 throw new ConflictException("Квартира уже продана");
             if (await db.Deals.AnyAsync(d => d.ApartmentId == apartment.Id && d.Stage != DealStage.Cancelled, ct))

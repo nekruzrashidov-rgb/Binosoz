@@ -13,6 +13,9 @@ public class LeadConfiguration : IEntityTypeConfiguration<Lead>
         builder.Property(l => l.Phone).HasMaxLength(20).IsRequired();
         builder.Property(l => l.Comment).HasMaxLength(1000);
         builder.HasIndex(l => new { l.Status, l.CreatedAt });
+        builder.HasIndex(l => new { l.OrganizationId, l.BuildingId });
+        builder.HasOne<Organization>().WithMany().HasForeignKey(l => l.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Building>().WithMany().HasForeignKey(l => l.BuildingId).OnDelete(DeleteBehavior.SetNull);
         builder.HasOne(l => l.Apartment).WithMany().HasForeignKey(l => l.ApartmentId).OnDelete(DeleteBehavior.SetNull);
         builder.HasOne(l => l.Manager).WithMany().HasForeignKey(l => l.ManagerId).OnDelete(DeleteBehavior.SetNull);
     }

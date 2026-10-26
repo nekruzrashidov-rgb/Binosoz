@@ -45,6 +45,7 @@ public static class SalesSeeder
 
         var customers = Names.Select((name, i) => new Customer
         {
+            OrganizationId = Organization.DefaultId,
             FullName = name,
             Phone = $"+99200000{i + 1:0000}",
             Email = $"client{i + 1}@example.com",
@@ -53,7 +54,7 @@ public static class SalesSeeder
         db.Customers.AddRange(customers);
 
         // Верхние этажи почти не проданы — берём свободные квартиры оттуда.
-        var apartments = await db.Apartments
+        var apartments = await db.Apartments.Include(a => a.Floor)
             .Where(a => a.Status == ApartmentStatus.Free)
             .OrderByDescending(a => a.Floor.Number).ThenBy(a => a.Number)
             .Take(DealStages.Length + SiteBookings.Length)
@@ -77,6 +78,8 @@ public static class SalesSeeder
             var apartment = apartments[DealStages.Length + i];
             var lead = new Lead
             {
+                OrganizationId = Organization.DefaultId,
+                BuildingId = apartment.Floor.BuildingId,
                 Name = SiteBookings[i].Name,
                 Phone = SiteBookings[i].Phone,
                 ApartmentId = apartment.Id,

@@ -7,7 +7,7 @@ namespace Sitora.WebApi.Controllers;
 
 [ApiController]
 [Route("api/v1/audit")]
-[Authorize(Roles = Roles.Admin)]
+[Authorize(Roles = Roles.OrganizationLeaders)]
 [Produces("application/json")]
 public class AuditController(IAuditService audit) : ControllerBase
 {

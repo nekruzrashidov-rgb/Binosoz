@@ -14,7 +14,7 @@ public static class DatabaseInitializer
 {
     private static readonly (string Email, string FullName, string Role, string PasswordVariable)[] DevelopmentUsers =
     [
-        ("admin@sitora.local", "Администратор", RoleNames.Admin, "SEED_ADMIN_PASSWORD"),
+        ("admin@sitora.local", "Владелец", RoleNames.Owner, "SEED_ADMIN_PASSWORD"),
         ("manager@sitora.local", "Менеджер по продажам", RoleNames.Manager, "SEED_MANAGER_PASSWORD"),
         ("accountant@sitora.local", "Бухгалтер", RoleNames.Accountant, "SEED_ACCOUNTANT_PASSWORD"),
         ("content@sitora.local", "Контент-менеджер", RoleNames.Content, "SEED_CONTENT_PASSWORD")
@@ -49,7 +49,9 @@ public static class DatabaseInitializer
         var db = provider.GetRequiredService<AppDbContext>();
         await db.Database.MigrateAsync();
         await SeedRolesAsync(provider.GetRequiredService<RoleManager<IdentityRole<Guid>>>());
-        await BootstrapAdminAsync(provider.GetRequiredService<UserManager<AppUser>>(),
+        await BootstrapOwnerAsync(provider.GetRequiredService<UserManager<AppUser>>(),
+            provider.GetRequiredService<IConfiguration>(), logger);
+        await EnsurePlatformOwnerAsync(provider.GetRequiredService<UserManager<AppUser>>(),
             provider.GetRequiredService<IConfiguration>(), logger);
 
         if (provider.GetRequiredService<IHostEnvironment>().IsDevelopment())
@@ -76,24 +78,66 @@ public static class DatabaseInitializer
         }
     }
 
-    // Первый администратор в любом окружении: создаётся, только пока в базе нет ни одного админа.
+    // Первый владелец организации по умолчанию в любом окружении: создаётся, только пока владельцев нет.
     // После первого запуска переменные BOOTSTRAP_ADMIN_* можно убрать из .env.
-    private static async Task BootstrapAdminAsync(UserManager<AppUser> userManager, IConfiguration configuration, ILogger logger)
+    private static async Task BootstrapOwnerAsync(UserManager<AppUser> userManager, IConfiguration configuration, ILogger logger)
     {
         var email = configuration["BOOTSTRAP_ADMIN_EMAIL"];
         var password = configuration["BOOTSTRAP_ADMIN_PASSWORD"];
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
             return;
-        if ((await userManager.GetUsersInRoleAsync(RoleNames.Admin)).Count > 0)
+        if ((await userManager.GetUsersInRoleAsync(RoleNames.Owner)).Count > 0)
             return;
 
-        var user = new AppUser { UserName = email, Email = email, EmailConfirmed = true, FullName = "Администратор" };
+        var user = new AppUser
+        {
+            UserName = email,
+            Email = email,
+            EmailConfirmed = true,
+            FullName = "Владелец",
+            OrganizationId = Organization.DefaultId
+        };
         var result = await userManager.CreateAsync(user, password);
         if (!result.Succeeded)
-            throw new InvalidOperationException("Не удалось создать первого администратора: " +
+            throw new InvalidOperationException("Не удалось создать первого владельца: " +
                                                 string.Join("; ", result.Errors.Select(e => e.Description)));
-        await userManager.AddToRoleAsync(user, RoleNames.Admin);
-        logger.LogInformation("Создан первый администратор {Email}", email);
+        await userManager.AddToRoleAsync(user, RoleNames.Owner);
+        logger.LogInformation("Создан первый владелец {Email}", email);
+    }
+
+    // Создатель платформы — только из .env (ADMIN_EMAIL). Вход: код из почты и обязательно второй фактор,
+    // поэтому без пароля (ADMIN_PASSWORD) учётная запись не создаётся: войти было бы нечем.
+    // TOTP можно включить потом в разделе платформы. Существующему пароль не меняется.
+    private static async Task EnsurePlatformOwnerAsync(UserManager<AppUser> userManager, IConfiguration configuration, ILogger logger)
+    {
+        var email = configuration["ADMIN_EMAIL"]?.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(email))
+            return;
+
+        var user = await userManager.FindByEmailAsync(email);
+        if (user is not null)
+        {
+            if (user.OrganizationId is not null)
+                throw new InvalidOperationException($"ADMIN_EMAIL {email} уже занят сотрудником организации");
+            if (!await userManager.IsInRoleAsync(user, RoleNames.PlatformOwner))
+                await userManager.AddToRoleAsync(user, RoleNames.PlatformOwner);
+            return;
+        }
+
+        var password = configuration["ADMIN_PASSWORD"];
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            logger.LogWarning("Создатель платформы {Email} не создан: задайте ADMIN_PASSWORD (второй фактор входа)", email);
+            return;
+        }
+
+        user = new AppUser { UserName = email, Email = email, EmailConfirmed = true, FullName = "Создатель платформы" };
+        var result = await userManager.CreateAsync(user, password);
+        if (!result.Succeeded)
+            throw new InvalidOperationException("Не удалось создать создателя платформы: " +
+                                                string.Join("; ", result.Errors.Select(e => e.Description)));
+        await userManager.AddToRoleAsync(user, RoleNames.PlatformOwner);
+        logger.LogInformation("Создан создатель платформы {Email}", email);
     }
 
     private static async Task SeedDevelopmentUsersAsync(UserManager<AppUser> userManager, IConfiguration configuration, ILogger logger)
@@ -110,7 +154,14 @@ public static class DatabaseInitializer
                 continue;
             }
 
-            var user = new AppUser { UserName = email, Email = email, EmailConfirmed = true, FullName = fullName };
+            var user = new AppUser
+            {
+                UserName = email,
+                Email = email,
+                EmailConfirmed = true,
+                FullName = fullName,
+                OrganizationId = Organization.DefaultId
+            };
             var result = await userManager.CreateAsync(user, password);
             if (!result.Succeeded)
             {

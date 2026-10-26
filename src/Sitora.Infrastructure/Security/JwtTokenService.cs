@@ -4,17 +4,20 @@ using System.Text;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
+using Sitora.Domain.Common;
 using Sitora.Domain.Entities;
 
 namespace Sitora.Infrastructure.Security;
 
 public class JwtTokenService(IOptions<JwtOptions> options, TimeProvider timeProvider)
 {
-    public const string RoleClaimType = "role";
+    public const string RoleClaimType = AccessClaims.Role;
 
     private readonly JwtOptions _options = options.Value;
 
-    public (string Token, DateTime ExpiresAt) CreateAccessToken(AppUser user, IEnumerable<string> roles)
+    // Организация, дома и режим «войти как владелец» попадают в claims: по ним AppDbContext
+    // ограничивает данные. Изменение домов сотрудника вступает в силу со следующим токеном (до 15 минут).
+    public (string Token, DateTime ExpiresAt) CreateAccessToken(AppUser user, IEnumerable<string> roles, TokenScope scope)
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var expiresAt = now.AddMinutes(_options.AccessTokenMinutes);
@@ -28,6 +31,11 @@ public class JwtTokenService(IOptions<JwtOptions> options, TimeProvider timeProv
         if (user.Email is not null)
             claims.Add(new Claim(JwtRegisteredClaimNames.Email, user.Email));
         claims.AddRange(roles.Select(r => new Claim(RoleClaimType, r)));
+        if (scope.OrganizationId is { } organizationId)
+            claims.Add(new Claim(AccessClaims.Organization, organizationId.ToString()));
+        claims.AddRange(scope.BuildingIds.Select(id => new Claim(AccessClaims.Building, id.ToString())));
+        if (scope.ImpersonatedBy is { } impersonator)
+            claims.Add(new Claim(AccessClaims.ImpersonatedBy, impersonator.ToString()));
 
         var descriptor = new SecurityTokenDescriptor
         {

@@ -186,6 +186,7 @@ if (!app.Environment.IsProduction())
 app.UseCors(SecuritySetup.CorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<ImpersonationAuditMiddleware>();
 app.UseRateLimiter();
 
 app.MapControllers();

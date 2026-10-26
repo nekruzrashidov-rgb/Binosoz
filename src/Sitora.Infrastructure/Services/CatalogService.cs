@@ -16,6 +16,7 @@ public class CatalogService(
     AppDbContext db,
     CatalogCache cache,
     IAuditService audit,
+    ICurrentUser currentUser,
     ApartmentImporter importer) : ICatalogService
 {
     private const string BuildingNotFound = "Дом не найден";
@@ -24,13 +25,28 @@ public class CatalogService(
 
     private static bool IsTajik => CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "tg";
 
-    public Task<PagedResult<BuildingResponse>> GetBuildingsAsync(int page, int pageSize, CancellationToken ct = default)
+    // Сотрудник видит каталог только своей организации, поэтому ключ кэша учитывает, кто смотрит:
+    // иначе урезанный каталог одного застройщика попал бы гостям или другому застройщику.
+    private Task<T> Cached<T>(string key, Func<Task<T>> factory)
+    {
+        var scope = currentUser.OrganizationId is { } org
+            ? $"{org}:{string.Join(',', currentUser.BuildingIds ?? [])}"
+            : "all";
+        return cache.GetOrCreateAsync($"{scope}:{key}", factory);
+    }
+
+    // organization — slug застройщика для его публичного сайта; без него — все дома платформы.
+    public Task<PagedResult<BuildingResponse>> GetBuildingsAsync(int page, int pageSize, string? organization = null, CancellationToken ct = default)
     {
         var p = PageRequest.Normalize(page, pageSize);
         var tg = IsTajik;
-        return cache.GetOrCreateAsync($"buildings:{tg}:{p.Page}:{p.PageSize}", async () =>
+        var slug = string.IsNullOrWhiteSpace(organization) ? null : organization.Trim().ToLowerInvariant();
+        return Cached($"buildings:{slug}:{tg}:{p.Page}:{p.PageSize}", async () =>
         {
-            var query = db.Buildings.AsNoTracking();
+            // Дома отключённой организации на сайте не показываются.
+            var query = db.Buildings.AsNoTracking().Where(b => b.Organization.IsActive);
+            if (slug is not null)
+                query = query.Where(b => b.Organization.Slug == slug);
             var total = await query.CountAsync(ct);
             var items = await query.OrderBy(b => b.NameRu).ThenBy(b => b.Id)
                 .Skip(p.Skip).Take(p.PageSize)
@@ -43,7 +59,7 @@ public class CatalogService(
     public Task<BuildingResponse> GetBuildingAsync(Guid id, CancellationToken ct = default)
     {
         var tg = IsTajik;
-        return cache.GetOrCreateAsync($"building:{id}:{tg}", async () =>
+        return Cached($"building:{id}:{tg}", async () =>
             await db.Buildings.AsNoTracking().Where(b => b.Id == id).Select(ToBuildingResponse(tg)).FirstOrDefaultAsync(ct)
             ?? throw new NotFoundException(BuildingNotFound));
     }
@@ -51,7 +67,7 @@ public class CatalogService(
     public Task<PagedResult<FloorResponse>> GetFloorsAsync(Guid buildingId, int page, int pageSize, CancellationToken ct = default)
     {
         var p = PageRequest.Normalize(page, pageSize);
-        return cache.GetOrCreateAsync($"floors:{buildingId}:{p.Page}:{p.PageSize}", async () =>
+        return Cached($"floors:{buildingId}:{p.Page}:{p.PageSize}", async () =>
         {
             if (!await db.Buildings.AnyAsync(b => b.Id == buildingId, ct))
                 throw new NotFoundException(BuildingNotFound);
@@ -69,7 +85,7 @@ public class CatalogService(
     public Task<PagedResult<ApartmentResponse>> GetApartmentsAsync(Guid floorId, int page, int pageSize, CancellationToken ct = default)
     {
         var p = PageRequest.Normalize(page, pageSize);
-        return cache.GetOrCreateAsync($"apartments:{floorId}:{p.Page}:{p.PageSize}", async () =>
+        return Cached($"apartments:{floorId}:{p.Page}:{p.PageSize}", async () =>
         {
             if (!await db.Floors.AnyAsync(f => f.Id == floorId, ct))
                 throw new NotFoundException(FloorNotFound);
@@ -85,13 +101,18 @@ public class CatalogService(
     }
 
     public Task<ApartmentResponse> GetApartmentAsync(Guid id, CancellationToken ct = default) =>
-        cache.GetOrCreateAsync($"apartment:{id}", async () =>
+        Cached($"apartment:{id}", async () =>
             await db.Apartments.AsNoTracking().Where(a => a.Id == id).Select(ToApartmentResponse).FirstOrDefaultAsync(ct)
             ?? throw new NotFoundException(ApartmentNotFound));
 
+    // Дом создаёт владелец в своей организации (создатель платформы — войдя как владелец).
     public async Task<BuildingResponse> CreateBuildingAsync(SaveBuildingRequest request, CancellationToken ct = default)
     {
-        var building = new Building();
+        var building = new Building
+        {
+            OrganizationId = currentUser.OrganizationId
+                ?? throw new BusinessRuleException("Выберите организацию: войдите как её владелец")
+        };
         Apply(building, request);
         db.Buildings.Add(building);
         audit.Record(nameof(Building), building.Id, "Created", null, Snapshot(building));

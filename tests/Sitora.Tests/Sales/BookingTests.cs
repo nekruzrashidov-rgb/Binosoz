@@ -70,7 +70,7 @@ public class BookingTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
         var apartmentId = await factory.FindFreeApartmentAsync();
         var leadId = await factory.WithDbAsync(async db =>
         {
-            var lead = new Lead { Name = "Индекс", Phone = SitoraApiFactory.RandomPhone() };
+            var lead = new Lead { OrganizationId = Organization.DefaultId, Name = "Индекс", Phone = SitoraApiFactory.RandomPhone() };
             db.Leads.Add(lead);
             await db.SaveChangesAsync();
             return lead.Id;

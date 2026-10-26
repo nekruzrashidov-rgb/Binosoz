@@ -26,9 +26,15 @@ public class BookingService(
 
     public async Task<BookingResponse> CreateAsync(Guid apartmentId, CreateBookingRequest request, CancellationToken ct = default)
     {
-        var isStaff = currentUser.IsInRole(RoleNames.Manager) || currentUser.IsInRole(RoleNames.Admin);
+        var isStaff = currentUser.IsInRole(RoleNames.Manager) || currentUser.IsLeader;
         if (request.CustomerId is not null && !isStaff)
             throw new ForbiddenException("Бронировать на клиента может только менеджер");
+
+        // Дом и застройщик квартиры: к ним привязываются заявка гостя и записи аудита.
+        var place = await db.Apartments.Where(a => a.Id == apartmentId)
+                        .Select(a => new { a.Floor.BuildingId, a.Floor.Building.OrganizationId })
+                        .FirstOrDefaultAsync(ct)
+                    ?? throw new NotFoundException("Квартира не найдена");
 
         var now = Now;
         Booking booking;
@@ -48,21 +54,23 @@ public class BookingService(
             {
                 var customer = await db.Customers.FirstOrDefaultAsync(c => c.Id == customerId, ct)
                     ?? throw new NotFoundException("Клиент не найден");
+                if (customer.OrganizationId != place.OrganizationId)
+                    throw new BusinessRuleException("Клиент и квартира принадлежат разным застройщикам");
                 booking.CustomerId = customer.Id;
                 (clientName, clientPhone) = (customer.FullName, customer.Phone);
             }
             else
             {
-                var lead = await FindOrCreateLeadAsync(request, apartment.Id, isStaff, ct);
+                var lead = await FindOrCreateLeadAsync(request, apartment.Id, place.BuildingId, place.OrganizationId, isStaff, ct);
                 booking.LeadId = lead.Id;
                 (clientName, clientPhone) = (lead.Name, lead.Phone);
             }
 
             apartment.Book();
             db.Bookings.Add(booking);
-            audit.Record(nameof(Booking), booking.Id, "Created", null, Snapshot(booking));
+            audit.Record(nameof(Booking), booking.Id, "Created", null, Snapshot(booking), place.OrganizationId);
             audit.Record(nameof(Apartment), apartment.Id, "StatusChanged",
-                new { Status = ApartmentStatus.Free }, new { apartment.Status });
+                new { Status = ApartmentStatus.Free }, new { apartment.Status }, place.OrganizationId);
 
             await SaveAsync(ct);
             await transaction.CommitAsync(ct);
@@ -156,7 +164,8 @@ public class BookingService(
         return true;
     }
 
-    private async Task<Lead> FindOrCreateLeadAsync(CreateBookingRequest request, Guid apartmentId, bool isStaff, CancellationToken ct)
+    private async Task<Lead> FindOrCreateLeadAsync(CreateBookingRequest request, Guid apartmentId, Guid buildingId,
+        Guid organizationId, bool isStaff, CancellationToken ct)
     {
         var phone = PhoneNumber.Normalize(request.Phone)
             ?? throw new BusinessRuleException("Неверный номер телефона");
@@ -165,12 +174,15 @@ public class BookingService(
         if (!isStaff && await db.Bookings.AnyAsync(b => b.Status == BookingStatus.Active && b.Lead!.Phone == phone, ct))
             throw new ConflictException("На этот номер уже есть активная бронь. Чтобы забронировать другую квартиру, свяжитесь с менеджером");
 
+        // Заявки у каждого застройщика свои: ищем открытую заявку только в организации квартиры.
         var lead = await db.Leads.FirstOrDefaultAsync(
-            l => l.Phone == phone && (l.Status == LeadStatus.New || l.Status == LeadStatus.InProgress), ct);
+            l => l.OrganizationId == organizationId && l.Phone == phone
+                 && (l.Status == LeadStatus.New || l.Status == LeadStatus.InProgress), ct);
         if (lead is null)
         {
             lead = new Lead
             {
+                OrganizationId = organizationId,
                 Name = request.Name!.Trim(),
                 Phone = phone,
                 Source = isStaff ? LeadSource.Office : LeadSource.Website,
@@ -180,6 +192,7 @@ public class BookingService(
         }
 
         lead.ApartmentId = apartmentId;
+        lead.BuildingId = buildingId;
         if (!string.IsNullOrWhiteSpace(request.Comment))
             lead.Comment = request.Comment.Trim();
         return lead;

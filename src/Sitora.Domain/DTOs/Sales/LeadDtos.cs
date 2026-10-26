@@ -2,7 +2,8 @@ using Sitora.Domain.Enums;
 
 namespace Sitora.Domain.DTOs.Sales;
 
-public record CreateLeadRequest(string Name, string Phone, Guid? ApartmentId, LeadSource? Source, string? Comment);
+// BuildingId — заявка на дом без конкретной квартиры (публичный сайт застройщика).
+public record CreateLeadRequest(string Name, string Phone, Guid? ApartmentId, LeadSource? Source, string? Comment, Guid? BuildingId = null);
 
 // null в поле — значение не меняется.
 public record UpdateLeadRequest(LeadStatus? Status, Guid? ManagerId, string? Comment);

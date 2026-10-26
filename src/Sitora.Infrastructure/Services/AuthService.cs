@@ -22,8 +22,12 @@ public class AuthService(
     UserManager<AppUser> userManager,
     JwtTokenService tokens,
     ISmsSender sms,
+    IEmailSender email,
+    IAuditService audit,
+    ICurrentUser currentUser,
     IMemoryCache cache,
     IOptions<IdentityOptions> identityOptions,
+    IOptions<AuthOptions> authOptions,
     TimeProvider timeProvider,
     ILogger<AuthService> logger) : IAuthService
 {
@@ -31,23 +35,259 @@ public class AuthService(
     private const string LockedOut = "Слишком много неудачных попыток входа, попробуйте позже";
     private const string InvalidRefreshToken = "Сессия истекла, войдите заново";
     private const string InvalidSmsCode = "Неверный или устаревший код";
+    private const string InvalidEmailCode = "Неверный или устаревший код";
+    private const string InvalidChallenge = "Время на подтверждение входа истекло, запросите код заново";
+    private const string InvalidInvitation = "Приглашение недействительно или уже использовано";
     public const int MaxSmsCodesPerHour = 5;
+
+    private static readonly TimeSpan ChallengeLifetime = TimeSpan.FromMinutes(5);
+    private const int MaxChallengeAttempts = 5;
+
+    // ---------- Вход по почте ----------
+
+    // Ответ одинаковый, есть ли такая учётная запись: код создаётся и учитывается в лимитах всегда,
+    // а письмо уходит, только если почта принадлежит сотруднику или покупателю.
+    public async Task<EmailSendResponse> SendEmailCodeAsync(EmailSendRequest request, string? requestIp, CancellationToken ct = default)
+    {
+        var address = EmailAddress.Normalize(request.Email)
+            ?? throw new BusinessRuleException("Неверный адрес почты");
+        var now = Now;
+        var limits = authOptions.Value;
+
+        await EnsureEmailCodeLimitAsync(c => c.Email == address, now, limits, ct);
+        if (!string.IsNullOrEmpty(requestIp))
+            await EnsureEmailCodeLimitAsync(c => c.RequestIp == requestIp, now, limits, ct);
+
+        var code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+        var known = await IsKnownEmailAsync(address, ct);
+        db.EmailCodes.Add(new EmailCode
+        {
+            Email = address,
+            CodeHash = HashCode(address, code),
+            RequestIp = requestIp,
+            Sent = known,
+            ExpiresAt = now.Add(EmailCode.Lifetime)
+        });
+        await db.SaveChangesAsync(ct);
+
+        if (known)
+            await email.SendAsync(new EmailMessage(address, $"Sitora: код для входа {code}",
+                $"Ваш код для входа в Sitora: {code}\n\nКод действует {EmailCode.Lifetime.TotalMinutes:0} минут. " +
+                "Никому его не сообщайте. Если вы не запрашивали код, просто удалите это письмо."), ct);
+        else
+            logger.LogInformation("Код не отправлен: почта не найдена среди пользователей и покупателей");
+
+        return new EmailSendResponse("Если почта зарегистрирована, мы отправили на неё код для входа",
+            (int)EmailCode.Lifetime.TotalSeconds);
+    }
+
+    private async Task EnsureEmailCodeLimitAsync(System.Linq.Expressions.Expression<Func<EmailCode, bool>> who, DateTime now,
+        AuthOptions limits, CancellationToken ct)
+    {
+        var recent = db.EmailCodes.Where(who);
+        if (await recent.CountAsync(c => c.CreatedAt > now.AddMinutes(-1), ct) >= limits.EmailCodesPerMinute)
+            throw new TooManyRequestsException("Код уже отправлен. Запросить новый можно через минуту");
+        if (await recent.CountAsync(c => c.CreatedAt > now.AddHours(-1), ct) >= limits.EmailCodesPerHour)
+            throw new TooManyRequestsException("Слишком много запросов кода. Попробуйте позже");
+    }
+
+    private async Task<bool> IsKnownEmailAsync(string address, CancellationToken ct)
+    {
+        var user = await userManager.FindByEmailAsync(address);
+        if (user is not null)
+            return user.IsActive;
+        return await db.Customers.IgnoreQueryFilters().AnyAsync(c => c.Email == address, ct);
+    }
+
+    public async Task<EmailLoginResult> VerifyEmailCodeAsync(EmailVerifyRequest request, CancellationToken ct = default)
+    {
+        var address = EmailAddress.Normalize(request.Email) ?? throw new UnauthorizedException(InvalidEmailCode);
+        var now = Now;
+
+        // Действует только последний код: запрос нового делает прежние бесполезными.
+        var stored = await db.EmailCodes
+            .Where(c => c.Email == address)
+            .OrderByDescending(c => c.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+        if (stored is null || !stored.IsUsable(now))
+            throw new UnauthorizedException(InvalidEmailCode);
+
+        if (!FixedTimeEquals(stored.CodeHash, HashCode(address, request.Code.Trim())))
+        {
+            stored.Attempts++;
+            await db.SaveChangesAsync(ct);
+            throw new UnauthorizedException(InvalidEmailCode);
+        }
+
+        stored.UsedAt = now;
+        await db.SaveChangesAsync(ct);
+
+        var user = await userManager.FindByEmailAsync(address) ?? await GetOrCreateCustomerUserByEmailAsync(address, ct);
+        await EnsureCanSignInAsync(user, ct);
+
+        if (await userManager.IsInRoleAsync(user, RoleNames.PlatformOwner))
+            return new EmailLoginResult(null, await CreateChallengeAsync(user));
+
+        logger.LogInformation("Пользователь {UserId} вошёл по коду из почты", user.Id);
+        return new EmailLoginResult(await IssueTokensAsync(user, ct), null);
+    }
+
+    // Покупатель входит по почте из своих сделок: учётная запись создаётся при первом входе
+    // и привязывается ко всем записям клиента с этой почтой (у разных застройщиков).
+    private async Task<AppUser> GetOrCreateCustomerUserByEmailAsync(string address, CancellationToken ct)
+    {
+        var customers = await db.Customers.IgnoreQueryFilters().Where(c => c.Email == address).ToListAsync(ct);
+        if (customers.Count == 0)
+            throw new UnauthorizedException(InvalidEmailCode);
+
+        AppUser? user = null;
+        foreach (var userId in customers.Where(c => c.UserId != null).Select(c => c.UserId!.Value).Distinct())
+        {
+            user = await userManager.FindByIdAsync(userId.ToString());
+            if (user is not null)
+                break;
+        }
+
+        if (user is null)
+        {
+            user = new AppUser { UserName = address, Email = address, EmailConfirmed = true, FullName = customers[0].FullName };
+            var result = await userManager.CreateAsync(user);
+            if (!result.Succeeded)
+                throw new ConflictException("Не удалось создать учётную запись покупателя: " +
+                                            string.Join("; ", result.Errors.Select(e => e.Description)));
+            await userManager.AddToRoleAsync(user, RoleNames.Customer);
+        }
+        else if (user.Email is null)
+        {
+            // Покупатель раньше входил по SMS: теперь у учётной записи появляется почта.
+            await userManager.SetEmailAsync(user, address);
+            user.EmailConfirmed = true;
+            await userManager.UpdateAsync(user);
+        }
+
+        foreach (var customer in customers)
+            customer.UserId = user.Id;
+        await db.SaveChangesAsync(ct);
+        return user;
+    }
+
+    // ---------- Второй фактор (создатель платформы) ----------
+
+    private async Task<SecondFactorChallenge> CreateChallengeAsync(AppUser user)
+    {
+        var methods = new List<string>();
+        if (await userManager.HasPasswordAsync(user))
+            methods.Add("password");
+        if (await userManager.GetTwoFactorEnabledAsync(user))
+            methods.Add("totp");
+        if (methods.Count == 0)
+            throw new UnauthorizedException("Для этой учётной записи не настроен второй фактор. Задайте пароль в ADMIN_PASSWORD");
+
+        var token = Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
+        var expiresAt = Now.Add(ChallengeLifetime);
+        cache.Set(ChallengeKey(token), new StrongBox<(Guid UserId, int Attempts)>((user.Id, 0)), ChallengeLifetime);
+        return new SecondFactorChallenge(token, expiresAt, methods,
+            "Код принят. Подтвердите вход паролем или кодом из приложения-аутентификатора");
+    }
+
+    public async Task<AuthResponse> CompleteSecondFactorAsync(SecondFactorRequest request, CancellationToken ct = default)
+    {
+        var key = ChallengeKey(request.ChallengeToken);
+        if (!cache.TryGetValue(key, out StrongBox<(Guid UserId, int Attempts)>? challenge) || challenge is null)
+            throw new UnauthorizedException(InvalidChallenge);
+
+        var user = await userManager.FindByIdAsync(challenge.Value.UserId.ToString());
+        if (user is null || !user.IsActive || !await userManager.IsInRoleAsync(user, RoleNames.PlatformOwner))
+        {
+            cache.Remove(key);
+            throw new UnauthorizedException(InvalidChallenge);
+        }
+
+        bool ok;
+        if (!string.IsNullOrWhiteSpace(request.TotpCode) && await userManager.GetTwoFactorEnabledAsync(user))
+            ok = await userManager.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultAuthenticatorProvider,
+                request.TotpCode.Replace(" ", "", StringComparison.Ordinal));
+        else if (!string.IsNullOrEmpty(request.Password))
+        {
+            if (await userManager.IsLockedOutAsync(user))
+                throw new UnauthorizedException(LockedOut);
+            ok = await userManager.CheckPasswordAsync(user, request.Password);
+            if (!ok)
+                await userManager.AccessFailedAsync(user);
+        }
+        else
+            throw new BusinessRuleException("Введите пароль или код из приложения-аутентификатора");
+
+        if (!ok)
+        {
+            challenge.Value = (challenge.Value.UserId, challenge.Value.Attempts + 1);
+            if (challenge.Value.Attempts >= MaxChallengeAttempts)
+                cache.Remove(key);
+            logger.LogWarning("Неверный второй фактор создателя платформы {UserId}", user.Id);
+            throw new UnauthorizedException("Неверный пароль или код");
+        }
+
+        cache.Remove(key);
+        await userManager.ResetAccessFailedCountAsync(user);
+        logger.LogInformation("Создатель платформы {UserId} вошёл с двумя факторами", user.Id);
+        return await IssueTokensAsync(user, ct);
+    }
+
+    private static string ChallengeKey(string token) => "2fa:" + JwtTokenService.HashToken(token);
+
+    // ---------- Приглашение сотрудника ----------
+
+    public async Task<AuthResponse> AcceptInvitationAsync(AcceptInvitationRequest request, CancellationToken ct = default)
+    {
+        var hash = JwtTokenService.HashToken(request.Token.Trim());
+        var invitation = await db.Invitations.IgnoreQueryFilters().Include(i => i.Organization)
+            .FirstOrDefaultAsync(i => i.TokenHash == hash, ct);
+        if (invitation is null || !invitation.IsPending(Now) || !invitation.Organization.IsActive)
+            throw new UnauthorizedException(InvalidInvitation);
+        if (await userManager.FindByEmailAsync(invitation.Email) is not null)
+            throw new ConflictException("Пользователь с такой почтой уже есть");
+
+        var user = new AppUser
+        {
+            UserName = invitation.Email,
+            Email = invitation.Email,
+            EmailConfirmed = true,
+            FullName = invitation.FullName,
+            OrganizationId = invitation.OrganizationId
+        };
+        var result = await userManager.CreateAsync(user);
+        if (!result.Succeeded)
+            throw new BusinessRuleException(string.Join("; ", result.Errors.Select(e => e.Description)));
+        await userManager.AddToRoleAsync(user, invitation.Role);
+
+        foreach (var buildingId in invitation.BuildingIds)
+            db.UserBuildings.Add(new UserBuilding { UserId = user.Id, BuildingId = buildingId });
+        invitation.AcceptedAt = Now;
+        audit.Record(nameof(Invitation), invitation.Id, "Accepted", null,
+            new { invitation.Email, invitation.Role, invitation.BuildingIds, UserId = user.Id }, invitation.OrganizationId);
+        await db.SaveChangesAsync(ct);
+
+        logger.LogInformation("Принято приглашение {InvitationId}: сотрудник {UserId}", invitation.Id, user.Id);
+        return await IssueTokensAsync(user, ct);
+    }
+
+    // ---------- Старый вход по SMS ----------
 
     // Ответ одинаковый для любого номера, чтобы по нему нельзя было узнать, кто покупатель.
     public async Task<SmsSendResponse> SendSmsCodeAsync(SmsSendRequest request, CancellationToken ct = default)
     {
         var phone = PhoneNumber.Normalize(request.Phone)
             ?? throw new BusinessRuleException("Неверный номер телефона");
-        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var now = Now;
 
         var sentLastHour = await db.SmsCodes.CountAsync(c => c.Phone == phone && c.CreatedAt > now.AddHours(-1), ct);
         if (sentLastHour >= MaxSmsCodesPerHour)
             throw new TooManyRequestsException("Слишком много запросов кода. Попробуйте позже");
 
-        if (await db.Customers.AnyAsync(c => c.Phone == phone, ct))
+        if (await db.Customers.IgnoreQueryFilters().AnyAsync(c => c.Phone == phone, ct))
         {
             var code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
-            db.SmsCodes.Add(new SmsCode { Phone = phone, CodeHash = HashSmsCode(phone, code), ExpiresAt = now.Add(SmsCode.Lifetime) });
+            db.SmsCodes.Add(new SmsCode { Phone = phone, CodeHash = HashCode(phone, code), ExpiresAt = now.Add(SmsCode.Lifetime) });
             await db.SaveChangesAsync(ct);
             await sms.SendAsync(phone, $"Sitora: код для входа {code}. Никому его не сообщайте.", ct);
         }
@@ -63,7 +303,7 @@ public class AuthService(
     public async Task<AuthResponse> VerifySmsCodeAsync(SmsVerifyRequest request, CancellationToken ct = default)
     {
         var phone = PhoneNumber.Normalize(request.Phone) ?? throw new UnauthorizedException(InvalidSmsCode);
-        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var now = Now;
 
         var smsCode = await db.SmsCodes
             .Where(c => c.Phone == phone && c.UsedAt == null && c.ExpiresAt > now)
@@ -72,9 +312,7 @@ public class AuthService(
         if (smsCode is null || !smsCode.IsUsable(now))
             throw new UnauthorizedException(InvalidSmsCode);
 
-        var expected = Encoding.ASCII.GetBytes(smsCode.CodeHash);
-        var actual = Encoding.ASCII.GetBytes(HashSmsCode(phone, request.Code.Trim()));
-        if (!CryptographicOperations.FixedTimeEquals(expected, actual))
+        if (!FixedTimeEquals(smsCode.CodeHash, HashCode(phone, request.Code.Trim())))
         {
             smsCode.Attempts++;
             await db.SaveChangesAsync(ct);
@@ -82,9 +320,10 @@ public class AuthService(
         }
 
         smsCode.UsedAt = now;
-        var customer = await db.Customers.FirstOrDefaultAsync(c => c.Phone == phone, ct)
-            ?? throw new UnauthorizedException(InvalidSmsCode);
-        var user = await GetOrCreateCustomerUserAsync(customer);
+        var customers = await db.Customers.IgnoreQueryFilters().Where(c => c.Phone == phone).ToListAsync(ct);
+        if (customers.Count == 0)
+            throw new UnauthorizedException(InvalidSmsCode);
+        var user = await GetOrCreateCustomerUserByPhoneAsync(customers);
         if (!user.IsActive)
             throw new UnauthorizedException("Учётная запись заблокирована");
 
@@ -93,36 +332,43 @@ public class AuthService(
         return await IssueTokensAsync(user, ct);
     }
 
-    private async Task<AppUser> GetOrCreateCustomerUserAsync(Customer customer)
+    private async Task<AppUser> GetOrCreateCustomerUserByPhoneAsync(List<Customer> customers)
     {
-        if (customer.UserId is { } userId && await userManager.FindByIdAsync(userId.ToString()) is { } existing)
-            return existing;
+        foreach (var userId in customers.Where(c => c.UserId != null).Select(c => c.UserId!.Value).Distinct())
+        {
+            if (await userManager.FindByIdAsync(userId.ToString()) is { } existing)
+            {
+                customers.ForEach(c => c.UserId = existing.Id);
+                return existing;
+            }
+        }
 
+        var first = customers[0];
         var user = new AppUser
         {
-            UserName = customer.Phone,
-            PhoneNumber = customer.Phone,
+            UserName = first.Phone,
+            PhoneNumber = first.Phone,
             PhoneNumberConfirmed = true,
-            FullName = customer.FullName
+            FullName = first.FullName
         };
         var result = await userManager.CreateAsync(user);
         if (!result.Succeeded)
             throw new ConflictException("Не удалось создать учётную запись покупателя: " +
                                         string.Join("; ", result.Errors.Select(e => e.Description)));
         await userManager.AddToRoleAsync(user, RoleNames.Customer);
-        customer.UserId = user.Id;
+        customers.ForEach(c => c.UserId = user.Id);
         return user;
     }
 
-    private static string HashSmsCode(string phone, string code) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{phone}:{code}")));
+    // ---------- Вход по паролю, обновление и выход ----------
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken ct = default)
     {
-        var email = request.Email.Trim();
-        var user = await userManager.FindByEmailAsync(email);
-        if (user is null || !user.IsActive)
-            throw UnknownAccountFailure(email, request.Password);
+        var address = request.Email.Trim();
+        var user = await userManager.FindByEmailAsync(address);
+        // Создатель платформы по паролю не входит: только код из почты и второй фактор.
+        if (user is null || !user.IsActive || await userManager.IsInRoleAsync(user, RoleNames.PlatformOwner))
+            throw UnknownAccountFailure(address, request.Password);
 
         if (await userManager.IsLockedOutAsync(user))
             throw new UnauthorizedException(LockedOut);
@@ -134,6 +380,7 @@ public class AuthService(
             throw new UnauthorizedException(InvalidCredentials);
         }
 
+        await EnsureCanSignInAsync(user, ct);
         await userManager.ResetAccessFailedCountAsync(user);
         logger.LogInformation("Пользователь {UserId} вошёл в систему", user.Id);
         return await IssueTokensAsync(user, ct);
@@ -141,12 +388,12 @@ public class AuthService(
 
     // Для несуществующей или отключённой почты ведём такой же счётчик ошибок, как Identity для настоящей,
     // и так же тратим время на проверку пароля: иначе по ответу или по задержке можно узнать, кто сотрудник.
-    private UnauthorizedException UnknownAccountFailure(string email, string password)
+    private UnauthorizedException UnknownAccountFailure(string address, string password)
     {
         userManager.PasswordHasher.VerifyHashedPassword(DummyUser, DummyPasswordHash.Value, password);
 
         var lockout = identityOptions.Value.Lockout;
-        var failures = cache.GetOrCreate("login-failures:" + email.ToUpperInvariant(), entry =>
+        var failures = cache.GetOrCreate("login-failures:" + address.ToUpperInvariant(), entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = lockout.DefaultLockoutTimeSpan;
             return new StrongBox<int>();
@@ -164,7 +411,7 @@ public class AuthService(
 
     public async Task<AuthResponse> RefreshAsync(RefreshRequest request, CancellationToken ct = default)
     {
-        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var now = Now;
         var hash = JwtTokenService.HashToken(request.RefreshToken);
         var stored = await db.RefreshTokens.Include(t => t.User)
             .SingleOrDefaultAsync(t => t.TokenHash == hash, ct);
@@ -180,7 +427,7 @@ public class AuthService(
             throw new UnauthorizedException(InvalidRefreshToken);
         }
 
-        if (!stored.IsActive(now) || !stored.User.IsActive)
+        if (!stored.IsActive(now) || !stored.User.IsActive || !await OrganizationActiveAsync(stored.User, ct))
             throw new UnauthorizedException(InvalidRefreshToken);
 
         return await IssueTokensAsync(stored.User, ct, stored);
@@ -193,26 +440,68 @@ public class AuthService(
         if (stored is null || stored.RevokedAt is not null)
             return;
 
-        stored.RevokedAt = timeProvider.GetUtcNow().UtcDateTime;
+        stored.RevokedAt = Now;
         await db.SaveChangesAsync(ct);
     }
 
+    // В режиме «войти как владелец» отвечаем по claims токена: роль Owner в выбранной организации.
     public async Task<CurrentUserResponse> GetCurrentUserAsync(Guid userId, CancellationToken ct = default)
     {
         var user = await userManager.FindByIdAsync(userId.ToString())
             ?? throw new NotFoundException("Пользователь не найден");
-        return ToResponse(user, await userManager.GetRolesAsync(user));
+
+        if (currentUser.ImpersonatorId is { } impersonator && currentUser.OrganizationId is { } organizationId)
+            return await BuildUserResponseAsync(user, [RoleNames.Owner], new TokenScope(organizationId, [], impersonator), ct);
+
+        return await BuildUserResponseAsync(user, await userManager.GetRolesAsync(user), await ScopeOfAsync(user, ct), ct);
     }
+
+    // ---------- Общее ----------
+
+    private async Task EnsureCanSignInAsync(AppUser user, CancellationToken ct)
+    {
+        if (!user.IsActive)
+            throw new UnauthorizedException("Учётная запись заблокирована");
+        if (!await OrganizationActiveAsync(user, ct))
+            throw new UnauthorizedException("Организация отключена. Обратитесь к владельцу платформы");
+    }
+
+    private async Task<bool> OrganizationActiveAsync(AppUser user, CancellationToken ct) =>
+        user.OrganizationId is not { } organizationId
+        || await db.Organizations.IgnoreQueryFilters().AnyAsync(o => o.Id == organizationId && o.IsActive, ct);
+
+    public async Task<TokenScope> ScopeOfAsync(AppUser user, CancellationToken ct)
+    {
+        var buildings = user.OrganizationId is null
+            ? []
+            : await db.UserBuildings.Where(ub => ub.UserId == user.Id).Select(ub => ub.BuildingId).OrderBy(id => id).ToListAsync(ct);
+        return new TokenScope(user.OrganizationId, buildings);
+    }
+
+    public async Task<CurrentUserResponse> BuildUserResponseAsync(AppUser user, IList<string> roles, TokenScope scope, CancellationToken ct)
+    {
+        string? organizationName = null;
+        if (scope.OrganizationId is { } organizationId)
+            organizationName = await db.Organizations.IgnoreQueryFilters()
+                .Where(o => o.Id == organizationId).Select(o => o.Name).FirstOrDefaultAsync(ct);
+
+        return new CurrentUserResponse(user.Id, user.Email, user.PhoneNumber, user.FullName, roles.ToList(),
+            PrimaryRole(roles), scope.OrganizationId, organizationName, scope.BuildingIds,
+            scope.ImpersonatedBy is { } impersonator && scope.OrganizationId is { } org ? new ImpersonationInfo(impersonator, org) : null);
+    }
+
+    public static string? PrimaryRole(IEnumerable<string> roles) => RoleNames.All.FirstOrDefault(roles.Contains);
 
     private async Task<AuthResponse> IssueTokensAsync(AppUser user, CancellationToken ct, RefreshToken? replacing = null)
     {
         var roles = await userManager.GetRolesAsync(user);
-        var (accessToken, accessExpiresAt) = tokens.CreateAccessToken(user, roles);
+        var scope = await ScopeOfAsync(user, ct);
+        var (accessToken, accessExpiresAt) = tokens.CreateAccessToken(user, roles, scope);
         var (refreshToken, refreshHash, refreshExpiresAt) = tokens.CreateRefreshToken();
 
         if (replacing is not null)
         {
-            replacing.RevokedAt = timeProvider.GetUtcNow().UtcDateTime;
+            replacing.RevokedAt = Now;
             replacing.ReplacedByTokenHash = refreshHash;
         }
 
@@ -224,7 +513,8 @@ public class AuthService(
         });
         await db.SaveChangesAsync(ct);
 
-        return new AuthResponse(accessToken, accessExpiresAt, refreshToken, refreshExpiresAt, ToResponse(user, roles));
+        return new AuthResponse(accessToken, accessExpiresAt, refreshToken, refreshExpiresAt,
+            await BuildUserResponseAsync(user, roles, scope, ct));
     }
 
     private Task RevokeAllAsync(Guid userId, DateTime now, CancellationToken ct) =>
@@ -232,6 +522,14 @@ public class AuthService(
             .Where(t => t.UserId == userId && t.RevokedAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, now), ct);
 
-    private static CurrentUserResponse ToResponse(AppUser user, IList<string> roles) =>
-        new(user.Id, user.Email, user.PhoneNumber, user.FullName, roles.ToList());
+    private DateTime Now => timeProvider.GetUtcNow().UtcDateTime;
+
+    private static string HashCode(string target, string code) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{target}:{code}")));
+
+    private static bool FixedTimeEquals(string expectedHash, string actualHash) =>
+        CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(expectedHash), Encoding.ASCII.GetBytes(actualHash));
+
+    private static string Base64UrlEncode(byte[] bytes) =>
+        Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 }

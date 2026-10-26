@@ -152,6 +152,6 @@ public class StagingTests(StagingFactory factory) : IClassFixture<StagingFactory
         var owner = await client.PostAsJsonAsync("/api/v1/auth/login", new LoginRequest(StagingFactory.BootstrapEmail, factory.BootstrapPassword));
         Assert.Equal(HttpStatusCode.OK, owner.StatusCode);
         var auth = await owner.Content.ReadFromJsonAsync<AuthResponse>();
-        Assert.Equal(["Admin"], auth!.User.Roles);
+        Assert.Equal(["Owner"], auth!.User.Roles);
     }
 }

@@ -35,7 +35,7 @@ public class MigrationCommandTests(NoAutoMigrateFactory factory) : IClassFixture
         await using var db = new AppDbContext(
             new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(factory.ConnectionString).Options, TimeProvider.System);
         Assert.Empty(await db.Database.GetPendingMigrationsAsync());
-        Assert.Equal(["Accountant", "Admin", "Content", "Customer", "Manager"],
+        Assert.Equal(["Accountant", "Content", "Customer", "Manager", "ObjectAdmin", "Owner", "PlatformOwner"],
             await db.Roles.Select(r => r.Name!).OrderBy(n => n).ToListAsync());
 
         // Production не запускает сидер разработки.

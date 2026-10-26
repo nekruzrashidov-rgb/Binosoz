@@ -14,7 +14,7 @@ public class ApartmentImportTests(SitoraApiFactory factory) : IClassFixture<Sito
     public async Task Import_CreatesFloorsAndApartments_ThenUpdatesExisting()
     {
         var client = await factory.CreateContentClientAsync();
-        var buildingId = await CreateBuildingAsync(client, "Импорт");
+        var buildingId = await CreateBuildingAsync("Импорт");
 
         var first = await client.PostAsync($"/api/v1/apartments/import?buildingId={buildingId}", Excel(
             [1, 101, 1, 40, 9000, 0, "SR-101"],
@@ -51,7 +51,7 @@ public class ApartmentImportTests(SitoraApiFactory factory) : IClassFixture<Sito
     public async Task Import_RejectsOccupiedOrDuplicatePlanSlots()
     {
         var client = await factory.CreateContentClientAsync();
-        var buildingId = await CreateBuildingAsync(client, "Импорт позиций");
+        var buildingId = await CreateBuildingAsync("Импорт позиций");
         (await client.PostAsync($"/api/v1/apartments/import?buildingId={buildingId}", Excel(
             [1, 101, 1, 40, 9000, 0],
             [1, 102, 1, 40, 9000, 1]))).EnsureSuccessStatusCode();
@@ -81,7 +81,7 @@ public class ApartmentImportTests(SitoraApiFactory factory) : IClassFixture<Sito
     public async Task Import_WithErrors_Returns422AndSavesNothing()
     {
         var client = await factory.CreateContentClientAsync();
-        var buildingId = await CreateBuildingAsync(client, "Импорт с ошибками");
+        var buildingId = await CreateBuildingAsync("Импорт с ошибками");
 
         var response = await client.PostAsync($"/api/v1/apartments/import?buildingId={buildingId}", Excel(
             [1, 101, 1, 40, 9000, 0],
@@ -103,7 +103,7 @@ public class ApartmentImportTests(SitoraApiFactory factory) : IClassFixture<Sito
     public async Task Import_NotXlsx_Returns422()
     {
         var client = await factory.CreateContentClientAsync();
-        var buildingId = await CreateBuildingAsync(client, "Импорт не Excel");
+        var buildingId = await CreateBuildingAsync("Импорт не Excel");
         using var content = new MultipartFormDataContent();
         content.Add(new StringContent("этаж;номер"), "file", "apartments.csv");
 
@@ -116,7 +116,7 @@ public class ApartmentImportTests(SitoraApiFactory factory) : IClassFixture<Sito
     public async Task Import_ForbiddenForManager()
     {
         var content = await factory.CreateContentClientAsync();
-        var buildingId = await CreateBuildingAsync(content, "Импорт менеджером");
+        var buildingId = await CreateBuildingAsync("Импорт менеджером");
         var manager = await factory.CreateManagerClientAsync();
 
         var response = await manager.PostAsync($"/api/v1/apartments/import?buildingId={buildingId}", Excel([1, 101, 1, 40, 9000, 0]));
@@ -124,9 +124,10 @@ public class ApartmentImportTests(SitoraApiFactory factory) : IClassFixture<Sito
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    private static async Task<Guid> CreateBuildingAsync(HttpClient client, string name)
+    // Дома создаёт владелец; импорт квартир — контент-менеджер.
+    private async Task<Guid> CreateBuildingAsync(string name)
     {
-        var response = await client.PostAsJsonAsync("/api/v1/buildings", new SaveBuildingRequest(name, name, "г. Душанбе", 3, null, null));
+        var response = await (await factory.CreateAdminClientAsync()).PostAsJsonAsync("/api/v1/buildings", new SaveBuildingRequest(name, name, "г. Душанбе", 3, null, null));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<BuildingResponse>(TestJson.Options))!.Id;
     }

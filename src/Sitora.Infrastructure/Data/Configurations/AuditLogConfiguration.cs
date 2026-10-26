@@ -15,6 +15,7 @@ public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
         builder.Property(a => a.After).HasColumnType("jsonb");
         builder.HasIndex(a => new { a.Entity, a.EntityId });
         builder.HasIndex(a => a.At);
+        builder.HasIndex(a => new { a.OrganizationId, a.At });
         // Без внешнего ключа на Users: аудит должен переживать удаление пользователя.
     }
 }

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Sitora.Domain.DTOs.Catalog;
 using Sitora.Domain.DTOs.Payments;
 using Sitora.Domain.DTOs.Sales;
+using Sitora.Domain.Entities;
 using Sitora.Domain.Enums;
 using Sitora.Infrastructure.Jobs;
 using Sitora.Tests.Infrastructure;
@@ -27,8 +28,12 @@ public class ExchangeRateTests(SitoraApiFactory factory) : IClassFixture<SitoraA
         await SetRateAsync(accountant, Today.AddDays(-10), 10.5m);
         await SetRateAsync(accountant, Today, 11m);
 
-        var current = await factory.CreateClient().GetFromJsonAsync<RateResponse>("/api/v1/rates/current", TestJson.Options);
+        // Ручной курс бухгалтера действует в его организации: публичный сайт застройщика передаёт её id,
+        // а без него виден только общий курс НБТ (его ещё нет).
+        var current = await factory.CreateClient().GetFromJsonAsync<RateResponse>(
+            $"/api/v1/rates/current?organizationId={Organization.DefaultId}", TestJson.Options);
         Assert.Equal((Today, 11m, RateSource.Manual), (current!.Date, current.RateToTjs, current.Source));
+        Assert.Equal(HttpStatusCode.NotFound, (await factory.CreateClient().GetAsync("/api/v1/rates/current")).StatusCode);
 
         var dealResponse = await CreateUsdDealResponseAsync();
         var deal = await TestScenarios.ReadAsync<DealResponse>(dealResponse);

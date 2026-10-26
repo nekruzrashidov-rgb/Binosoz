@@ -13,7 +13,7 @@ public class AuthTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFactor
     private readonly HttpClient _client = factory.CreateClient();
 
     [Fact]
-    public async Task Login_Admin_ReturnsJwtWithAdminRole()
+    public async Task Login_Owner_ReturnsJwtWithOwnerRole()
     {
         var response = await _client.PostAsJsonAsync("/api/v1/auth/login",
             new LoginRequest(SitoraApiFactory.AdminEmail, factory.AdminPassword));
@@ -24,7 +24,7 @@ public class AuthTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFactor
         Assert.False(string.IsNullOrEmpty(auth.RefreshToken));
 
         var jwt = new JsonWebToken(auth.AccessToken);
-        Assert.Contains(jwt.Claims, c => c.Type == "role" && c.Value == "Admin");
+        Assert.Contains(jwt.Claims, c => c.Type == "role" && c.Value == "Owner");
         Assert.Equal(auth.User.Id.ToString(), jwt.Subject);
 
         var lifetime = jwt.ValidTo - jwt.IssuedAt;
@@ -110,7 +110,7 @@ public class AuthTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFactor
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var me = await response.Content.ReadFromJsonAsync<CurrentUserResponse>();
         Assert.Equal(SitoraApiFactory.AdminEmail, me?.Email);
-        Assert.Equal(["Admin"], me?.Roles);
+        Assert.Equal(["Owner"], me?.Roles);
     }
 
     [Fact]

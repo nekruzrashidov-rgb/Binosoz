@@ -35,7 +35,9 @@ public static class DependencyInjection
             })
             .AddRoles<IdentityRole<Guid>>()
             .AddErrorDescriber<RussianIdentityErrorDescriber>()
-            .AddEntityFrameworkStores<AppDbContext>();
+            .AddEntityFrameworkStores<AppDbContext>()
+            // TOTP-коды приложения-аутентификатора — второй фактор создателя платформы.
+            .AddTokenProvider<AuthenticatorTokenProvider<AppUser>>(TokenOptions.DefaultAuthenticatorProvider);
 
         services.AddOptions<JwtOptions>()
             .BindConfiguration(JwtOptions.SectionName)
@@ -45,13 +47,23 @@ public static class DependencyInjection
             .BindConfiguration(EncryptionOptions.SectionName)
             .ValidateDataAnnotations()
             .ValidateOnStart();
+        services.AddOptions<AuthOptions>()
+            .BindConfiguration(AuthOptions.SectionName)
+            .ValidateDataAnnotations();
+        services.AddOptions<EmailOptions>()
+            .BindConfiguration(EmailOptions.SectionName)
+            .ValidateDataAnnotations();
 
         services.AddMemoryCache();
         services.AddSingleton<CatalogCache>();
         services.AddSingleton<EncryptionService>();
 
         services.AddScoped<JwtTokenService>();
-        services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<AuthService>();
+        services.AddScoped<IAuthService>(sp => sp.GetRequiredService<AuthService>());
+        services.AddScoped<StaffPolicy>();
+        services.AddScoped<IInvitationService, InvitationService>();
+        services.AddScoped<IPlatformService, PlatformService>();
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<ApartmentImporter>();
         services.AddScoped<ICatalogService, CatalogService>();
@@ -74,6 +86,7 @@ public static class DependencyInjection
 
         services.AddScoped<INotificationSender, TelegramNotificationSender>();
         services.AddSingleton<ISmsSender, SmsSender>();
+        AddEmailSender(services);
         services.AddSingleton<IRateProvider, NbtRateProvider>();
         services.AddSingleton<IFileStorage, LocalFileStorage>();
         services.AddSingleton<IPdfGenerator, QuestPdfGenerator>();
@@ -97,6 +110,21 @@ public static class DependencyInjection
         jobs.AddOrUpdate<ExpireBookingsJob>(ExpireBookingsJob.Id, job => job.RunAsync(CancellationToken.None), ExpireBookingsJob.Schedule);
         jobs.AddOrUpdate<UpdateRatesJob>(UpdateRatesJob.Id, job => job.RunAsync(CancellationToken.None), UpdateRatesJob.Schedule);
         jobs.AddOrUpdate<HealthAlertJob>(HealthAlertJob.Id, job => job.RunAsync(CancellationToken.None), HealthAlertJob.Schedule);
+    }
+
+    // Почтовый сервис выбирается настройкой Email__Provider: Smtp, Resend или Dev (письма в лог, только для разработки).
+    private static void AddEmailSender(IServiceCollection services)
+    {
+        services.AddHttpClient<ResendEmailSender>();
+        services.AddSingleton<DevEmailSender>();
+        services.AddSingleton<SmtpEmailSender>();
+        services.AddScoped<IEmailSender>(sp =>
+            sp.GetRequiredService<IConfiguration>()[$"{EmailOptions.SectionName}:Provider"]?.Trim().ToLowerInvariant() switch
+            {
+                "smtp" => sp.GetRequiredService<SmtpEmailSender>(),
+                "resend" => sp.GetRequiredService<ResendEmailSender>(),
+                _ => sp.GetRequiredService<DevEmailSender>()
+            });
     }
 
     private static string GetConnectionString(IServiceProvider sp)

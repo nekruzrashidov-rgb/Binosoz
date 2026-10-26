@@ -48,7 +48,9 @@ public class ExchangeRateConfiguration : IEntityTypeConfiguration<ExchangeRate>
     {
         builder.ToTable("ExchangeRates");
         builder.Property(r => r.RateToTjs).HasPrecision(18, 4);
-        builder.HasIndex(r => new { r.Currency, r.Date }).IsUnique();
+        // Один курс на дату у платформы (OrganizationId = null) и у каждой организации.
+        builder.HasIndex(r => new { r.OrganizationId, r.Currency, r.Date }).IsUnique().AreNullsDistinct(false);
+        builder.HasOne<Organization>().WithMany().HasForeignKey(r => r.OrganizationId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 

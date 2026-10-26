@@ -125,20 +125,68 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("RateLimiting:PublicFormsPerHour", "1000000");
         builder.UseSetting("RateLimiting:AnonymousPerMinute", "1000000");
         builder.UseSetting("RateLimiting:UserPerMinute", "1000000");
-        builder.ConfigureTestServices(services => services.AddSingleton<ISmsSender>(Sms));
+        // Лимиты кодов из почты проверяет EmailAuthTests со своей фабрикой; здесь покупатели входят много раз подряд.
+        builder.UseSetting("Auth:EmailCodesPerMinute", "100");
+        builder.UseSetting("Auth:EmailCodesPerHour", "1000");
+        // Старый вход по SMS выключен по умолчанию; его тесты проверяют сам вход, поэтому здесь он включён.
+        builder.UseSetting("Auth:SmsLoginEnabled", SmsLoginEnabled ? "true" : "false");
+        builder.UseSetting("ADMIN_EMAIL", PlatformOwnerEmail);
+        builder.UseSetting("ADMIN_PASSWORD", PlatformOwnerPassword);
+        builder.ConfigureTestServices(services =>
+        {
+            services.AddSingleton<ISmsSender>(Sms);
+            services.AddSingleton<IEmailSender>(Email);
+        });
     }
 
+    protected virtual bool SmsLoginEnabled => true;
+
+    public const string PlatformOwnerEmail = "owner@platform.test";
+    public string PlatformOwnerPassword { get; } = GeneratePassword();
+
     public FakeSmsSender Sms { get; } = new();
+    public FakeEmailSender Email { get; } = new();
 
     public string ConnectionString => _connectionString;
 
-    // Входит как покупатель с этим телефоном через SMS-код.
+    // Входит как покупатель с этим телефоном по коду из почты. Если у клиента нет почты, задаёт её.
     public async Task<HttpClient> CreateCustomerClientAsync(string phone)
     {
+        var email = await WithDbAsync(async db =>
+        {
+            var customers = await db.Customers.Where(c => c.Phone == phone).ToListAsync();
+            var existing = customers.Select(c => c.Email).FirstOrDefault(e => e != null);
+            var address = existing ?? $"c{phone.TrimStart('+')}@customers.test";
+            customers.ForEach(c => c.Email ??= address);
+            await db.SaveChangesAsync();
+            return address;
+        });
+        return await CreateEmailClientAsync(email);
+    }
+
+    // Вход по коду из почты; для создателя платформы возвращает ответ второго шага.
+    public async Task<HttpClient> CreateEmailClientAsync(string email)
+    {
         var client = CreateClient();
-        var sent = await client.PostAsJsonAsync("/api/v1/auth/sms/send", new SmsSendRequest(phone));
+        var sent = await client.PostAsJsonAsync("/api/v1/auth/email/send", new EmailSendRequest(email));
         sent.EnsureSuccessStatusCode();
-        var response = await client.PostAsJsonAsync("/api/v1/auth/sms/verify", new SmsVerifyRequest(phone, Sms.LastCode(phone)!));
+        var response = await client.PostAsJsonAsync("/api/v1/auth/email/verify", new EmailVerifyRequest(email, Email.LastCode(email)!));
+        response.EnsureSuccessStatusCode();
+        var auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
+        return client;
+    }
+
+    // Создатель платформы: код из почты и пароль вторым фактором.
+    public async Task<HttpClient> CreatePlatformOwnerClientAsync()
+    {
+        var client = CreateClient();
+        (await client.PostAsJsonAsync("/api/v1/auth/email/send", new EmailSendRequest(PlatformOwnerEmail))).EnsureSuccessStatusCode();
+        var verified = await client.PostAsJsonAsync("/api/v1/auth/email/verify",
+            new EmailVerifyRequest(PlatformOwnerEmail, Email.LastCode(PlatformOwnerEmail)!));
+        var challenge = await verified.Content.ReadFromJsonAsync<SecondFactorChallenge>();
+        var response = await client.PostAsJsonAsync("/api/v1/auth/second-factor",
+            new SecondFactorRequest(challenge!.ChallengeToken, PlatformOwnerPassword, null));
         response.EnsureSuccessStatusCode();
         var auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);

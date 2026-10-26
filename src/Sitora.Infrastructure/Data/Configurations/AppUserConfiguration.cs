@@ -14,5 +14,8 @@ public class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
         // У покупателей почты нет, поэтому уникальность почты проверяет база, а не Identity.
         builder.HasIndex(u => u.NormalizedEmail).HasDatabaseName("EmailIndex")
             .IsUnique().HasFilter("\"NormalizedEmail\" IS NOT NULL");
+
+        builder.HasOne(u => u.Organization).WithMany()
+            .HasForeignKey(u => u.OrganizationId).OnDelete(DeleteBehavior.Restrict);
     }
 }

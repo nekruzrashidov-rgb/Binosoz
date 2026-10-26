@@ -15,6 +15,7 @@ namespace Sitora.Infrastructure.Services;
 public class LeadService(
     AppDbContext db,
     UserManager<AppUser> userManager,
+    ICurrentUser currentUser,
     INotificationSender notifications,
     IAuditService audit,
     ILogger<LeadService> logger) : ILeadService
@@ -33,8 +34,11 @@ public class LeadService(
                 ?? throw new NotFoundException("Квартира не найдена");
         }
 
+        var (organizationId, buildingId) = await ResolvePlaceAsync(apartment, request.BuildingId, ct);
         var lead = new Lead
         {
+            OrganizationId = organizationId,
+            BuildingId = buildingId,
             Name = request.Name.Trim(),
             Phone = phone,
             Comment = string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment.Trim(),
@@ -43,6 +47,7 @@ public class LeadService(
             Status = LeadStatus.New
         };
         db.Leads.Add(lead);
+        audit.Record(nameof(Lead), lead.Id, "Created", null, new { lead.Name, lead.Phone, lead.Source, lead.BuildingId }, organizationId);
         await db.SaveChangesAsync(ct);
 
         // Заявка уже сохранена; сбой канала уведомлений не должен терять её.
@@ -81,9 +86,11 @@ public class LeadService(
         if (request.ManagerId is { } managerId)
         {
             var manager = await userManager.FindByIdAsync(managerId.ToString());
-            if (manager is null || !manager.IsActive
-                || !(await userManager.IsInRoleAsync(manager, RoleNames.Manager) || await userManager.IsInRoleAsync(manager, RoleNames.Admin)))
-                throw new BusinessRuleException("Ответственным можно назначить только активного менеджера");
+            if (manager is null || !manager.IsActive || manager.OrganizationId != lead.OrganizationId
+                || !(await userManager.IsInRoleAsync(manager, RoleNames.Manager)
+                     || await userManager.IsInRoleAsync(manager, RoleNames.Owner)
+                     || await userManager.IsInRoleAsync(manager, RoleNames.ObjectAdmin)))
+                throw new BusinessRuleException("Ответственным можно назначить только активного менеджера этого застройщика");
         }
 
         var before = new { lead.Status, lead.ManagerId, lead.Comment };
@@ -95,6 +102,29 @@ public class LeadService(
         audit.Record(nameof(Lead), lead.Id, "Updated", before, new { lead.Status, lead.ManagerId, lead.Comment });
         await db.SaveChangesAsync(ct);
         return ToResponse(lead);
+    }
+
+    // Застройщик и дом заявки: из квартиры, из указанного дома, из организации сотрудника,
+    // а если на платформе один застройщик — он. Иначе заявку не к кому отнести.
+    private async Task<(Guid OrganizationId, Guid? BuildingId)> ResolvePlaceAsync(Apartment? apartment, Guid? buildingId, CancellationToken ct)
+    {
+        if (apartment is not null)
+            return (apartment.Floor.Building.OrganizationId, apartment.Floor.BuildingId);
+
+        if (buildingId is { } id)
+        {
+            var organizationId = await db.Buildings.Where(b => b.Id == id).Select(b => (Guid?)b.OrganizationId).FirstOrDefaultAsync(ct)
+                ?? throw new NotFoundException("Дом не найден");
+            return (organizationId, id);
+        }
+
+        if (currentUser.OrganizationId is { } own)
+            return (own, currentUser.BuildingIds is [var single] ? single : null);
+
+        var organizations = await db.Organizations.Where(o => o.IsActive).Select(o => o.Id).Take(2).ToListAsync(ct);
+        return organizations.Count == 1
+            ? (organizations[0], null)
+            : throw new BusinessRuleException("Укажите дом или квартиру, к которой относится заявка");
     }
 
     private static LeadResponse ToResponse(Lead l) =>

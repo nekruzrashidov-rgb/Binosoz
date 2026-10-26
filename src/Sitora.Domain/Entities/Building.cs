@@ -2,6 +2,9 @@ namespace Sitora.Domain.Entities;
 
 public class Building : BaseEntity
 {
+    public Guid OrganizationId { get; set; }
+    public Organization Organization { get; set; } = null!;
+
     public string NameRu { get; set; } = string.Empty;
     public string NameTg { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;

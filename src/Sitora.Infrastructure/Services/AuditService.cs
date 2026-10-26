@@ -15,11 +15,15 @@ public class AuditService(AppDbContext db, ICurrentUser currentUser, TimeProvide
         Converters = { new JsonStringEnumConverter() }
     };
 
-    public void Record(string entity, Guid entityId, string action, object? before, object? after)
+    public void Record(string entity, Guid entityId, string action, object? before, object? after, Guid? organizationId = null)
     {
         db.AuditLogs.Add(new AuditLog
         {
+            // В режиме «войти как владелец» автор — сам создатель платформы, а пометка ImpersonatedById
+            // показывает, что он действовал от имени организации.
             UserId = currentUser.UserId,
+            OrganizationId = organizationId ?? currentUser.OrganizationId,
+            ImpersonatedById = currentUser.ImpersonatorId,
             Entity = entity,
             EntityId = entityId,
             Action = action,
@@ -49,7 +53,7 @@ public class AuditService(AppDbContext db, ICurrentUser currentUser, TimeProvide
                 from u in users.DefaultIfEmpty()
                 orderby a.At descending, a.Id descending
                 select new AuditLogResponse(a.Id, a.UserId, u != null ? u.Email : null,
-                    a.Entity, a.EntityId, a.Action, a.Before, a.After, a.At))
+                    a.Entity, a.EntityId, a.Action, a.Before, a.After, a.At, a.OrganizationId, a.ImpersonatedById))
             .Skip(p.Skip).Take(p.PageSize)
             .ToListAsync(ct);
         return new PagedResult<AuditLogResponse>(items, p.Page, p.PageSize, total);

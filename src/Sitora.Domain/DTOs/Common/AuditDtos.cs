@@ -11,4 +11,6 @@ public record AuditLogResponse(
     string Action,
     string? Before,
     string? After,
-    DateTime At);
+    DateTime At,
+    Guid? OrganizationId = null,
+    Guid? ImpersonatedById = null);

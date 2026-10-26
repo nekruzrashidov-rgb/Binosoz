@@ -4,6 +4,11 @@ namespace Sitora.Domain.Entities;
 
 public class Lead : BaseEntity
 {
+    public Guid OrganizationId { get; set; }
+
+    // Дом заявки: из квартиры или из запроса; null — заявка на застройщика в целом.
+    public Guid? BuildingId { get; set; }
+
     public string Name { get; set; } = string.Empty;
     public string Phone { get; set; } = string.Empty;
     public string? Comment { get; set; }

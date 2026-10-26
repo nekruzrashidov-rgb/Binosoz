@@ -32,6 +32,7 @@ public static class CatalogSeeder
         var random = new Random(RandomSeed);
         var building = new Building
         {
+            OrganizationId = Organization.DefaultId,
             NameRu = BuildingName,
             NameTg = BuildingName,
             Address = "г. Душанбе",

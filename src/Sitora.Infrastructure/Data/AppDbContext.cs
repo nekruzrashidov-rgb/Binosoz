@@ -1,14 +1,28 @@
+using System.Linq.Expressions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Query;
 using Sitora.Domain.Entities;
 using Sitora.Domain.Enums;
+using Sitora.Domain.Interfaces;
 
 namespace Sitora.Infrastructure.Data;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider timeProvider)
+// currentUser == null — контекст без пользователя (миграции, сидеры в тестах): ограничений нет.
+public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider timeProvider, ICurrentUser? currentUser = null)
     : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>(options)
 {
+    // Параметры фильтров доступа. EF читает их у текущего экземпляра контекста при каждом запросе.
+    public bool ScopeAll => currentUser?.OrganizationId is null;
+    public Guid ScopeOrganizationId => currentUser?.OrganizationId ?? Guid.Empty;
+    public bool ScopeAllBuildings => currentUser?.BuildingIds is null;
+    public Guid[] ScopeBuildingIds => currentUser?.BuildingIds?.ToArray() ?? [];
+
+    public DbSet<Organization> Organizations => Set<Organization>();
+    public DbSet<UserBuilding> UserBuildings => Set<UserBuilding>();
+    public DbSet<EmailCode> EmailCodes => Set<EmailCode>();
+    public DbSet<Invitation> Invitations => Set<Invitation>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Building> Buildings => Set<Building>();
     public DbSet<Floor> Floors => Set<Floor>();
@@ -42,6 +56,54 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider t
         builder.Entity<IdentityRoleClaim<Guid>>().ToTable("RoleClaims");
 
         builder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        ApplyAccessFilters(builder);
+    }
+
+    // Мультиарендность на уровне запросов к базе: сотрудник видит только данные своей организации
+    // и своих домов, что бы ни делал контроллер или сервис. Для каждой сущности задаётся путь
+    // до организации и до дома. Обойти фильтр можно только явным IgnoreQueryFilters().
+    private void ApplyAccessFilters(ModelBuilder builder)
+    {
+        ByBuilding<Building>(builder, x => x.OrganizationId, x => x.Id);
+        ByBuilding<Floor>(builder, x => x.Building.OrganizationId, x => x.BuildingId);
+        ByBuilding<Apartment>(builder, x => x.Floor.Building.OrganizationId, x => x.Floor.BuildingId);
+        ByBuilding<Booking>(builder, x => x.Apartment.Floor.Building.OrganizationId, x => x.Apartment.Floor.BuildingId);
+        ByBuilding<Deal>(builder, x => x.Apartment.Floor.Building.OrganizationId, x => x.Apartment.Floor.BuildingId);
+        ByBuilding<PaymentPlan>(builder, x => x.Deal.Apartment.Floor.Building.OrganizationId, x => x.Deal.Apartment.Floor.BuildingId);
+        ByBuilding<PaymentScheduleItem>(builder, x => x.Plan.Deal.Apartment.Floor.Building.OrganizationId, x => x.Plan.Deal.Apartment.Floor.BuildingId);
+        ByBuilding<Payment>(builder, x => x.Deal.Apartment.Floor.Building.OrganizationId, x => x.Deal.Apartment.Floor.BuildingId);
+        ByBuilding<Document>(builder, x => x.Deal.Apartment.Floor.Building.OrganizationId, x => x.Deal.Apartment.Floor.BuildingId);
+        ByBuilding<ChatMessage>(builder, x => x.Deal.Apartment.Floor.Building.OrganizationId, x => x.Deal.Apartment.Floor.BuildingId);
+        ByBuilding<ConstructionStage>(builder, x => x.Building.OrganizationId, x => x.BuildingId);
+        ByBuilding<ConstructionPhoto>(builder, x => x.Stage.Building.OrganizationId, x => x.Stage.BuildingId);
+
+        // Заявка без дома видна только тем, у кого доступ ко всем домам организации.
+        builder.Entity<Lead>().HasQueryFilter(x => ScopeAll || (x.OrganizationId == ScopeOrganizationId
+            && (ScopeAllBuildings || (x.BuildingId != null && ScopeBuildingIds.Contains(x.BuildingId.Value)))));
+
+        // Клиента сотрудник с частью домов видит, если клиента завели в его доме или у клиента там сделка.
+        builder.Entity<Customer>().HasQueryFilter(x => ScopeAll || (x.OrganizationId == ScopeOrganizationId
+            && (ScopeAllBuildings
+                || (x.HomeBuildingId != null && ScopeBuildingIds.Contains(x.HomeBuildingId.Value))
+                || x.Deals.Any(d => ScopeBuildingIds.Contains(d.Apartment.Floor.BuildingId)))));
+
+        builder.Entity<AuditLog>().HasQueryFilter(x => ScopeAll || x.OrganizationId == ScopeOrganizationId);
+        builder.Entity<Invitation>().HasQueryFilter(x => ScopeAll || x.OrganizationId == ScopeOrganizationId);
+        builder.Entity<Organization>().HasQueryFilter(x => ScopeAll || x.Id == ScopeOrganizationId);
+    }
+
+    private void ByBuilding<T>(ModelBuilder builder, Expression<Func<T, Guid>> organizationId, Expression<Func<T, Guid>> buildingId)
+        where T : class
+    {
+        Expression<Func<Guid, Guid, bool>> rule = (org, building) =>
+            ScopeAll || (org == ScopeOrganizationId && (ScopeAllBuildings || ScopeBuildingIds.Contains(building)));
+
+        var entity = organizationId.Parameters[0];
+        var body = ReplacingExpressionVisitor.Replace(
+            [rule.Parameters[0], rule.Parameters[1]],
+            [organizationId.Body, ReplacingExpressionVisitor.Replace(buildingId.Parameters[0], entity, buildingId.Body)],
+            rule.Body);
+        builder.Entity<T>().HasQueryFilter(Expression.Lambda<Func<T, bool>>(body, entity));
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
