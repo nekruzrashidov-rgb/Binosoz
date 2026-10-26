@@ -160,7 +160,8 @@ public class AuthService(
             .FirstOrDefaultAsync(ct);
         // Разработка: подходит 123456 (для любой почты при Auth:DevFixedCodeForAnyEmail, иначе — из Auth:DevFixedCodeEmails),
         // даже если код не запрашивали; неизвестная почта становится покупателем.
-        if (IsDevFixedCodeEmail(address) && request.Code.Trim() == AuthOptions.DevFixedCode)
+        var devFixedCode = IsDevFixedCodeEmail(address) && request.Code.Trim() == AuthOptions.DevFixedCode;
+        if (devFixedCode)
         {
             if (stored is not null)
                 stored.UsedAt = now;
@@ -186,7 +187,8 @@ public class AuthService(
         var user = await userManager.FindByEmailAsync(address) ?? await GetOrCreateCustomerUserByEmailAsync(address, ct);
         await EnsureCanSignInAsync(user, ct);
 
-        if (await userManager.IsInRoleAsync(user, RoleNames.PlatformOwner))
+        // Второй шаг создателя платформы пропускается только в разработке с кодом 123456.
+        if (await userManager.IsInRoleAsync(user, RoleNames.PlatformOwner) && !devFixedCode)
             return new EmailLoginResult(null, await CreateChallengeAsync(user));
 
         logger.LogInformation("Пользователь {UserId} вошёл по коду из почты", user.Id);
@@ -254,15 +256,15 @@ public class AuthService(
 
     // Отдельный вход создателя платформы: только для этой роли, дальше — второй фактор, как и в обычном входе.
     // Для чужой почты ответ такой же, как на неверный код, и код при этом не тратится.
-    public async Task<SecondFactorChallenge> VerifyPlatformCodeAsync(EmailVerifyRequest request, CancellationToken ct = default)
+    public async Task<EmailLoginResult> VerifyPlatformCodeAsync(EmailVerifyRequest request, CancellationToken ct = default)
     {
         var address = EmailAddress.Normalize(request.Email) ?? throw new UnauthorizedException(InvalidEmailCode);
         var user = await userManager.FindByEmailAsync(address);
         if (user is null || !await userManager.IsInRoleAsync(user, RoleNames.PlatformOwner))
             throw new UnauthorizedException(InvalidEmailCode);
 
-        var result = await VerifyEmailCodeAsync(request, ct);
-        return result.Challenge ?? throw new UnauthorizedException(InvalidEmailCode);
+        // Обычно — запрос второго фактора; в разработке с кодом 123456 — сразу токены.
+        return await VerifyEmailCodeAsync(request, ct);
     }
 
     // Покупатель входит по почте из своих сделок: учётная запись создаётся при первом входе

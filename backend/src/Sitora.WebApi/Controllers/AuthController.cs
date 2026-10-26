@@ -53,14 +53,19 @@ public class AuthController(IAuthService auth, IOptions<AuthOptions> options) : 
     /// <summary>
     /// Вход создателя платформы: почта и код из письма (код запрашивается обычным /auth/email/send).
     /// Только для этой роли; ответ — запрос второго фактора (202), токен выдаёт /auth/second-factor.
+    /// В разработке с кодом 123456 второй шаг пропускается и сразу приходят токены (200).
     /// </summary>
     [HttpPost("platform/login")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicies.Login)]
+    [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<SecondFactorChallenge>(StatusCodes.Status202Accepted)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> PlatformLogin(EmailVerifyRequest request, CancellationToken ct) =>
-        Accepted(await auth.VerifyPlatformCodeAsync(request, ct));
+    public async Task<IActionResult> PlatformLogin(EmailVerifyRequest request, CancellationToken ct)
+    {
+        var result = await auth.VerifyPlatformCodeAsync(request, ct);
+        return result.Challenge is { } challenge ? Accepted(challenge) : Ok(result.Auth);
+    }
 
     /// <summary>Второй фактор создателя платформы: пароль или код из приложения-аутентификатора.</summary>
     [HttpPost("second-factor")]

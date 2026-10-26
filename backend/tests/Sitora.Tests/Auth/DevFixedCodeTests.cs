@@ -73,7 +73,7 @@ public class AnyEmailFixedCodeFactory : SitoraApiFactory
 public class AnyEmailFixedCodeTests(AnyEmailFixedCodeFactory factory) : IClassFixture<AnyEmailFixedCodeFactory>
 {
     [Fact]
-    public async Task UnknownEmail_BecomesCustomer_StaffKeepsRole_PlatformOwnerStillAsksSecondFactor()
+    public async Task UnknownEmail_BecomesCustomer_StaffKeepsRole_PlatformOwnerSkipsSecondStep()
     {
         var client = factory.CreateClient();
         var email = $"New-{Guid.NewGuid():N}@Mail.Test";
@@ -91,8 +91,11 @@ public class AnyEmailFixedCodeTests(AnyEmailFixedCodeFactory factory) : IClassFi
         var manager = await client.PostAsJsonAsync("/api/v1/auth/email/verify", new EmailVerifyRequest(SitoraApiFactory.ManagerEmail, "123456"));
         Assert.Equal("Manager", (await manager.Content.ReadFromJsonAsync<AuthResponse>(TestJson.Options))!.User.Role);
 
+        // Создатель платформы с 123456 входит без второго шага — только в разработке.
         var platform = await client.PostAsJsonAsync("/api/v1/auth/email/verify", new EmailVerifyRequest(SitoraApiFactory.PlatformOwnerEmail, "123456"));
-        Assert.Equal(HttpStatusCode.Accepted, platform.StatusCode);
+        Assert.Equal("PlatformOwner", (await platform.Content.ReadFromJsonAsync<AuthResponse>(TestJson.Options))!.User.Role);
+        var platformLogin = await client.PostAsJsonAsync("/api/v1/auth/platform/login", new EmailVerifyRequest(SitoraApiFactory.PlatformOwnerEmail, "123456"));
+        Assert.Equal(HttpStatusCode.OK, platformLogin.StatusCode);
 
         // Неверный код по-прежнему не подходит.
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/v1/auth/email/verify",

@@ -14,7 +14,7 @@
   const PLATFORM_PASSWORD = 'Platform123!';
   const DEMO_CUSTOMER_EMAIL = 'demo@sitora.tj';
   const STAFF = [
-    { id: 'u0', email: 'platform@sitora.tj', password: PLATFORM_PASSWORD, name: 'Создатель платформы', roles: ['PlatformOwner'], platform: true },
+    { id: 'u0', email: 'nekrashidov@gmail.com', password: PLATFORM_PASSWORD, name: 'Создатель платформы', roles: ['PlatformOwner'], platform: true },
     { id: 'u1', email: 'admin@sitora.tj', password: 'Admin123!', name: 'Фирдавс Назаров', roles: ['Owner'] },
     { id: 'u5', email: 'object@sitora.tj', password: 'Object123!', name: 'Рустам Каримов', roles: ['ObjectAdmin'], buildingIds: [1] },
     { id: 'u2', email: 'manager@sitora.tj', password: 'Manager123!', name: 'Мадина Исмоилова', roles: ['Manager'] },
@@ -218,13 +218,14 @@
     if (String(c.body.code || '').trim() !== '123456') err(401, 'Unauthorized', 'Неверный или устаревший код');
     let u = db.users.find((x) => x.email && x.email.toLowerCase() === email);
     if (!u) {
-      const cust = db.customers.find((x) => x.email && x.email.toLowerCase() === email);
-      if (!cust) err(401, 'Unauthorized', 'Неверный или устаревший код');
+      let cust = db.customers.find((x) => x.email && x.email.toLowerCase() === email);
+      // Demo: an unknown address becomes a buyer, like the API in development.
+      if (!cust) { if (!/^\S+@\S+\.\S+$/.test(email)) err(401, 'Unauthorized', 'Неверный или устаревший код'); cust = { id: db.customers.length + 1, fullName: email.split('@')[0], phone: '', email, passport: '', createdAt: iso(Date.now()) }; db.customers.push(cust); }
       u = db.users.find((x) => x.customerId === cust.id);
       if (!u) { u = { id: 'c' + cust.id, email, phone: cust.phone, name: cust.fullName, roles: ['Customer'], status: 'Active', customerId: cust.id, buildingIds: [] }; db.users.push(u); }
     }
     if (u.status === 'Blocked') err(401, 'Unauthorized', 'Учётная запись заблокирована');
-    if (u.platform) return { challengeToken: 'demo-ch.' + u.id, expiresAt: iso(Date.now() + 5 * 60000), methods: db.totp ? ['password', 'totp'] : ['password'], message: 'Код принят. Подтвердите вход паролем или кодом из приложения-аутентификатора' };
+    // Demo: the platform owner signs in with the code alone (the real API asks for a password outside development).
     return authResp(u);
   });
   route('POST', /^\/auth\/second-factor$/, (c) => {
@@ -267,7 +268,7 @@
     audit(db, c.user.name, 'ImpersonationStarted', 'Organization', o.id, null, { organization: o.name });
     return { accessToken: tokenFor(u), accessTokenExpiresAt: iso(Date.now() + 15 * 60000), user: userView(u) };
   }, ['PlatformOwner']);
-  route('GET', /^\/platform\/totp$/, () => ({ sharedKey: 'DEMO DEMO DEMO DEMO', authenticatorUri: 'otpauth://totp/Sitora:platform@sitora.tj?secret=DEMODEMODEMODEMO&issuer=Sitora&digits=6' }), ['PlatformOwner']);
+  route('GET', /^\/platform\/totp$/, () => ({ sharedKey: 'DEMO DEMO DEMO DEMO', authenticatorUri: 'otpauth://totp/Sitora:nekrashidov@gmail.com?secret=DEMODEMODEMODEMO&issuer=Sitora&digits=6' }), ['PlatformOwner']);
   route('POST', /^\/platform\/totp\/enable$/, (c) => { if (!/^\d{6}$/.test(String(c.body.code || ''))) err(422, 'Business', 'Неверный код из приложения'); db.totp = true; return {}; }, ['PlatformOwner']);
   route('GET', /^\/auth\/me$/, (c) => userView(c.user), 'any');
 
@@ -544,7 +545,7 @@
 
   S.mock = {
     reset() { db = makeDb(); },
-    // The platform owner is not offered on the login page (demo address: platform@sitora.tj, see web/README.md).
+    // The platform owner is not offered on the login page (demo address: nekrashidov@gmail.com, code 123456).
     demoUsers: STAFF.filter((u) => !u.platform).map((u) => ({ email: u.email, role: u.roles[0] })).concat([{ email: DEMO_CUSTOMER_EMAIL, role: 'Customer' }]),
     demoCustomerEmail: DEMO_CUSTOMER_EMAIL,
     demoPlatformPassword: PLATFORM_PASSWORD,

@@ -13,7 +13,7 @@ public interface IAuthService
     Task<EmailSendResponse> SendEmailCodeAsync(EmailSendRequest request, string? requestIp, CancellationToken ct = default);
     Task<EmailLoginResult> VerifyEmailCodeAsync(EmailVerifyRequest request, CancellationToken ct = default);
     Task<EmailSendResponse> RegisterCustomerAsync(RegisterCustomerRequest request, string? requestIp, CancellationToken ct = default);
-    Task<SecondFactorChallenge> VerifyPlatformCodeAsync(EmailVerifyRequest request, CancellationToken ct = default);
+    Task<EmailLoginResult> VerifyPlatformCodeAsync(EmailVerifyRequest request, CancellationToken ct = default);
     Task<AuthResponse> CompleteSecondFactorAsync(SecondFactorRequest request, CancellationToken ct = default);
 
     Task<AuthResponse> AcceptInvitationAsync(AcceptInvitationRequest request, CancellationToken ct = default);
