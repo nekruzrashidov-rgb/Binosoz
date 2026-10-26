@@ -388,3 +388,10 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
   .top-in .icon-btn { width: 34px; height: 34px; }
   .top-in .btn.sm { padding: 8px 12px; }
 }
+
+/* Organizations and roles */
+.userchip .nm { display: inline-flex; flex-direction: column; line-height: 1.15; }
+.userchip .nm .org { font-size: 11px; font-weight: 600; color: var(--muted, var(--ink-2)); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.imp-banner { background: var(--warn-soft); color: var(--warn); border-bottom: 1px solid var(--warn); font-weight: 700; font-size: 13.5px; }
+.imp-banner .wrap { padding-top: 8px; padding-bottom: 8px; gap: 10px; }
+.ctx-line { padding-top: 14px; font-size: 13.5px; }

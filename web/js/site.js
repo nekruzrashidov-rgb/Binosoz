@@ -52,6 +52,7 @@
         const bs = await S.api.buildings();
         if (!bs.length) throw new Error(t('err.noBuildings'));
         st.building = bs.find((b) => String(b.id) === String(cfg.DEFAULT_BUILDING_ID)) || bs[0];
+        S.siteBuildingId = st.building.id;
         const full = await S.api.building(st.building.id).catch(() => st.building);
         st.building = Object.assign({}, st.building, full);
         st.floors = await S.api.floors(st.building.id);

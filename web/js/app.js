@@ -3,13 +3,14 @@
   const S = (window.S = window.S || {});
   const h = (...a) => S.h(...a);
   const t = (...a) => S.t(...a);
-  const ROUTES = ['home', 'cabinet', 'crm'];
+  const ROUTES = ['home', 'cabinet', 'crm', 'platform', 'invite'];
   let cleanup = null, token = 0;
   const header = h('header', { class: 'top' });
   const main = h('div', { id: 'view' });
   const app = document.getElementById('app');
 
-  function route() { const r = (location.hash || '').replace(/^#\/?/, '').split(/[?/]/)[0]; return ROUTES.includes(r) ? r : 'home'; }
+  // #invite=<token> is the link from an invitation letter.
+  function route() { const r = (location.hash || '').replace(/^#\/?/, '').split(/[?/=]/)[0]; return ROUTES.includes(r) ? r : 'home'; }
   S.go = (r) => { if (location.hash === '#' + r) render(); else location.hash = r; };
 
   function applyTheme() { const v = S.store.get('sitora.theme'); if (v === 'dark' || v === 'light') document.documentElement.dataset.theme = v; else delete document.documentElement.dataset.theme; }
@@ -25,14 +26,23 @@
       h('button', { onclick: goHome('about') }, t('nav.about')),
       h('button', { onclick: goHome('contact') }, t('nav.contact')),
       h('button', { class: r === 'cabinet' ? 'on' : '', onclick: () => { menu.classList.remove('open'); S.go('cabinet'); } }, t('nav.cabinet')),
-      S.api.isStaff() ? h('button', { class: r === 'crm' ? 'on' : '', onclick: () => { menu.classList.remove('open'); S.go('crm'); } }, t('nav.crm')) : null);
+      S.api.isStaff() ? h('button', { class: r === 'crm' ? 'on' : '', onclick: () => { menu.classList.remove('open'); S.go('crm'); } }, t('nav.crm')) : null,
+      S.api.isPlatform() ? h('button', { class: r === 'platform' ? 'on' : '', onclick: () => { menu.classList.remove('open'); S.go('platform'); } }, t('nav.platform')) : null);
     const lang = h('div', { class: 'seg', role: 'group', 'aria-label': 'Language' }, [['ru', 'RU'], ['tg', 'TJ']].map(([k, l]) => h('button', { class: S.lang === k ? 'on' : '', onclick: () => { if (S.lang !== k) { S.setLang(k); } } }, l)));
     const theme = h('button', { class: 'icon-btn', title: t('nav.theme'), 'aria-label': t('nav.theme'), onclick: () => { S.store.set('sitora.theme', isDark() ? 'light' : 'dark'); applyTheme(); drawHeader(); S.bus.emit('theme'); } }, S.icon(isDark() ? 'sun' : 'moon'));
-    const who = u ? h('div', { class: 'row', style: { gap: '8px', flexWrap: 'nowrap' } }, h('span', { class: 'userchip', title: u.email || u.phone }, h('span', { class: 'avatar' }, S.fmt.initials(u.name)), h('span', { class: 'nm' }, u.name)), h('button', { class: 'icon-btn', title: t('nav.logout'), 'aria-label': t('nav.logout'), onclick: async () => { await S.api.logout(); S.toast(t('nav.loggedOut')); S.go('home'); } }, S.icon('out'))) : h('button', { class: 'btn sm', onclick: () => S.go('cabinet') }, t('nav.login'));
-    header.replaceChildren(h('div', { class: 'wrap top-in' }, h('button', { class: 'brand', onclick: () => { S.go('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }, 'aria-label': 'Sitora' }, S.logo(), h('span', null, 'SITORA')), menu, h('span', { class: 'spacer' }),
+    const who = u ? h('div', { class: 'row', style: { gap: '8px', flexWrap: 'nowrap' } }, h('span', { class: 'userchip', title: [u.email || u.phone, t('role.' + u.role, null, u.role), u.organizationName].filter(Boolean).join(' · ') }, h('span', { class: 'avatar' }, S.fmt.initials(u.name)), h('span', { class: 'nm' }, u.name, u.organizationName ? h('small', { class: 'org' }, u.organizationName) : null)), h('button', { class: 'icon-btn', title: t('nav.logout'), 'aria-label': t('nav.logout'), onclick: async () => { await S.api.logout(); S.toast(t('nav.loggedOut')); S.go('home'); } }, S.icon('out'))) : h('button', { class: 'btn sm', onclick: () => S.go('cabinet') }, t('nav.login'));
+    header.replaceChildren(impBanner(), h('div', { class: 'wrap top-in' }, h('button', { class: 'brand', onclick: () => { S.go('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }, 'aria-label': 'Sitora' }, S.logo(), h('span', null, 'SITORA')), menu, h('span', { class: 'spacer' }),
       S.isDemo() ? h('button', { class: 'chip warn demo-chip', style: { border: 0 }, onclick: () => S.openSettings(), title: t('settings.demoTip') }, t('settings.demo')) : null, lang, theme, who,
       h('button', { class: 'icon-btn menu-btn', 'aria-label': t('nav.menu'), onclick: () => menu.classList.toggle('open') }, S.icon('menu'))));
     void open;
+  }
+
+  // Working "as owner" of an organization: a strip that cannot be missed, with a way back.
+  function impBanner() {
+    if (!S.api.impersonating) return null;
+    const u = S.api.user;
+    return h('div', { class: 'imp-banner', role: 'status' }, h('div', { class: 'wrap row between' }, h('span', null, t('imp.banner', { o: (u && u.organizationName) || '' })),
+      h('button', { class: 'btn sm', onclick: (e) => S.busy(e.currentTarget, async () => { await S.api.stopImpersonation(); S.toast(t('imp.stopped'), 'ok'); S.go('platform'); }) }, t('imp.stop'))));
   }
 
   function render() {

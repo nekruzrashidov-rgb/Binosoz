@@ -1,4 +1,4 @@
-/* Manager / accountant / content / admin workspace. */
+/* Management workspace: owner, building admin and the positions inside an organization (manager, accountant, content). */
 (function () {
   const S = (window.S = window.S || {});
   const h = (...a) => S.h(...a);
@@ -6,6 +6,10 @@
   S.views = S.views || {};
   const STAGES = ['Lead', 'Showing', 'Booking', 'Contract', 'Payment', 'Completed', 'Cancelled'];
   const has = (...r) => S.api.has(...r);
+  // Sales actions (create deals, move stages, build plans) and money actions; leaders can do both.
+  const sales = () => has('Manager');
+  const money = () => has('Accountant');
+  const STAFF_POSITIONS = ['ObjectAdmin', 'Manager', 'Accountant', 'Content'];
 
   // Ids are GUIDs in the real API and numbers in the demo: show a short readable part.
   // The API issues UUIDv7 — they start with a timestamp, so the tail is what tells two ids apart.
@@ -13,8 +17,13 @@
   function toObj(x) { if (!x) return {}; if (Array.isArray(x)) { const o = {}; x.forEach((i) => { o[S.pick(i, ['stage', 'status', 'name', 'key'], '')] = S.pick(i, ['count', 'value', 'total'], 0); }); return o; } const o = {}; Object.keys(x).forEach((k) => { o[k.charAt(0).toUpperCase() + k.slice(1)] = x[k]; }); return o; }
 
   S.views.crm = function (root) {
-    if (!S.api.isAuthed || !S.api.isStaff()) return S.views.login(root, 'staff');
+    if (!S.api.isAuthed) return S.views.login(root);
+    if (!S.api.isStaff()) { root.appendChild(h('div', { class: 'wrap page-in' }, h('div', { class: 'card login-card login' }, h('h2', null, t('crm.notStaff')), h('div', { class: 'row', style: { marginTop: '14px' } }, h('button', { class: 'btn', onclick: () => S.go(S.homeFor(S.api.user)) }, t('cab.toCrm')))))); return () => {}; }
     const page = h('div', { class: 'page-in' }); root.appendChild(page);
+    // Which developer and which buildings this workspace is about.
+    const ctx = h('div', { class: 'wrap ctx-line' });
+    page.appendChild(ctx);
+    S.api.buildings().then((bs) => { S.crmBuildings = bs; const u = S.api.user; ctx.replaceChildren(h('b', null, u.organizationName || ''), h('span', { class: 'muted' }, ' · ' + t('role.' + u.role, null, u.role) + ' · ' + (u.buildingIds.length ? bs.filter((b) => u.buildingIds.includes(b.id)).map((b) => b.name).join(', ') : t('crm.allBuildings')))); }).catch(() => {});
     const items = [];
     const add = (key, label, icon, group, ok) => { if (ok) items.push({ key, label, icon, group }); };
     add('dashboard', t('crm.dashboard'), 'chart', t('crm.g.sales'), has('Manager'));
@@ -28,8 +37,8 @@
     add('rate', t('crm.rate'), 'chart', t('crm.g.finance'), has('Accountant'));
     add('catalog', t('crm.catalog'), 'building', t('crm.g.catalog'), has('Content'));
     add('construction', t('crm.construction'), 'hammer', t('crm.g.catalog'), has('Content'));
-    add('users', t('crm.users'), 'users', t('crm.g.system'), has('__admin__'));
-    add('audit', t('crm.audit'), 'shield', t('crm.g.system'), has('__admin__'));
+    add('users', t('crm.users'), 'users', t('crm.g.system'), S.api.isLeader());
+    add('audit', t('crm.audit'), 'shield', t('crm.g.system'), S.api.isOwner());
     const user = S.api.user;
     const ws = S.workspace(items, items[0].key, (k, main) => { S.clear(main); main.append(h('h1', null, items.find((i) => i.key === k).label), h('p', { class: 'sub' }, t('crm.sub.' + k))); const body = h('div', { class: 'stack' }); main.appendChild(body); try { views[k](body); } catch (e) { body.appendChild(h('div', { class: 'form-err' }, e.message)); console.error(e); } });
     page.appendChild(ws.el);
@@ -93,7 +102,7 @@
       async deals(body) {
         let stage = 'all', q = ''; const holder = h('div'); let list = [];
         const search = S.input('q', { type: 'search', placeholder: t('common.search'), 'aria-label': t('common.search') }); search.addEventListener('input', S.debounce(() => { q = search.value.toLowerCase(); draw(); }, 150));
-        const bar = h('div', { class: 'toolbar' }, search, h('div', { class: 'pill-group' }, ['all', ...STAGES].map((s) => h('button', { class: 'pill' + (stage === s ? ' on' : ''), onclick: (e) => { stage = s; S.$$('.pill', bar).forEach((p) => p.classList.remove('on')); e.currentTarget.classList.add('on'); draw(); } }, s === 'all' ? t('filter.all') : t('stage.' + s)))), h('span', { class: 'spacer' }), S.api.user.roles.some((r) => r === 'Manager' || r === 'Admin') ? h('button', { class: 'btn', onclick: () => newDealModal(load) }, S.icon('plus'), t('deal.new')) : null);
+        const bar = h('div', { class: 'toolbar' }, search, h('div', { class: 'pill-group' }, ['all', ...STAGES].map((s) => h('button', { class: 'pill' + (stage === s ? ' on' : ''), onclick: (e) => { stage = s; S.$$('.pill', bar).forEach((p) => p.classList.remove('on')); e.currentTarget.classList.add('on'); draw(); } }, s === 'all' ? t('filter.all') : t('stage.' + s)))), h('span', { class: 'spacer' }), sales() ? h('button', { class: 'btn', onclick: () => newDealModal(load) }, S.icon('plus'), t('deal.new')) : null);
         S.$$('.btn svg', bar).forEach((s) => { s.style.cssText = 'width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2'; });
         body.replaceChildren(bar, holder);
         const draw = () => holder.replaceChildren(S.tbl([
@@ -154,7 +163,10 @@
 
       async catalog(body) {
         body.replaceChildren(S.skeleton(4, 60));
-        const bs = await S.api.buildings(); const b = await S.api.building(bs[0].id).catch(() => bs[0]); const floors = await S.api.floors(b.id);
+        const bs = await S.api.buildings();
+        if (!bs.length) { body.replaceChildren(S.empty(t('cat.noBuildings'), 'building'), S.api.isOwner() ? h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => buildingForm(() => S.crmGo('catalog')) }, t('cat.newBuilding'))) : null); return; }
+        const bid = pickBuilding(bs);
+        const b = await S.api.building(bid).catch(() => bs.find((x) => x.id === bid)); const floors = await S.api.floors(b.id);
         let floorId = (floors.find((f) => !f.commercial) || floors[0]).id; const holder = h('div');
         const nameRu = S.input('nameRu', { value: b.nameRu || b.name }), nameTg = S.input('nameTg', { value: b.nameTg }), addr = S.input('address', { value: b.address });
         const dRu = h('textarea', { class: 'inp', name: 'descriptionRu', id: 'b-dru' }); dRu.value = b.descriptionRu || b.description || ''; const dTg = h('textarea', { class: 'inp', name: 'descriptionTg', id: 'b-dtg' }); dTg.value = b.descriptionTg || '';
@@ -165,7 +177,7 @@
         const imp = h('input', { type: 'file', id: 'imp-file', accept: '.xlsx', hidden: true });
         imp.addEventListener('change', async () => { const f = imp.files[0]; if (!f) return; try { const r = await S.api.importApartments(b.id, f); S.toast(r && r.message ? r.message : t('cat.imported'), 'ok'); drawApts(); } catch (er) { S.modal({ title: t('cat.importErr'), body: h('div', { class: 'stack' }, h('p', null, er.message), er.errors ? h('pre', { class: 'paper', style: { whiteSpace: 'pre-wrap' } }, JSON.stringify(er.errors, null, 1)) : null) }); } imp.value = ''; });
         const tools = h('div', { class: 'toolbar' }, h('div', { style: { minWidth: '200px' } }, S.field(t('cat.floor'), sel)), h('span', { class: 'spacer' }), imp, h('label', { class: 'btn ghost', for: 'imp-file' }, t('cat.import')), h('button', { class: 'btn', onclick: () => aptForm(null, floors.find((f) => String(f.id) === String(floorId)), drawApts) }, t('cat.addApt')));
-        body.replaceChildren(bform, h('h3', { style: { marginTop: '10px' } }, t('cat.apts')), tools, holder);
+        body.replaceChildren(buildingBar(bs, bid, 'catalog'), bform, h('h3', { style: { marginTop: '10px' } }, t('cat.apts')), tools, holder);
         async function drawApts() {
           const fl = floors.find((f) => String(f.id) === String(floorId)); holder.replaceChildren(S.skeleton(4, 38));
           const list = (await S.api.floorApartments(fl)).sort((a, c) => (a.planSlot || 0) - (c.planSlot || 0));
@@ -175,25 +187,31 @@
       },
 
       async construction(body) {
-        const holder = h('div', { class: 'stack' }); const bs = await S.api.buildings(); const bid = bs[0].id;
+        const holder = h('div', { class: 'stack' }); const bs = await S.api.buildings();
+        if (!bs.length) { body.replaceChildren(S.empty(t('cat.noBuildings'), 'building')); return; }
+        const bid = pickBuilding(bs);
         const load = async () => {
           holder.replaceChildren(S.skeleton(4, 60)); const st = await S.api.stages(bid);
           holder.replaceChildren(S.tbl([{ label: t('con.stage'), render: (s) => h('b', null, s.title) }, { label: t('con.progress'), render: (s) => h('div', { style: { minWidth: '160px' } }, S.bar(s.percent)) }, { label: '%', r: true, num: true, render: (s) => s.percent + '%' }, { label: t('doc.date'), render: (s) => S.fmt.date(s.date) }, { label: t('con.photos'), r: true, num: true, render: (s) => s.photos.length }, { label: '', r: true, render: (s) => h('button', { class: 'btn ghost sm', onclick: () => stageForm(s, bid, load) }, t('common.edit')) }], st, { empty: t('con.none') }));
         };
-        body.replaceChildren(h('div', { class: 'toolbar' }, h('span', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => stageForm(null, bid, load) }, t('con.add'))), holder); load();
+        body.replaceChildren(buildingBar(bs, bid, 'construction'), h('div', { class: 'toolbar' }, h('span', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => stageForm(null, bid, load) }, t('con.add'))), holder); load();
       },
 
       async users(body) {
         const holder = h('div');
-        const load = async () => { holder.replaceChildren(S.skeleton(4, 38)); const l = await S.api.users(); holder.replaceChildren(S.tbl([{ label: t('f.fullName'), render: (u) => h('b', null, u.name) }, { label: t('login.email'), render: (u) => u.email }, { label: t('users.role'), render: (u) => u.roles.map((r) => t('role.' + r)).join(', ') }, { label: t('deal.stage'), render: (u) => S.chip(u.blocked ? 'Blocked' : 'Active ok', t(u.blocked ? 'users.blocked' : 'users.active')) }, { label: '', r: true, render: (u) => (u.id === (S.api.user && S.api.user.id) ? '' : h('button', { class: 'btn ghost sm', onclick: async (e) => { await S.busy(e.currentTarget, async () => { try { await S.api.setUserBlocked(u.id, !u.blocked); S.toast(t('common.saved'), 'ok'); load(); } catch (er) { S.err(er); } }); } }, u.blocked ? t('users.unblock') : t('users.block'))) }], l)); };
-        body.replaceChildren(h('div', { class: 'toolbar' }, h('span', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => userForm(load) }, t('users.new'))), holder); load();
+        const pending = h('div');
+        const bname = (ids) => (ids.length ? ids.map((id) => ((S.crmBuildings || []).find((b) => b.id === id) || { name: '…' }).name).join(', ') : t('crm.allBuildings'));
+        const load = async () => { holder.replaceChildren(S.skeleton(4, 38)); const [l, inv] = await Promise.all([S.api.users(), S.api.invitations().catch(() => [])]); S.crmBuildings = S.crmBuildings || (await S.api.buildings());
+          pending.replaceChildren(...(inv.length ? [h('h3', { style: { margin: '18px 0 8px' } }, t('inv.pending')), S.tbl([{ label: t('login.email'), render: (i) => h('b', null, i.email) }, { label: t('f.fullName'), render: (i) => i.name }, { label: t('users.role'), render: (i) => t('role.' + i.role, null, i.role) }, { label: t('users.buildings'), render: (i) => bname(i.buildingIds) }, { label: t('inv.until'), render: (i) => S.fmt.date(i.expiresAt) }, { label: '', r: true, render: (i) => h('button', { class: 'btn ghost sm', onclick: (e) => S.busy(e.currentTarget, async () => { try { await S.api.revokeInvitation(i.id); S.toast(t('inv.revoked'), 'ok'); load(); } catch (er) { S.err(er); } }) }, t('inv.revoke')) }], inv)] : []));
+          holder.replaceChildren(S.tbl([{ label: t('f.fullName'), render: (u) => h('b', null, u.name) }, { label: t('login.email'), render: (u) => u.email }, { label: t('users.role'), render: (u) => u.roles.map((r) => t('role.' + r)).join(', ') }, { label: t('users.buildings'), render: (u) => (S.api.isOwner() && u.id !== S.api.user.id && !u.roles.includes('Owner') ? h('button', { class: 'btn ghost sm', title: t('users.setBuildings'), onclick: () => buildingsForm(u, load) }, bname(u.buildingIds)) : bname(u.buildingIds)) }, { label: t('deal.stage'), render: (u) => S.chip(u.blocked ? 'Blocked' : 'Active ok', t(u.blocked ? 'users.blocked' : 'users.active')) }, { label: '', r: true, render: (u) => (u.id === (S.api.user && S.api.user.id) ? '' : h('button', { class: 'btn ghost sm', onclick: async (e) => { await S.busy(e.currentTarget, async () => { try { await S.api.setUserBlocked(u.id, !u.blocked); S.toast(t('common.saved'), 'ok'); load(); } catch (er) { S.err(er); } }); } }, u.blocked ? t('users.unblock') : t('users.block'))) }], l)); };
+        body.replaceChildren(h('div', { class: 'toolbar' }, h('p', { class: 'hint' }, t('inv.hint')), h('span', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => userForm(load) }, t('inv.new'))), holder, pending); load();
       },
 
       async audit(body) {
         // Entity names as the server writes them (class names); the demo calls users "User".
         const userEntity = S.isDemo() ? 'User' : 'AppUser';
-        const holder = h('div'); const sel = S.select('entity', [['', t('filter.all')], ['Deal', 'Deal'], ['Payment', 'Payment'], ['Apartment', 'Apartment'], ['Booking', 'Booking'], ['Lead', 'Lead'], [userEntity, 'User']], '');
-        const load = async () => { holder.replaceChildren(S.skeleton(6, 34)); const l = await S.api.audit(sel.value); holder.replaceChildren(S.tbl([{ label: t('audit.when'), render: (a) => S.fmt.dt(a.at) }, { label: t('audit.who'), render: (a) => a.user }, { label: t('audit.action'), render: (a) => h('b', null, a.action) }, { label: t('audit.entity'), render: (a) => a.entity + ' #' + shortId(a.entityId) }, { label: t('audit.change'), render: (a) => h('code', { style: { fontSize: '12px', color: 'var(--ink-2)' } }, [a.before ? JSON.stringify(a.before) : '', a.before && a.after ? ' → ' : '', a.after ? JSON.stringify(a.after) : ''].join('')) }], l, { empty: t('audit.none') })); };
+        const holder = h('div'); const sel = S.select('entity', [['', t('filter.all')], ['Deal', 'Deal'], ['Payment', 'Payment'], ['Apartment', 'Apartment'], ['Booking', 'Booking'], ['Lead', 'Lead'], [userEntity, 'User'], ['Impersonation', t('audit.viaPlatform')], ['Invitation', 'Invitation']], '');
+        const load = async () => { holder.replaceChildren(S.skeleton(6, 34)); const l = await S.api.audit(sel.value); holder.replaceChildren(S.tbl([{ label: t('audit.when'), render: (a) => S.fmt.dt(a.at) }, { label: t('audit.who'), render: (a) => (a.viaPlatform ? h('span', null, a.user, ' ', S.chip('warn', t('audit.viaPlatform'))) : a.user) }, { label: t('audit.action'), render: (a) => h('b', null, a.action) }, { label: t('audit.entity'), render: (a) => a.entity + ' #' + shortId(a.entityId) }, { label: t('audit.change'), render: (a) => h('code', { style: { fontSize: '12px', color: 'var(--ink-2)' } }, [a.before ? JSON.stringify(a.before) : '', a.before && a.after ? ' → ' : '', a.after ? JSON.stringify(a.after) : ''].join('')) }], l, { empty: t('audit.none') })); };
         sel.addEventListener('change', load); body.replaceChildren(h('div', { class: 'toolbar' }, h('div', { style: { minWidth: '200px' } }, S.field(t('audit.entity'), sel))), holder); load();
       },
     };
@@ -224,10 +242,12 @@
     function customerForm(pre, done) {
       pre = pre || {};
       const name = S.input('fullName', { value: pre.fullName || '', autocomplete: 'off' }), phone = S.input('phone', { type: 'tel', value: pre.phone || '+992' }), email = S.input('email', { type: 'email' }), pass = S.input('passport');
-      const form = h('form', { class: 'stack', id: 'custform', novalidate: true }, S.field(t('f.fullName'), name), S.field(t('f.phone'), phone, t('f.phoneHint')), S.field(t('f.email'), email), S.field(t('f.passport'), pass, t('f.passportHint')));
+      const bs = S.crmBuildings || [];
+      const building = bs.length > 1 ? S.select('buildingId', [['', t('cust.pickBuilding')]].concat(bs.map((b) => [b.id, b.name])), pre.buildingId || '') : null;
+      const form = h('form', { class: 'stack', id: 'custform', novalidate: true }, S.field(t('f.fullName'), name), S.field(t('f.phone'), phone, t('f.phoneHint')), S.field(t('f.email'), email, t('cust.emailHint')), S.field(t('f.passport'), pass, t('f.passportHint')), building ? S.field(t('cust.building'), building, t('cust.buildingHint')) : null);
       const btn = h('button', { class: 'btn', type: 'submit', form: 'custform' }, t('common.save'));
       const md = S.modal({ title: t('cust.new'), body: form, actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
-      form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await S.api.createCustomer({ fullName: name.value.trim(), phone: phone.value.replace(/[\s()-]/g, ''), email: email.value.trim(), passport: pass.value.trim(), leadId: pre.leadId }); S.toast(t('common.saved'), 'ok'); md.close(); done && done(); } catch (er) { S.showErrors(form, er); } }); });
+      form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await S.api.createCustomer({ fullName: name.value.trim(), phone: phone.value.replace(/[\s()-]/g, ''), email: email.value.trim(), passport: pass.value.trim(), leadId: pre.leadId, buildingId: building ? building.value || null : null }); S.toast(t('common.saved'), 'ok'); md.close(); done && done(); } catch (er) { S.showErrors(form, er); } }); });
     }
 
     async function customerModal(id) {
@@ -243,9 +263,10 @@
       const holder = h('div', null, S.skeleton(3)); const md = S.modal({ title: t('deal.new'), body: holder });
       try {
         const [customers, bs] = await Promise.all([S.api.customers(''), S.api.buildings()]);
-        const floors = await S.api.floors(bs[0].id); const apts = (await S.api.allApartments(floors)).filter((a) => a.status === 'free' || (booking && String(a.id) === String(booking.apartmentId)));
+        const perBuilding = await Promise.all(bs.map(async (b) => (await S.api.allApartments(await S.api.floors(b.id))).map((a) => Object.assign(a, { buildingName: b.name }))));
+        const apts = perBuilding.flat().filter((a) => a.status === 'free' || (booking && String(a.id) === String(booking.apartmentId)));
         const cust = S.select('customerId', [['', t('deal.pickCustomer')]].concat(customers.map((c) => [c.id, c.fullName + ' · ' + c.phone])), '');
-        const apt = S.select('apartmentId', [['', t('deal.pickApt')]].concat(apts.sort((a, b) => a.number - b.number).map((a) => [a.id, '№ ' + a.number + ' · ' + t('floor.n', { n: a.floor }) + ' · ' + S.fmt.rooms(a.rooms) + ' · ' + S.fmt.money(a.price, 'TJS')])), booking && booking.apartmentId ? booking.apartmentId : '');
+        const apt = S.select('apartmentId', [['', t('deal.pickApt')]].concat(apts.sort((a, b) => a.number - b.number).map((a) => [a.id, (bs.length > 1 ? a.buildingName + ' · ' : '') + '№ ' + a.number + ' · ' + t('floor.n', { n: a.floor }) + ' · ' + S.fmt.rooms(a.rooms) + ' · ' + S.fmt.money(a.price, 'TJS')])), booking && booking.apartmentId ? booking.apartmentId : '');
         const cur = S.select('currency', [['TJS', 'TJS'], ['USD', 'USD']], 'TJS'); const disc = S.input('discount', { type: 'number', min: 0, value: 0 }); const rs = S.input('discountReason', { placeholder: t('deal.reasonPh') });
         const form = h('form', { class: 'stack', id: 'dealform', novalidate: true }, S.field(t('deal.customer'), cust, null), S.field(t('deal.apt'), apt), h('div', { class: 'grid g2' }, S.field(t('deal.currency'), cur, t('deal.currencyHint')), S.field(t('deal.discount'), disc)), S.field(t('deal.discountReason'), rs));
         const btn = h('button', { class: 'btn', type: 'submit', form: 'dealform' }, t('deal.create'));
@@ -275,12 +296,57 @@
         S.toast(t('common.saved'), 'ok'); md.close(); done && done(); } catch (er) { S.showErrors(form, er); } }); });
     }
 
+    // Invite a person by e-mail: they get a link and then sign in with a code. A building admin invites only into their building.
     function userForm(done) {
-      const name = S.input('name'), email = S.input('email', { type: 'email' }), pass = S.input('password', { type: 'password', autocomplete: 'new-password' }), role = S.select('role', ['Manager', 'Accountant', 'Content', 'Admin'].map((r) => [r, t('role.' + r)]), 'Manager');
-      const form = h('form', { class: 'stack', id: 'userform', novalidate: true }, S.field(t('f.fullName'), name), S.field(t('login.email'), email), S.field(t('login.password'), pass, t('users.passHint')), S.field(t('users.role'), role));
-      const btn = h('button', { class: 'btn', type: 'submit', form: 'userform' }, t('common.save'));
-      const md = S.modal({ title: t('users.new'), body: form, actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
-      form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await S.api.createUser({ name: name.value.trim(), fullName: name.value.trim(), email: email.value.trim(), password: pass.value, role: role.value, roles: [role.value] }); S.toast(t('common.saved'), 'ok'); md.close(); done && done(); } catch (er) { S.showErrors(form, er); } }); });
+      const u = S.api.user; const bs = S.crmBuildings || [];
+      const roles = (S.api.isOwner() ? STAFF_POSITIONS : STAFF_POSITIONS.filter((r) => r !== 'ObjectAdmin'));
+      const name = S.input('fullName'), email = S.input('email', { type: 'email' }), role = S.select('role', roles.map((r) => [r, t('role.' + r)]), 'Manager');
+      const own = u.buildingIds.length ? bs.filter((b) => u.buildingIds.includes(b.id)) : bs;
+      const boxes = h('div', { class: 'stack', style: { gap: '6px' } }, own.map((b) => h('label', { class: 'row', style: { gap: '8px', flexWrap: 'nowrap' } }, h('input', { type: 'checkbox', value: b.id, checked: own.length === 1 }), b.name)));
+      const hint = h('div', { class: 'hint' });
+      const syncHint = () => { hint.textContent = role.value === 'ObjectAdmin' ? t('inv.oneBuilding') : t('inv.allHint'); };
+      role.addEventListener('change', syncHint); syncHint();
+      const form = h('form', { class: 'stack', id: 'userform', novalidate: true }, S.field(t('f.fullName'), name), S.field(t('login.email'), email, t('inv.emailHint')), S.field(t('users.role'), role),
+        h('div', { class: 'field', dataset: { name: 'buildingIds' } }, h('label', null, t('users.buildings')), boxes, hint, h('div', { class: 'ferr' })));
+      const btn = h('button', { class: 'btn', type: 'submit', form: 'userform' }, t('inv.send'));
+      const md = S.modal({ title: t('inv.new'), body: form, actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
+      form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try {
+        const buildingIds = S.$$('input[type=checkbox]:checked', boxes).map((c) => c.value);
+        await S.api.invite({ fullName: name.value.trim(), email: email.value.trim(), role: role.value, buildingIds });
+        S.toast(t('inv.sent', { e: email.value.trim() }), 'ok'); md.close(); done && done(); } catch (er) { S.showErrors(form, er); } }); });
+    }
+
+    // Owner only: which buildings a person works in (empty — all). Their sessions end, new rights apply on the next sign-in.
+    function buildingsForm(u, done) {
+      const bs = S.crmBuildings || [];
+      const boxes = h('div', { class: 'stack', style: { gap: '6px' } }, bs.map((b) => h('label', { class: 'row', style: { gap: '8px', flexWrap: 'nowrap' } }, h('input', { type: 'checkbox', value: b.id, checked: u.buildingIds.includes(b.id) }), b.name)));
+      const form = h('form', { class: 'stack', id: 'bldform', novalidate: true }, h('p', { class: 'muted' }, u.name + ' · ' + u.roles.map((r) => t('role.' + r)).join(', ')),
+        h('div', { class: 'field', dataset: { name: 'buildingIds' } }, boxes, h('div', { class: 'hint' }, u.roles.includes('ObjectAdmin') ? t('inv.oneBuilding') : t('inv.allHint')), h('div', { class: 'ferr' })), h('p', { class: 'hint' }, t('users.buildingsNote')));
+      const btn = h('button', { class: 'btn', type: 'submit', form: 'bldform' }, t('common.save'));
+      const md = S.modal({ title: t('users.setBuildings'), body: form, actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
+      form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await S.api.setUserBuildings(u.id, S.$$('input:checked', boxes).map((c) => c.value)); S.toast(t('common.saved'), 'ok'); md.close(); done && done(); } catch (er) { S.showErrors(form, er); } }); });
+    }
+
+    // Owner only: a new building of the organization.
+    function buildingForm(done) {
+      const nameRu = S.input('nameRu'), nameTg = S.input('nameTg'), addr = S.input('address'), floors = S.input('floorsCount', { type: 'number', min: 1, max: 100, value: 9 });
+      const form = h('form', { class: 'stack', id: 'newbform', novalidate: true }, h('div', { class: 'grid g2' }, S.field(t('cat.nameRu'), nameRu), S.field(t('cat.nameTg'), nameTg)), S.field(t('f.address'), addr), S.field(t('cat.floorsCount'), floors));
+      const btn = h('button', { class: 'btn', type: 'submit', form: 'newbform' }, t('common.save'));
+      const md = S.modal({ title: t('cat.newBuilding'), body: form, actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
+      form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { const b = await S.api.createBuilding({ nameRu: nameRu.value.trim(), nameTg: nameTg.value.trim() || nameRu.value.trim(), address: addr.value.trim(), floorsCount: +floors.value }); S.crmBuildings = null; S.store.set('sitora.crmBuilding', b.id); S.toast(t('common.saved'), 'ok'); md.close(); done && done(); } catch (er) { S.showErrors(form, er); } }); });
+    }
+
+    // The building the catalog and construction sections work on (remembered between visits).
+    function pickBuilding(bs) {
+      const saved = S.store.get('sitora.crmBuilding');
+      return (bs.find((b) => String(b.id) === String(saved)) || bs[0]).id;
+    }
+    function buildingBar(bs, bid, tab) {
+      if (bs.length < 2 && !S.api.isOwner()) return null;
+      const sel = S.select('building', bs.map((b) => [b.id, b.name]), bid, { 'aria-label': t('cust.building') });
+      sel.addEventListener('change', () => { S.store.set('sitora.crmBuilding', sel.value); S.crmGo(tab); });
+      return h('div', { class: 'toolbar' }, bs.length > 1 ? h('div', { style: { minWidth: '240px' } }, S.field(t('cust.building'), sel)) : null, h('span', { class: 'spacer' }),
+        S.api.isOwner() ? h('button', { class: 'btn ghost', onclick: () => buildingForm(() => S.crmGo(tab)) }, t('cat.newBuilding')) : null);
     }
 
     /* ---------- deal drawer ---------- */
@@ -305,7 +371,7 @@
       const panes = {
         overview(c) {
           const stageSel = S.select('stage', STAGES.map((s) => [s, t('stage.' + s)]), d.stage); const reason = S.input('reason', { placeholder: t('deal.reasonPh') });
-          const canMove = S.api.has('Manager') && d.stage !== 'Completed' && d.stage !== 'Cancelled' && S.api.user.roles.some((r) => r === 'Manager' || r === 'Admin');
+          const canMove = S.api.has('Manager') && d.stage !== 'Completed' && d.stage !== 'Cancelled' && sales();
           const btn = h('button', { class: 'btn', type: 'submit' }, t('deal.move'));
           const sf = h('form', { class: 'card flat stack', novalidate: true }, h('h3', null, t('deal.changeStage')), h('div', { class: 'grid g2' }, S.field(t('deal.stage'), stageSel), S.field(t('deal.reason'), reason, t('deal.reasonHint'))), btn);
           sf.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(sf, null); if (stageSel.value === d.stage) { S.toast(t('deal.sameStage')); return; }
@@ -317,12 +383,12 @@
         },
         async schedule(c) {
           c.replaceChildren(S.skeleton(3, 50)); const s = await getSched();
-          if (!s.none) { c.replaceChildren(S.panels.schedule(s), h('div', { class: 'row' }, h('button', { class: 'btn ghost', onclick: (e) => S.busy(e.currentTarget, () => S.api.openDoc('/deals/' + id + '/schedule.pdf', null, 'PDF').catch(S.err)) }, t('cab.pdfSchedule')), h('button', { class: 'btn ghost', onclick: (e) => S.busy(e.currentTarget, () => S.api.openDoc('/deals/' + id + '/statement.pdf', { date: S.today() }, 'PDF').catch(S.err)) }, t('cab.pdfAct')), s.paid === 0 && S.api.user.roles.some((r) => r === 'Manager' || r === 'Admin') ? h('button', { class: 'btn soft', onclick: () => planForm(true) }, t('plan.rebuild')) : null)); return; }
-          c.replaceChildren(S.api.user.roles.some((r) => r === 'Manager' || r === 'Admin') ? planFormEl() : S.empty(t('plan.none'), 'wallet'));
+          if (!s.none) { c.replaceChildren(S.panels.schedule(s), h('div', { class: 'row' }, h('button', { class: 'btn ghost', onclick: (e) => S.busy(e.currentTarget, () => S.api.openDoc('/deals/' + id + '/schedule.pdf', null, 'PDF').catch(S.err)) }, t('cab.pdfSchedule')), h('button', { class: 'btn ghost', onclick: (e) => S.busy(e.currentTarget, () => S.api.openDoc('/deals/' + id + '/statement.pdf', { date: S.today() }, 'PDF').catch(S.err)) }, t('cab.pdfAct')), s.paid === 0 && sales() ? h('button', { class: 'btn soft', onclick: () => planForm(true) }, t('plan.rebuild')) : null)); return; }
+          c.replaceChildren(sales() ? planFormEl() : S.empty(t('plan.none'), 'wallet'));
         },
         async payments(c) {
           c.replaceChildren(S.skeleton(3, 40));
-          const canPay = S.api.user.roles.some((r) => r === 'Accountant' || r === 'Admin');
+          const canPay = money();
           const parts = [];
           if (canPay) {
             const sc = await getSched();

@@ -122,7 +122,7 @@ SecondFactorChallenge = { challengeToken, expiresAt, methods: ["password", "totp
 | GET | `/buildings/{id}/floors` | страница `FloorResponse` | `floors()` |
 | GET | `/floors/{id}/apartments` | страница `ApartmentResponse` | `floorApartments()` |
 | GET | `/apartments/{id}` | `ApartmentResponse` | `apartment()` |
-| GET | `/rates/current?currency=USD&organizationId=` | `{ date, currency, rateToTjs, source }`. Ручной курс у каждой организации свой, поэтому сайт передаёт `organizationId`. Без него — только общий курс НБТ. Сотруднику организация берётся из токена. 404, если курса нет | `rate()` → `{ rate, date }` |
+| GET | `/rates/current?currency=USD&organization=slug` (или `&organizationId=`) | `{ date, currency, rateToTjs, source }`. Ручной курс у каждой организации свой, поэтому сайт передаёт slug или id организации; неизвестный slug — 404. Без него — только общий курс НБТ. Сотруднику организация берётся из токена. 404, если курса нет | `rate()` → `{ rate, date }` |
 | POST | `/leads` | `{ name, phone, apartmentId?, buildingId?, source, comment? }`. Организация берётся из квартиры или дома. Если на платформе несколько застройщиков, без них — 422 | `createLead()` |
 | POST | `/apartments/{id}/bookings` | `{ name, phone }` (гость) или `{ customerId }` (менеджер) → `BookingResponse`; 409, если квартира занята | `book()` |
 
@@ -209,9 +209,9 @@ SecondFactorChallenge = { challengeToken, expiresAt, methods: ["password", "totp
 | PATCH | `/apartments/{id}/on-request` | Content, руководители | `{ onRequest }` |
 | POST | `/apartments/import?buildingId=` | Content, руководители | form-data `file` (.xlsx) |
 
-## Что поменять во фронтенде web/ (вход по почте и организации)
+## Фронтенд web/: вход по почте и организации (сделано)
 
-Бэкенд уже работает по новым правилам, а `web/js/api.js` пока ходит по-старому.
+Всё из списка ниже сделано в `web/`: `js/api.js`, `js/cabinet.js` (вход и приглашение), `js/platform.js` (новый раздел), `js/crm.js`, `js/app.js`; демо-бэкенд `js/mock.js` понимает новые адреса. Для сайта застройщика в `config.js` задаётся `ORG_SLUG`.
 
 1. **Страница входа.** Одна форма «Почта → Код» для всех: `POST /auth/email/send`, затем `POST /auth/email/verify`. Кнопки «Покупатель / Менеджер / Админ», вход по паролю и вход по SMS убрать (`/auth/sms/*` теперь отвечают 404).
 2. **Второй шаг.** Если verify ответил **202**, показать поле «Пароль или код из приложения» и отправить `POST /auth/second-factor` с `challengeToken`. Это бывает только у создателя платформы; отдельного входа для него нет.
@@ -234,7 +234,7 @@ SecondFactorChallenge = { challengeToken, expiresAt, methods: ["password", "totp
 9. **Страница приглашения.** Адрес `#invite=<token>` → `POST /auth/invitations/accept { token }` → сохранить сессию, как после входа.
 10. **Публичный сайт.**
     - Добавить `ORG_SLUG` в `config.js` и передавать `?organization=` в `/buildings`.
-    - `organizationId` организации — в `/rates/current`.
+    - slug организации — в `/rates/current?organization=` (или её `organizationId`).
     - `buildingId` (или `apartmentId`) в форме заявки.
 11. **Клиенты.** В форме клиента почта теперь важна: по ней покупатель входит в кабинет. При нескольких домах у сотрудника нужен выбор дома (`buildingId`).
 12. **Аудит.** Показывать `impersonatedById` («через платформу»). Раздел аудита — только Owner.

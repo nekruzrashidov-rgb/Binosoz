@@ -1,4 +1,4 @@
-/* Login (buyers by SMS, staff by e-mail) and the buyer cabinet. */
+/* Login by a code from e-mail (everyone), staff invitations and the buyer cabinet. */
 (function () {
   const S = (window.S = window.S || {});
   const h = (...a) => S.h(...a);
@@ -6,63 +6,99 @@
   S.views = S.views || {};
 
   /* ---------- login ---------- */
-  S.views.login = function (root, mode) {
-    let tab = mode || 'customer';
-    const wrap = h('div', { class: 'wrap page-in' });
-    root.appendChild(wrap);
+  // Where each role works: the platform section, the management workspace or the buyer cabinet.
+  S.homeFor = (u) => (!u ? 'cabinet' : u.role === 'PlatformOwner' ? 'platform' : u.role === 'Customer' ? 'cabinet' : 'crm');
+  const enter = (r) => { S.toast(t('login.welcome'), 'ok'); S.go(S.homeFor(r.user)); };
+
+  // One form for everyone: e-mail, then the code from the letter. Only the platform owner gets a third step.
+  S.views.login = function (root) {
     const card = h('div', { class: 'card login-card login' });
-    wrap.appendChild(card);
+    root.appendChild(h('div', { class: 'wrap page-in' }, card));
+    let step = 'email', emailVal = '', timer = 0, tick = null, challenge = null;
+
+    const startTick = () => {
+      clearInterval(tick); timer = 60;
+      tick = setInterval(() => {
+        if (!card.isConnected) { clearInterval(tick); return; }
+        timer = Math.max(0, timer - 1);
+        const b = S.$('[data-resend]', card);
+        if (b) { b.disabled = timer > 0; b.textContent = timer > 0 ? t('login.resendIn', { s: timer }) : t('login.resend'); }
+        if (!timer) clearInterval(tick);
+      }, 1000);
+    };
+    const send = async () => { await S.api.emailSend(emailVal); startTick(); };
 
     function draw() {
-      const seg = h('div', { class: 'seg', style: { marginBottom: '18px' } }, [['customer', t('login.buyer')], ['staff', t('login.staff')]].map(([k, l]) => h('button', { class: tab === k ? 'on' : '', onclick: () => { tab = k; draw(); } }, l)));
-      card.replaceChildren(seg, tab === 'customer' ? buyerForm() : staffForm());
+      const form = h('form', { class: 'stack', novalidate: true });
+      const btn = h('button', { class: 'btn lg block', type: 'submit' }, step === 'email' ? t('login.getCode') : t('login.enter'));
+      let submit;
+      if (step === 'email') {
+        const email = S.input('email', { type: 'email', value: emailVal, placeholder: 'name@mail.tj', autocomplete: 'email', inputmode: 'email' });
+        form.append(h('h2', null, t('login.title')), h('p', { class: 'muted' }, t('login.sub')), S.field(t('login.email'), email), btn);
+        submit = async () => {
+          emailVal = email.value.trim();
+          if (!/^\S+@\S+\.\S+$/.test(emailVal)) { S.showErrors(form, { message: t('val.email'), errors: { email: [t('val.email')] } }); return; }
+          await send(); step = 'code'; draw();
+        };
+        setTimeout(() => email.focus(), 30);
+      } else if (step === 'code') {
+        const code = S.input('code', { inputmode: 'numeric', maxlength: 6, placeholder: '••••••', autocomplete: 'one-time-code', style: { letterSpacing: '.4em', fontSize: '20px', textAlign: 'center', fontWeight: 800 } });
+        const resend = h('button', { class: 'btn ghost sm', type: 'button', 'data-resend': '', disabled: timer > 0, onclick: async () => { try { await send(); S.toast(t('login.sent'), 'ok'); } catch (er) { S.err(er); } } }, timer > 0 ? t('login.resendIn', { s: timer }) : t('login.resend'));
+        form.append(h('h2', null, t('login.codeTitle')), h('p', { class: 'muted' }, t('login.codeSub', { p: emailVal })), S.field(t('login.code'), code, t('login.codeHint')), btn,
+          h('div', { class: 'row between' }, h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { step = 'email'; clearInterval(tick); draw(); } }, t('login.changeEmail')), resend));
+        submit = async () => {
+          const r = await S.api.emailVerify(emailVal, code.value.replace(/\s/g, ''));
+          if (r.challenge) { challenge = r.challenge; step = 'second'; clearInterval(tick); draw(); return; }
+          enter(r);
+        };
+        setTimeout(() => code.focus(), 30);
+      } else {
+        const pass = S.input('password', { type: 'password', autocomplete: 'current-password' });
+        form.append(h('h2', null, t('login.secondTitle')), h('p', { class: 'muted' }, t('login.secondSub')), S.field(t('login.secondLabel'), pass, t('login.secondHint')), btn,
+          h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { step = 'email'; challenge = null; draw(); } }, t('login.again')));
+        submit = async () => {
+          // Six digits are a code from the authenticator app, anything else is the password.
+          const v = pass.value.trim(); const totp = /^\d{6}$/.test(v);
+          enter(await S.api.secondFactor(challenge.token, totp ? null : pass.value, totp ? v : null));
+        };
+        setTimeout(() => pass.focus(), 30);
+      }
+      form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await submit(); } catch (er) { S.showErrors(form, er); } }); });
+      card.replaceChildren(form);
+      if (S.isDemo()) card.appendChild(demoBox());
     }
 
-    function buyerForm() {
-      let step = 1, phoneVal = '+992', timer = 0, tick;
-      const box = h('div');
-      const render = () => {
-        const form = h('form', { class: 'stack', novalidate: true });
-        if (step === 1) {
-          const phone = S.input('phone', { type: 'tel', value: phoneVal, placeholder: '+992 9XX XX XX XX', autocomplete: 'tel' });
-          const btn = h('button', { class: 'btn lg block', type: 'submit' }, t('login.getCode'));
-          form.append(h('h2', null, t('login.buyerTitle')), h('p', { class: 'muted' }, t('login.buyerSub')), S.field(t('f.phone'), phone, t('f.phoneHint')), btn);
-          form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); phoneVal = phone.value.replace(/[\s()-]/g, ''); await S.busy(btn, async () => { try { await S.api.smsSend(phoneVal); step = 2; timer = 60; startTick(); render(); } catch (er) { S.showErrors(form, er); } }); });
-        } else {
-          const code = S.input('code', { inputmode: 'numeric', maxlength: 6, placeholder: '••••••', autocomplete: 'one-time-code', style: { letterSpacing: '.4em', fontSize: '20px', textAlign: 'center', fontWeight: 800 } });
-          const btn = h('button', { class: 'btn lg block', type: 'submit' }, t('login.enter'));
-          const resend = h('button', { class: 'btn ghost sm', type: 'button', disabled: timer > 0, onclick: async () => { try { await S.api.smsSend(phoneVal); timer = 60; startTick(); render(); S.toast(t('login.sent'), 'ok'); } catch (er) { S.err(er); } } }, timer > 0 ? t('login.resendIn', { s: timer }) : t('login.resend'));
-          form.append(h('h2', null, t('login.codeTitle')), h('p', { class: 'muted' }, t('login.codeSub', { p: phoneVal })), S.field(t('login.code'), code), btn, h('div', { class: 'row between' }, h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { step = 1; clearInterval(tick); render(); } }, t('login.changePhone')), resend));
-          form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await S.api.smsVerify(phoneVal, code.value.trim()); S.toast(t('login.welcome'), 'ok'); S.go(S.api.isStaff() ? 'crm' : 'cabinet'); } catch (er) { S.showErrors(form, er); } }); });
-          setTimeout(() => code.focus(), 30);
-        }
-        box.replaceChildren(form);
-        if (S.isDemo()) box.appendChild(h('div', { class: 'demo-box' }, t('login.demoBuyer'), ' ', h('button', { type: 'button', onclick: () => { phoneVal = S.mock.demoCustomerPhone; step === 1 ? (S.$('input[name=phone]', box).value = phoneVal) : null; if (step === 2) { S.$('input[name=code]', box).value = '123456'; } else { S.toast(t('login.demoFilled')); } } }, t('login.demoFill'))));
-      };
-      const startTick = () => { clearInterval(tick); tick = setInterval(() => { if (!box.isConnected) { clearInterval(tick); return; } timer = Math.max(0, timer - 1); const b = S.$('button.btn.ghost.sm:last-child', box); if (b && step === 2) { b.disabled = timer > 0; b.textContent = timer > 0 ? t('login.resendIn', { s: timer }) : t('login.resend'); } if (!timer) clearInterval(tick); }, 1000); };
-      render();
-      return box;
-    }
-
-    function staffForm() {
-      const email = S.input('email', { type: 'email', placeholder: 'name@company.tj', autocomplete: 'username' });
-      const pass = S.input('password', { type: 'password', autocomplete: 'current-password' });
-      const btn = h('button', { class: 'btn lg block', type: 'submit' }, t('login.enter'));
-      const form = h('form', { class: 'stack', novalidate: true }, h('h2', null, t('login.staffTitle')), h('p', { class: 'muted' }, t('login.staffSub')), S.field(t('login.email'), email), S.field(t('login.password'), pass), btn);
-      form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await S.api.login(email.value.trim(), pass.value); S.toast(t('login.welcome'), 'ok'); S.go(S.api.isStaff() ? 'crm' : 'cabinet'); } catch (er) { S.showErrors(form, er); } }); });
-      const box = h('div', null, form);
-      if (S.isDemo()) box.appendChild(h('div', { class: 'demo-box' }, h('div', null, t('login.demoStaff')), h('div', { style: { marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '4px 12px' } }, S.mock.demoUsers.map((u) => h('button', { type: 'button', onclick: () => { email.value = u.email; pass.value = u.password; } }, t('role.' + u.role))))));
-      return box;
+    // Demo: pick a role and the address is filled in; the code is always 123456.
+    function demoBox() {
+      if (step === 'second') return h('div', { class: 'demo-box' }, t('login.demoSecond', { p: S.mock.demoPlatformPassword }));
+      if (step === 'code') return h('div', { class: 'demo-box' }, t('login.demoCode'), ' ', h('button', { type: 'button', onclick: () => { S.$('input[name=code]', card).value = '123456'; } }, t('login.demoFill')));
+      return h('div', { class: 'demo-box' }, h('div', null, t('login.demoPick')),
+        h('div', { style: { marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '4px 12px' } }, S.mock.demoUsers.map((u) => h('button', { type: 'button', onclick: () => { S.$('input[name=email]', card).value = u.email; } }, t('role.' + u.role)))));
     }
     draw();
+    return () => clearInterval(tick);
+  };
+
+  /* ---------- staff invitation: #invite=<token> ---------- */
+  S.views.invite = function (root) {
+    const token = (location.hash.match(/invite=([0-9A-Fa-f]+)/) || [])[1] || '';
+    const card = h('div', { class: 'card login-card login' });
+    root.appendChild(h('div', { class: 'wrap page-in' }, card));
+    const btn = h('button', { class: 'btn lg block' }, t('invite.accept'));
+    const msg = h('div');
+    btn.addEventListener('click', () => S.busy(btn, async () => {
+      msg.replaceChildren();
+      try { enter(await S.api.acceptInvitation(token)); } catch (er) { msg.replaceChildren(h('div', { class: 'form-err' }, er.message)); }
+    }));
+    card.append(h('h2', null, t('invite.title')), h('p', { class: 'muted', style: { margin: '8px 0 16px' } }, t('invite.text')), token ? btn : h('div', { class: 'form-err' }, t('invite.bad')), msg);
     return () => {};
   };
 
   /* ---------- buyer cabinet ---------- */
   S.views.cabinet = function (root) {
-    if (!S.api.isAuthed) return S.views.login(root, 'customer');
+    if (!S.api.isAuthed) return S.views.login(root);
     if (!S.api.isCustomer()) {
-      const w = h('div', { class: 'wrap page-in' }, h('div', { class: 'card login-card login' }, h('h2', null, t('cab.staffTitle')), h('p', { class: 'muted', style: { margin: '8px 0 16px' } }, t('cab.staffText')), h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => S.go('crm') }, t('cab.toCrm')), h('button', { class: 'btn ghost', onclick: async () => { await S.api.logout(); S.go('cabinet'); } }, t('nav.logout')))));
+      const w = h('div', { class: 'wrap page-in' }, h('div', { class: 'card login-card login' }, h('h2', null, t('cab.staffTitle')), h('p', { class: 'muted', style: { margin: '8px 0 16px' } }, t('cab.staffText')), h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => S.go(S.homeFor(S.api.user)) }, t('cab.toCrm')), h('button', { class: 'btn ghost', onclick: async () => { await S.api.logout(); S.go('cabinet'); } }, t('nav.logout')))));
       root.appendChild(w); return () => {};
     }
     const page = h('div', { class: 'page-in' }); root.appendChild(page);
