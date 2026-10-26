@@ -64,6 +64,7 @@ services:
       Email__Smtp__Username: ${SMTP_USERNAME:-}
       Email__Smtp__Password: ${SMTP_PASSWORD:-}
       Email__Resend__ApiKey: ${RESEND_API_KEY:-}
+      Claude__ApiKey: ${CLAUDE_API_KEY:-}
     volumes:
       - files:/app/storage
       # JSON-логи по дням, хранятся 14 дней (Serilog, appsettings.Production.json).

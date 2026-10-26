@@ -395,3 +395,21 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .imp-banner { background: var(--warn-soft); color: var(--warn); border-bottom: 1px solid var(--warn); font-weight: 700; font-size: 13.5px; }
 .imp-banner .wrap { padding-top: 8px; padding-bottom: 8px; gap: 10px; }
 .ctx-line { padding-top: 14px; font-size: 13.5px; }
+
+/* AI assistant */
+.ai-fab { position: fixed; z-index: 31; right: max(14px, env(safe-area-inset-right, 0px)); bottom: calc(66px + env(safe-area-inset-bottom, 0px)); width: 44px; height: 44px; border-radius: 50%; border: 0; cursor: pointer; font-size: 20px; color: #1b1405; background: linear-gradient(135deg, #f2c46a, #cf9a33); box-shadow: var(--shadow); }
+.ai-fab:hover { transform: translateY(-1px); }
+.ai-fab.hidden { display: none; }
+.ai-panel { position: fixed; z-index: 60; top: 0; right: 0; bottom: 0; width: 320px; max-width: 100vw; display: none; flex-direction: column; background: var(--surface); color: var(--ink); border-left: 1px solid var(--line); box-shadow: var(--shadow-lg); }
+.ai-panel.open { display: flex; }
+.ai-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.ai-head b { color: var(--gold); }
+.ai-list { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.ai-msg { max-width: 85%; padding: 9px 12px; border-radius: 14px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
+.ai-msg.bot { align-self: flex-start; background: var(--surface-3); border-bottom-left-radius: 4px; }
+.ai-msg.me { align-self: flex-end; background: var(--gold); color: #1b1405; border-bottom-right-radius: 4px; }
+.ai-msg.err { align-self: flex-start; background: var(--bad-soft); color: var(--bad); }
+.ai-msg.typing { color: var(--muted); font-style: italic; }
+.ai-form { display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); }
+.ai-input { resize: none; min-height: 42px; }
+@media (max-width: 560px) { .ai-panel { width: 100vw; } }

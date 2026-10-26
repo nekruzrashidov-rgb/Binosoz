@@ -198,6 +198,11 @@
     // The same answer whether the address is known or not.
     return { message: 'Если почта зарегистрирована, мы отправили на неё код для входа', expiresInSeconds: 600 };
   });
+  // The assistant needs the real API (a Claude key on the server); the built-in backend only says so.
+  route('POST', /^\/ai\/chat$/, (c) => {
+    if (!String(c.body.message || '').trim()) err(422, 'Business', 'Напишите вопрос');
+    return { reply: 'Помощник отвечает, когда сайт подключён к API с настроенным ключом Claude. Сейчас сайт работает без сервера.' };
+  }, 'any');
   route('POST', /^\/auth\/register$/, (c) => {
     const b = c.body; const email = String(b.email || '').trim().toLowerCase(); const phone = normPhone(b.phone);
     if (!/^\S+@\S+\.\S+$/.test(email)) err(400, 'Validation', 'Неверный формат почты', { Email: ['Неверный формат почты'] });

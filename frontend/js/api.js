@@ -458,6 +458,8 @@
     setUserBuildings(id, buildingIds) { return request('PUT', '/users/' + id + '/buildings', { body: { buildingIds } }).then(M.user); },
     setUserBlocked(id, blocked) { return request('PATCH', '/users/' + id + '/status', { body: { isActive: !blocked, blocked } }); },
     async audit(entity) { return (await all('/audit', { entity: entity || undefined }, 1)).map(M.audit); },
+    // AI assistant: the server chooses the prompt by role; history = [{ role: 'user'|'assistant', content }].
+    aiChat(message, history) { return request('POST', '/ai/chat', { body: { message, history: history || [] } }); },
     async health() { return S.isDemo() ? request('GET', '/health/ready', { auth: false }) : request('GET', '/health/ready', { auth: false, absolute: true }); },
 
     /* Opens a PDF in a tab or downloads Excel: real API -> file from the server; demo -> in-page preview */

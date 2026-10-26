@@ -111,6 +111,7 @@ Caddy сам получает сертификат HTTPS. Бэкап — `./scri
 | `Hangfire__ServerEnabled` | `false` выключает фоновые задачи в этом экземпляре |
 | `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` | первый владелец организации по умолчанию, если владельцев ещё нет (в Production создаётся командой `--migrate`) |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | создатель платформы (PlatformOwner); пароль — его второй фактор |
+| `Claude__ApiKey` | ключ Claude для AI-помощника в чате сайта (в разработке — `dotnet user-secrets set Claude:ApiKey ...`); без него `/ai/chat` отвечает 503. `Claude__Model` и `Claude__MaxTokens` — модель (по умолчанию `claude-haiku-5-5`) и длина ответа (1000) |
 | `Email__Provider` | `Dev` (код в лог, только для разработки), `Smtp` или `Resend` |
 | `Email__From`, `Email__FromName`, `Email__InviteUrl` | отправитель писем и адрес страницы приглашения (токен дописывается в конец) |
 | `Email__Smtp__Host`, `__Port`, `__Username`, `__Password`, `__UseSsl` | SMTP |
