@@ -13,3 +13,6 @@ public class BusinessRuleException(string message) : DomainException(message);
 public class UnauthorizedException(string message) : DomainException(message);
 
 public class TooManyRequestsException(string message) : DomainException(message);
+
+// Внешний сервис не настроен или недоступен (например, AI-помощник без ключа).
+public class ServiceUnavailableException(string message) : DomainException(message);

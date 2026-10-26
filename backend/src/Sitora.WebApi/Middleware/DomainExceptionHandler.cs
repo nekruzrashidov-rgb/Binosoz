@@ -37,6 +37,7 @@ public class DomainExceptionHandler(IProblemDetailsService problemDetails, ILogg
         BusinessRuleException => (StatusCodes.Status422UnprocessableEntity, "Нарушено бизнес-правило"),
         UnauthorizedException => (StatusCodes.Status401Unauthorized, "Требуется вход"),
         TooManyRequestsException => (StatusCodes.Status429TooManyRequests, "Слишком много запросов"),
+        ServiceUnavailableException => (StatusCodes.Status503ServiceUnavailable, "Сервис недоступен"),
         _ => (StatusCodes.Status500InternalServerError, "Внутренняя ошибка сервера")
     };
 }

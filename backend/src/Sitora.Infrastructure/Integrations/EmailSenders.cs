@@ -100,7 +100,9 @@ public class ResendEmailSender(HttpClient http, IOptions<EmailOptions> options) 
         };
         request.Headers.Authorization = new("Bearer", o.Resend.ApiKey);
         using var response = await http.SendAsync(request, ct);
+        // Текст ответа Resend объясняет причину (например, домен отправителя не подтверждён); ключа в нём нет.
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"Resend не принял письмо: {(int)response.StatusCode}");
+            throw new InvalidOperationException(
+                $"Resend не принял письмо: {(int)response.StatusCode} {await response.Content.ReadAsStringAsync(ct)}");
     }
 }

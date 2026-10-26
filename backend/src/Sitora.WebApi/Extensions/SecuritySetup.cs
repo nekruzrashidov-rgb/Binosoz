@@ -15,6 +15,9 @@ public class RateLimitSettings
     public int SmsPerHour { get; set; } = 20;
     public int PublicFormsPerHour { get; set; } = 30;
 
+    // AI-помощник: каждое сообщение — платный запрос к Claude, поэтому лимит на пользователя.
+    public int AiPerHour { get; set; } = 60;
+
     // Общий лимит на все запросы: гости — на IP, вошедшие — на пользователя
     // (сотрудники за одним офисным IP не мешают друг другу).
     public int AnonymousPerMinute { get; set; } = 300;
@@ -27,6 +30,7 @@ public static class RateLimitPolicies
     public const string Sms = "sms";
     // Заявки и брони без входа; сотрудников не ограничиваем.
     public const string PublicForms = "public-forms";
+    public const string Ai = "ai";
 }
 
 public static class SecuritySetup
@@ -66,6 +70,13 @@ public static class SecuritySetup
                 context.User.Identity?.IsAuthenticated == true
                     ? RateLimitPartition.GetNoLimiter("staff")
                     : PerIp(context, s => s.PublicFormsPerHour, TimeSpan.FromHours(1)));
+
+            options.AddPolicy(RateLimitPolicies.Ai, context =>
+            {
+                var settings = context.RequestServices.GetRequiredService<IOptions<RateLimitSettings>>().Value;
+                var userId = context.User.FindFirst(Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames.Sub)?.Value;
+                return FixedWindow("ai:" + (userId ?? ClientIp(context)), settings.AiPerHour, TimeSpan.FromHours(1));
+            });
 
             // Общий лимит действует вместе с политиками выше; проверки здоровья не ограничиваем.
             options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>

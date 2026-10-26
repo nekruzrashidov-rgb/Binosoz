@@ -50,6 +50,8 @@ public static class DependencyInjection
         services.AddOptions<AuthOptions>()
             .BindConfiguration(AuthOptions.SectionName)
             .ValidateDataAnnotations();
+        services.AddOptions<ClaudeOptions>()
+            .BindConfiguration(ClaudeOptions.SectionName);
         services.AddOptions<BrandOptions>()
             .BindConfiguration(BrandOptions.SectionName);
         services.AddOptions<EmailOptions>()
@@ -67,6 +69,8 @@ public static class DependencyInjection
         services.AddScoped<IInvitationService, InvitationService>();
         services.AddScoped<IPlatformService, PlatformService>();
         services.AddScoped<IBrandService, BrandService>();
+        services.AddSingleton<IChatModel, ClaudeChatModel>();
+        services.AddScoped<IAiAssistant, AiAssistant>();
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<ApartmentImporter>();
         services.AddScoped<ICatalogService, CatalogService>();
