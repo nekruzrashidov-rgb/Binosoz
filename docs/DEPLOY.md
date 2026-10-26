@@ -63,7 +63,10 @@ chmod 600 .env
 | `ENCRYPTION_KEY` | `openssl rand -base64 32`. **Сохраните копию вне сервера:** без ключа паспортные данные не расшифровать |
 | `API_DOMAIN` | домен API без `https://`, например `api.sitora.tj` |
 | `SITE_ORIGIN`, `CRM_ORIGIN` | адреса фронтендов с `https://` |
-| `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` | первый администратор. Пароль от 8 символов, с цифрой, строчной и заглавной буквой |
+| `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` | первый владелец организации по умолчанию. Пароль от 8 символов, с цифрой, строчной и заглавной буквой |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | создатель платформы (скрытая роль); пароль — второй фактор его входа |
+| `EMAIL_PROVIDER`, `EMAIL_FROM`, `EMAIL_INVITE_URL` | почта для кодов входа и приглашений: `Smtp` или `Resend`, адрес отправителя, страница приглашения во фронтенде |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` или `RESEND_API_KEY` | доступ к почтовому сервису |
 
 Строки `SEED_*` и `ASPNETCORE_ENVIRONMENT` в продакшене не используются.
 

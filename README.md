@@ -109,7 +109,14 @@ Caddy сам получает сертификат HTTPS. Бэкап — `./scri
 | `RateLimiting__AnonymousPerMinute`, `__UserPerMinute` | общий лимит: гостю на IP и вошедшему на пользователя (по умолчанию 300 и 600) |
 | `Storage__RootPath` | папка для документов и фото (по умолчанию `./storage`, в Docker — том `files`) |
 | `Hangfire__ServerEnabled` | `false` выключает фоновые задачи в этом экземпляре |
-| `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` | первый администратор в любом окружении, если админов ещё нет (в Production создаётся командой `--migrate`) |
+| `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` | первый владелец организации по умолчанию, если владельцев ещё нет (в Production создаётся командой `--migrate`) |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | создатель платформы (PlatformOwner); пароль — его второй фактор |
+| `Email__Provider` | `Dev` (код в лог, только для разработки), `Smtp` или `Resend` |
+| `Email__From`, `Email__FromName`, `Email__InviteUrl` | отправитель писем и адрес страницы приглашения (токен дописывается в конец) |
+| `Email__Smtp__Host`, `__Port`, `__Username`, `__Password`, `__UseSsl` | SMTP |
+| `Email__Resend__ApiKey` | ключ Resend |
+| `Auth__SmsLoginEnabled`, `Auth__PasswordLoginEnabled` | старый вход по SMS (по умолчанию `false`) и вход по паролю (`true`) |
+| `Auth__EmailCodesPerMinute`, `Auth__EmailCodesPerHour` | лимит кодов из почты на адрес и на IP (1 и 5) |
 | `Database__MigrateOnStartup` | применять миграции при старте API; по умолчанию `true`, в Production `false` |
 | `SEED_ADMIN_PASSWORD`, `SEED_MANAGER_PASSWORD`, `SEED_ACCOUNTANT_PASSWORD`, `SEED_CONTENT_PASSWORD` | пароли пользователей сидера (только Development) |
 
@@ -121,37 +128,40 @@ Caddy сам получает сертификат HTTPS. Бэкап — `./scri
 
 | Метод и путь | Доступ |
 | --- | --- |
+| `POST /auth/email/send`, `/auth/email/verify`, `/auth/second-factor`, `/auth/invitations/accept` | все (вход по коду из почты) |
 | `POST /auth/login`, `/auth/refresh`, `/auth/logout`, `GET /auth/me` | все / вошедшие |
-| `POST /auth/sms/send`, `/auth/sms/verify` | покупатель (вход по коду из SMS) |
+| `POST /auth/sms/send`, `/auth/sms/verify` | выключены, включаются `Auth__SmsLoginEnabled=true` |
 | `GET /buildings`, `/buildings/{id}`, `/buildings/{id}/floors`, `/floors/{id}/apartments`, `/apartments/{id}` | гость |
-| `POST`, `PUT /buildings`, `/floors`, `/apartments`; `PATCH /apartments/{id}/on-request` | Content, Admin |
-| `POST /apartments/import?buildingId=…` (файл `.xlsx`) | Content, Admin |
+| `POST`, `PUT /buildings`, `/floors`, `/apartments`; `PATCH /apartments/{id}/on-request` | Content, руководители (Owner, ObjectAdmin) |
+| `POST /apartments/import?buildingId=…` (файл `.xlsx`) | Content, руководители (Owner, ObjectAdmin) |
 | `POST /leads` | гость |
-| `GET /leads`, `PATCH /leads/{id}` | Manager, Admin |
+| `GET /leads`, `PATCH /leads/{id}` | Manager, руководители (Owner, ObjectAdmin) |
 | `POST /apartments/{id}/bookings` | гость (имя и телефон), Manager (клиент) |
-| `POST /bookings/{id}/extend`, `/bookings/{id}/cancel` | Manager, Admin |
-| `GET`, `POST /customers`, `GET /customers/{id}` | Manager, Admin |
-| `GET`, `POST /deals`, `GET /deals/{id}`, `PATCH /deals/{id}/stage` | Manager, Admin |
-| `GET /crm/summary`, `/crm/pipeline` | Manager, Admin |
+| `POST /bookings/{id}/extend`, `/bookings/{id}/cancel` | Manager, руководители (Owner, ObjectAdmin) |
+| `GET`, `POST /customers`, `GET /customers/{id}` | Manager, руководители (Owner, ObjectAdmin) |
+| `GET`, `POST /deals`, `GET /deals/{id}`, `PATCH /deals/{id}/stage` | Manager, руководители (Owner, ObjectAdmin) |
+| `GET /crm/summary`, `/crm/pipeline` | Manager, руководители (Owner, ObjectAdmin) |
 | `GET /me/deals` | покупатель |
-| `POST /deals/{id}/plan` | Manager, Admin |
-| `GET /deals/{id}/schedule`, `/deals/{id}/schedule.pdf`, `/deals/{id}/statement.pdf?date=…` | владелец сделки, Manager, Accountant, Admin |
-| `POST /deals/{id}/payments`, `/payments/{id}/reverse` | Accountant, Admin |
-| `GET /reports/payments?from=&to=`, `/reports/payments.xlsx` — поступления за период | Accountant, Admin |
-| `GET /reports/debts?asOf=`, `/reports/debts.xlsx` — задолженность на дату | Accountant, Admin |
+| `POST /deals/{id}/plan` | Manager, руководители (Owner, ObjectAdmin) |
+| `GET /deals/{id}/schedule`, `/deals/{id}/schedule.pdf`, `/deals/{id}/statement.pdf?date=…` | владелец сделки, Manager, Accountant, руководители (Owner, ObjectAdmin) |
+| `POST /deals/{id}/payments`, `/payments/{id}/reverse` | Accountant, руководители (Owner, ObjectAdmin) |
+| `GET /reports/payments?from=&to=`, `/reports/payments.xlsx` — поступления за период | Accountant, руководители (Owner, ObjectAdmin) |
+| `GET /reports/debts?asOf=`, `/reports/debts.xlsx` — задолженность на дату | Accountant, руководители (Owner, ObjectAdmin) |
 | `GET /rates/current` | все |
-| `PUT /rates` | Accountant, Admin |
-| `GET /deals/{id}/documents`, `/documents/{id}/download` (подписанная ссылка на 15 минут) | владелец сделки, Manager, Accountant, Admin |
+| `PUT /rates` | Accountant, руководители (Owner, ObjectAdmin) |
+| `GET /deals/{id}/documents`, `/documents/{id}/download` (подписанная ссылка на 15 минут) | владелец сделки, Manager, Accountant, руководители (Owner, ObjectAdmin) |
 | `GET /files?token=…` — скачивание по подписанной ссылке | любой, у кого есть действующая ссылка |
-| `POST /deals/{id}/documents` (файл) | Manager, Accountant, Admin |
+| `POST /deals/{id}/documents` (файл) | Manager, Accountant, руководители (Owner, ObjectAdmin) |
 | `GET /buildings/{id}/stages` (фото — подписанными ссылками на 15 минут) | покупатель со сделкой в доме, сотрудники |
-| `POST /buildings/{id}/stages`, `PUT /stages/{id}`, `POST /stages/{id}/photos` | Content, Admin |
-| `GET`, `POST /deals/{id}/messages`; SignalR `/hubs/chat` | владелец сделки, Manager, Accountant, Admin |
-| `GET /audit`, `GET`, `POST /users`, `PATCH /users/{id}/status` | Admin |
+| `POST /buildings/{id}/stages`, `PUT /stages/{id}`, `POST /stages/{id}/photos` | Content, руководители (Owner, ObjectAdmin) |
+| `GET`, `POST /deals/{id}/messages`; SignalR `/hubs/chat` | владелец сделки, Manager, Accountant, руководители (Owner, ObjectAdmin) |
+| `GET`, `POST /users`, `PATCH /users/{id}/status`, `POST`, `GET`, `DELETE /invitations` | руководители (Owner, ObjectAdmin) |
+| `GET /audit`, `POST /buildings`, `PUT /users/{id}/buildings` | Owner |
+| `GET`, `POST /platform/organizations`, `POST /platform/impersonate/{organizationId}`, `/platform/impersonate/stop`, `/platform/totp` | PlatformOwner |
 | `GET /health/live`, `/health/ready` (и `/health`) — без префикса `/api/v1` | все |
 
 - Для чужой сделки любой из адресов `/deals/{id}/…` отвечает 404, как для несуществующей.
-- Покупатель входит так: `sms/send` с телефоном → код в SMS → `sms/verify` с кодом. Пока SMS — заглушка: в Development код виден в логе API.
+- Все входят по почте: `email/send` → код в письме → `email/verify`. Создатель платформы после кода вводит второй фактор (`second-factor`). В Development с `Email__Provider=Dev` код виден в логе API. Роли, организации и изменения для фронтенда — в [docs/API_CONTRACT.md](docs/API_CONTRACT.md).
 - Бронь живёт 48 часов; фоновая задача Hangfire раз в 5 минут снимает просроченные брони.
 - Чат в реальном времени: подключитесь к `/hubs/chat` (JWT в заголовке или в `?access_token=`), вызовите `JoinDeal(dealId)` и слушайте событие `messageReceived`. Отправка — `SendMessage(dealId, text)` в хабе или `POST /deals/{id}/messages`.
 - Excel для импорта: первая строка — заголовки, столбцы A–G: этаж, номер квартиры, комнат (0 — студия), площадь, цена за м², позиция на плане этажа (0–7), ID в 3D-модели (необязательно; пустая ячейка не стирает уже заданный).

@@ -11,18 +11,79 @@
 - **Язык.** `Accept-Language: ru|tg` влияет на название и описание дома. Тексты ошибок всегда на русском.
 - **Списки.** Списки отдаются страницами: `{ items, page, pageSize, totalCount }`, `pageSize` не больше 100. `api.js` забирает все страницы по 100. Без этого при сдаче было бы видно только первые 20 записей.
 
+## Роли и организации
+
+- **Организация** — застройщик. Ей принадлежат дома, сотрудники, клиенты, заявки, ручной курс и аудит. Данные из базы фильтруются по организации и домам из токена. Чужое отвечает 404, как несуществующее.
+- **PlatformOwner** — создатель платформы, скрытая роль. Создаётся только из `ADMIN_EMAIL` и `ADMIN_PASSWORD`. Ведёт организации и может войти «как владелец» любой из них. На странице входа его нет: он входит той же формой по почте, а потом вводит второй фактор.
+- **Owner** — владелец организации (бывшая роль `Admin`). Ведёт все свои дома, создаёт дома, назначает админов объектов и сотрудников, видит аудит и отчёты.
+- **ObjectAdmin** — админ одного дома. Ведёт свой дом, его сделки и сотрудников этого дома.
+- **Manager, Accountant, Content** — должности внутри организации. Без домов в `buildingIds` должность действует во всей организации, с домами — только в них.
+- **Customer** — покупатель, видит только свои сделки.
+
+В таблицах ниже «руководители» — это Owner и ObjectAdmin, а также PlatformOwner в режиме «как владелец».
+
+Сотрудников не регистрируют сами: их приглашают по почте (`/invitations`) или заводят сразу (`/users`).
+
 ## Вход и сессия
+
+Вход для всех — по коду из почты. Отдельных кнопок по ролям нет: интерфейс выбирает раздел по `user.role`.
 
 | Метод | Путь | Тело | Ответ |
 | --- | --- | --- | --- |
-| POST | `/auth/login` | `{ email, password }` | `AuthResponse` |
-| POST | `/auth/sms/send` | `{ phone }` | 202 `{ message, expiresInSeconds }` |
-| POST | `/auth/sms/verify` | `{ phone, code }` | `AuthResponse` |
+| POST | `/auth/email/send` | `{ email }` | 202 `{ message, expiresInSeconds }` — всегда одинаковый, даже если почты нет |
+| POST | `/auth/email/verify` | `{ email, code }` | 200 `AuthResponse` или 202 `SecondFactorChallenge` (только PlatformOwner) |
+| POST | `/auth/second-factor` | `{ challengeToken, password? , totpCode? }` | `AuthResponse` |
+| POST | `/auth/invitations/accept` | `{ token }` | `AuthResponse`; 401 — приглашение недействительно или использовано |
 | POST | `/auth/refresh` | `{ refreshToken }` | `AuthResponse` |
 | POST | `/auth/logout` | `{ refreshToken }` | 204 |
-| GET | `/auth/me` | — | `{ id, email, phone, fullName, roles[] }` |
+| GET | `/auth/me` | — | `CurrentUser` |
+| POST | `/auth/login` | `{ email, password }` | `AuthResponse`; выключается `Auth__PasswordLoginEnabled=false` (тогда 404). PlatformOwner так не входит |
+| POST | `/auth/sms/send`, `/auth/sms/verify` | — | выключены (404), включаются `Auth__SmsLoginEnabled=true` |
 
-`AuthResponse = { accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt, user }`.
+Код из почты:
+- 6 цифр, действует 10 минут;
+- 5 неверных попыток — и код сгорает;
+- код одноразовый, действует только последний запрошенный;
+- новый код — не чаще раза в минуту и не больше 5 в час, отдельно на почту и на IP (429 с русским текстом);
+- в базе хранится только хеш;
+- почта нормализуется: регистр и пробелы по краям не важны.
+
+Покупатель входит по почте, указанной в карточке клиента. Учётная запись создаётся при первом входе и привязывается ко всем карточкам с этой почтой.
+
+```
+AuthResponse = { accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt, user: CurrentUser }
+
+CurrentUser = {
+  id, email, phone, fullName,
+  roles: ["Owner"],                 // все роли
+  role: "Owner",                    // главная: PlatformOwner > Owner > ObjectAdmin > Manager > Accountant > Content > Customer
+  organizationId: "…" | null,       // null у PlatformOwner вне режима и у покупателя
+  organizationName: "…" | null,
+  buildingIds: [],                  // пусто — все дома организации; у ObjectAdmin ровно один
+  impersonation: null | { impersonatedBy, organizationId }
+}
+
+SecondFactorChallenge = { challengeToken, expiresAt, methods: ["password", "totp"?], message }
+```
+
+В access-токене те же данные — в claims `role`, `org`, `bld` (по одному на дом) и `imp`. Если владелец меняет сотруднику дома, все сессии сотрудника отзываются: новые права действуют со следующего входа.
+
+## Платформа (только PlatformOwner)
+
+| Метод | Путь | Тело / ответ |
+| --- | --- | --- |
+| GET | `/platform/organizations` | `[{ id, name, slug, isActive, buildingsCount, usersCount, createdAt }]` |
+| POST | `/platform/organizations` | `{ name, slug, ownerEmail, ownerFullName }` → 201. Владельцу уходит письмо, он входит по коду из почты. `slug`: латиница, цифры, дефис |
+| POST | `/platform/impersonate/{organizationId}` | `AccessTokenResponse = { accessToken, accessTokenExpiresAt, user }` без refresh-токена; `user.role = "Owner"`, `user.impersonation` заполнено |
+| POST | `/platform/impersonate/stop` | `AccessTokenResponse` — обычный токен создателя платформы |
+| GET | `/platform/totp` | `{ sharedKey, authenticatorUri }` для приложения-аутентификатора |
+| POST | `/platform/totp/enable` | `{ code }` → 204; после этого вторым фактором подходит и код из приложения |
+
+В режиме «как владелец»:
+- в каждом ответе есть заголовок `X-Impersonated-By: <id создателя платформы>`;
+- каждый запрос, кроме GET, пишется в аудит (`entity = "Impersonation"`, `action = "POST /api/v1/…"`, `after = { status }`). Пишутся и неудачные запросы;
+- записи самих сервисов получают `impersonatedById`;
+- интерфейс показывает плашку «Вы вошли как владелец …» и кнопку «Выйти», которая вызывает `/platform/impersonate/stop`. Токен режима истекает через 15 минут, и обновить его нельзя.
 
 Сессия:
 - Access-токен живёт 15 минут и передаётся в заголовке `Authorization: Bearer`.
@@ -56,13 +117,13 @@
 
 | Метод | Путь | Ответ | `api.js` |
 | --- | --- | --- | --- |
-| GET | `/buildings` | страница `BuildingResponse` | `buildings()` |
+| GET | `/buildings?organization=slug` | страница `BuildingResponse`. Сайт застройщика передаёт свой `slug` (у организации по умолчанию — `sitora`). Без параметра — дома всех активных организаций. С токеном сотрудника — только его дома | `buildings()` |
 | GET | `/buildings/{id}` | `BuildingResponse` | `building()` |
 | GET | `/buildings/{id}/floors` | страница `FloorResponse` | `floors()` |
 | GET | `/floors/{id}/apartments` | страница `ApartmentResponse` | `floorApartments()` |
 | GET | `/apartments/{id}` | `ApartmentResponse` | `apartment()` |
-| GET | `/rates/current?currency=USD` | `{ date, currency, rateToTjs, source }`; 404, если курс не введён | `rate()` → `{ rate, date }` |
-| POST | `/leads` | `{ name, phone, apartmentId?, source, comment? }` | `createLead()` |
+| GET | `/rates/current?currency=USD&organizationId=` | `{ date, currency, rateToTjs, source }`. Ручной курс у каждой организации свой, поэтому сайт передаёт `organizationId`. Без него — только общий курс НБТ. Сотруднику организация берётся из токена. 404, если курса нет | `rate()` → `{ rate, date }` |
+| POST | `/leads` | `{ name, phone, apartmentId?, buildingId?, source, comment? }`. Организация берётся из квартиры или дома. Если на платформе несколько застройщиков, без них — 422 | `createLead()` |
 | POST | `/apartments/{id}/bookings` | `{ name, phone }` (гость) или `{ customerId }` (менеджер) → `BookingResponse`; 409, если квартира занята | `book()` |
 
 Состав ответов:
@@ -73,32 +134,32 @@
 
 | Метод | Путь | Роли | Примечание для фронтенда |
 | --- | --- | --- | --- |
-| GET | `/crm/summary` | Manager, Admin | `newLeads, leadsInProgress, activeBookings, bookingsExpiringIn24Hours, dealsByStage{}, apartmentsByStatus{}, soldAmount[{currency, amount}]`. Сумма продаж на дашборде — в сомони, USD по текущему курсу |
-| GET | `/crm/pipeline` | Manager, Admin | `columns[{ stage, count, cards[{ kind: Lead\|Booking\|Deal, id, clientName, phone, apartmentId, apartmentNumber, amount, currency, expiresAt }] }]` |
-| GET | `/leads?status=` | Manager, Admin | `status`: `New, InProgress, Converted, Rejected`. Интерфейс показывает `Converted` и `Rejected` как «Закрыта», а «Закрыть» отправляет `Rejected` |
-| PATCH | `/leads/{id}` | Manager, Admin | `{ status, managerId, comment }` («Взять себе» — `managerId` текущего пользователя) |
-| POST | `/bookings/{id}/extend` | Manager, Admin | +48 часов |
-| POST | `/bookings/{id}/cancel` | Manager, Admin | `{ reason }` |
-| GET | `/customers?search=` | Manager, Admin | страница `CustomerListItem` |
-| GET | `/customers/{id}` | Manager, Admin | `passportData` — только здесь. Сделки клиента — `GET /deals?customerId=` |
-| POST | `/customers` | Manager, Admin | `{ fullName, phone, email?, passportData?, leadId? }` |
-| GET | `/deals?stage=&customerId=` | Manager, Accountant, Admin | страница `DealResponse` |
-| GET | `/deals/{id}` | Manager, Accountant, Admin | `DealResponse` без этажа, площади и оплат: `api.deal()` дополняет их из `/apartments/{id}` и `/deals/{id}/schedule` |
-| POST | `/deals` | Manager, Admin | `{ apartmentId, customerId, stage?, currency?, discount?, discountReason? }` |
-| PATCH | `/deals/{id}/stage` | Manager, Admin | `{ stage, reason }`; назад и в отмену — только с причиной (иначе 422) |
+| GET | `/crm/summary` | Manager, руководители | `newLeads, leadsInProgress, activeBookings, bookingsExpiringIn24Hours, dealsByStage{}, apartmentsByStatus{}, soldAmount[{currency, amount}]`. Сумма продаж на дашборде — в сомони, USD по текущему курсу |
+| GET | `/crm/pipeline` | Manager, руководители | `columns[{ stage, count, cards[{ kind: Lead\|Booking\|Deal, id, clientName, phone, apartmentId, apartmentNumber, amount, currency, expiresAt }] }]` |
+| GET | `/leads?status=` | Manager, руководители | `status`: `New, InProgress, Converted, Rejected`. Интерфейс показывает `Converted` и `Rejected` как «Закрыта», а «Закрыть» отправляет `Rejected` |
+| PATCH | `/leads/{id}` | Manager, руководители | `{ status, managerId, comment }` («Взять себе» — `managerId` текущего пользователя) |
+| POST | `/bookings/{id}/extend` | Manager, руководители | +48 часов |
+| POST | `/bookings/{id}/cancel` | Manager, руководители | `{ reason }` |
+| GET | `/customers?search=` | Manager, руководители | страница `CustomerListItem` |
+| GET | `/customers/{id}` | Manager, руководители | `passportData` — только здесь. Сделки клиента — `GET /deals?customerId=` |
+| POST | `/customers` | Manager, руководители | `{ fullName, phone, email?, passportData?, leadId?, buildingId? }`. Телефон уникален в пределах организации. `email` нужен покупателю для входа. `buildingId` обязателен, если у сотрудника несколько домов |
+| GET | `/deals?stage=&customerId=` | Manager, Accountant, руководители | страница `DealResponse` |
+| GET | `/deals/{id}` | Manager, Accountant, руководители | `DealResponse` без этажа, площади и оплат: `api.deal()` дополняет их из `/apartments/{id}` и `/deals/{id}/schedule` |
+| POST | `/deals` | Manager, руководители | `{ apartmentId, customerId, stage?, currency?, discount?, discountReason? }` |
+| PATCH | `/deals/{id}/stage` | Manager, руководители | `{ stage, reason }`; назад и в отмену — только с причиной (иначе 422) |
 
 ## Деньги
 
 | Метод | Путь | Роли | Тело / ответ |
 | --- | --- | --- | --- |
-| POST | `/deals/{id}/plan` | Manager, Admin | `{ downPaymentPct, months, paymentDay (1–28), startDate }` → `ScheduleResponse` |
+| POST | `/deals/{id}/plan` | Manager, руководители | `{ downPaymentPct, months, paymentDay (1–28), startDate }` → `ScheduleResponse` |
 | GET | `/deals/{id}/schedule` | владелец, сотрудник сделки | `{ currency, total, paid, remaining, overdue, downPaymentPct, months, paymentDay, startDate, items[], payments[], equivalent }`; 404, если графика ещё нет |
 | GET | `/deals/{id}/schedule.pdf`, `/statement.pdf?date=` | владелец, сотрудник сделки | PDF |
-| POST | `/deals/{id}/payments` | Accountant, Admin | `{ amount, currency, paidAt, method: Cash\|BankTransfer\|Card\|Other, comment }` |
-| POST | `/payments/{id}/reverse` | Accountant, Admin | `{ reason }` → обратная запись: суммы со знаком минус, `reversalOfId` указывает на исходный платёж, у исходного `isReversed = true` |
-| PUT | `/rates` | Accountant, Admin | `{ date, currency: "USD", rateToTjs }` |
-| GET | `/reports/payments?from=&to=` | Accountant, Admin | `{ rows[], totalsByCurrency[], totalTjs }`, Excel — `.xlsx` |
-| GET | `/reports/debts?asOf=` | Accountant, Admin | `rows[{ dealId, customerName, phone, apartmentNumber, currency, overdue, oldestOverdueDate, daysOverdue, remaining }]`, Excel — `.xlsx` |
+| POST | `/deals/{id}/payments` | Accountant, руководители | `{ amount, currency, paidAt, method: Cash\|BankTransfer\|Card\|Other, comment }` |
+| POST | `/payments/{id}/reverse` | Accountant, руководители | `{ reason }` → обратная запись: суммы со знаком минус, `reversalOfId` указывает на исходный платёж, у исходного `isReversed = true` |
+| PUT | `/rates` | Accountant, руководители | `{ date, currency: "USD", rateToTjs }` |
+| GET | `/reports/payments?from=&to=` | Accountant, руководители | `{ rows[], totalsByCurrency[], totalTjs }`, Excel — `.xlsx` |
+| GET | `/reports/debts?asOf=` | Accountant, руководители | `rows[{ dealId, customerName, phone, apartmentNumber, currency, overdue, oldestOverdueDate, daysOverdue, remaining }]`, Excel — `.xlsx` |
 
 Подробности:
 - Пункт графика: `kind` (`DownPayment` или `Monthly`), `status` (`Pending`, `PartiallyPaid` или `Paid`) и признак `isOverdue`. Интерфейс показывает «Просрочен» по `isOverdue`.
@@ -110,14 +171,14 @@
 | Метод | Путь | Роли | Примечание |
 | --- | --- | --- | --- |
 | GET | `/deals/{id}/documents` | владелец, сотрудник сделки | `{ id, type, fileName, contentType, sizeBytes, signedAt, createdAt }` |
-| POST | `/deals/{id}/documents` | Manager, Accountant, Admin | form-data: `file`, `type` (Contract, Annex, Act, Invoice, Receipt, Other), `signedAt?`; PDF, PNG, JPG, DOCX до 20 МБ |
+| POST | `/deals/{id}/documents` | Manager, Accountant, руководители | form-data: `file`, `type` (Contract, Annex, Act, Invoice, Receipt, Other), `signedAt?`; PDF, PNG, JPG, DOCX до 20 МБ |
 | GET | `/documents/{id}/download` | владелец, сотрудник сделки | `{ url, expiresAt }` — подписанная ссылка на 15 минут. `url` относительный (`/api/v1/files?token=…`), фронтенд добавляет адрес сервера |
 | GET | `/files?token=` | все, по ссылке | сам файл; подделанная или просроченная ссылка — 404 |
 | GET | `/deals/{id}/messages` | владелец, сотрудник сделки | страница `{ id, dealId, senderId, senderName, fromCustomer, text, createdAt, readAt }`, новые сверху |
 | POST | `/deals/{id}/messages` | владелец, сотрудник сделки | `{ text }` |
 | GET | `/buildings/{id}/stages` | покупатель с неотменённой сделкой, сотрудники | `{ overallPercent, stages[{ id, name, percent, sortOrder, updatedAt, photos[{ url, caption, takenAt }] }] }`. Ссылки на фото подписаны на 15 минут |
-| POST | `/buildings/{id}/stages`, PUT `/stages/{id}` | Content, Admin | `{ name, percent, sortOrder }` |
-| POST | `/stages/{id}/photos` | Content, Admin | form-data: `file` (PNG или JPG до 10 МБ), `caption?`, `takenAt?` |
+| POST | `/buildings/{id}/stages`, PUT `/stages/{id}` | Content, руководители | `{ name, percent, sortOrder }` |
+| POST | `/stages/{id}/photos` | Content, руководители | form-data: `file` (PNG или JPG до 10 МБ), `caption?`, `takenAt?` |
 
 **Хаб чата** `/hubs/chat` (SignalR):
 - токен передаётся в `accessTokenFactory`;
@@ -129,14 +190,54 @@
 
 | Метод | Путь | Роли | Примечание |
 | --- | --- | --- | --- |
-| GET | `/users` | Admin | страница `{ id, email, phone, fullName, roles[], isActive, createdAt }` |
-| POST | `/users` | Admin | `{ email, fullName, role, password, phone? }` |
-| PATCH | `/users/{id}/status` | Admin | `{ isActive }` |
-| GET | `/audit?entity=&from=&to=` | Admin | страница `{ userEmail, entity, entityId, action, before, after, at }`. `before` и `after` — JSON-строки. Имена сущностей — имена классов: `Deal`, `Payment`, `Apartment`, `AppUser`… |
-| PUT | `/buildings/{id}` | Content, Admin | полная замена: `{ nameRu, nameTg, address, floorsCount, descriptionRu, descriptionTg, modelUrl }`. Поля, которых нет в форме, `api.js` берёт из текущей версии |
-| PUT | `/apartments/{id}`, POST `/apartments` | Content, Admin | `{ number, rooms, area, pricePerM2, planSlot, model3dId }` (+ `floorId` при создании) |
-| PATCH | `/apartments/{id}/on-request` | Content, Admin | `{ onRequest }` |
-| POST | `/apartments/import?buildingId=` | Content, Admin | form-data `file` (.xlsx) |
+| GET | `/users` | руководители | страница `{ id, email, phone, fullName, roles[], isActive, createdAt, organizationId, buildingIds[] }`. ObjectAdmin видит только сотрудников своего дома |
+| POST | `/users` | руководители | `{ email, fullName, role, password?, phone?, buildingIds? }`. Пароль необязателен: вход по коду из почты |
+| PATCH | `/users/{id}/status` | руководители | `{ isActive }`. ObjectAdmin не может блокировать руководителей |
+| PUT | `/users/{id}/buildings` | Owner | `{ buildingIds }`: пусто — все дома, у ObjectAdmin ровно один. Сессии сотрудника отзываются |
+| POST | `/invitations` | руководители | `{ email, fullName, role, buildingIds? }` → 201 `{ id, email, fullName, role, buildingIds, expiresAt, acceptedAt, createdAt }`. Письмо со ссылкой `EMAIL_INVITE_URL + token` живёт 7 дней |
+| GET | `/invitations` | руководители | непринятые приглашения |
+| DELETE | `/invitations/{id}` | руководители | 204 |
+| POST | `/buildings` | Owner | новый дом организации |
+
+Кого может назначить:
+- **Owner** — ObjectAdmin (ровно один дом), Manager, Accountant, Content (дома необязательны, пусто — все);
+- **ObjectAdmin** — Manager, Accountant, Content, только в свой дом: если дома не переданы, подставляется его дом;
+- владельцев заводит только создатель платформы.
+| GET | `/audit?entity=&from=&to=` | Owner | страница `{ userEmail, organizationId, impersonatedById, entity, entityId, action, before, after, at }`. `before` и `after` — JSON-строки. Имена сущностей — имена классов: `Deal`, `Payment`, `Apartment`, `AppUser`… |
+| PUT | `/buildings/{id}` | Content, руководители | полная замена: `{ nameRu, nameTg, address, floorsCount, descriptionRu, descriptionTg, modelUrl }`. Поля, которых нет в форме, `api.js` берёт из текущей версии |
+| PUT | `/apartments/{id}`, POST `/apartments` | Content, руководители | `{ number, rooms, area, pricePerM2, planSlot, model3dId }` (+ `floorId` при создании) |
+| PATCH | `/apartments/{id}/on-request` | Content, руководители | `{ onRequest }` |
+| POST | `/apartments/import?buildingId=` | Content, руководители | form-data `file` (.xlsx) |
+
+## Что поменять во фронтенде web/ (вход по почте и организации)
+
+Бэкенд уже работает по новым правилам, а `web/js/api.js` пока ходит по-старому.
+
+1. **Страница входа.** Одна форма «Почта → Код» для всех: `POST /auth/email/send`, затем `POST /auth/email/verify`. Кнопки «Покупатель / Менеджер / Админ», вход по паролю и вход по SMS убрать (`/auth/sms/*` теперь отвечают 404).
+2. **Второй шаг.** Если verify ответил **202**, показать поле «Пароль или код из приложения» и отправить `POST /auth/second-factor` с `challengeToken`. Это бывает только у создателя платформы; отдельного входа для него нет.
+3. **Таймер и ошибки кода.** Повторная отправка — не раньше чем через 60 секунд. На 429 показать `detail`. На 401 показать «Неверный или устаревший код» и предложить запросить новый.
+4. **Выбор раздела** — по `user.role`:
+   - `PlatformOwner` → раздел платформы;
+   - `Owner` / `ObjectAdmin` → админка;
+   - `Manager` / `Accountant` / `Content` → CRM с пунктами по должности;
+   - `Customer` → кабинет.
+
+   Роль `Admin` больше не приходит, вместо неё `Owner`.
+5. **Шапка.** Показывать `organizationName`. У ObjectAdmin — название его дома (`buildingIds[0]` → `/buildings/{id}`).
+6. **Плашка режима «как владелец».** Если `user.impersonation` не `null` или в ответе есть заголовок `X-Impersonated-By`, показать заметную полосу «Вы вошли как владелец организации …» с кнопкой «Выйти». Кнопка вызывает `POST /platform/impersonate/stop` и подменяет токен. Refresh-токена в этом режиме нет: на 401 вернуть человека в раздел платформы.
+7. **Раздел платформы** (новый): список организаций, «Создать организацию» (`name, slug, ownerEmail, ownerFullName`), кнопка «Войти как владелец», настройка TOTP (`/platform/totp`).
+8. **Сотрудники.**
+   - Вместо поля «Пароль» — «Пригласить по почте» (`POST /invitations`), выбор должности и домов.
+   - Для ObjectAdmin — ровно один дом.
+   - Список ожидающих приглашений с кнопкой «Отозвать».
+   - Владельцу — «Дома сотрудника» (`PUT /users/{id}/buildings`).
+9. **Страница приглашения.** Адрес `#invite=<token>` → `POST /auth/invitations/accept { token }` → сохранить сессию, как после входа.
+10. **Публичный сайт.**
+    - Добавить `ORG_SLUG` в `config.js` и передавать `?organization=` в `/buildings`.
+    - `organizationId` организации — в `/rates/current`.
+    - `buildingId` (или `apartmentId`) в форме заявки.
+11. **Клиенты.** В форме клиента почта теперь важна: по ней покупатель входит в кабинет. При нескольких домах у сотрудника нужен выбор дома (`buildingId`).
+12. **Аудит.** Показывать `impersonatedById` («через платформу»). Раздел аудита — только Owner.
 
 ## Что было не так в web/js/api.js и вьюхах (исправлено)
 

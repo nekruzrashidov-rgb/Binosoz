@@ -36,6 +36,8 @@ services:
       Encryption__Key: ${ENCRYPTION_KEY:?Задайте ENCRYPTION_KEY в файле .env}
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     depends_on:
       db:
         condition: service_healthy
@@ -53,6 +55,15 @@ services:
       Cors__AllowedOrigins__1: ${CRM_ORIGIN:-}
       # API доступен только через Caddy, поэтому заголовкам X-Forwarded-* можно доверять.
       ForwardedHeaders__Enabled: "true"
+      # Коды входа и приглашения уходят письмами: Smtp или Resend.
+      Email__Provider: ${EMAIL_PROVIDER:?Задайте EMAIL_PROVIDER (Smtp или Resend) в файле .env}
+      Email__From: ${EMAIL_FROM:?Задайте EMAIL_FROM в файле .env}
+      Email__InviteUrl: ${EMAIL_INVITE_URL:?Задайте EMAIL_INVITE_URL, например https://crm.sitora.tj/#invite=}
+      Email__Smtp__Host: ${SMTP_HOST:-}
+      Email__Smtp__Port: ${SMTP_PORT:-587}
+      Email__Smtp__Username: ${SMTP_USERNAME:-}
+      Email__Smtp__Password: ${SMTP_PASSWORD:-}
+      Email__Resend__ApiKey: ${RESEND_API_KEY:-}
     volumes:
       - files:/app/storage
       # JSON-логи по дням, хранятся 14 дней (Serilog, appsettings.Production.json).
