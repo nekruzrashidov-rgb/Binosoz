@@ -56,6 +56,15 @@ public class CatalogService(
         });
     }
 
+    public async Task<Guid?> FindOrganizationIdAsync(string slug, CancellationToken ct = default)
+    {
+        var normalized = slug.Trim().ToLowerInvariant();
+        return await db.Organizations.AsNoTracking()
+            .Where(o => o.Slug == normalized && o.IsActive)
+            .Select(o => (Guid?)o.Id)
+            .FirstOrDefaultAsync(ct);
+    }
+
     public Task<BuildingResponse> GetBuildingAsync(Guid id, CancellationToken ct = default)
     {
         var tg = IsTajik;

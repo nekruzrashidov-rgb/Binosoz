@@ -34,6 +34,10 @@ public class ExchangeRateTests(SitoraApiFactory factory) : IClassFixture<SitoraA
             $"/api/v1/rates/current?organizationId={Organization.DefaultId}", TestJson.Options);
         Assert.Equal((Today, 11m, RateSource.Manual), (current!.Date, current.RateToTjs, current.Source));
         Assert.Equal(HttpStatusCode.NotFound, (await factory.CreateClient().GetAsync("/api/v1/rates/current")).StatusCode);
+        var bySlug = await factory.CreateClient().GetFromJsonAsync<RateResponse>(
+            $"/api/v1/rates/current?organization={Organization.DefaultSlug}", TestJson.Options);
+        Assert.Equal(11m, bySlug!.RateToTjs);
+        Assert.Equal(HttpStatusCode.NotFound, (await factory.CreateClient().GetAsync("/api/v1/rates/current?organization=no-such-org")).StatusCode);
 
         var dealResponse = await CreateUsdDealResponseAsync();
         var deal = await TestScenarios.ReadAsync<DealResponse>(dealResponse);
