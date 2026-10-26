@@ -1,0 +1,85 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+@import "@fontsource/playfair-display/400.css";
+@import "@fontsource/playfair-display/600.css";
+@import "@fontsource/playfair-display/400-italic.css";
+
+@theme {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Playfair Display", Georgia, serif;
+
+  /* Палитра: тёплый светлый фон, графит, золото «звезды» (Sitora — «звезда»). */
+  --color-paper: #f6f3ee;
+  --color-paper-2: #efeae2;
+  --color-ink: #0f1115;
+  --color-ink-2: #1b1e25;
+  --color-ink-3: #2a2e37;
+  --color-muted: #6b6f78;
+  --color-line: #e3ddd3;
+  --color-gold: #c9a46a;
+  --color-gold-2: #b08a4f;
+  --color-gold-soft: #f3e9d8;
+
+  /* Статусы квартир — одинаковые на сайте, в 3D и в CRM. */
+  --color-free: #2f9e6e;
+  --color-free-soft: #e3f4ec;
+  --color-booked: #d99a2b;
+  --color-booked-soft: #fbf0dc;
+  --color-sold: #9aa0aa;
+  --color-sold-soft: #eef0f3;
+  --color-request: #4a74d9;
+  --color-request-soft: #e6edfb;
+  --color-danger: #d4493f;
+  --color-danger-soft: #fbe7e5;
+
+  --radius-xl: 14px;
+  --radius-2xl: 20px;
+
+  --shadow-soft: 0 1px 2px rgb(15 17 21 / 0.04), 0 8px 24px -12px rgb(15 17 21 / 0.12);
+  --shadow-lift: 0 2px 4px rgb(15 17 21 / 0.05), 0 22px 44px -18px rgb(15 17 21 / 0.28);
+
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-float: float 6s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  from { background-position: -400px 0; }
+  to { background-position: 400px 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@layer base {
+  html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  body { @apply bg-paper text-ink font-sans; }
+  ::selection { background: var(--color-gold-soft); color: var(--color-ink); }
+  :focus-visible { outline: 2px solid var(--color-gold); outline-offset: 2px; border-radius: 6px; }
+  input, select, textarea, button { font: inherit; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+}
+
+@layer components {
+  .container-x { @apply mx-auto w-full max-w-[1240px] px-4 sm:px-6 lg:px-8; }
+  .eyebrow { @apply text-[11px] font-semibold uppercase tracking-[0.22em] text-gold-2; }
+  .display { @apply font-display font-normal tracking-[-0.01em]; }
+  .skeleton {
+    background: linear-gradient(90deg, #ebe6dd 0px, #f5f1ea 160px, #ebe6dd 320px);
+    background-size: 800px 100%;
+    @apply animate-shimmer rounded-lg;
+  }
+  .link-underline {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 0% 1px;
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    transition: background-size 0.35s ease;
+  }
+  .link-underline:hover { background-size: 100% 1px; }
+  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: #cfc8bc transparent; }
+  .tabular { font-variant-numeric: tabular-nums; }
+}
