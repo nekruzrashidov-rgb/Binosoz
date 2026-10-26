@@ -156,15 +156,36 @@ public class DealTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFactor
     }
 
     [Fact]
-    public async Task Deals_ForbiddenForContentAndAccountant()
+    public async Task Deals_ForbiddenForContent()
     {
         var content = await (await factory.CreateContentClientAsync()).GetAsync("/api/v1/deals");
-        var accountant = await (await factory.CreateAccountantClientAsync()).GetAsync("/api/v1/deals");
         var admin = await (await factory.CreateAdminClientAsync()).GetAsync("/api/v1/deals");
 
         Assert.Equal(HttpStatusCode.Forbidden, content.StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, accountant.StatusCode);
         Assert.Equal(HttpStatusCode.OK, admin.StatusCode);
+    }
+
+    // Бухгалтер находит сделку в списке, чтобы внести первый платёж, но продажи не ведёт.
+    [Fact]
+    public async Task Accountant_ReadsDeals_ButCannotCreateOrMoveThem()
+    {
+        var manager = await factory.CreateManagerClientAsync();
+        var accountant = await factory.CreateAccountantClientAsync();
+        var apartmentId = await factory.FindFreeApartmentAsync();
+        var customer = await BookingTests.CreateCustomerAsync(manager);
+        var deal = await CreateDealAsync(manager, apartmentId, customer.Id);
+
+        var list = await accountant.GetAsync("/api/v1/deals");
+        var card = await accountant.GetAsync($"/api/v1/deals/{deal.Id}");
+        var create = await accountant.PostAsJsonAsync("/api/v1/deals",
+            new CreateDealRequest(apartmentId, customer.Id, null, null, null, null), TestJson.Options);
+        var move = await accountant.PatchAsJsonAsync($"/api/v1/deals/{deal.Id}/stage",
+            new ChangeDealStageRequest(DealStage.Contract, null), TestJson.Options);
+
+        Assert.Equal(HttpStatusCode.OK, list.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, card.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, create.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, move.StatusCode);
     }
 
     private async Task<ApartmentResponse> GetApartmentAsync(Guid id) =>
