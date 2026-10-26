@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sitora.Domain.Common;
@@ -30,6 +31,7 @@ public class AuthService(
     IOptions<IdentityOptions> identityOptions,
     IOptions<AuthOptions> authOptions,
     TimeProvider timeProvider,
+    IHostEnvironment environment,
     ILogger<AuthService> logger) : IAuthService
 {
     private const string InvalidCredentials = "Неверная почта или пароль";
@@ -60,6 +62,8 @@ public class AuthService(
             await EnsureEmailCodeLimitAsync(c => c.RequestIp == requestIp, now, limits, ct);
 
         var code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+        if (IsDevFixedCodeEmail(address))
+            logger.LogInformation("OTP для {Email}: {Code} (разработка; подходит и {FixedCode})", address, code, AuthOptions.DevFixedCode);
         var known = await IsKnownEmailAsync(address, ct);
         db.EmailCodes.Add(new EmailCode
         {
@@ -104,6 +108,10 @@ public class AuthService(
             throw new TooManyRequestsException("Слишком много запросов кода. Попробуйте позже");
     }
 
+    private bool IsDevFixedCodeEmail(string address) =>
+        environment.IsDevelopment()
+        && authOptions.Value.DevFixedCodeEmails.Any(e => string.Equals(EmailAddress.Normalize(e), address, StringComparison.Ordinal));
+
     private async Task<bool> IsKnownEmailAsync(string address, CancellationToken ct)
     {
         var user = await userManager.FindByEmailAsync(address);
@@ -122,17 +130,27 @@ public class AuthService(
             .Where(c => c.Email == address)
             .OrderByDescending(c => c.CreatedAt)
             .FirstOrDefaultAsync(ct);
-        if (stored is null || !stored.IsUsable(now))
-            throw new UnauthorizedException(InvalidEmailCode);
-
-        if (!FixedTimeEquals(stored.CodeHash, HashCode(address, request.Code.Trim())))
+        // Разработка: для почт из Auth:DevFixedCodeEmails подходит 123456, даже если код не запрашивали.
+        if (IsDevFixedCodeEmail(address) && request.Code.Trim() == AuthOptions.DevFixedCode)
         {
-            stored.Attempts++;
-            await db.SaveChangesAsync(ct);
-            throw new UnauthorizedException(InvalidEmailCode);
+            if (stored is not null)
+                stored.UsedAt = now;
+        }
+        else
+        {
+            if (stored is null || !stored.IsUsable(now))
+                throw new UnauthorizedException(InvalidEmailCode);
+
+            if (!FixedTimeEquals(stored.CodeHash, HashCode(address, request.Code.Trim())))
+            {
+                stored.Attempts++;
+                await db.SaveChangesAsync(ct);
+                throw new UnauthorizedException(InvalidEmailCode);
+            }
+
+            stored.UsedAt = now;
         }
 
-        stored.UsedAt = now;
         await db.SaveChangesAsync(ct);
 
         var user = await userManager.FindByEmailAsync(address) ?? await GetOrCreateCustomerUserByEmailAsync(address, ct);

@@ -19,6 +19,12 @@ public class AuthOptions
 
     [Range(1, 1000)]
     public int EmailCodesPerHour { get; set; } = 5;
+
+    // Только Development: для этих почт код из письма пишется в лог и всегда подходит DevFixedCode.
+    // В других окружениях список не действует, даже если задан.
+    public string[] DevFixedCodeEmails { get; set; } = [];
+
+    public const string DevFixedCode = "123456";
 }
 
 // Чей это токен и что ему видно. OrganizationId null — без ограничения организацией.
