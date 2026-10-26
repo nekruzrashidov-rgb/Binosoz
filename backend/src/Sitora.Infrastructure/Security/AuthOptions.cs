@@ -24,6 +24,9 @@ public class AuthOptions
     // В других окружениях список не действует, даже если задан.
     public string[] DevFixedCodeEmails { get; set; } = [];
 
+    // Только Development: 123456 подходит для любой почты, а неизвестная почта становится покупателем.
+    public bool DevFixedCodeForAnyEmail { get; set; }
+
     public const string DevFixedCode = "123456";
 }
 

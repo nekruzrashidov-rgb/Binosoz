@@ -132,6 +132,8 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Auth:SmsLoginEnabled", SmsLoginEnabled ? "true" : "false");
         // Второй застройщик из сидера разработки не нужен: изоляцию проверяют тесты со своими организациями.
         builder.UseSetting("Seed:RichTower", "false");
+        // Код 123456 для любой почты (Development) выключен: тесты проверяют настоящие коды; режим проверяет DevFixedCodeTests.
+        builder.UseSetting("Auth:DevFixedCodeForAnyEmail", "false");
         builder.UseSetting("ADMIN_EMAIL", PlatformOwnerEmail);
         builder.UseSetting("ADMIN_PASSWORD", PlatformOwnerPassword);
         builder.ConfigureTestServices(services =>

@@ -110,7 +110,35 @@ public class AuthService(
 
     private bool IsDevFixedCodeEmail(string address) =>
         environment.IsDevelopment()
-        && authOptions.Value.DevFixedCodeEmails.Any(e => string.Equals(EmailAddress.Normalize(e), address, StringComparison.Ordinal));
+        && (authOptions.Value.DevFixedCodeForAnyEmail
+            || authOptions.Value.DevFixedCodeEmails.Any(e => string.Equals(EmailAddress.Normalize(e), address, StringComparison.Ordinal)));
+
+    // Разработка: неизвестная почта с кодом 123456 становится покупателем застройщика по умолчанию.
+    private async Task EnsureDevCustomerAsync(string address, CancellationToken ct)
+    {
+        if (await userManager.FindByEmailAsync(address) is not null
+            || await db.Customers.IgnoreQueryFilters().AnyAsync(c => c.Email == address, ct))
+            return;
+
+        var organizationId = await db.Organizations.IgnoreQueryFilters()
+            .Where(o => o.IsActive)
+            .OrderBy(o => o.Id == Organization.DefaultId ? 0 : 1).ThenBy(o => o.CreatedAt)
+            .Select(o => (Guid?)o.Id)
+            .FirstOrDefaultAsync(ct) ?? throw new UnauthorizedException(InvalidEmailCode);
+
+        var customer = new Customer
+        {
+            OrganizationId = organizationId,
+            FullName = address.Split('@')[0],
+            // Телефон обязателен и уникален у застройщика: условный номер из почты, клиент поменяет его у менеджера.
+            Phone = "+992" + (BitConverter.ToUInt32(SHA256.HashData(Encoding.UTF8.GetBytes(address)), 0) % 1_000_000_000).ToString("D9"),
+            Email = address
+        };
+        db.Customers.Add(customer);
+        audit.Record(nameof(Customer), customer.Id, "CreatedOnDevLogin", null, new { customer.Email }, organizationId);
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("Разработка: для {Email} создан покупатель", address);
+    }
 
     private async Task<bool> IsKnownEmailAsync(string address, CancellationToken ct)
     {
@@ -130,11 +158,13 @@ public class AuthService(
             .Where(c => c.Email == address)
             .OrderByDescending(c => c.CreatedAt)
             .FirstOrDefaultAsync(ct);
-        // Разработка: для почт из Auth:DevFixedCodeEmails подходит 123456, даже если код не запрашивали.
+        // Разработка: подходит 123456 (для любой почты при Auth:DevFixedCodeForAnyEmail, иначе — из Auth:DevFixedCodeEmails),
+        // даже если код не запрашивали; неизвестная почта становится покупателем.
         if (IsDevFixedCodeEmail(address) && request.Code.Trim() == AuthOptions.DevFixedCode)
         {
             if (stored is not null)
                 stored.UsedAt = now;
+            await EnsureDevCustomerAsync(address, ct);
         }
         else
         {
