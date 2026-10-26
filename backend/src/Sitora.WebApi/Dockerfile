@@ -1,5 +1,5 @@
 # Продакшен-образ: многоэтапная сборка, в итоговом образе только рантайм ASP.NET и опубликованное приложение,
-# процесс работает не от root. Сборка из корня репозитория: docker build -f src/Sitora.WebApi/Dockerfile .
+# процесс работает не от root. Сборка из папки backend/: docker build -f src/Sitora.WebApi/Dockerfile .
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 

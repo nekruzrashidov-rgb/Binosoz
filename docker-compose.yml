@@ -19,7 +19,7 @@ services:
 
   webapi:
     build:
-      context: .
+      context: ./backend
       dockerfile: src/Sitora.WebApi/Dockerfile
     restart: unless-stopped
     environment:

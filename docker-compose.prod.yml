@@ -24,7 +24,7 @@ services:
   # API в Production миграции сам не применяет и без неё не стартует.
   migrate:
     build:
-      context: .
+      context: ./backend
       dockerfile: src/Sitora.WebApi/Dockerfile
     image: sitora-webapi:latest
     command: ["--migrate"]

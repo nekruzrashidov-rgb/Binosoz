@@ -1,4 +1,4 @@
-﻿# Запуск для разработки: API в отдельном окне, сайт (папка web/) в этом окне, браузер открывается сам.
+﻿# Запуск для разработки: API (backend/) в отдельном окне, сайт (папка frontend/) в этом окне, браузер открывается сам.
 # Секреты API берутся из user secrets (см. README, раздел «Переменные окружения»).
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
@@ -17,7 +17,7 @@ if (Test-Api) {
 } else {
     Write-Host 'Запускаю API в отдельном окне…' -ForegroundColor Cyan
     # Окружение задаётся переменной: флаг --environment у dotnet run в .NET 10 означает переменные окружения процесса.
-    Start-Process powershell -WorkingDirectory "$root\src\Sitora.WebApi" -ArgumentList '-NoExit', '-Command', '$Host.UI.RawUI.WindowTitle = ''Sitora API''; $env:ASPNETCORE_ENVIRONMENT = ''Development''; dotnet run --no-launch-profile --urls http://localhost:5194'
+    Start-Process powershell -WorkingDirectory "$root\backend\src\Sitora.WebApi" -ArgumentList '-NoExit', '-Command', '$Host.UI.RawUI.WindowTitle = ''Sitora API''; $env:ASPNETCORE_ENVIRONMENT = ''Development''; dotnet run --no-launch-profile --urls http://localhost:5194'
 
     # Первый запуск собирает проект и применяет миграции — это может занять пару минут.
     $deadline = (Get-Date).AddMinutes(4)

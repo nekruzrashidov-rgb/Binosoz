@@ -1,11 +1,11 @@
 /* Sitora front-end settings.
    API_BASE: address of the Sitora API, e.g. 'http://localhost:5194/api/v1'.
-   Leave it empty to run the built-in demo backend (no server needed).
-   The address can also be changed in the page itself (gear button, bottom right).
+   Empty (the default) runs the built-in demo backend: no server needed; the address of a real API
+   is entered in the page itself (gear button, bottom right) and remembered in the browser.
    ORG_SLUG: short name of the developer whose buildings and USD rate the public site shows
    ('sitora' is the default organization). Empty — buildings of all developers on the platform. */
 window.SITORA_CONFIG = {
-  API_BASE: 'http://localhost:5194/api/v1',
+  API_BASE: '',
   ORG_SLUG: 'sitora',
   DEFAULT_BUILDING_ID: null,
   CONTACT: {

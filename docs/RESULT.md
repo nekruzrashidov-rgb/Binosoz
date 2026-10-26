@@ -261,7 +261,7 @@ Admin входит во все наборы ролей, кроме кабине�
   - вход bootstrap-админа работает, `--healthcheck` возвращает 0;
   - логи — JSON в файле, с IP клиента, без паролей.
 - **Compose-файлы.** Оба проходят `docker compose config`: синтаксис и обязательные переменные.
-- **Локальный запуск.** `dotnet run` из `src/Sitora.WebApi` в обычном терминале без переменных окружения: секреты берутся из user secrets, окружение Development, `/health/ready` — 200, Swagger открывается, вход всех четырёх сотрудников сидера работает, каталог отдаёт дом из сидера.
+- **Локальный запуск.** `dotnet run` из `backend/src/Sitora.WebApi` в обычном терминале без переменных окружения: секреты берутся из user secrets, окружение Development, `/health/ready` — 200, Swagger открывается, вход всех четырёх сотрудников сидера работает, каталог отдаёт дом из сидера.
 
 ## 6. Что не проверено или не готово
 
@@ -343,13 +343,13 @@ Admin входит во все наборы ролей, кроме кабине�
 Их можно задать переменными окружения или, для разработки, через user secrets (хранятся в профиле Windows, вне репозитория):
 
 ```bash
-dotnet user-secrets set "Jwt:Key" "<значение>" --project src/Sitora.WebApi
+dotnet user-secrets set "Jwt:Key" "<значение>" --project backend/src/Sitora.WebApi
 ```
 
 На этой машине user secrets уже заданы, поэтому достаточно:
 
 ```bash
-cd src/Sitora.WebApi
+cd backend/src/Sitora.WebApi
 dotnet run
 ```
 

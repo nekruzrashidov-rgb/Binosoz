@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sitora.Domain.DTOs.Auth;
+using Sitora.Domain.DTOs.Brand;
 using Sitora.Domain.Interfaces;
 
 namespace Sitora.WebApi.Controllers;

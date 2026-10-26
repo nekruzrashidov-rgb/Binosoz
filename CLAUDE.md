@@ -1,7 +1,7 @@
 # Проект: backend платформы для застройщика
 Полное ТЗ: docs/TZ.md. Решения: docs/DECISIONS.md.
 Стек: .NET 10 LTS, ASP.NET Core Web API, PostgreSQL 18, EF Core, Identity + JWT.
-Проекты: Sitora.Domain, Sitora.Infrastructure, Sitora.WebApi, tests/Sitora.Tests. Бизнес-логика в Infrastructure/Services, контроллеры тонкие.
+Структура: backend/ (.NET: backend/Sitora.sln, backend/src/Sitora.Domain, Sitora.Infrastructure, Sitora.WebApi, backend/tests/Sitora.Tests) и frontend/ (статический сайт, кабинет и CRM). Бизнес-логика в Infrastructure/Services, контроллеры тонкие.
 - Деньги только decimal(18,2) + код валюты. Платежи не удаляются, только сторно.
 - Одна активная бронь на квартиру (частичный уникальный индекс + транзакция).
 - Статус квартиры меняют только операции брони и сделки.

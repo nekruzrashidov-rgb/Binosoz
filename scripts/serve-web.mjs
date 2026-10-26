@@ -1,11 +1,11 @@
-// Статик-сервер для папки web/ в разработке, без зависимостей: node scripts/serve-web.mjs [порт]
+// Статик-сервер для папки frontend/ в разработке, без зависимостей: node scripts/serve-web.mjs [порт]
 // Отдаёт файлы как есть и без кэша, чтобы правки JS и CSS были видны после обновления страницы.
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = resolve(fileURLToPath(new URL('../web', import.meta.url)));
+const root = resolve(fileURLToPath(new URL('../frontend', import.meta.url)));
 const port = Number(process.argv[2] ?? process.env.PORT ?? 5500);
 
 const types = {
@@ -27,7 +27,7 @@ createServer(async (req, res) => {
   try {
     const path = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname);
     let file = normalize(join(root, path));
-    // Не выпускаем запрос за пределы web/.
+    // Не выпускаем запрос за пределы frontend/.
     if (file !== root && !file.startsWith(root + sep)) {
       res.writeHead(403).end();
       return;
@@ -39,4 +39,4 @@ createServer(async (req, res) => {
   } catch {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Не найдено');
   }
-}).listen(port, () => console.log(`web/ доступен на http://localhost:${port}`));
+}).listen(port, () => console.log(`frontend/ доступен на http://localhost:${port}`));

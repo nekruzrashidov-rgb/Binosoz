@@ -488,3 +488,10 @@ $RECYCLE.BIN/
 # Загруженные файлы (документы сделок)
 storage/
 
+
+# РЎС‚СЂСѓРєС‚СѓСЂР° СЂРµРїРѕР·РёС‚РѕСЂРёСЏ: backend/ (.NET) Рё frontend/ (СЃС‚Р°С‚РёС‡РµСЃРєРёР№ СЃР°Р№С‚)
+backend/bin/
+backend/obj/
+backend/.env
+*.user
+.DS_Store

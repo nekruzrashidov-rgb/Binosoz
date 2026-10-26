@@ -9,7 +9,7 @@
 - Проверка безопасности: [docs/SECURITY.md](docs/SECURITY.md)
 
 Стек: .NET 10, ASP.NET Core Web API, PostgreSQL 18, EF Core, Identity + JWT, Hangfire, SignalR, QuestPDF, Serilog.
-Фронтенд (сайт, кабинет, CRM; чистый JavaScript без сборки) — в [web/](web/README.md). Контракт API и сверка с фронтендом — [docs/API_CONTRACT.md](docs/API_CONTRACT.md). Прежний React-фронтенд и прочее неиспользуемое — в `_old/`.
+Фронтенд (сайт, кабинет, CRM; чистый JavaScript без сборки) — в [frontend/](frontend/README.md). Контракт API и сверка с фронтендом — [docs/API_CONTRACT.md](docs/API_CONTRACT.md). Прежний React-фронтенд и прочее неиспользуемое — в `_old/`.
 
 ## API и фронтенд одной командой (Windows)
 
@@ -19,7 +19,7 @@
 .\run.cmd
 ```
 
-Скрипт открывает API в отдельном окне «Sitora API» (если он ещё не запущен), ждёт, пока API ответит, раздаёт папку `web/` статик-сервером `scripts/serve-web.mjs` и открывает сайт в браузере (http://localhost:5500). Нужны .NET 10 SDK, Node.js, локальный PostgreSQL и секреты в user secrets (раздел «Переменные окружения»). Остановить сайт — Ctrl+C, API — закрыть его окно.
+Скрипт открывает API в отдельном окне «Sitora API» (если он ещё не запущен), ждёт, пока API ответит, раздаёт папку `frontend/` статик-сервером `scripts/serve-web.mjs` и открывает сайт в браузере (http://localhost:5500). Нужны .NET 10 SDK, Node.js, локальный PostgreSQL и секреты в user secrets (раздел «Переменные окружения»). Остановить сайт — Ctrl+C, API — закрыть его окно.
 
 ## Запуск для разработки за 3 команды
 
@@ -45,11 +45,11 @@ curl http://localhost:8080/health
 Секреты для Development удобнее один раз положить в user secrets (хранятся в профиле пользователя, вне репозитория). После этого `dotnet run` работает в любом окне без переменных окружения:
 
 ```bash
-dotnet user-secrets set "ConnectionStrings:Default" "Host=localhost;Port=5432;Database=sitora;Username=...;Password=..." --project src/Sitora.WebApi
-dotnet user-secrets set "Jwt:Key" "<не короче 32 символов>" --project src/Sitora.WebApi
-dotnet user-secrets set "Encryption:Key" "<32 байта в base64>" --project src/Sitora.WebApi
-dotnet user-secrets set "SEED_ADMIN_PASSWORD" "<пароль админа>" --project src/Sitora.WebApi
-dotnet run --project src/Sitora.WebApi
+dotnet user-secrets set "ConnectionStrings:Default" "Host=localhost;Port=5432;Database=sitora;Username=...;Password=..." --project backend/src/Sitora.WebApi
+dotnet user-secrets set "Jwt:Key" "<не короче 32 символов>" --project backend/src/Sitora.WebApi
+dotnet user-secrets set "Encryption:Key" "<32 байта в base64>" --project backend/src/Sitora.WebApi
+dotnet user-secrets set "SEED_ADMIN_PASSWORD" "<пароль админа>" --project backend/src/Sitora.WebApi
+dotnet run --project backend/src/Sitora.WebApi
 ```
 
 Вместо user secrets можно задать те же значения переменными окружения (`ConnectionStrings__Default`, `Jwt__Key`, `Encryption__Key`, `SEED_ADMIN_PASSWORD`). В Staging и Production user secrets не читаются — только переменные окружения.
@@ -58,13 +58,13 @@ dotnet run --project src/Sitora.WebApi
 
 ```bash
 dotnet tool restore
-dotnet dotnet-ef migrations add <Имя> --project src/Sitora.Infrastructure --output-dir Data/Migrations
+dotnet dotnet-ef migrations add <Имя> --project backend/src/Sitora.Infrastructure --output-dir Data/Migrations
 ```
 
 ## Тесты
 
 ```bash
-dotnet test
+dotnet test backend/Sitora.sln
 ```
 
 По умолчанию тесты поднимают PostgreSQL 18 через Testcontainers (нужен запущенный Docker).
@@ -72,7 +72,7 @@ dotnet test
 
 ```bash
 export SITORA_TEST_DB="Host=localhost;Port=5432;Username=postgres;Password=..."
-dotnet test
+dotnet test backend/Sitora.sln
 ```
 
 ## CI
@@ -188,10 +188,12 @@ Caddy сам получает сертификат HTTPS. Бэкап — `./scri
 ## Структура
 
 ```
-src/Sitora.Domain          сущности, перечисления, DTO, интерфейсы, исключения
-src/Sitora.Infrastructure  EF Core, Identity, сервисы, интеграции, фоновые задачи, JWT, шифрование
-src/Sitora.WebApi          контроллеры, хаб SignalR, middleware, валидаторы, Program.cs, Dockerfile
-tests/Sitora.Tests         модульные и интеграционные тесты
-deploy/Caddyfile           обратный прокси с HTTPS для продакшена
-scripts/                   бэкап и восстановление
+backend/                          .NET: решение Sitora.sln, проекты и тесты
+backend/src/Sitora.Domain          сущности, перечисления, DTO, интерфейсы, исключения
+backend/src/Sitora.Infrastructure  EF Core, Identity, сервисы, интеграции, фоновые задачи, JWT, шифрование
+backend/src/Sitora.WebApi          контроллеры, хаб SignalR, middleware, валидаторы, Program.cs, Dockerfile
+backend/tests/Sitora.Tests         модульные и интеграционные тесты
+frontend/                         сайт, кабинет и CRM (статические файлы; vercel.json публикует эту папку)
+deploy/Caddyfile                  обратный прокси с HTTPS для продакшена
+scripts/                          бэкап и восстановление
 ```
