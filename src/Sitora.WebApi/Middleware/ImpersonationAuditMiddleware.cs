@@ -33,6 +33,12 @@ public class ImpersonationAuditMiddleware(RequestDelegate next)
             await next(context);
             status = context.Response.StatusCode;
         }
+        catch (Exception exception)
+        {
+            // Ответ запишет DomainExceptionHandler выше по конвейеру — с этим же кодом.
+            status = DomainExceptionHandler.Describe(exception).Status;
+            throw;
+        }
         finally
         {
             if (writes)

@@ -30,7 +30,8 @@ public class CreateUserRequestValidator : AbstractValidator<CreateUserRequest>
             .EmailAddress().WithMessage("Неверный формат почты").MaximumLength(256);
         RuleFor(x => x.FullName).NotEmpty().WithMessage("Укажите имя").MaximumLength(200);
         RuleFor(x => x.Role).NotEmpty().WithMessage("Укажите роль");
-        RuleFor(x => x.Password).NotEmpty().WithMessage("Укажите пароль").MaximumLength(128);
+        // Пароль необязателен: сотрудник входит по коду из почты.
+        RuleFor(x => x.Password).MaximumLength(128);
         RuleFor(x => x.Phone).Must(PhoneRules.IsValid).WithMessage(PhoneRules.Message)
             .When(x => !string.IsNullOrWhiteSpace(x.Phone));
     }
