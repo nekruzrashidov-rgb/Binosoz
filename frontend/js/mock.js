@@ -12,6 +12,7 @@
   // Everyone signs in with a code from e-mail (always 123456 here); the platform owner also gives a password.
   const ORG = { id: 'org1', name: 'Ситора Девелопмент', slug: 'sitora' };
   const PLATFORM_PASSWORD = 'Platform123!';
+  const DEMO_CUSTOMER_EMAIL = 'demo@sitora.tj';
   const STAFF = [
     { id: 'u0', email: 'platform@sitora.tj', password: PLATFORM_PASSWORD, name: 'Создатель платформы', roles: ['PlatformOwner'], platform: true },
     { id: 'u1', email: 'admin@sitora.tj', password: 'Admin123!', name: 'Фирдавс Назаров', roles: ['Owner'] },
@@ -51,6 +52,8 @@
     }
     const names = ['Фарҳод Раҳимов', 'Мадина Холиқова', 'Умед Ҷураев', 'Зарина Назарова', 'Сухроб Каримов', 'Дилором Шарипова', 'Бахтиёр Азизов', 'Гулнора Мирзоева', 'Парвиз Одинаев', 'Саодат Юсупова'];
     db.customers = names.map((n, i) => ({ id: i + 1, fullName: n, phone: '+99290000000' + (i + 1 > 9 ? '' : '') + (i + 1 > 9 ? '10' : i + 1), email: i % 3 === 0 ? 'client' + (i + 1) + '@mail.tj' : '', passport: 'A' + (1200000 + i * 1311), createdAt: iso(Date.now() - (30 + i * 9) * DAY) }));
+    // Demo buyer signs in as demo@sitora.tj with code 123456.
+    db.customers[0].email = DEMO_CUSTOMER_EMAIL;
     db.customers[9].phone = '+992900000010';
     db.leads = [
       ['Сарвар Алиев', '+992935551001', 'Интересует 2-комнатная до 700 тыс.', 'New'], ['Нигина Сафарова', '+992988881202', 'Хочу посмотреть квартиру на выходных', 'New'],
@@ -527,7 +530,8 @@
   S.mock = {
     reset() { db = makeDb(); },
     // The platform owner is not offered on the login page (demo address: platform@sitora.tj, see web/README.md).
-    demoUsers: STAFF.filter((u) => !u.platform).map((u) => ({ email: u.email, role: u.roles[0] })).concat([{ email: 'client1@mail.tj', role: 'Customer' }]),
+    demoUsers: STAFF.filter((u) => !u.platform).map((u) => ({ email: u.email, role: u.roles[0] })).concat([{ email: DEMO_CUSTOMER_EMAIL, role: 'Customer' }]),
+    demoCustomerEmail: DEMO_CUSTOMER_EMAIL,
     demoPlatformPassword: PLATFORM_PASSWORD,
     async handle(method, path, o) {
       o = o || {};

@@ -30,7 +30,7 @@
 
 | Метод | Путь | Тело | Ответ |
 | --- | --- | --- | --- |
-| POST | `/auth/email/send` | `{ email }` | 202 `{ message, expiresInSeconds }` — всегда одинаковый, даже если почты нет |
+| POST | `/auth/email/send` | `{ email }` | 200 `{ message, expiresInSeconds }` — всегда одинаковый, даже если почты нет |
 | POST | `/auth/email/verify` | `{ email, code }` | 200 `AuthResponse` или 202 `SecondFactorChallenge` (только PlatformOwner) |
 | POST | `/auth/second-factor` | `{ challengeToken, password? , totpCode? }` | `AuthResponse` |
 | POST | `/auth/invitations/accept` | `{ token }` | `AuthResponse`; 401 — приглашение недействительно или использовано |

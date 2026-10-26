@@ -19,10 +19,10 @@ public class AuthController(IAuthService auth, IOptions<AuthOptions> options) : 
     [HttpPost("email/send")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicies.Sms)]
-    [ProducesResponseType<EmailSendResponse>(StatusCodes.Status202Accepted)]
+    [ProducesResponseType<EmailSendResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult<EmailSendResponse>> SendEmailCode(EmailSendRequest request, CancellationToken ct) =>
-        Accepted(await auth.SendEmailCodeAsync(request, HttpContext.Connection.RemoteIpAddress?.ToString(), ct));
+        Ok(await auth.SendEmailCodeAsync(request, HttpContext.Connection.RemoteIpAddress?.ToString(), ct));
 
     /// <summary>Проверка кода из почты: токены (200) или запрос второго фактора для создателя платформы (202).</summary>
     [HttpPost("email/verify")]

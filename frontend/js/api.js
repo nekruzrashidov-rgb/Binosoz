@@ -269,6 +269,8 @@
     request,
     get user() { return auth && auth.user; },
     get isAuthed() { return !!(auth && auth.accessToken); },
+    // Access token of the current session (kept in localStorage under sitora.auth together with the refresh token).
+    get token() { return (auth && auth.accessToken) || null; },
     isStaff() { return !!(auth && auth.user && auth.user.roles.some((r) => STAFF_ROLES.includes(r))); },
     isCustomer() { return role() === 'Customer'; },
     // The platform owner's own section (not while working "as owner" of an organization).

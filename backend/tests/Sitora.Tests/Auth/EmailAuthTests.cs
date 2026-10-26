@@ -22,7 +22,7 @@ public class EmailAuthTests(SitoraApiFactory factory) : IClassFixture<SitoraApiF
         var known = await _client.PostAsJsonAsync("/api/v1/auth/email/send", new EmailSendRequest(SitoraApiFactory.ManagerEmail));
         var missing = await _client.PostAsJsonAsync("/api/v1/auth/email/send", new EmailSendRequest(unknown));
 
-        Assert.Equal((HttpStatusCode.Accepted, HttpStatusCode.Accepted), (known.StatusCode, missing.StatusCode));
+        Assert.Equal((HttpStatusCode.OK, HttpStatusCode.OK), (known.StatusCode, missing.StatusCode));
         Assert.Equal(await known.Content.ReadAsStringAsync(), await missing.Content.ReadAsStringAsync());
         Assert.Equal(0, factory.Email.SentCount(unknown));
         Assert.NotNull(factory.Email.LastCode(SitoraApiFactory.ManagerEmail));
@@ -188,7 +188,7 @@ public class EmailLimitTests(EmailLimitsFactory factory) : IClassFixture<EmailLi
         {
             for (var i = 0; i < 5; i++)
             {
-                Assert.Equal(HttpStatusCode.Accepted, (await Send(client, email)).StatusCode);
+                Assert.Equal(HttpStatusCode.OK, (await Send(client, email)).StatusCode);
                 var again = await Send(client, email);
                 Assert.Equal(HttpStatusCode.TooManyRequests, again.StatusCode);
                 Assert.Contains("через минуту", await again.Content.ReadAsStringAsync());
@@ -201,7 +201,7 @@ public class EmailLimitTests(EmailLimitsFactory factory) : IClassFixture<EmailLi
 
             // Через час лимит снова свободен.
             await ShiftBackAsync(email, TimeSpan.FromHours(1));
-            Assert.Equal(HttpStatusCode.Accepted, (await Send(client, email)).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await Send(client, email)).StatusCode);
         }
     }
 
