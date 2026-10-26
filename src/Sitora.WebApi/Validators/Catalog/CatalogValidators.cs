@@ -73,8 +73,11 @@ public class ApartmentFieldsValidator<T> : AbstractValidator<T>
     {
         RuleFor(number).InclusiveBetween(1, 99999).WithMessage("Номер квартиры должен быть от 1 до 99999");
         RuleFor(rooms).InclusiveBetween(0, 10).WithMessage("Комнат должно быть от 0 (студия) до 10");
-        RuleFor(area).GreaterThan(0).LessThanOrEqualTo(1000).WithMessage("Площадь должна быть больше 0 и не больше 1000 м²");
-        RuleFor(pricePerM2).GreaterThan(0).LessThanOrEqualTo(10_000_000).WithMessage("Цена за м² должна быть больше нуля");
+        // WithMessage относится только к правилу перед ним, поэтому сообщение — у каждой границы.
+        const string areaMessage = "Площадь должна быть больше 0 и не больше 1000 м²";
+        const string priceMessage = "Цена за м² должна быть больше нуля и не больше 10 000 000";
+        RuleFor(area).GreaterThan(0).WithMessage(areaMessage).LessThanOrEqualTo(1000).WithMessage(areaMessage);
+        RuleFor(pricePerM2).GreaterThan(0).WithMessage(priceMessage).LessThanOrEqualTo(10_000_000).WithMessage(priceMessage);
         RuleFor(planSlot).InclusiveBetween(0, Apartment.MaxPlanSlot)
             .WithMessage($"Позиция на плане этажа должна быть от 0 до {Apartment.MaxPlanSlot}");
         RuleFor(model3dId).MaximumLength(Apartment.Model3dIdMaxLength)

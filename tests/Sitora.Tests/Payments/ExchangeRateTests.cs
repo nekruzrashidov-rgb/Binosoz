@@ -84,6 +84,27 @@ public class ExchangeRateTests(SitoraApiFactory factory) : IClassFixture<SitoraA
         Assert.Equal(HttpStatusCode.UnprocessableEntity, future.StatusCode);
     }
 
+    // Сообщение по-русски у каждой границы диапазона и при любом языке запроса, без имён полей вроде «Rate To Tjs».
+    [Theory]
+    [InlineData("ru")]
+    [InlineData("tg")]
+    public async Task SetRate_ZeroRate_ExplainsInRussian(string language)
+    {
+        var admin = await factory.CreateAdminClientAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Put, "/api/v1/rates")
+        {
+            Content = JsonContent.Create(new SetRateRequest(Today, Currency.USD, 0m), options: TestJson.Options)
+        };
+        request.Headers.AcceptLanguage.ParseAdd(language);
+
+        var response = await admin.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("Курс должен быть больше 0", body);
+        Assert.DoesNotContain("Rate To Tjs", body);
+    }
+
     [Fact]
     public async Task UpdateRatesJob_WithStubProvider_KeepsManualRates()
     {

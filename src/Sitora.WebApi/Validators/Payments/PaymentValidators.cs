@@ -9,8 +9,9 @@ public class CreatePlanRequestValidator : AbstractValidator<CreatePlanRequest>
 {
     public CreatePlanRequestValidator()
     {
-        RuleFor(x => x.DownPaymentPct).GreaterThanOrEqualTo(0).LessThan(100)
-            .WithMessage("Первоначальный взнос должен быть от 0 до 100% (не включая 100)");
+        const string downPaymentMessage = "Первоначальный взнос должен быть от 0 до 100% (не включая 100)";
+        RuleFor(x => x.DownPaymentPct).GreaterThanOrEqualTo(0).WithMessage(downPaymentMessage)
+            .LessThan(100).WithMessage(downPaymentMessage);
         RuleFor(x => x.Months).InclusiveBetween(1, PaymentScheduleCalculator.MaxMonths)
             .WithMessage($"Срок должен быть от 1 до {PaymentScheduleCalculator.MaxMonths} месяцев");
         RuleFor(x => x.PaymentDay).InclusiveBetween(1, PaymentScheduleCalculator.MaxPaymentDay)
@@ -46,7 +47,8 @@ public class SetRateRequestValidator : AbstractValidator<SetRateRequest>
     public SetRateRequestValidator()
     {
         RuleFor(x => x.Currency).Equal(Currency.USD).WithMessage("Курс задаётся только для USD");
-        RuleFor(x => x.RateToTjs).GreaterThan(0).LessThanOrEqualTo(1000).WithMessage("Курс должен быть больше 0 и не больше 1000");
+        const string rateMessage = "Курс должен быть больше 0 и не больше 1000";
+        RuleFor(x => x.RateToTjs).GreaterThan(0).WithMessage(rateMessage).LessThanOrEqualTo(1000).WithMessage(rateMessage);
         RuleFor(x => x.Date).NotEmpty().WithMessage("Укажите дату курса");
     }
 }

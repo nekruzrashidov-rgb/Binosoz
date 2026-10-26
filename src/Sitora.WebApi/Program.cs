@@ -20,6 +20,7 @@ using Sitora.Infrastructure.Security;
 using Sitora.WebApi.Extensions;
 using Sitora.WebApi.Hubs;
 using Sitora.WebApi.Middleware;
+using Sitora.WebApi.Validators;
 
 // Проверка контейнера: опросить уже запущенный API и выйти, не поднимая второй экземпляр.
 if (args.Contains(HealthProbe.Command))
@@ -43,7 +44,7 @@ builder.Services.AddScoped<IChatNotifier, SignalRChatNotifier>();
 builder.Services.AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
-ValidatorOptions.Global.LanguageManager.Culture = new CultureInfo("ru");
+ValidationSetup.Configure();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddFluentValidationAutoValidation();
 
@@ -139,9 +140,9 @@ if (migrateOnly)
 
 if (forwardedHeadersEnabled)
     app.UseForwardedHeaders();
-app.UseExceptionHandler();
-app.UseStatusCodePages();
-app.UseMiddleware<SecurityHeadersMiddleware>();
+// Журнал запросов — снаружи обработчика исключений: так он видит итоговый код ответа.
+// Внутри он принимал каждую ошибку домена (404, 409, 422) за 500 и писал её со стеком.
+// Настоящие 500 отдельно пишет DomainExceptionHandler.
 app.UseSerilogRequestLogging(options =>
 {
     // IP клиента (после X-Forwarded-For) и пользователь — в каждой записи о запросе.
@@ -156,6 +157,9 @@ app.UseSerilogRequestLogging(options =>
         : http.Request.Path.StartsWithSegments("/health") ? LogEventLevel.Verbose
         : LogEventLevel.Information;
 });
+app.UseExceptionHandler();
+app.UseStatusCodePages();
+app.UseMiddleware<SecurityHeadersMiddleware>();
 
 // В продакшене TLS завершает обратный прокси; приложение только требует HTTPS и шлёт HSTS.
 // /health не перенаправляется: его опрашивают изнутри сети docker по HTTP.
