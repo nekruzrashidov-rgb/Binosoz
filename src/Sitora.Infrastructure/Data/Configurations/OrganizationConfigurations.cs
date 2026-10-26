@@ -12,6 +12,15 @@ public class OrganizationConfiguration : IEntityTypeConfiguration<Organization>
         builder.Property(o => o.Name).HasMaxLength(200).IsRequired();
         builder.Property(o => o.Slug).HasMaxLength(64).IsRequired();
         builder.HasIndex(o => o.Slug).IsUnique();
+        builder.Property(o => o.LogoUrl).HasMaxLength(500);
+        builder.Property(o => o.LogoFileKey).HasMaxLength(300);
+        builder.Property(o => o.LogoContentType).HasMaxLength(100);
+        builder.Property(o => o.PrimaryColor).HasMaxLength(7);
+        builder.Property(o => o.Phone).HasMaxLength(32);
+        builder.Property(o => o.Telegram).HasMaxLength(64);
+        builder.Property(o => o.Address).HasMaxLength(300);
+        builder.Property(o => o.CustomDomain).HasMaxLength(253);
+        builder.HasIndex(o => o.CustomDomain).IsUnique().HasFilter("\"CustomDomain\" IS NOT NULL");
     }
 }
 

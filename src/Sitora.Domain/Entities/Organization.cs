@@ -10,8 +10,22 @@ public class Organization : BaseEntity
     public string Name { get; set; } = string.Empty;
 
     // Короткое имя для адреса публичного сайта застройщика: латиница, цифры, дефис.
+    // Оно же поддомен: richtower → richtower.sitora.tj.
     public string Slug { get; set; } = string.Empty;
     public bool IsActive { get; set; } = true;
+
+    // Бренд на сайте и в письмах (white-label).
+    // LogoUrl — адрес логотипа для сайта; загруженный файл лежит в хранилище под LogoFileKey.
+    public string? LogoUrl { get; set; }
+    public string? LogoFileKey { get; set; }
+    public string? LogoContentType { get; set; }
+    public string? PrimaryColor { get; set; }
+    public string? Phone { get; set; }
+    public string? Telegram { get; set; }
+    public string? Address { get; set; }
+
+    // Свой домен застройщика (например, richtower.tj). Задаёт только создатель платформы.
+    public string? CustomDomain { get; set; }
 
     public List<Building> Buildings { get; set; } = [];
 }

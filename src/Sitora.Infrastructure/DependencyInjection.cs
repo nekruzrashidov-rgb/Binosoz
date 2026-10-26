@@ -50,6 +50,8 @@ public static class DependencyInjection
         services.AddOptions<AuthOptions>()
             .BindConfiguration(AuthOptions.SectionName)
             .ValidateDataAnnotations();
+        services.AddOptions<BrandOptions>()
+            .BindConfiguration(BrandOptions.SectionName);
         services.AddOptions<EmailOptions>()
             .BindConfiguration(EmailOptions.SectionName)
             .ValidateDataAnnotations();
@@ -64,6 +66,7 @@ public static class DependencyInjection
         services.AddScoped<StaffPolicy>();
         services.AddScoped<IInvitationService, InvitationService>();
         services.AddScoped<IPlatformService, PlatformService>();
+        services.AddScoped<IBrandService, BrandService>();
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<ApartmentImporter>();
         services.AddScoped<ICatalogService, CatalogService>();

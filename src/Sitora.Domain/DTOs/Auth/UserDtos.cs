@@ -52,4 +52,5 @@ public record OrganizationResponse(
     bool IsActive,
     int BuildingsCount,
     int UsersCount,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    string? CustomDomain = null);

@@ -23,6 +23,7 @@ public class AuthService(
     JwtTokenService tokens,
     ISmsSender sms,
     IEmailSender email,
+    IBrandService brands,
     IAuditService audit,
     ICurrentUser currentUser,
     IMemoryCache cache,
@@ -70,10 +71,14 @@ public class AuthService(
         });
         await db.SaveChangesAsync(ct);
 
+        // Письмо подписано брендом застройщика: покупатель знает его, а не платформу.
         if (known)
-            await email.SendAsync(new EmailMessage(address, $"Sitora: код для входа {code}",
-                $"Ваш код для входа в Sitora: {code}\n\nКод действует {EmailCode.Lifetime.TotalMinutes:0} минут. " +
+        {
+            var brand = await brands.NameForEmailAsync(address, ct);
+            await email.SendAsync(new EmailMessage(address, $"{brand}: код для входа {code}",
+                $"Ваш код для входа в {brand}: {code}\n\nКод действует {EmailCode.Lifetime.TotalMinutes:0} минут. " +
                 "Никому его не сообщайте. Если вы не запрашивали код, просто удалите это письмо."), ct);
+        }
         else
             logger.LogInformation("Код не отправлен: почта не найдена среди пользователей и покупателей");
 

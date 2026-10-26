@@ -285,7 +285,7 @@ public class CatalogService(
     private static object Snapshot(Apartment a) =>
         new { a.Number, a.Rooms, a.Area, a.PricePerM2, a.Price, a.Currency, a.Status, a.PlanSlot, a.Model3dId };
 
-    private static Expression<Func<Building, BuildingResponse>> ToBuildingResponse(bool tg) => b => new BuildingResponse(
+    internal static Expression<Func<Building, BuildingResponse>> ToBuildingResponse(bool tg) => b => new BuildingResponse(
         b.Id,
         tg ? b.NameTg : b.NameRu,
         b.NameRu,

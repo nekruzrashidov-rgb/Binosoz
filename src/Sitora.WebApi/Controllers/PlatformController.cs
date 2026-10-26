@@ -24,6 +24,15 @@ public class PlatformController(IPlatformService platform) : ControllerBase
     public async Task<ActionResult<OrganizationResponse>> CreateOrganization(CreateOrganizationRequest request, CancellationToken ct) =>
         StatusCode(StatusCodes.Status201Created, await platform.CreateOrganizationAsync(request, ct));
 
+    /// <summary>Короткое имя (поддомен) и свой домен организации; пустой домен — без своего домена.</summary>
+    [HttpPut("organizations/{organizationId:guid}/domain")]
+    [Authorize(Roles = Roles.PlatformOwner)]
+    [ProducesResponseType<BrandResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public Task<BrandResponse> SetDomain(Guid organizationId, UpdateOrganizationDomainRequest request, [FromServices] IBrandService brands,
+        CancellationToken ct) =>
+        brands.SetDomainAsync(organizationId, request, ct);
+
     /// <summary>
     /// Войти как владелец организации: access-токен без refresh с ролью Owner и пометкой imp.
     /// Каждое действие в этом режиме пишется в аудит с настоящим автором.

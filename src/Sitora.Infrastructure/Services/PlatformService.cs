@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -16,7 +15,7 @@ using Sitora.Infrastructure.Security;
 namespace Sitora.Infrastructure.Services;
 
 // Действия создателя платформы: организации, вход «как владелец» и второй фактор.
-public partial class PlatformService(
+public class PlatformService(
     AppDbContext db,
     UserManager<AppUser> userManager,
     AuthService auth,
@@ -33,15 +32,15 @@ public partial class PlatformService(
         await db.Organizations.AsNoTracking()
             .OrderBy(o => o.Name)
             .Select(o => new OrganizationResponse(o.Id, o.Name, o.Slug, o.IsActive,
-                o.Buildings.Count, db.Users.Count(u => u.OrganizationId == o.Id), o.CreatedAt))
+                o.Buildings.Count, db.Users.Count(u => u.OrganizationId == o.Id), o.CreatedAt, o.CustomDomain))
             .ToListAsync(ct);
 
     // Новая организация сразу получает владельца; он входит по коду из почты.
     public async Task<OrganizationResponse> CreateOrganizationAsync(CreateOrganizationRequest request, CancellationToken ct = default)
     {
-        var slug = request.Slug.Trim().ToLowerInvariant();
-        if (!SlugPattern().IsMatch(slug))
-            throw new BusinessRuleException("Короткое имя — латинские буквы, цифры и дефис, от 2 до 64 символов");
+        var slug = BrandRules.NormalizeSlug(request.Slug) ?? throw new BusinessRuleException(BrandRules.SlugMessage);
+        if (BrandRules.IsReserved(slug))
+            throw new BusinessRuleException($"Короткое имя «{slug}» зарезервировано платформой, выберите другое");
         if (await db.Organizations.IgnoreQueryFilters().AnyAsync(o => o.Slug == slug, ct))
             throw new ConflictException("Организация с таким коротким именем уже есть");
 
@@ -152,7 +151,4 @@ public partial class PlatformService(
         return await userManager.FindByIdAsync(userId.ToString())
             ?? throw new UnauthorizedException("Требуется вход");
     }
-
-    [GeneratedRegex("^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$")]
-    private static partial Regex SlugPattern();
 }
