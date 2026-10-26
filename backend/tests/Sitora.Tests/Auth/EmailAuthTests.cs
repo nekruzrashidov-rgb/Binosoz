@@ -36,6 +36,19 @@ public class EmailAuthTests(SitoraApiFactory factory) : IClassFixture<SitoraApiF
     }
 
     [Fact]
+    public async Task Send_MailServiceFailure_AnswersTheSame_AndDoesNotRevealTheAccount()
+    {
+        var email = await NewCustomerEmailAsync();
+        factory.Email.Failing[email] = true;
+
+        var failed = await _client.PostAsJsonAsync("/api/v1/auth/email/send", new EmailSendRequest(email));
+        var unknown = await _client.PostAsJsonAsync("/api/v1/auth/email/send", new EmailSendRequest($"nobody-{Guid.NewGuid():N}@nowhere.test"));
+
+        Assert.Equal((HttpStatusCode.OK, HttpStatusCode.OK), (failed.StatusCode, unknown.StatusCode));
+        Assert.Equal(await unknown.Content.ReadAsStringAsync(), await failed.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Verify_StaffGetsTokensWithRoleAndOrganization()
     {
         await Send(SitoraApiFactory.ManagerEmail);

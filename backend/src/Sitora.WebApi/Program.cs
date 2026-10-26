@@ -122,6 +122,9 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
+// Какой почтовый сервис выбран: без этого не понять, почему коды входа не приходят (Dev пишет их только в лог).
+app.Logger.LogInformation("Почтовый сервис: {Provider}", app.Configuration["Email:Provider"] ?? "Dev");
+
 var migrateOnly = args.Contains(DatabaseInitializer.MigrateCommand);
 var missingSettings = RequiredSettings.Missing(app.Configuration, migrateOnly, app.Environment.IsDevelopment());
 if (missingSettings.Count > 0)

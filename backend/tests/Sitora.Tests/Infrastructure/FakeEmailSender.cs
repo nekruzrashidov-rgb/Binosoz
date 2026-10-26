@@ -9,8 +9,13 @@ public partial class FakeEmailSender : IEmailSender
 {
     private readonly ConcurrentDictionary<string, List<EmailMessage>> _messages = new();
 
+    // Адреса, на которые «почтовый сервис» падает (как Gmail, отклонивший пароль).
+    public ConcurrentDictionary<string, bool> Failing { get; } = new();
+
     public Task SendAsync(EmailMessage message, CancellationToken ct = default)
     {
+        if (Failing.ContainsKey(message.To))
+            throw new System.Net.Mail.SmtpException("Почтовый сервис недоступен");
         _messages.AddOrUpdate(message.To, _ => [message], (_, list) =>
         {
             lock (list)

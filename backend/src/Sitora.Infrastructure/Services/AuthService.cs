@@ -75,9 +75,17 @@ public class AuthService(
         if (known)
         {
             var brand = await brands.NameForEmailAsync(address, ct);
-            await email.SendAsync(new EmailMessage(address, $"{brand}: код для входа {code}",
-                $"Ваш код для входа в {brand}: {code}\n\nКод действует {EmailCode.Lifetime.TotalMinutes:0} минут. " +
-                "Никому его не сообщайте. Если вы не запрашивали код, просто удалите это письмо."), ct);
+            // Сбой почтового сервиса не меняет ответ: иначе по ошибке 500 было бы видно, что почта зарегистрирована.
+            try
+            {
+                await email.SendAsync(new EmailMessage(address, $"{brand}: код для входа {code}",
+                    $"Ваш код для входа в {brand}: {code}\n\nКод действует {EmailCode.Lifetime.TotalMinutes:0} минут. " +
+                    "Никому его не сообщайте. Если вы не запрашивали код, просто удалите это письмо."), ct);
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                logger.LogError(e, "Письмо с кодом входа не отправлено: ошибка почтового сервиса");
+            }
         }
         else
             logger.LogInformation("Код не отправлен: почта не найдена среди пользователей и покупателей");
