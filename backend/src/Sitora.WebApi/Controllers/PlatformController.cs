@@ -34,15 +34,24 @@ public class PlatformController(IPlatformService platform) : ControllerBase
         CancellationToken ct) =>
         brands.SetDomainAsync(organizationId, request, ct);
 
+    /// <summary>Добавить владельца организации: почта, имя и пароль (необязательно — вход по коду из почты).</summary>
+    [HttpPost("organizations/{organizationId:guid}/owners")]
+    [Authorize(Roles = Roles.PlatformOwner)]
+    [ProducesResponseType<UserResponse>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<UserResponse>> AddOwner(Guid organizationId, AddOwnerRequest request, CancellationToken ct) =>
+        StatusCode(StatusCodes.Status201Created, await platform.AddOwnerAsync(organizationId, request, ct));
+
     /// <summary>
-    /// Войти как владелец организации: access-токен без refresh с ролью Owner и пометкой imp.
-    /// Каждое действие в этом режиме пишется в аудит с настоящим автором.
+    /// Войти «как владелец» организации (id организации) или под конкретным пользователем (id пользователя):
+    /// access-токен без refresh с пометкой imp. Каждое действие в этом режиме пишется в аудит.
     /// </summary>
-    [HttpPost("impersonate/{organizationId:guid}")]
+    [HttpPost("impersonate/{id:guid}")]
     [Authorize(Roles = Roles.PlatformOwner)]
     [ProducesResponseType<AccessTokenResponse>(StatusCodes.Status200OK)]
-    public Task<AccessTokenResponse> Impersonate(Guid organizationId, CancellationToken ct) =>
-        platform.ImpersonateAsync(organizationId, ct);
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public Task<AccessTokenResponse> Impersonate(Guid id, CancellationToken ct) =>
+        platform.ImpersonateAsync(id, ct);
 
     /// <summary>Выйти из режима «войти как владелец»: обычный access-токен создателя платформы.</summary>
     [HttpPost("impersonate/stop")]

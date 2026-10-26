@@ -281,6 +281,8 @@
     has(...roles) { return !!(auth && auth.user && (api.isLeader() || auth.user.roles.some((r) => roles.includes(r)))); },
     // Everyone signs in with a code from e-mail; the platform owner then confirms with a password or an authenticator code.
     emailSend(email) { return request('POST', '/auth/email/send', { auth: false, body: { email } }); },
+    // A buyer registers on the developer's site (ORG_SLUG); the code then comes by e-mail as usual.
+    register(b) { return request('POST', '/auth/register', { auth: false, body: { email: b.email, fullName: b.fullName, phone: b.phone, organization: cfgSlug() || null } }); },
     async emailVerify(email, code) { return signedIn(await request('POST', '/auth/email/verify', { auth: false, body: { email, code } })); },
     async secondFactor(token, password, totpCode) { return signedIn(await request('POST', '/auth/second-factor', { auth: false, body: { challengeToken: token, password: password || null, totpCode: totpCode || null } })); },
     async acceptInvitation(token) { return signedIn(await request('POST', '/auth/invitations/accept', { auth: false, body: { token } })); },

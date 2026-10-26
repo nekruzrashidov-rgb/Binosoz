@@ -12,6 +12,8 @@ public interface IAuthService
     // Вход по коду из почты — для всех ролей. Ответ на отправку одинаковый, есть учётная запись или нет.
     Task<EmailSendResponse> SendEmailCodeAsync(EmailSendRequest request, string? requestIp, CancellationToken ct = default);
     Task<EmailLoginResult> VerifyEmailCodeAsync(EmailVerifyRequest request, CancellationToken ct = default);
+    Task<EmailSendResponse> RegisterCustomerAsync(RegisterCustomerRequest request, string? requestIp, CancellationToken ct = default);
+    Task<SecondFactorChallenge> VerifyPlatformCodeAsync(EmailVerifyRequest request, CancellationToken ct = default);
     Task<AuthResponse> CompleteSecondFactorAsync(SecondFactorRequest request, CancellationToken ct = default);
 
     Task<AuthResponse> AcceptInvitationAsync(AcceptInvitationRequest request, CancellationToken ct = default);

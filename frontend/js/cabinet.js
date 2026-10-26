@@ -34,13 +34,29 @@
       let submit;
       if (step === 'email') {
         const email = S.input('email', { type: 'email', value: emailVal, placeholder: 'name@mail.tj', autocomplete: 'email', inputmode: 'email' });
-        form.append(h('h2', null, t('login.title')), h('p', { class: 'muted' }, t('login.sub')), S.field(t('login.email'), email), btn);
+        // The server answers the same for known and unknown addresses, so registration is offered as a link, not detected.
+        form.append(h('h2', null, t('login.title')), h('p', { class: 'muted' }, t('login.sub')), S.field(t('login.email'), email), btn,
+          h('p', { class: 'muted', style: { textAlign: 'center' } }, t('reg.ask'), ' ', h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { emailVal = email.value.trim(); step = 'register'; draw(); } }, t('reg.link'))));
         submit = async () => {
           emailVal = email.value.trim();
           if (!/^\S+@\S+\.\S+$/.test(emailVal)) { S.showErrors(form, { message: t('val.email'), errors: { email: [t('val.email')] } }); return; }
           await send(); step = 'code'; draw();
         };
         setTimeout(() => email.focus(), 30);
+      } else if (step === 'register') {
+        const email = S.input('email', { type: 'email', value: emailVal, placeholder: 'name@mail.tj', autocomplete: 'email', inputmode: 'email' });
+        const name = S.input('fullName', { autocomplete: 'name' });
+        const phone = S.input('phone', { type: 'tel', value: '+992', autocomplete: 'tel' });
+        btn.textContent = t('reg.submit');
+        form.append(h('h2', null, t('reg.title')), h('p', { class: 'muted' }, t('reg.sub')), S.field(t('login.email'), email), S.field(t('f.fullName'), name), S.field(t('f.phone'), phone, t('f.phoneHint')), btn,
+          h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { step = 'email'; draw(); } }, t('reg.haveAccount')));
+        submit = async () => {
+          emailVal = email.value.trim();
+          if (!/^\S+@\S+\.\S+$/.test(emailVal)) { S.showErrors(form, { message: t('val.email'), errors: { email: [t('val.email')] } }); return; }
+          await S.api.register({ email: emailVal, fullName: name.value.trim(), phone: phone.value.replace(/[\s()-]/g, '') });
+          startTick(); step = 'code'; draw();
+        };
+        setTimeout(() => (emailVal ? name : email).focus(), 30);
       } else if (step === 'code') {
         const code = S.input('code', { inputmode: 'numeric', maxlength: 6, placeholder: '••••••', autocomplete: 'one-time-code', style: { letterSpacing: '.4em', fontSize: '20px', textAlign: 'center', fontWeight: 800 } });
         const resend = h('button', { class: 'btn ghost sm', type: 'button', 'data-resend': '', disabled: timer > 0, onclick: async () => { try { await send(); S.toast(t('login.sent'), 'ok'); } catch (er) { S.err(er); } } }, timer > 0 ? t('login.resendIn', { s: timer }) : t('login.resend'));
@@ -65,15 +81,6 @@
       }
       form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await submit(); } catch (er) { S.showErrors(form, er); } }); });
       card.replaceChildren(form);
-      if (S.isDemo()) card.appendChild(demoBox());
-    }
-
-    // Demo: pick a role and the address is filled in; the code is always 123456.
-    function demoBox() {
-      if (step === 'second') return h('div', { class: 'demo-box' }, t('login.demoSecond', { p: S.mock.demoPlatformPassword }));
-      if (step === 'code') return h('div', { class: 'demo-box' }, t('login.demoCode'), ' ', h('button', { type: 'button', onclick: () => { S.$('input[name=code]', card).value = '123456'; } }, t('login.demoFill')));
-      return h('div', { class: 'demo-box' }, h('div', null, t('login.demoPick')),
-        h('div', { style: { marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '4px 12px' } }, S.mock.demoUsers.map((u) => h('button', { type: 'button', onclick: () => { S.$('input[name=email]', card).value = u.email; } }, t('role.' + u.role)))));
     }
     draw();
     return () => clearInterval(tick);

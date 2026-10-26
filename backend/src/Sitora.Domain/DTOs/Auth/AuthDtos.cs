@@ -27,7 +27,8 @@ public record CurrentUserResponse(
     IReadOnlyList<Guid>? BuildingIds = null,
     ImpersonationInfo? Impersonation = null);
 
-public record ImpersonationInfo(Guid ImpersonatedBy, Guid OrganizationId);
+// OrganizationId — организация, в которую вошли «как владелец»; при входе под конкретным пользователем — его организация (у покупателя null).
+public record ImpersonationInfo(Guid ImpersonatedBy, Guid? OrganizationId);
 
 // Вход по коду из почты.
 public record EmailSendRequest(string Email);
@@ -35,6 +36,9 @@ public record EmailSendRequest(string Email);
 public record EmailSendResponse(string Message, int ExpiresInSeconds);
 
 public record EmailVerifyRequest(string Email, string Code);
+
+// Регистрация покупателя на сайте застройщика: Organization — его короткое имя (slug); без него — единственный застройщик платформы.
+public record RegisterCustomerRequest(string Email, string FullName, string Phone, string? Organization = null);
 
 // Код из почты принят, но учётной записи нужен второй фактор (создатель платформы).
 public record SecondFactorChallenge(string ChallengeToken, DateTime ExpiresAt, IReadOnlyList<string> Methods, string Message);

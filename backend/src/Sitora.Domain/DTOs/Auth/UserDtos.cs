@@ -43,6 +43,9 @@ public record InvitationResponse(
 public record AcceptInvitationRequest(string Token);
 
 // Организации — только для создателя платформы.
+// Ещё один владелец организации (создатель платформы). Пароль необязателен: владелец входит по коду из почты.
+public record AddOwnerRequest(string Email, string FullName, string? Password);
+
 public record CreateOrganizationRequest(string Name, string Slug, string OwnerEmail, string OwnerFullName);
 
 public record OrganizationResponse(

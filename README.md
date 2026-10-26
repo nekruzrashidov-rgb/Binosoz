@@ -119,6 +119,7 @@ Caddy сам получает сертификат HTTPS. Бэкап — `./scri
 | `Auth__EmailCodesPerMinute`, `Auth__EmailCodesPerHour` | лимит кодов из почты на адрес и на IP (1 и 5) |
 | `Database__MigrateOnStartup` | применять миграции при старте API; по умолчанию `true`, в Production `false` |
 | `SEED_ADMIN_PASSWORD`, `SEED_MANAGER_PASSWORD`, `SEED_ACCOUNTANT_PASSWORD`, `SEED_CONTENT_PASSWORD` | пароли пользователей сидера (только Development) |
+| `SEED_RICHTOWER_OWNER_PASSWORD` | пароль владельца демо-застройщика Rich Tower (`owner@rich-tower.tj`, только Development); `Seed__RichTower=false` отключает этот сидер |
 
 В docker-compose эти значения берутся из `.env`; образец — [.env.example](.env.example).
 

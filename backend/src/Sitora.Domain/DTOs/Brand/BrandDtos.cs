@@ -12,7 +12,8 @@ public record BrandResponse(
     string? Phone,
     string? Telegram,
     string? Address,
-    string? CustomDomain);
+    string? CustomDomain,
+    string? Email = null);
 
 // Публичный ответ для сайта: бренд и только дома этого застройщика.
 public record PublicBrandResponse(
@@ -24,10 +25,11 @@ public record PublicBrandResponse(
     string? Phone,
     string? Telegram,
     string? Address,
-    IReadOnlyList<BuildingResponse> Buildings);
+    IReadOnlyList<BuildingResponse> Buildings,
+    string? Email = null);
 
 // Владелец меняет название, короткое имя (поддомен), цвет и контакты. Свой домен задаёт создатель платформы.
-public record UpdateBrandRequest(string Name, string Slug, string? PrimaryColor, string? Phone, string? Telegram, string? Address);
+public record UpdateBrandRequest(string Name, string Slug, string? PrimaryColor, string? Phone, string? Telegram, string? Address, string? Email = null);
 
 // Создатель платформы: короткое имя и свой домен организации (null — без своего домена).
 public record UpdateOrganizationDomainRequest(string Slug, string? CustomDomain);

@@ -32,6 +32,8 @@
 | --- | --- | --- | --- |
 | POST | `/auth/email/send` | `{ email }` | 200 `{ message, expiresInSeconds }` — всегда одинаковый, даже если почты нет |
 | POST | `/auth/email/verify` | `{ email, code }` | 200 `AuthResponse` или 202 `SecondFactorChallenge` (только PlatformOwner) |
+| POST | `/auth/register` | `{ email, fullName, phone, organization? }` | 200, как `/auth/email/send`: создаётся карточка клиента у застройщика `organization` (slug; без него — единственный застройщик платформы) и уходит код. Дальше — `/auth/email/verify`. Телефон из карточки с другой почтой — 409, неизвестный застройщик — 404 |
+| POST | `/auth/platform/login` | `{ email, code }` | только PlatformOwner: 202 `SecondFactorChallenge`, токен — после `/auth/second-factor`. Для других почт — 401, как на неверный код |
 | POST | `/auth/second-factor` | `{ challengeToken, password? , totpCode? }` | `AuthResponse` |
 | POST | `/auth/invitations/accept` | `{ token }` | `AuthResponse`; 401 — приглашение недействительно или использовано |
 | POST | `/auth/refresh` | `{ refreshToken }` | `AuthResponse` |
@@ -74,7 +76,8 @@ SecondFactorChallenge = { challengeToken, expiresAt, methods: ["password", "totp
 | --- | --- | --- |
 | GET | `/platform/organizations` | `[{ id, name, slug, isActive, buildingsCount, usersCount, createdAt }]` |
 | POST | `/platform/organizations` | `{ name, slug, ownerEmail, ownerFullName }` → 201. Владельцу уходит письмо, он входит по коду из почты. `slug`: латиница, цифры, дефис |
-| POST | `/platform/impersonate/{organizationId}` | `AccessTokenResponse = { accessToken, accessTokenExpiresAt, user }` без refresh-токена; `user.role = "Owner"`, `user.impersonation` заполнено |
+| POST | `/platform/organizations/{id}/owners` | `{ email, fullName, password? }` → 201 `UserResponse`: ещё один владелец организации. Без пароля он входит по коду из почты |
+| POST | `/platform/impersonate/{id}` | `id` — организация: вход «как владелец» (`user.role = "Owner"`). `id` — пользователь: вход под ним самим, с его ролью и домами. Ответ — `AccessTokenResponse = { accessToken, accessTokenExpiresAt, user }` без refresh-токена, `user.impersonation` заполнено. Под создателем платформы войти нельзя (422) |
 | POST | `/platform/impersonate/stop` | `AccessTokenResponse` — обычный токен создателя платформы |
 | GET | `/platform/totp` | `{ sharedKey, authenticatorUri }` для приложения-аутентификатора |
 | POST | `/platform/totp/enable` | `{ code }` → 204; после этого вторым фактором подходит и код из приложения |

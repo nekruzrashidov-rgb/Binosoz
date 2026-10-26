@@ -23,6 +23,8 @@ public class Organization : BaseEntity
     public string? Phone { get; set; }
     public string? Telegram { get; set; }
     public string? Address { get; set; }
+    // Почта для связи на сайте застройщика (не для входа).
+    public string? Email { get; set; }
 
     // Свой домен застройщика (например, richtower.tj). Задаёт только создатель платформы.
     public string? CustomDomain { get; set; }

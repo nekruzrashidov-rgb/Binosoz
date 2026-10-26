@@ -145,6 +145,78 @@ public class AuthService(
         return new EmailLoginResult(await IssueTokensAsync(user, ct), null);
     }
 
+    // Покупатель сам регистрируется на сайте застройщика: появляется карточка клиента с этой почтой,
+    // и на почту уходит код — как при обычном входе. Учётная запись создаётся при вводе кода.
+    public async Task<EmailSendResponse> RegisterCustomerAsync(RegisterCustomerRequest request, string? requestIp, CancellationToken ct = default)
+    {
+        var address = EmailAddress.Normalize(request.Email) ?? throw new BusinessRuleException("Неверный адрес почты");
+        var phone = PhoneNumber.Normalize(request.Phone) ?? throw new BusinessRuleException("Неверный номер телефона");
+        var fullName = request.FullName?.Trim();
+        if (string.IsNullOrEmpty(fullName) || fullName.Length > 200)
+            throw new BusinessRuleException("Укажите имя (до 200 символов)");
+
+        // Лимиты кодов проверяются до того, как появится карточка: иначе регистрацией можно было бы заваливать базу.
+        var limits = authOptions.Value;
+        await EnsureEmailCodeLimitAsync(c => c.Email == address, Now, limits, ct);
+        if (!string.IsNullOrEmpty(requestIp))
+            await EnsureEmailCodeLimitAsync(c => c.RequestIp == requestIp, Now, limits, ct);
+
+        var organizationId = await ResolveRegistrationOrganizationAsync(request.Organization, ct);
+        var existing = await db.Customers.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(c => c.OrganizationId == organizationId && (c.Email == address || c.Phone == phone), ct);
+        if (existing is null)
+        {
+            var customer = new Customer { OrganizationId = organizationId, FullName = fullName, Phone = phone, Email = address };
+            db.Customers.Add(customer);
+            audit.Record(nameof(Customer), customer.Id, "Registered", null,
+                new { customer.FullName, customer.Phone, customer.Email }, organizationId);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException e) when (e.IsUniqueViolation())
+            {
+                throw new ConflictException(PhoneTaken);
+            }
+        }
+        // Телефон из чужой карточки не привязывается к новой почте: иначе по одному номеру можно было бы
+        // получить доступ к чужим сделкам.
+        else if (existing.Email != address)
+            throw new ConflictException(PhoneTaken);
+
+        return await SendEmailCodeAsync(new EmailSendRequest(address), requestIp, ct);
+    }
+
+    private const string PhoneTaken =
+        "Этот телефон уже указан в договоре с другой почтой. Войдите по почте из договора или обратитесь к менеджеру";
+
+    private async Task<Guid> ResolveRegistrationOrganizationAsync(string? slug, CancellationToken ct)
+    {
+        var active = db.Organizations.IgnoreQueryFilters().Where(o => o.IsActive);
+        if (!string.IsNullOrWhiteSpace(slug))
+        {
+            var normalized = BrandRules.NormalizeSlug(slug);
+            return await active.Where(o => o.Slug == normalized).Select(o => (Guid?)o.Id).FirstOrDefaultAsync(ct)
+                   ?? throw new NotFoundException("Застройщик не найден");
+        }
+
+        var ids = await active.Select(o => o.Id).Take(2).ToListAsync(ct);
+        return ids is [var single] ? single : throw new BusinessRuleException("Укажите застройщика (organization)");
+    }
+
+    // Отдельный вход создателя платформы: только для этой роли, дальше — второй фактор, как и в обычном входе.
+    // Для чужой почты ответ такой же, как на неверный код, и код при этом не тратится.
+    public async Task<SecondFactorChallenge> VerifyPlatformCodeAsync(EmailVerifyRequest request, CancellationToken ct = default)
+    {
+        var address = EmailAddress.Normalize(request.Email) ?? throw new UnauthorizedException(InvalidEmailCode);
+        var user = await userManager.FindByEmailAsync(address);
+        if (user is null || !await userManager.IsInRoleAsync(user, RoleNames.PlatformOwner))
+            throw new UnauthorizedException(InvalidEmailCode);
+
+        var result = await VerifyEmailCodeAsync(request, ct);
+        return result.Challenge ?? throw new UnauthorizedException(InvalidEmailCode);
+    }
+
     // Покупатель входит по почте из своих сделок: учётная запись создаётся при первом входе
     // и привязывается ко всем записям клиента с этой почтой (у разных застройщиков).
     private async Task<AppUser> GetOrCreateCustomerUserByEmailAsync(string address, CancellationToken ct)
@@ -463,10 +535,15 @@ public class AuthService(
         var user = await userManager.FindByIdAsync(userId.ToString())
             ?? throw new NotFoundException("Пользователь не найден");
 
-        if (currentUser.ImpersonatorId is { } impersonator && currentUser.OrganizationId is { } organizationId)
+        // «Как владелец организации»: в токене сам создатель платформы с ролью Owner.
+        if (currentUser.ImpersonatorId is { } impersonator && impersonator == userId && currentUser.OrganizationId is { } organizationId)
             return await BuildUserResponseAsync(user, [RoleNames.Owner], new TokenScope(organizationId, [], impersonator), ct);
 
-        return await BuildUserResponseAsync(user, await userManager.GetRolesAsync(user), await ScopeOfAsync(user, ct), ct);
+        // Под конкретным пользователем: его роли и дома, с пометкой, кто вошёл.
+        var scope = await ScopeOfAsync(user, ct);
+        if (currentUser.ImpersonatorId is { } asUser)
+            scope = scope with { ImpersonatedBy = asUser };
+        return await BuildUserResponseAsync(user, await userManager.GetRolesAsync(user), scope, ct);
     }
 
     // ---------- Общее ----------
@@ -500,7 +577,7 @@ public class AuthService(
 
         return new CurrentUserResponse(user.Id, user.Email, user.PhoneNumber, user.FullName, roles.ToList(),
             PrimaryRole(roles), scope.OrganizationId, organizationName, scope.BuildingIds,
-            scope.ImpersonatedBy is { } impersonator && scope.OrganizationId is { } org ? new ImpersonationInfo(impersonator, org) : null);
+            scope.ImpersonatedBy is { } impersonator ? new ImpersonationInfo(impersonator, scope.OrganizationId) : null);
     }
 
     public static string? PrimaryRole(IEnumerable<string> roles) => RoleNames.All.FirstOrDefault(roles.Contains);

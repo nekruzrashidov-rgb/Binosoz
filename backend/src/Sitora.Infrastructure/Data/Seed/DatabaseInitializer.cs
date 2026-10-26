@@ -66,6 +66,10 @@ public static class DatabaseInitializer
                 provider.GetRequiredService<TimeProvider>(),
                 logger);
             await ConstructionSeeder.SeedAsync(db);
+            // Второй застройщик; тесты его выключают (Seed:RichTower=false), чтобы данные сидера были предсказуемы.
+            if (provider.GetRequiredService<IConfiguration>().GetValue("Seed:RichTower", true))
+                await RichTowerSeeder.SeedAsync(db, provider.GetRequiredService<UserManager<AppUser>>(),
+                    provider.GetRequiredService<IConfiguration>(), logger);
         }
     }
 

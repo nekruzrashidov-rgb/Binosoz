@@ -37,6 +37,31 @@ public class AuthController(IAuthService auth, IOptions<AuthOptions> options) : 
         return result.Challenge is { } challenge ? Accepted(challenge) : Ok(result.Auth);
     }
 
+    /// <summary>
+    /// Регистрация покупателя на сайте застройщика (organization — его короткое имя). Создаёт карточку клиента
+    /// и отправляет код на почту; дальше — обычный /auth/email/verify. Телефон из чужой карточки — 409.
+    /// </summary>
+    [HttpPost("register")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Sms)]
+    [ProducesResponseType<EmailSendResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
+    public async Task<ActionResult<EmailSendResponse>> Register(RegisterCustomerRequest request, CancellationToken ct) =>
+        Ok(await auth.RegisterCustomerAsync(request, HttpContext.Connection.RemoteIpAddress?.ToString(), ct));
+
+    /// <summary>
+    /// Вход создателя платформы: почта и код из письма (код запрашивается обычным /auth/email/send).
+    /// Только для этой роли; ответ — запрос второго фактора (202), токен выдаёт /auth/second-factor.
+    /// </summary>
+    [HttpPost("platform/login")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Login)]
+    [ProducesResponseType<SecondFactorChallenge>(StatusCodes.Status202Accepted)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> PlatformLogin(EmailVerifyRequest request, CancellationToken ct) =>
+        Accepted(await auth.VerifyPlatformCodeAsync(request, ct));
+
     /// <summary>Второй фактор создателя платформы: пароль или код из приложения-аутентификатора.</summary>
     [HttpPost("second-factor")]
     [AllowAnonymous]

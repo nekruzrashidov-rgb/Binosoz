@@ -19,6 +19,7 @@ public class OrganizationConfiguration : IEntityTypeConfiguration<Organization>
         builder.Property(o => o.Phone).HasMaxLength(32);
         builder.Property(o => o.Telegram).HasMaxLength(64);
         builder.Property(o => o.Address).HasMaxLength(300);
+        builder.Property(o => o.Email).HasMaxLength(256);
         builder.Property(o => o.CustomDomain).HasMaxLength(253);
         builder.HasIndex(o => o.CustomDomain).IsUnique().HasFilter("\"CustomDomain\" IS NOT NULL");
     }

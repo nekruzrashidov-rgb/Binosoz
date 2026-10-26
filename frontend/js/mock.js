@@ -198,6 +198,16 @@
     // The same answer whether the address is known or not.
     return { message: 'Если почта зарегистрирована, мы отправили на неё код для входа', expiresInSeconds: 600 };
   });
+  route('POST', /^\/auth\/register$/, (c) => {
+    const b = c.body; const email = String(b.email || '').trim().toLowerCase(); const phone = normPhone(b.phone);
+    if (!/^\S+@\S+\.\S+$/.test(email)) err(400, 'Validation', 'Неверный формат почты', { Email: ['Неверный формат почты'] });
+    if (!String(b.fullName || '').trim()) err(422, 'Business', 'Укажите имя (до 200 символов)');
+    if (!validPhone(phone)) err(422, 'Business', 'Неверный номер телефона');
+    const byPhone = db.customers.find((x) => x.phone === phone);
+    if (byPhone && (byPhone.email || '').toLowerCase() !== email) err(409, 'Conflict', 'Этот телефон уже указан в договоре с другой почтой. Войдите по почте из договора или обратитесь к менеджеру');
+    if (!byPhone && !db.customers.some((x) => (x.email || '').toLowerCase() === email)) db.customers.push({ id: db.customers.length + 1, fullName: b.fullName.trim(), phone, email, passport: '', createdAt: iso(Date.now()) });
+    return { message: 'Если почта зарегистрирована, мы отправили на неё код для входа', expiresInSeconds: 600 };
+  });
   route('POST', /^\/auth\/email\/verify$/, (c) => {
     const email = String(c.body.email || '').trim().toLowerCase();
     if (String(c.body.code || '').trim() !== '123456') err(401, 'Unauthorized', 'Неверный или устаревший код');

@@ -78,13 +78,70 @@ public class PlatformService(
             organization.CreatedAt);
     }
 
-    // Токен без refresh: создатель платформы действует как владелец выбранной организации.
-    // Автор каждого действия — он сам (sub), пометка imp видна в аудите и в ответах.
-    public async Task<AccessTokenResponse> ImpersonateAsync(Guid organizationId, CancellationToken ct = default)
+    // Ещё один владелец организации. Пароль необязателен: владелец входит по коду из почты.
+    public async Task<UserResponse> AddOwnerAsync(Guid organizationId, AddOwnerRequest request, CancellationToken ct = default)
     {
-        var user = await RequirePlatformOwnerAsync();
+        await RequirePlatformOwnerAsync();
         var organization = await db.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId, ct)
             ?? throw new NotFoundException("Организация не найдена");
+        var email = EmailAddress.Normalize(request.Email) ?? throw new BusinessRuleException("Неверный адрес почты владельца");
+        var fullName = request.FullName?.Trim();
+        if (string.IsNullOrEmpty(fullName))
+            throw new BusinessRuleException("Укажите имя владельца");
+        if (await userManager.FindByEmailAsync(email) is not null)
+            throw new ConflictException("Пользователь с такой почтой уже есть");
+
+        var owner = new AppUser { UserName = email, Email = email, EmailConfirmed = true, FullName = fullName, OrganizationId = organization.Id };
+        var result = string.IsNullOrEmpty(request.Password)
+            ? await userManager.CreateAsync(owner)
+            : await userManager.CreateAsync(owner, request.Password);
+        if (!result.Succeeded)
+            throw new BusinessRuleException(string.Join("; ", result.Errors.Select(e => e.Description)));
+        await userManager.AddToRoleAsync(owner, RoleNames.Owner);
+
+        audit.Record(nameof(AppUser), owner.Id, "OwnerAdded", null, new { owner.Email, owner.FullName, OrganizationId = organization.Id }, organization.Id);
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("В организацию {OrganizationId} добавлен владелец {UserId}", organization.Id, owner.Id);
+        return new UserResponse(owner.Id, owner.Email, owner.PhoneNumber, owner.FullName, [RoleNames.Owner], owner.IsActive, owner.CreatedAt,
+            organization.Id, []);
+    }
+
+    // id — организация или пользователь. Пометка imp видна в аудите и в каждом ответе (X-Impersonated-By).
+    public async Task<AccessTokenResponse> ImpersonateAsync(Guid id, CancellationToken ct = default)
+    {
+        var user = await RequirePlatformOwnerAsync();
+        var organization = await db.Organizations.FirstOrDefaultAsync(o => o.Id == id, ct);
+        return organization is not null
+            ? await ImpersonateOrganizationAsync(user, organization, ct)
+            : await ImpersonateUserAsync(user, id, ct);
+    }
+
+    // Под конкретным пользователем: его роли и дома, sub — он сам (иначе покупатель не увидел бы своих сделок),
+    // а imp — создатель платформы; аудит пишет обоих.
+    private async Task<AccessTokenResponse> ImpersonateUserAsync(AppUser platformOwner, Guid userId, CancellationToken ct)
+    {
+        var target = await userManager.FindByIdAsync(userId.ToString())
+            ?? throw new NotFoundException("Организация или пользователь не найдены");
+        var roles = await userManager.GetRolesAsync(target);
+        if (roles.Contains(RoleNames.PlatformOwner))
+            throw new BusinessRuleException("Нельзя войти под создателем платформы");
+        if (!target.IsActive)
+            throw new BusinessRuleException("Пользователь заблокирован");
+
+        var scope = await auth.ScopeOfAsync(target, ct) with { ImpersonatedBy = platformOwner.Id };
+        var (token, expiresAt) = tokens.CreateAccessToken(target, roles, scope);
+        audit.Record(nameof(AppUser), target.Id, "ImpersonationStarted", null,
+            new { ImpersonatedBy = platformOwner.Id, platformOwner.Email, Roles = roles }, target.OrganizationId);
+        await db.SaveChangesAsync(ct);
+
+        logger.LogWarning("Создатель платформы {UserId} вошёл под пользователем {TargetId}", platformOwner.Id, target.Id);
+        return new AccessTokenResponse(token, expiresAt, await auth.BuildUserResponseAsync(target, roles, scope, ct));
+    }
+
+    // Токен без refresh: создатель платформы действует как владелец выбранной организации.
+    // Автор каждого действия — он сам (sub), пометка imp видна в аудите и в ответах.
+    private async Task<AccessTokenResponse> ImpersonateOrganizationAsync(AppUser user, Organization organization, CancellationToken ct)
+    {
         if (!organization.IsActive)
             throw new BusinessRuleException("Организация отключена");
 
@@ -101,12 +158,16 @@ public class PlatformService(
 
     public async Task<AccessTokenResponse> StopImpersonationAsync(CancellationToken ct = default)
     {
-        if (currentUser.ImpersonatorId is not { } impersonator || currentUser.OrganizationId is not { } organizationId)
+        if (currentUser.ImpersonatorId is not { } impersonator || currentUser.UserId is not { } subject)
             throw new BusinessRuleException("Режим «войти как владелец» не включён");
 
         var user = await userManager.FindByIdAsync(impersonator.ToString())
             ?? throw new UnauthorizedException("Требуется вход");
-        audit.Record(nameof(Organization), organizationId, "ImpersonationStopped", null, new { ImpersonatedBy = user.Id });
+        // Вход «как владелец» — запись по организации; вход под пользователем — по нему.
+        if (subject == impersonator && currentUser.OrganizationId is { } organizationId)
+            audit.Record(nameof(Organization), organizationId, "ImpersonationStopped", null, new { ImpersonatedBy = user.Id });
+        else
+            audit.Record(nameof(AppUser), subject, "ImpersonationStopped", null, new { ImpersonatedBy = user.Id });
         await db.SaveChangesAsync(ct);
 
         var roles = await userManager.GetRolesAsync(user);

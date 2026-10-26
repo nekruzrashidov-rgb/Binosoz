@@ -47,7 +47,7 @@ public class BrandService(
             .ToListAsync(ct);
 
         return new PublicBrandResponse(organization.Id, organization.Name, organization.Slug, organization.LogoUrl,
-            organization.PrimaryColor, organization.Phone, organization.Telegram, organization.Address, buildings);
+            organization.PrimaryColor, organization.Phone, organization.Telegram, organization.Address, buildings, organization.Email);
     }
 
     // Свой домен проверяется первым; иначе нужен ровно один уровень под доменом платформы: slug.sitora.tj.
@@ -111,6 +111,9 @@ public class BrandService(
         organization.Phone = Clean(request.Phone, 32, "Телефон");
         organization.Telegram = Clean(request.Telegram, 64, "Telegram");
         organization.Address = Clean(request.Address, 300, "Адрес");
+        organization.Email = string.IsNullOrWhiteSpace(request.Email)
+            ? null
+            : EmailAddress.Normalize(request.Email) ?? throw new BusinessRuleException("Неверный адрес почты для связи");
 
         audit.Record(nameof(Organization), organization.Id, "BrandUpdated", before, ToResponse(organization), organization.Id);
         await SaveAsync(ct);
@@ -244,5 +247,5 @@ public class BrandService(
     }
 
     private static BrandResponse ToResponse(Organization o) =>
-        new(o.Id, o.Name, o.Slug, o.LogoUrl, o.PrimaryColor, o.Phone, o.Telegram, o.Address, o.CustomDomain);
+        new(o.Id, o.Name, o.Slug, o.LogoUrl, o.PrimaryColor, o.Phone, o.Telegram, o.Address, o.CustomDomain, o.Email);
 }
