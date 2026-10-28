@@ -19,8 +19,8 @@ services:
 
   webapi:
     build:
-      context: ./backend
-      dockerfile: src/Sitora.WebApi/Dockerfile
+      context: .
+      dockerfile: backend/src/Sitora.WebApi/Dockerfile
     restart: unless-stopped
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}

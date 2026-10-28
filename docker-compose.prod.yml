@@ -24,8 +24,8 @@ services:
   # API в Production миграции сам не применяет и без неё не стартует.
   migrate:
     build:
-      context: ./backend
-      dockerfile: src/Sitora.WebApi/Dockerfile
+      context: .
+      dockerfile: backend/src/Sitora.WebApi/Dockerfile
     image: sitora-webapi:latest
     command: ["--migrate"]
     restart: "no"
@@ -58,7 +58,7 @@ services:
       # Коды входа и приглашения уходят письмами: Smtp или Resend.
       Email__Provider: ${EMAIL_PROVIDER:?Задайте EMAIL_PROVIDER (Smtp или Resend) в файле .env}
       Email__From: ${EMAIL_FROM:?Задайте EMAIL_FROM в файле .env}
-      Email__InviteUrl: ${EMAIL_INVITE_URL:?Задайте EMAIL_INVITE_URL, например https://crm.sitora.tj/#invite=}
+      Email__InviteUrl: ${EMAIL_INVITE_URL:?Задайте EMAIL_INVITE_URL, например https://crm.sitora.tj/login#invite=}
       Email__Smtp__Host: ${SMTP_HOST:-}
       Email__Smtp__Port: ${SMTP_PORT:-587}
       Email__Smtp__Username: ${SMTP_USERNAME:-}

@@ -57,7 +57,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Сборка образа (без публикации)
-        run: docker build --file backend/src/Sitora.WebApi/Dockerfile --tag sitora-webapi:ci backend
+        run: docker build --file backend/src/Sitora.WebApi/Dockerfile --tag sitora-webapi:ci .
 
       # Значения-заглушки нужны только для разбора файлов: compose требует обязательные переменные.
       - name: Проверка compose-файлов

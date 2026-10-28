@@ -26,7 +26,11 @@ using Sitora.WebApi.Validators;
 if (args.Contains(HealthProbe.Command))
     return await HealthProbe.RunAsync();
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    WebRootPath = FrontendSetup.FindWebRoot()
+});
 builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
 
 builder.Services.AddSerilog((services, logger) => logger
@@ -175,6 +179,11 @@ if (app.Environment.IsProduction())
     });
 }
 
+// Скрипты, стили и иконка сайта — до локализации, CORS и авторизации: им они не нужны.
+var hasFrontend = app.HasFrontend();
+if (hasFrontend)
+    app.UseStaticFiles();
+
 app.UseRequestLocalization(options => options
     .SetDefaultCulture("ru")
     .AddSupportedCultures("ru", "tg")
@@ -196,8 +205,10 @@ app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
 app.MapSitoraHealthChecks();
 
-// Вне Production корень сайта ведёт на Swagger, чтобы после dotnet run не видеть пустой 404.
-if (!app.Environment.IsProduction())
+// Корень — сайт; если папки сайта нет, вне Production корень ведёт на Swagger, чтобы после dotnet run не видеть пустой 404.
+if (hasFrontend)
+    app.MapSitoraFrontend();
+else if (!app.Environment.IsProduction())
     app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
 
 // В Production миграции применяются только отдельной командой --migrate (сервис migrate в docker-compose.prod.yml).

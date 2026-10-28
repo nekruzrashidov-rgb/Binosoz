@@ -1,0 +1,15 @@
+# Контекст сборки образа — корень репозитория: в образ идут backend/src и frontend/.
+**/bin/
+**/obj/
+.git/
+.github/
+.vs/
+.idea/
+.claude/
+backend/tests/
+_old/
+docs/
+deploy/
+scripts/
+**/.env
+*.md
