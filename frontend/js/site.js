@@ -7,14 +7,35 @@
   const STATUS_VAR = { free: 'var(--good)', booked: 'var(--warn)', sold: 'var(--muted)', onrequest: 'var(--info)' };
   const STATUS_BG = { free: 'var(--good-soft)', booked: 'var(--warn-soft)', sold: 'var(--surface-3)', onrequest: 'var(--info-soft)' };
   // Role cards of the landing: key, icon, where the button leads, button text.
-  const ROLES = [['buyer', 'home', '/cabinet', 'land.demo'], ['dev', 'building', '/crm', 'land.enter'], ['acc', 'chart', '/crm', 'land.enter']];
-  const SA_ICONS = ['plus', 'users', 'file', 'chart'];
+  const ROLES = [['buyer', 'house', '/cabinet', 'land.demo'], ['dev', 'crane', '/crm', 'land.enter'], ['acc', 'bars', '/crm', 'land.enter']];
+  // Landing icons (24×24, stroke): drawn for the role cards and the platform-owner list.
+  const LAND_ICONS = {
+    house: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>',
+    crane: '<path d="M4 21h9"/><path d="M7 21V3l12 4H7"/><path d="M15 7v5"/><path d="M13.5 12h3v2.5h-3z"/><path d="M7 7 4 3h3"/><path d="M7 11h3M7 15h3"/>',
+    bars: '<path d="M3 21h18"/><rect x="5" y="12" width="3" height="6" rx="1"/><rect x="10.5" y="8" width="3" height="10" rx="1"/><rect x="16" y="4" width="3" height="14" rx="1"/>',
+    check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  };
+  function landIcon(name) {
+    const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('fill', 'none'); s.setAttribute('stroke', 'currentColor'); s.setAttribute('stroke-width', '1.8');
+    s.setAttribute('stroke-linecap', 'round'); s.setAttribute('stroke-linejoin', 'round'); s.setAttribute('aria-hidden', 'true');
+    s.innerHTML = LAND_ICONS[name];
+    return s;
+  }
+  // Section headings: the first word in the accent colour; a short one («Для», «О») takes the next word with it.
+  function accentFirst(text) {
+    const words = String(text).split(' ');
+    const n = words[0].length <= 3 && words.length > 1 ? 2 : 1;
+    const head = words.slice(0, n).join(' '), rest = words.slice(n).join(' ');
+    return rest ? [h('span', { class: 'accent-word' }, head), ' ' + rest] : h('span', { class: 'accent-word' }, head);
+  }
 
   S.views.home = function (root) {
     const cfg = window.SITORA_CONFIG || {};
     const st = { building: null, floors: [], apts: [], rate: null, sel: null, floor: null, rooms: 'all', maxPrice: 0, sort: 'price', onlyFree: true, shown: 12, overlay: true, time: 'dusk' };
-    let house = null, alive = true, io = null;
-    const page = h('div', { class: 'page-in' });
+    let house = null, alive = true, io = null, countToken = 0;
+    const shown = [0, 0, 0]; // numbers currently in the hero's stats bar
+    const page = h('div', { class: 'page-in landing-page' });
     root.appendChild(page);
 
     // Platform hero above the 3D tower: what Binosoz is, before the showroom of one building.
@@ -22,7 +43,7 @@
     const landStats = h('div', { class: 'land-stats glass' });
     page.appendChild(h('section', { class: 'land-hero', id: 'landing' }, h('div', { class: 'wrap' },
       h('span', { class: 'land-eyebrow' }, S.icon('building'), t('land.eyebrow')),
-      h('h1', null, t('land.title')),
+      h('h1', null, accentFirst(t('land.title'))),
       h('p', null, t('land.sub')),
       h('div', { class: 'land-cta' },
         h('button', { class: 'btn gold lg', onclick: () => scrollTo('contact') }, t('land.cta1')),
@@ -117,28 +138,44 @@
       const b = st.building;
       const floors = (b && (b.floorsCount || Math.max(0, ...st.floors.map((f) => f.number)))) || cfg.DEFAULT_FLOORS || 16;
       const apts = st.apts.length || cfg.DEFAULT_APTS || 128;
-      const ls = (v, l) => h('div', { class: 'ls' }, h('b', null, v), h('span', null, l));
-      landStats.replaceChildren(ls(S.fmt.n(floors), t('land.floors')), ls(S.fmt.n(apts), t('land.apts')), ls('3', t('land.roles')));
+      const to = [floors, apts, 3], labels = [t('land.floors'), t('land.apts'), t('land.roles')];
+      const nums = to.map(() => h('b', null));
+      landStats.replaceChildren(...to.map((_, i) => h('div', { class: 'ls' }, nums[i], h('span', null, labels[i]))));
+      countUp(nums, to);
+    }
+    // The numbers count up from what is shown (0 at first) over ~1 s. A timer puts the final value in place
+    // in case animation frames are paused (a background tab), so the stats are never left half-counted.
+    function countUp(els, to) {
+      const my = ++countToken, from = shown.slice();
+      const show = (k) => { if (my !== countToken) return; els.forEach((el, i) => { shown[i] = Math.round(from[i] + (to[i] - from[i]) * k); el.textContent = S.fmt.n(shown[i]); }); };
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { show(1); return; }
+      const t0 = performance.now();
+      const step = (now) => { const p = Math.min(1, (now - t0) / 1000); show(1 - Math.pow(1 - p, 3)); if (p < 1 && my === countToken) requestAnimationFrame(step); };
+      show(0); requestAnimationFrame(step);
+      setTimeout(() => show(1), 1100);
     }
     function renderRoles() {
       rolesSection.replaceChildren(h('div', { class: 'wrap' },
-        h('div', { class: 'sec-head reveal' }, h('div', null, h('h2', null, t('roles.title')), h('p', null, t('roles.sub')))),
-        h('div', { class: 'grid g3' }, ROLES.map(([k, ic, href, cta], i) => h('article', { class: 'role-card reveal', 'data-role': k, style: { transitionDelay: i * 90 + 'ms' } },
-          h('div', { class: 'role-ic' }, S.icon(ic)),
-          h('h3', null, t('roles.' + k)),
+        h('div', { class: 'sec-head reveal' }, h('div', null, h('h2', null, accentFirst(t('roles.title'))), h('p', null, t('roles.sub')))),
+        h('div', { class: 'grid g3 roles-grid' }, ROLES.map(([k, ic, href, cta], i) => h('article', { class: 'role-card reveal', 'data-role': k, style: { transitionDelay: i * 90 + 'ms' } },
+          h('div', { class: 'role-ic' }, landIcon(ic)),
+          h('div', null, h('h3', null, t('roles.' + k)), h('p', { class: 'role-desc' }, t('roles.' + k + '.d'))),
           h('ul', { class: 'role-list' }, [1, 2, 3, 4].map((n) => h('li', null, t('roles.' + k + '.' + n)))),
           h('a', { class: 'btn ghost', href }, t(cta)))))));
     }
     function renderSuper() {
       superSection.replaceChildren(h('div', { class: 'wrap' }, h('div', { class: 'sa-card reveal' },
+        h('span', { class: 'sa-invite' }, t('sa.invite')),
         h('div', { class: 'sa-text' }, h('span', { class: 'sa-badge' }, S.icon('shield'), 'Super Admin'), h('h2', null, t('sa.title')), h('p', null, t('sa.sub')), h('a', { class: 'btn gold lg', href: '/platform' }, t('sa.cta'))),
-        h('ul', { class: 'sa-list' }, SA_ICONS.map((ic, i) => h('li', null, h('span', { class: 'sa-ic' }, S.icon(ic)), t('sa.' + (i + 1))))))));
+        h('ul', { class: 'sa-list' }, [1, 2, 3, 4].map((n) => h('li', null, h('span', { class: 'sa-ic' }, landIcon('check')), t('sa.' + n)))))));
     }
     // Sections fade in as they scroll into view; without IntersectionObserver they are simply shown.
+    // The stagger delay is dropped once a card is in, so its hover reacts at once.
     function reveal() {
       const els = S.$$('.reveal:not(.in)', page);
-      if (!('IntersectionObserver' in window)) { els.forEach((el) => el.classList.add('in')); return; }
-      io = io || new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.12 });
+      const show = (el) => { el.classList.add('in'); setTimeout(() => { el.style.transitionDelay = ''; }, 900); };
+      if (!('IntersectionObserver' in window)) { els.forEach(show); return; }
+      io = io || new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { show(e.target); io.unobserve(e.target); } }), { threshold: 0.12 });
       els.forEach((el) => io.observe(el));
     }
 
@@ -277,7 +314,7 @@
         more.replaceChildren(l.length > st.shown ? h('button', { class: 'btn ghost', onclick: () => { st.shown += 12; drawList(); } }, t('list.more', { n: l.length - st.shown })) : '');
       }
       aptSection.replaceChildren(h('div', { class: 'wrap' },
-        h('div', { class: 'sec-head' }, h('div', null, h('h2', null, t('apts.title')), h('p', null, t('apts.sub'))), count),
+        h('div', { class: 'sec-head' }, h('div', null, h('h2', null, accentFirst(t('apts.title'))), h('p', null, t('apts.sub'))), count),
         h('div', { class: 'filters' },
           h('div', { class: 'field' }, h('label', null, t('filter.rooms')), h('div', { class: 'pill-group' }, rooms.map(([v, l]) => h('button', { class: 'pill' + (st.rooms === v ? ' on' : ''), onclick: (e) => { st.rooms = v; st.shown = 12; S.$$('.pill', e.target.parentNode).forEach((p) => p.classList.remove('on')); e.target.classList.add('on'); drawList(); } }, l)))),
           h('div', { class: 'field' }, h('label', { for: 'f-price' }, t('filter.priceTo')), price, priceVal),
@@ -310,7 +347,7 @@
         out.replaceChildren(h('small', null, t('calc.monthly')), h('div', { class: 'big' }, S.fmt.money(r.monthly, 'TJS')), h('small', null, t('calc.noInterest')), h('div', { style: { marginTop: '14px', position: 'relative', zIndex: 1 } }, h('button', { class: 'btn gold', onclick: () => leadModal(t('lead.calc', { p: S.fmt.n(p), d: down.value, m: months.value, mo: S.fmt.n(r.monthly) }), a && a.id) }, t('calc.send'))));
       };
       [price, down, months].forEach((el) => el.addEventListener('input', upd));
-      calcSection.replaceChildren(h('div', { class: 'wrap' }, h('div', { class: 'sec-head' }, h('div', null, h('h2', null, t('calc.title')), h('p', null, a ? t('calc.forApt', { n: a.number }) : t('calc.sub')))),
+      calcSection.replaceChildren(h('div', { class: 'wrap' }, h('div', { class: 'sec-head' }, h('div', null, h('h2', null, accentFirst(t('calc.title'))), h('p', null, a ? t('calc.forApt', { n: a.number }) : t('calc.sub')))),
         h('div', { class: 'calc' }, h('div', { class: 'card stack' }, S.field(t('calc.price') + ' (TJS)', price), h('div', { class: 'field' }, h('label', { for: 'c-down' }, t('calc.down')), down, dv), h('div', { class: 'field' }, h('label', { for: 'c-months' }, t('calc.months')), months, mv)), out)));
       upd();
     }
@@ -318,7 +355,7 @@
     // ---------- about / contact ----------
     function renderAbout() {
       const items = [['building', 'about.1'], ['shield', 'about.2'], ['grid', 'about.3'], ['users', 'about.4']];
-      aboutSection.replaceChildren(h('div', { class: 'wrap' }, h('div', { class: 'sec-head' }, h('div', null, h('h2', null, t('about.title')), h('p', null, t('about.sub')))),
+      aboutSection.replaceChildren(h('div', { class: 'wrap' }, h('div', { class: 'sec-head' }, h('div', null, h('h2', null, accentFirst(t('about.title'))), h('p', null, t('about.sub')))),
         h('div', { class: 'grid g4' }, items.map(([ic, k]) => h('div', { class: 'card hover stack' }, h('div', { class: 'avatar', style: { width: '40px', height: '40px', borderRadius: '12px' } }, S.icon(ic, '')), h('h3', null, t(k + '.t')), h('p', { class: 'muted' }, t(k + '.d')))))));
       S.$$('.avatar svg', aboutSection).forEach((s) => { s.style.cssText = 'width:20px;height:20px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round'; });
     }
@@ -329,7 +366,7 @@
       const form = h('form', { class: 'stack card', novalidate: true }, S.field(t('f.name'), name), S.field(t('f.phone'), phone, t('f.phoneHint')), S.field(t('f.comment'), cm));
       const btn = h('button', { class: 'btn lg', type: 'submit' }, t('lead.send')); form.appendChild(btn);
       form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await S.api.createLead({ name: name.value.trim(), phone: phone.value.replace(/[\s()-]/g, ''), comment: cm.value.trim() }); form.reset(); phone.value = '+992'; S.toast(t('lead.ok'), 'ok'); } catch (er) { S.showErrors(form, er); } }); });
-      contactSection.replaceChildren(h('div', { class: 'wrap' }, h('div', { class: 'sec-head' }, h('div', null, h('h2', null, t('contact.title')), h('p', null, t('contact.sub')))),
+      contactSection.replaceChildren(h('div', { class: 'wrap' }, h('div', { class: 'sec-head' }, h('div', null, h('h2', null, accentFirst(t('contact.title'))), h('p', null, t('contact.sub')))),
         h('div', { class: 'calc' }, form, h('div', { class: 'card stack' }, h('h3', null, t('contact.office')),
           h('div', { class: 'row' }, S.icon('pin'), h('span', null, c.address || (st.building && st.building.address) || '')),
           h('div', { class: 'row' }, S.icon('phone'), h('b', null, c.phone || ''), c.phone ? h('button', { class: 'btn ghost sm', onclick: () => S.copy(c.phone) }, t('common.copy')) : null),
