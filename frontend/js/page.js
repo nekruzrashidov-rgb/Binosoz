@@ -1,13 +1,15 @@
-/* Page boot for the multi-page site (index, login, cabinet, crm, platform .html); spa.html still uses app.js.
+/* Page boot for the multi-page site (index, apartments, contact, login, cabinet, crm, platform .html); spa.html still uses app.js.
    The page names itself in <body data-page="...">. Views keep calling S.go('crm') as in the SPA:
    here that is an ordinary link to /crm. */
 (function () {
   const S = (window.S = window.S || {});
   const h = (...a) => S.h(...a);
   const t = (...a) => S.t(...a);
-  const PAGES = { home: '/', login: '/login', cabinet: '/cabinet', crm: '/crm', platform: '/platform', invite: '/login' };
+  const PAGES = { home: '/', apartments: '/apartments', contact: '/contact', login: '/login', cabinet: '/cabinet', crm: '/crm', platform: '/platform', invite: '/login' };
   const page = document.body.dataset.page;
   const guarded = page === 'cabinet' || page === 'crm' || page === 'platform';
+  // The buyer-facing pages are always dark: the design of the showroom is built for it.
+  const isPublic = page === 'home' || page === 'apartments' || page === 'contact';
   const app = document.getElementById('app');
   const header = h('header', { class: 'top' });
   const main = h('div', { id: 'view' });
@@ -33,23 +35,24 @@
     const md = S.modal({ title: t('settings.title'), body: h('div', { class: 'stack' }, h('p', { class: 'muted' }, t('settings.nowLive', { u: S.apiBase() })), S.field(t('settings.api'), inp, t('settings.apiHint')), test, res, h('p', { class: 'hint' }, t('settings.cors2'))), actions: [ok] });
   };
 
-  function applyTheme() { const v = S.store.get('sitora.theme'); if (v === 'dark' || v === 'light') document.documentElement.dataset.theme = v; else delete document.documentElement.dataset.theme; }
+  function applyTheme() {
+    if (isPublic) { document.documentElement.dataset.theme = 'dark'; return; }
+    const v = S.store.get('sitora.theme'); if (v === 'dark' || v === 'light') document.documentElement.dataset.theme = v; else delete document.documentElement.dataset.theme;
+  }
   function isDark() { const v = document.documentElement.dataset.theme; return v ? v === 'dark' : window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches; }
 
   function drawHeader() {
     if (page === 'login') return;
+    if (isPublic) { drawPublicHeader(); return; }
     const u = S.api.user;
     const link = (href, label, on) => h('a', { class: on ? 'on' : '', href }, label);
-    const section = (id, label) => h('button', { type: 'button', onclick: () => { menu.classList.remove('open'); S.scrollTo(id); } }, label);
-    const menu = page === 'home'
-      ? h('nav', { class: 'nav', 'aria-label': t('nav.main') }, section('landing', t('nav.home')), section('apartments', t('nav.apartments')), section('calc', t('nav.calc')), section('about', t('nav.about')), section('contact', t('nav.contact')))
-      : h('nav', { class: 'nav', 'aria-label': t('nav.main') }, link('/', t('nav.home')),
+    const menu = h('nav', { class: 'nav', 'aria-label': t('nav.main') }, link('/', t('nav.home')),
         S.api.isCustomer() ? link('/cabinet', t('nav.cabinet'), page === 'cabinet') : null,
         S.api.isStaff() ? link('/crm', t('nav.crm'), page === 'crm') : null,
         S.api.isPlatform() ? link('/platform', t('nav.platform'), page === 'platform') : null);
     const lang = h('div', { class: 'seg', role: 'group', 'aria-label': 'Language' }, [['ru', 'RU'], ['tg', 'TJ']].map(([k, l]) => h('button', { class: S.lang === k ? 'on' : '', onclick: () => { if (S.lang !== k) S.setLang(k); } }, l)));
     const theme = h('button', { class: 'icon-btn', title: t('nav.theme'), 'aria-label': t('nav.theme'), onclick: () => { S.store.set('sitora.theme', isDark() ? 'light' : 'dark'); applyTheme(); drawHeader(); S.bus.emit('theme'); } }, S.icon(isDark() ? 'sun' : 'moon'));
-    const who = page === 'home' || !u
+    const who = !u
       ? h('a', { class: 'btn sm', href: '/login' }, t('nav.login'))
       : h('div', { class: 'row', style: { gap: '8px', flexWrap: 'nowrap' } },
         h('span', { class: 'userchip', title: [u.email || u.phone, t('role.' + u.role, null, u.role), u.organizationName].filter(Boolean).join(' · ') }, h('span', { class: 'avatar' }, S.fmt.initials(u.name)), h('span', { class: 'nm' }, u.name, u.organizationName ? h('small', { class: 'org' }, u.organizationName) : null)),
@@ -59,9 +62,21 @@
       h('button', { class: 'icon-btn menu-btn', 'aria-label': t('nav.menu'), onclick: () => menu.classList.toggle('open') }, S.icon('menu'))));
   }
 
+  // Buyer-facing pages: the complex, its apartments and contacts; on a phone the menu opens over the whole screen.
+  function drawPublicHeader() {
+    const link = (href, label, key) => h('a', { class: page === key ? 'on' : '', href, 'aria-current': page === key ? 'page' : null }, label);
+    const menu = h('nav', { class: 'nav lux-nav', 'aria-label': t('nav.main') },
+      link('/', t('nav.home'), 'home'), link('/apartments', t('nav.apartments'), 'apartments'), link('/contact', t('nav.contact'), 'contact'));
+    const lang = h('div', { class: 'seg', role: 'group', 'aria-label': 'Language' }, [['ru', 'RU'], ['tg', 'TJ']].map(([k, l]) => h('button', { class: S.lang === k ? 'on' : '', onclick: () => { if (S.lang !== k) S.setLang(k); } }, l)));
+    const toggle = h('button', { class: 'icon-btn menu-btn', 'aria-label': t('nav.menu'), 'aria-expanded': 'false', onclick: () => { const open = menu.classList.toggle('open'); toggle.setAttribute('aria-expanded', String(open)); document.body.classList.toggle('menu-open', open); } }, S.icon('menu'));
+    header.className = 'top lux-top';
+    header.replaceChildren(h('div', { class: 'wrap top-in' }, h('a', { class: 'brand', href: '/', 'aria-label': 'Sitora' }, S.logo(), h('span', null, 'SITORA')), menu, h('span', { class: 'spacer' }),
+      lang, h('a', { class: 'btn sm gold', href: '/login' }, t('nav.login')), toggle));
+  }
+
   // Working "as owner" of an organization: a strip that cannot be missed, with a way back.
   function impBanner() {
-    if (page === 'home' || !S.api.impersonating) return null;
+    if (isPublic || !S.api.impersonating) return null;
     const u = S.api.user;
     return h('div', { class: 'imp-banner', role: 'status' }, h('div', { class: 'wrap row between' }, h('span', null, t('imp.banner', { o: (u && u.organizationName) || '' })),
       h('button', { class: 'btn sm', onclick: (e) => S.busy(e.currentTarget, async () => { await S.api.stopImpersonation(); S.toast(t('imp.stopped'), 'ok'); location.href = '/platform'; }) }, t('imp.stop'))));
@@ -94,6 +109,8 @@
     if (guarded && !S.api.isAuthed) { location.replace('/login'); return; }
     if (page === 'login' && S.api.isAuthed && !/invite=/.test(location.hash)) { location.replace(PAGES[S.homeFor(S.api.user)]); return; }
     render();
+    // /#why from the footer of another page: the section exists only after render.
+    if (location.hash.length > 1) { const el = document.getElementById(location.hash.slice(1)); if (el) setTimeout(() => el.scrollIntoView(), 50); }
     S.bus.on('lang', render);
     S.bus.on('auth', () => { if (guarded && !S.api.isAuthed) location.replace('/login'); else drawHeader(); });
   }

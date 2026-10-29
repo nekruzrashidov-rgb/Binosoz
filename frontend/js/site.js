@@ -1,4 +1,5 @@
-/* Public site: 3D tower, apartment picker, booking, calculator, contact. */
+/* Public site, three pages: the landing (home), the catalog with the 3D tower, booking and calculator (apartments),
+   and the contact page (contact). */
 (function () {
   const S = (window.S = window.S || {});
   const { h, t } = { h: (...a) => S.h(...a), t: (...a) => S.t(...a) };
@@ -6,14 +7,22 @@
 
   const STATUS_VAR = { free: 'var(--good)', booked: 'var(--warn)', sold: 'var(--muted)', onrequest: 'var(--info)' };
   const STATUS_BG = { free: 'var(--good-soft)', booked: 'var(--warn-soft)', sold: 'var(--surface-3)', onrequest: 'var(--info-soft)' };
-  // Role cards of the landing: key, icon, where the button leads, button text.
-  const ROLES = [['buyer', 'house', '/cabinet', 'land.demo'], ['dev', 'crane', '/crm', 'land.enter'], ['acc', 'bars', '/crm', 'land.enter']];
-  // Landing icons (24×24, stroke): drawn for the role cards and the platform-owner list.
+  // Landing features: icon and the i18n key of the card.
+  const FEATURES = [['mountain', 'why.view'], ['screen', 'why.cabinet'], ['card', 'why.plan'], ['crane', 'why.dev'], ['pin', 'why.center'], ['key', 'why.keys']];
+  // Public-site icons (24×24, stroke).
   const LAND_ICONS = {
-    house: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>',
     crane: '<path d="M4 21h9"/><path d="M7 21V3l12 4H7"/><path d="M15 7v5"/><path d="M13.5 12h3v2.5h-3z"/><path d="M7 7 4 3h3"/><path d="M7 11h3M7 15h3"/>',
-    bars: '<path d="M3 21h18"/><rect x="5" y="12" width="3" height="6" rx="1"/><rect x="10.5" y="8" width="3" height="10" rx="1"/><rect x="16" y="4" width="3" height="14" rx="1"/>',
     check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+    mountain: '<path d="m2 20 7-11 4 6 3-4 6 9z"/><path d="m7.5 11.5 1.5 1 1.5-1"/>',
+    screen: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/><path d="m8 11 2.5-2.5L13 11l3-3"/>',
+    card: '<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19M6.5 15h4"/>',
+    pin: '<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+    key: '<circle cx="8" cy="15" r="4.5"/><path d="m11.2 11.8 8.3-8.3M16.5 6.5l2.5 2.5M14 9l2 2"/>',
+    phone: '<path d="M5 3.5h3l1.5 4.5-2 1.5a11 11 0 0 0 5 5l1.5-2 4.5 1.5v3A2 2 0 0 1 17 21 15 15 0 0 1 3 5.5a2 2 0 0 1 2-2z"/>',
+    send: '<path d="m21.5 3-19 7.5 7 2.5 2.5 7z"/><path d="m9.5 13 5-5"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    chat: '<path d="M4 20l1.4-3.6A8 8 0 1 1 8.5 19z"/><path d="M9 10.5h6M9 13.5h4"/>',
+    down: '<path d="m6 9 6 6 6-6"/>',
   };
   function landIcon(name) {
     const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -29,26 +38,76 @@
     const head = words.slice(0, n).join(' '), rest = words.slice(n).join(' ');
     return rest ? [h('span', { class: 'accent-word' }, head), ' ' + rest] : h('span', { class: 'accent-word' }, head);
   }
+  // "16 этажей", "21 этаж", "71 квартира": the i18n value holds the forms as "one|few|many" (Tajik has one form).
+  function plural(n, key) {
+    const f = t(key).split('|');
+    if (f.length < 3) return f[0];
+    const m10 = n % 10, m100 = n % 100;
+    return m10 === 1 && m100 !== 11 ? f[0] : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? f[1] : f[2];
+  }
+  const counted = (n, key) => S.fmt.n(n) + ' ' + plural(n, key);
+  const contacts = () => (window.SITORA_CONFIG || {}).CONTACT || {};
+  const telegramUrl = (tg) => 'https://t.me/' + String(tg || '').replace('@', '');
+  const phoneDigits = (p) => String(p || '').replace(/\D/g, '');
 
-  S.views.home = function (root) {
+  // The organization's first building: leads without an apartment need it to know whose they are.
+  async function siteBuilding() {
+    if (S.siteBuildingId) return S.siteBuildingId;
+    const cfg = window.SITORA_CONFIG || {};
+    const bs = await S.api.buildings();
+    const b = bs.find((x) => String(x.id) === String(cfg.DEFAULT_BUILDING_ID)) || bs[0];
+    if (b) S.siteBuildingId = b.id;
+    return S.siteBuildingId;
+  }
+
+  // Numbers count up over ~1 s. A timer puts the final value in place in case animation frames are paused
+  // (a background tab), so a counter is never left half-counted. fmt turns the number into text.
+  function countUp(el, to, fmt) {
+    const token = (el._count = (el._count || 0) + 1), from = el._shown || 0;
+    const show = (k) => { if (el._count !== token) return; el._shown = Math.round(from + (to - from) * k); el.textContent = fmt(el._shown); };
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { show(1); return; }
+    const t0 = performance.now();
+    const step = (now) => { const p = Math.min(1, (now - t0) / 1000); show(1 - Math.pow(1 - p, 3)); if (p < 1 && el._count === token) requestAnimationFrame(step); };
+    show(0); requestAnimationFrame(step);
+    setTimeout(() => show(1), 1100);
+  }
+
+  // Blocks with .reveal fade in as they scroll into view; without IntersectionObserver they are simply shown.
+  // onShow runs for each block once it is in (counters start there). Returns the cleanup.
+  function revealIn(root, onShow) {
+    const els = S.$$('.reveal', root);
+    const show = (el) => { el.classList.add('in'); if (onShow) onShow(el); setTimeout(() => { el.style.transitionDelay = ''; }, 900); };
+    if (!('IntersectionObserver' in window)) { els.forEach(show); return () => {}; }
+    const io = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { show(e.target); io.unobserve(e.target); } }), { threshold: 0.12 });
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }
+
+  function siteFooter() {
+    const c = contacts();
+    const col = (title, ...items) => h('div', { class: 'foot-col' }, h('h4', null, title), ...items);
+    return h('footer', { class: 'footer lux-footer' }, h('div', { class: 'wrap' },
+      h('div', { class: 'foot-grid' },
+        h('div', { class: 'foot-brand' }, h('a', { class: 'row', href: '/', style: { gap: '10px' } }, S.logo(), h('b', null, 'Sitora Residence')), h('p', null, t('foot.tagline')),
+          h('a', { class: 'btn ghost sm', href: '/login' }, t('foot.login'))),
+        col(t('foot.apts'), h('a', { href: '/apartments' }, t('foot.catalog')), h('a', { href: '/apartments#calc' }, t('foot.calc')), h('a', { href: '/apartments' }, t('foot.3d'))),
+        col(t('foot.info'), h('a', { href: '/#why' }, t('foot.why')), h('a', { href: '/#steps' }, t('foot.steps')), h('a', { href: '/login' }, t('foot.cabinet'))),
+        col(t('foot.contacts'), h('span', null, c.address || ''), c.phone ? h('a', { href: 'tel:+' + phoneDigits(c.phone) }, c.phone) : null, c.telegram ? h('a', { href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, c.telegram) : null, h('a', { href: '/contact' }, t('foot.write')))),
+      h('div', { class: 'foot-bottom' }, h('span', null, '© ' + new Date().getFullYear() + ' Sitora Residence. ' + t('footer.rights')), h('a', { href: '/login' }, t('foot.login')))));
+  }
+
+  // Page head of the inner pages: a way back to the landing and the title.
+  const pageHead = (title, sub) => h('section', { class: 'lux-pagehead' }, h('div', { class: 'wrap' },
+    h('a', { class: 'back-link', href: '/' }, '← ' + t('nav.home')), h('h1', null, accentFirst(title)), sub ? h('p', null, sub) : null));
+
+  /* ---------- catalog: the 3D tower, the list with filters, the calculator ---------- */
+  S.views.apartments = function (root) {
     const cfg = window.SITORA_CONFIG || {};
     const st = { building: null, floors: [], apts: [], rate: null, sel: null, floor: null, rooms: 'all', maxPrice: 0, sort: 'price', onlyFree: true, shown: 12, overlay: true, time: 'dusk' };
-    let house = null, alive = true, io = null, countToken = 0;
-    const shown = [0, 0, 0]; // numbers currently in the hero's stats bar
-    const page = h('div', { class: 'page-in landing-page' });
+    let house = null, alive = true;
+    const page = h('div', { class: 'page-in landing-page lux' });
     root.appendChild(page);
-
-    // Platform hero above the 3D tower: what Binosoz is, before the showroom of one building.
-    // It is on screen at once, so it rises with a CSS animation instead of waiting for the scroll observer.
-    const landStats = h('div', { class: 'land-stats glass' });
-    page.appendChild(h('section', { class: 'land-hero', id: 'landing' }, h('div', { class: 'wrap' },
-      h('span', { class: 'land-eyebrow' }, S.icon('building'), t('land.eyebrow')),
-      h('h1', null, accentFirst(t('land.title'))),
-      h('p', null, t('land.sub')),
-      h('div', { class: 'land-cta' },
-        h('button', { class: 'btn gold lg', onclick: () => scrollTo('contact') }, t('land.cta1')),
-        h('button', { class: 'btn ghost lg', onclick: () => scrollTo('home') }, t('land.cta2'))),
-      landStats)));
+    page.appendChild(pageHead(t('cat.title'), t('cat.sub')));
 
     const houseBox = h('div', { class: 'house3d', id: 'house3d' });
     const tip = h('div', { class: 'tip', hidden: true });
@@ -77,14 +136,8 @@
     page.appendChild(hero);
 
     const aptSection = h('section', { class: 'section', id: 'apartments' });
-    const rolesSection = h('section', { class: 'section alt', id: 'roles' });
-    const superSection = h('section', { class: 'section', id: 'platform-owner' });
     const calcSection = h('section', { class: 'section alt', id: 'calc' });
-    const aboutSection = h('section', { class: 'section', id: 'about' });
-    const contactSection = h('section', { class: 'section alt', id: 'contact' });
-    page.append(aptSection, rolesSection, superSection, calcSection, aboutSection, contactSection, footer());
-    // These do not depend on the building's data, so they show even while it loads or when the API is down.
-    renderLandStats(); renderRoles(); renderSuper(); reveal();
+    page.append(aptSection, calcSection, siteFooter());
 
     // ---------- data ----------
     async function load() {
@@ -109,6 +162,8 @@
       loading.remove();
       renderAll();
       initHouse();
+      // /apartments#calc from the landing: the calculator exists only now, after the data.
+      if (location.hash === '#calc') setTimeout(() => scrollTo('calc'), 100);
     }
 
     function initHouse() {
@@ -130,54 +185,7 @@
     function pushToHouse() { if (!house) return; house.setData(st.apts.map((a) => ({ id: a.id, floor: a.floor, planSlot: a.planSlot, number: a.number, status: a.status, rooms: a.rooms, area: a.area, price: a.price }))); if (st.sel) house.selectApartment(st.sel.id); else if (st.floor !== null) house.selectFloor(st.floor); }
 
     // ---------- render ----------
-    function renderAll() { renderLandStats(); renderHero(); renderFloors(); renderSheet(); renderApartments(); renderCalc(); renderAbout(); renderContact(); }
-
-    // ---------- landing ----------
-    // The numbers from config.js until the building loads (and when the API is unavailable), then the real ones.
-    function renderLandStats() {
-      const b = st.building;
-      const floors = (b && (b.floorsCount || Math.max(0, ...st.floors.map((f) => f.number)))) || cfg.DEFAULT_FLOORS || 16;
-      const apts = st.apts.length || cfg.DEFAULT_APTS || 128;
-      const to = [floors, apts, 3], labels = [t('land.floors'), t('land.apts'), t('land.roles')];
-      const nums = to.map(() => h('b', null));
-      landStats.replaceChildren(...to.map((_, i) => h('div', { class: 'ls' }, nums[i], h('span', null, labels[i]))));
-      countUp(nums, to);
-    }
-    // The numbers count up from what is shown (0 at first) over ~1 s. A timer puts the final value in place
-    // in case animation frames are paused (a background tab), so the stats are never left half-counted.
-    function countUp(els, to) {
-      const my = ++countToken, from = shown.slice();
-      const show = (k) => { if (my !== countToken) return; els.forEach((el, i) => { shown[i] = Math.round(from[i] + (to[i] - from[i]) * k); el.textContent = S.fmt.n(shown[i]); }); };
-      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { show(1); return; }
-      const t0 = performance.now();
-      const step = (now) => { const p = Math.min(1, (now - t0) / 1000); show(1 - Math.pow(1 - p, 3)); if (p < 1 && my === countToken) requestAnimationFrame(step); };
-      show(0); requestAnimationFrame(step);
-      setTimeout(() => show(1), 1100);
-    }
-    function renderRoles() {
-      rolesSection.replaceChildren(h('div', { class: 'wrap' },
-        h('div', { class: 'sec-head reveal' }, h('div', null, h('h2', null, accentFirst(t('roles.title'))), h('p', null, t('roles.sub')))),
-        h('div', { class: 'grid g3 roles-grid' }, ROLES.map(([k, ic, href, cta], i) => h('article', { class: 'role-card reveal', 'data-role': k, style: { transitionDelay: i * 90 + 'ms' } },
-          h('div', { class: 'role-ic' }, landIcon(ic)),
-          h('div', null, h('h3', null, t('roles.' + k)), h('p', { class: 'role-desc' }, t('roles.' + k + '.d'))),
-          h('ul', { class: 'role-list' }, [1, 2, 3, 4].map((n) => h('li', null, t('roles.' + k + '.' + n)))),
-          h('a', { class: 'btn ghost', href }, t(cta)))))));
-    }
-    function renderSuper() {
-      superSection.replaceChildren(h('div', { class: 'wrap' }, h('div', { class: 'sa-card reveal' },
-        h('span', { class: 'sa-invite' }, t('sa.invite')),
-        h('div', { class: 'sa-text' }, h('span', { class: 'sa-badge' }, S.icon('shield'), 'Super Admin'), h('h2', null, t('sa.title')), h('p', null, t('sa.sub')), h('a', { class: 'btn gold lg', href: '/platform' }, t('sa.cta'))),
-        h('ul', { class: 'sa-list' }, [1, 2, 3, 4].map((n) => h('li', null, h('span', { class: 'sa-ic' }, landIcon('check')), t('sa.' + n)))))));
-    }
-    // Sections fade in as they scroll into view; without IntersectionObserver they are simply shown.
-    // The stagger delay is dropped once a card is in, so its hover reacts at once.
-    function reveal() {
-      const els = S.$$('.reveal:not(.in)', page);
-      const show = (el) => { el.classList.add('in'); setTimeout(() => { el.style.transitionDelay = ''; }, 900); };
-      if (!('IntersectionObserver' in window)) { els.forEach(show); return; }
-      io = io || new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { show(e.target); io.unobserve(e.target); } }), { threshold: 0.12 });
-      els.forEach((el) => io.observe(el));
-    }
+    function renderAll() { renderHero(); renderFloors(); renderSheet(); renderApartments(); renderCalc(); }
 
     function minPrice() { const f = st.apts.filter((a) => a.status === 'free'); return f.length ? Math.min(...f.map((a) => a.price)) : 0; }
     function renderHero() {
@@ -352,34 +360,228 @@
       upd();
     }
 
-    // ---------- about / contact ----------
-    function renderAbout() {
-      const items = [['building', 'about.1'], ['shield', 'about.2'], ['grid', 'about.3'], ['users', 'about.4']];
-      aboutSection.replaceChildren(h('div', { class: 'wrap' }, h('div', { class: 'sec-head' }, h('div', null, h('h2', null, accentFirst(t('about.title'))), h('p', null, t('about.sub')))),
-        h('div', { class: 'grid g4' }, items.map(([ic, k]) => h('div', { class: 'card hover stack' }, h('div', { class: 'avatar', style: { width: '40px', height: '40px', borderRadius: '12px' } }, S.icon(ic, '')), h('h3', null, t(k + '.t')), h('p', { class: 'muted' }, t(k + '.d')))))));
-      S.$$('.avatar svg', aboutSection).forEach((s) => { s.style.cssText = 'width:20px;height:20px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round'; });
-    }
-    function renderContact() {
-      const c = cfg.CONTACT || {};
-      const name = S.input('name', { placeholder: t('f.namePh'), autocomplete: 'name' }), phone = S.input('phone', { type: 'tel', value: '+992', autocomplete: 'tel' });
-      const cm = h('textarea', { class: 'inp', name: 'comment', id: 'contact-comment', maxlength: 400, placeholder: t('f.commentPh') });
-      const form = h('form', { class: 'stack card', novalidate: true }, S.field(t('f.name'), name), S.field(t('f.phone'), phone, t('f.phoneHint')), S.field(t('f.comment'), cm));
-      const btn = h('button', { class: 'btn lg', type: 'submit' }, t('lead.send')); form.appendChild(btn);
-      form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await S.api.createLead({ name: name.value.trim(), phone: phone.value.replace(/[\s()-]/g, ''), comment: cm.value.trim() }); form.reset(); phone.value = '+992'; S.toast(t('lead.ok'), 'ok'); } catch (er) { S.showErrors(form, er); } }); });
-      contactSection.replaceChildren(h('div', { class: 'wrap' }, h('div', { class: 'sec-head' }, h('div', null, h('h2', null, accentFirst(t('contact.title'))), h('p', null, t('contact.sub')))),
-        h('div', { class: 'calc' }, form, h('div', { class: 'card stack' }, h('h3', null, t('contact.office')),
-          h('div', { class: 'row' }, S.icon('pin'), h('span', null, c.address || (st.building && st.building.address) || '')),
-          h('div', { class: 'row' }, S.icon('phone'), h('b', null, c.phone || ''), c.phone ? h('button', { class: 'btn ghost sm', onclick: () => S.copy(c.phone) }, t('common.copy')) : null),
-          c.telegram ? h('div', { class: 'row' }, S.icon('send'), h('a', { href: 'https://t.me/' + c.telegram.replace('@', ''), target: '_blank', rel: 'noopener' }, c.telegram)) : null,
-          h('div', { class: 'row' }, S.icon('clock'), h('span', null, c.hours || t('contact.hours'))),
-          h('p', { class: 'muted' }, t('contact.note'))))));
-    }
-    function footer() { return h('footer', { class: 'footer' }, h('div', { class: 'wrap row between' }, h('div', { class: 'row' }, S.logo(), h('b', { style: { color: '#fff', fontFamily: 'var(--display)' } }, 'Sitora')), h('span', null, t('footer.rights')))); }
-
-    function scrollTo(id) { const el = document.getElementById(id === 'home' ? 'hero-top' : id); if (el) el.scrollIntoView({ behavior: 'smooth', block: id === 'home' ? 'start' : 'start' }); }
+    function scrollTo(id) { const el = document.getElementById(id === 'home' ? 'hero-top' : id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     S.scrollTo = scrollTo;
 
     load();
-    return () => { alive = false; if (io) io.disconnect(); if (house) house.destroy(); };
+    return () => { alive = false; if (house) house.destroy(); };
+  };
+
+  /* ---------- landing: hero, numbers, why us, how to buy, apartments teaser, contact teaser ---------- */
+  S.views.home = function (root) {
+    const cfg = window.SITORA_CONFIG || {};
+    const c = contacts();
+    // config.js numbers until the building loads, and when the API is unavailable.
+    const d = { floors: cfg.DEFAULT_FLOORS || 16, apts: cfg.DEFAULT_APTS || 128, year: cfg.DEFAULT_YEAR || 2026, minPrice: cfg.DEFAULT_MIN_PRICE || 325700, free: null, list: null };
+    let alive = true;
+    const page = h('div', { class: 'page-in lux lux-home' });
+    root.appendChild(page);
+    const rnd = (n) => Math.random() * n;
+
+    // 1. Fullscreen hero: night sky, Tajik mountains, the name of the complex.
+    const stars = h('div', { class: 'stars', 'aria-hidden': 'true' }, Array.from({ length: 60 }, () => { const s = (1 + rnd(1.6)).toFixed(1) + 'px'; return h('i', { style: { left: rnd(100).toFixed(1) + '%', top: rnd(62).toFixed(1) + '%', width: s, height: s, animationDelay: rnd(4).toFixed(2) + 's', animationDuration: (2.4 + rnd(3)).toFixed(2) + 's' } }); }));
+    const mountains = h('div', { class: 'mountains', 'aria-hidden': 'true', html: '<svg viewBox="0 0 1440 320" preserveAspectRatio="none"><path fill="currentColor" opacity=".55" d="M0 230 120 150l70 40 110-110 90 70 80-50 120 120 90-60 140 90 100-80 120 70 110-100 130 110 80-40 80 50v120H0z"/><path fill="currentColor" d="M0 270 90 220l90 30 120-70 100 60 90-40 130 70 110-50 120 60 100-30 120 50 110-60 120 50 140-20v130H0z"/></svg>' });
+    const chips = h('div', { class: 'hero-chips' });
+    const freeCard = h('div', { class: 'float-card glass' });
+    const hero = h('section', { class: 'lux-hero', id: 'top' }, stars, mountains,
+      h('div', { class: 'wrap lux-hero-in' },
+        h('div', { class: 'lux-hero-text' },
+          h('span', { class: 'lux-pill' }, landIcon('pin'), t('home.place')),
+          h('h1', { class: 'lux-title' }, h('span', { class: 'gold-text' }, 'Sitora'), h('br'), 'Residence'),
+          h('i', { class: 'gold-line', 'aria-hidden': 'true' }),
+          h('p', { class: 'lux-tagline' }, t('home.tagline')),
+          chips,
+          h('div', { class: 'lux-cta' }, h('a', { class: 'btn gold lg', href: '/apartments' }, t('home.cta1')), h('a', { class: 'btn ghost lg', href: '/apartments#calc' }, t('home.cta2')))),
+        h('div', { class: 'lux-hero-side' }, freeCard,
+          h('div', { class: 'float-card glass second' }, landIcon('phone'), h('div', null, h('small', null, t('home.showing')), h('b', null, c.phone ? h('a', { href: 'tel:+' + phoneDigits(c.phone) }, c.phone) : t('home.call')))))),
+      h('button', { class: 'scroll-hint', type: 'button', 'aria-label': t('home.scroll'), onclick: () => document.getElementById('numbers').scrollIntoView({ behavior: 'smooth' }) }, landIcon('down')));
+
+    // 2. Numbers.
+    const counters = [['floors', (v) => S.fmt.n(v)], ['apts', (v) => S.fmt.n(v)], ['year', (v) => String(v)], ['zero', (v) => v + '%']]
+      .map(([k, fmt]) => ({ k, fmt, el: h('b', null, '0') }));
+    const numbers = h('section', { class: 'lux-numbers', id: 'numbers' }, h('div', { class: 'wrap nums-grid reveal' },
+      counters.map((x) => h('div', { class: 'num-cell' }, x.el, h('span', null, t('home.num.' + x.k))))));
+    const valueOf = (k) => ({ floors: d.floors, apts: d.apts, year: d.year, zero: 0 }[k]);
+    const count = () => counters.forEach((x) => countUp(x.el, valueOf(x.k), x.fmt));
+
+    // 3. Why us.
+    const why = h('section', { class: 'section lux-sec', id: 'why' }, h('div', { class: 'wrap' },
+      h('div', { class: 'lux-head reveal' }, h('h2', null, accentFirst(t('why.title'))), h('p', null, t('why.sub'))),
+      h('div', { class: 'feat-grid' }, FEATURES.map(([ic, k], i) => h('article', { class: 'feat-card reveal', style: { transitionDelay: (i % 3) * 90 + 'ms' } },
+        h('div', { class: 'feat-ic' }, landIcon(ic)), h('h3', null, t(k)), h('p', null, t(k + '.d')))))));
+
+    // 4. How to buy.
+    const steps = h('section', { class: 'section lux-sec alt-band', id: 'steps' }, h('div', { class: 'wrap' },
+      h('div', { class: 'lux-head reveal' }, h('h2', null, accentFirst(t('steps.title')))),
+      h('ol', { class: 'steps' }, [1, 2, 3].map((n) => h('li', { class: 'step reveal', style: { transitionDelay: (n - 1) * 120 + 'ms' } },
+        h('span', { class: 'step-no' }, '0' + n), h('h3', null, t('steps.' + n)), h('p', null, t('steps.' + n + '.d')),
+        n === 1 ? h('a', { class: 'btn gold', href: '/apartments' }, t('steps.cta')) : null)))));
+
+    // 5. Apartments teaser.
+    const aptGrid = h('div', { class: 'teaser-grid' });
+    const allBtn = h('a', { class: 'btn ghost lg', href: '/apartments' });
+    const teaser = h('section', { class: 'section lux-sec', id: 'teaser' }, h('div', { class: 'wrap' },
+      h('div', { class: 'lux-head reveal' }, h('h2', null, accentFirst(t('teaser.title'))), h('p', null, t('teaser.sub'))),
+      aptGrid, h('div', { class: 'teaser-more' }, allBtn)));
+
+    // 6. Contact teaser with a call-back form.
+    const callBox = h('div', { class: 'call-box glass reveal' });
+    const contactBand = h('section', { class: 'lux-contact', id: 'contact' }, h('div', { class: 'wrap contact-band' },
+      h('div', { class: 'reveal' },
+        h('h2', null, accentFirst(t('cta.title'))), h('p', { class: 'muted-lux' }, t('cta.sub')),
+        h('ul', { class: 'contact-lines' },
+          c.address ? h('li', null, landIcon('pin'), c.address) : null,
+          c.phone ? h('li', null, landIcon('phone'), h('a', { href: 'tel:+' + phoneDigits(c.phone) }, c.phone)) : null,
+          c.telegram ? h('li', null, landIcon('send'), h('a', { href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, c.telegram)) : null),
+        c.telegram ? h('a', { class: 'btn gold lg', href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, landIcon('send'), t('cta.tg')) : null),
+      callBox));
+
+    page.append(hero, numbers, why, steps, teaser, contactBand, siteFooter());
+    renderData(); renderCall();
+    const stopReveal = revealIn(page, (el) => { if (el.closest('#numbers')) count(); });
+
+    // Mountains and stars drift a little slower than the page.
+    let ticking = false;
+    const onScroll = () => { if (ticking) return; ticking = true; requestAnimationFrame(() => { ticking = false; hero.style.setProperty('--py', Math.min(window.scrollY, 900) + 'px'); }); };
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+    function renderData() {
+      chips.replaceChildren(
+        h('span', { class: 'chip-lux' }, counted(d.floors, 'home.chip.floors')),
+        h('span', { class: 'chip-lux' }, counted(d.apts, 'home.chip.apts')),
+        h('span', { class: 'chip-lux' }, t('home.chip.year', { y: d.year })),
+        h('span', { class: 'chip-lux' }, t('home.chip.from', { p: S.fmt.money(d.minPrice, 'TJS') })));
+      freeCard.replaceChildren(h('i', { class: 'live-dot' }), h('div', null, h('small', null, t('home.freeNow')), h('b', null, d.free === null ? '—' : counted(d.free, 'home.chip.apts'))));
+      allBtn.textContent = t('teaser.all', { n: S.fmt.n(d.apts) });
+      aptGrid.replaceChildren(...(d.list ? d.list.map(aptCard) : [0, 1, 2].map(typeCard)));
+      if (numbers.querySelector('.reveal.in')) count();
+    }
+    function aptCard(a) {
+      return h('a', { class: 'apt-lux', href: '/apartments' },
+        h('div', { class: 'apt-lux-top' }, S.statusChip(a.status), h('span', { class: 'apt-no' }, '№ ' + a.number)),
+        h('div', { class: 'apt-lux-meta' }, t('floor.n', { n: a.floor }) + ' · ' + S.fmt.rooms(a.rooms) + ' · ' + S.fmt.area(a.area)),
+        h('div', { class: 'apt-lux-price' }, S.fmt.money(a.price, 'TJS')),
+        h('div', { class: 'apt-lux-sqm' }, S.fmt.n(a.pricePerSqm) + ' TJS / ' + t('u.m2')),
+        h('span', { class: 'apt-lux-more' }, t('teaser.more')));
+    }
+    // Without the API: apartment types instead of made-up apartments.
+    function typeCard(i) {
+      return h('a', { class: 'apt-lux', href: '/apartments' },
+        h('div', { class: 'apt-lux-top' }, S.statusChip('free')),
+        h('div', { class: 'apt-lux-meta' }, t('teaser.type' + i)),
+        h('div', { class: 'apt-lux-price' }, i === 0 ? t('home.chip.from', { p: S.fmt.money(d.minPrice, 'TJS') }) : t('teaser.ask')),
+        h('div', { class: 'apt-lux-sqm' }, t('teaser.typeSub')),
+        h('span', { class: 'apt-lux-more' }, t('teaser.more')));
+    }
+
+    function renderCall() {
+      const phone = S.input('phone', { type: 'tel', value: '+992', autocomplete: 'tel', 'aria-label': t('f.phone') });
+      const btn = h('button', { class: 'btn gold lg block', type: 'submit' }, t('cta.call'));
+      const form = h('form', { class: 'stack', novalidate: true }, h('h3', null, t('cta.formTitle')), phone, btn, h('small', { class: 'micro' }, t('cta.micro')));
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault(); S.showErrors(form, null);
+        await S.busy(btn, async () => {
+          try {
+            await siteBuilding();
+            await S.api.createLead({ name: t('cta.leadName'), phone: phone.value.replace(/[\s()-]/g, ''), comment: t('cta.leadComment') });
+            callBox.replaceChildren(successBlock(t('cta.done')));
+          } catch (er) { S.showErrors(form, er); }
+        });
+      });
+      callBox.replaceChildren(form);
+    }
+
+    async function load() {
+      try {
+        const id = await siteBuilding();
+        if (!id) return;
+        const b = await S.api.building(id);
+        const floors = await S.api.floors(id);
+        const apts = await S.api.allApartments(floors);
+        if (!alive) return;
+        const free = apts.filter((a) => a.status === 'free').sort((x, y) => x.price - y.price);
+        d.floors = b.floorsCount || Math.max(0, ...floors.map((f) => f.number)) || d.floors;
+        d.apts = apts.length || d.apts;
+        if (b.deliveryDate) d.year = new Date(b.deliveryDate).getFullYear();
+        if (free.length) d.minPrice = free[0].price;
+        d.free = free.length;
+        // One apartment of each room count, cheapest first.
+        const seen = new Set();
+        d.list = free.filter((a) => (seen.has(a.rooms) ? false : seen.add(a.rooms))).slice(0, 3);
+        if (d.list.length < 3) d.list = d.list.concat(free.filter((a) => !d.list.includes(a))).slice(0, 3);
+        if (!d.list.length) d.list = null;
+        renderData();
+      } catch (e) { /* the page stays on the numbers from config.js */ }
+    }
+    load();
+    return () => { alive = false; stopReveal(); window.removeEventListener('scroll', onScroll); };
+  };
+
+  // A drawn check mark with a message: the end state of the forms.
+  function successBlock(text, again) {
+    return h('div', { class: 'success-box', role: 'status' },
+      h('div', { class: 'success-ic', html: '<svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="24"/><path d="m15 27 7.5 7.5L38 19"/></svg>' }),
+      h('b', null, t('ok.title')), h('p', null, text), again || null);
+  }
+
+  /* ---------- contact page ---------- */
+  S.views.contact = function (root) {
+    const c = contacts();
+    const page = h('div', { class: 'page-in lux contact-page' });
+    root.appendChild(page);
+
+    const line = (ic, label, ...value) => h('div', { class: 'ct-card' }, h('span', { class: 'ct-ic' }, landIcon(ic)), h('div', null, h('small', null, label), h('div', { class: 'ct-val' }, ...value)));
+    const left = h('div', { class: 'ct-left' },
+      h('a', { class: 'back-link', href: '/' }, '← ' + t('nav.home')),
+      h('h1', null, accentFirst(t('ct.title'))), h('p', { class: 'muted-lux' }, t('ct.sub')),
+      h('div', { class: 'ct-cards' },
+        line('pin', t('ct.address'), c.address || ''),
+        line('phone', t('ct.phone'), c.phone ? h('a', { href: 'tel:+' + phoneDigits(c.phone) }, c.phone) : '', c.phone ? h('button', { class: 'btn ghost sm', type: 'button', onclick: () => S.copy(c.phone) }, t('common.copy')) : null),
+        c.telegram ? line('send', 'Telegram', h('a', { href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, c.telegram)) : null,
+        line('clock', t('ct.hours'), c.hours || t('ct.hoursVal'))),
+      h('div', { class: 'ct-buttons' },
+        c.telegram ? h('a', { class: 'btn gold lg', href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, landIcon('send'), 'Telegram') : null,
+        c.phone ? h('a', { class: 'btn lg wa', href: 'https://wa.me/' + phoneDigits(c.phone), target: '_blank', rel: 'noopener' }, landIcon('chat'), 'WhatsApp') : null));
+
+    const right = h('div', { class: 'ct-right' });
+    page.append(h('section', { class: 'ct-split' }, left, right), siteFooter());
+
+    // Floating labels: the label sits in the field and moves up when the field has focus or a value.
+    const fl = (field, label, req) => h('label', { class: 'fl' }, field, h('span', null, label + (req ? ' *' : '')), h('em', { class: 'fl-err' }));
+    function renderForm() {
+      const name = h('input', { class: 'inp', name: 'name', placeholder: ' ', autocomplete: 'name', maxlength: 200 });
+      const phone = h('input', { class: 'inp', name: 'phone', type: 'tel', placeholder: ' ', value: '+992', autocomplete: 'tel' });
+      const kind = h('select', { class: 'inp', name: 'kind' }, ['buy', 'plan', 'other'].map((k) => h('option', { value: k }, t('ct.kind.' + k))));
+      const cm = h('textarea', { class: 'inp', name: 'comment', placeholder: ' ', maxlength: 800, rows: 4 });
+      const agree = h('input', { type: 'checkbox', name: 'agree' });
+      const btn = h('button', { class: 'btn gold lg block', type: 'submit' }, t('ct.send'));
+      const form = h('form', { class: 'ct-form', novalidate: true },
+        h('h2', null, t('ct.formTitle')),
+        fl(name, t('f.name'), true), fl(phone, t('f.phone'), true), h('label', { class: 'fl fixed' }, kind, h('span', null, t('ct.kind'))), fl(cm, t('f.comment')),
+        h('label', { class: 'check ct-agree' }, agree, h('span', null, t('ct.agree')), h('em', { class: 'fl-err' })), btn);
+      const fail = (el, msg) => { const box = el.closest('label'); box.classList.add('err'); box.querySelector('.fl-err').textContent = msg; };
+      form.addEventListener('input', (e) => { const box = e.target.closest('label'); if (box) box.classList.remove('err'); });
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault(); S.showErrors(form, null);
+        S.$$('label.err', form).forEach((l) => l.classList.remove('err'));
+        const ph = phone.value.replace(/[\s()-]/g, '');
+        let ok = true;
+        if (!name.value.trim()) { fail(name, t('ct.errName')); ok = false; }
+        if (!/^\+992\d{9}$/.test(ph)) { fail(phone, t('ct.errPhone')); ok = false; }
+        if (!agree.checked) { fail(agree, t('ct.errAgree')); ok = false; }
+        if (!ok) return;
+        await S.busy(btn, async () => {
+          try {
+            await siteBuilding();
+            await S.api.createLead({ name: name.value.trim(), phone: ph, comment: [t('ct.kind.' + kind.value), cm.value.trim()].filter(Boolean).join('. ') });
+            right.replaceChildren(successBlock(t('ct.done'), h('button', { class: 'btn ghost', type: 'button', onclick: renderForm }, t('ct.again'))));
+          } catch (er) { S.showErrors(form, er); }
+        });
+      });
+      right.replaceChildren(form);
+    }
+    renderForm();
+    siteBuilding().catch(() => {});
+    return () => {};
   };
 })();
