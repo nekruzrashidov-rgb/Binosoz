@@ -23,6 +23,16 @@
     else location.href = PAGES[r] || '/';
   };
 
+  // The API address dialog of app.js, without the demo backend: an empty address means this site's own /api/v1.
+  S.openSettings = () => {
+    const inp = S.input('api', { value: S.store.get('sitora.api') || '', placeholder: cfg.API_BASE });
+    const res = h('div', { class: 'hint' });
+    const save = (v) => { v = String(v || '').trim(); if (v) S.setApiBase(v); else S.store.del('sitora.api'); };
+    const test = h('button', { class: 'btn ghost', type: 'button', onclick: async () => { const old = S.store.get('sitora.api'); save(inp.value); try { const r = await fetch(S.apiBase() + '/buildings'); res.replaceChildren(r.ok ? h('span', { style: { color: 'var(--good)', fontWeight: 700 } }, t('settings.ok')) : h('span', { style: { color: 'var(--bad)', fontWeight: 700 } }, t('settings.http', { s: r.status }))); } catch (e) { res.replaceChildren(h('span', { style: { color: 'var(--bad)', fontWeight: 700 } }, t('settings.cors'))); } save(old); } }, t('settings.test'));
+    const ok = h('button', { class: 'btn', onclick: () => { save(inp.value); S.api.clearAuth(); md.close(); S.toast(t('settings.saved'), 'ok'); render(); } }, t('common.save'));
+    const md = S.modal({ title: t('settings.title'), body: h('div', { class: 'stack' }, h('p', { class: 'muted' }, t('settings.nowLive', { u: S.apiBase() })), S.field(t('settings.api'), inp, t('settings.apiHint')), test, res, h('p', { class: 'hint' }, t('settings.cors2'))), actions: [ok] });
+  };
+
   function applyTheme() { const v = S.store.get('sitora.theme'); if (v === 'dark' || v === 'light') document.documentElement.dataset.theme = v; else delete document.documentElement.dataset.theme; }
   function isDark() { const v = document.documentElement.dataset.theme; return v ? v === 'dark' : window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches; }
 
