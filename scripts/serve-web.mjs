@@ -32,7 +32,10 @@ createServer(async (req, res) => {
       res.writeHead(403).end();
       return;
     }
-    if ((await stat(file).catch(() => null))?.isDirectory()) file = join(file, 'index.html');
+    const found = await stat(file).catch(() => null);
+    if (found?.isDirectory()) file = join(file, 'index.html');
+    // Адреса страниц без .html (/login, /crm), как на Vercel и в API: по ним ведут ссылки сайта.
+    else if (!found && !extname(file)) file += '.html';
     const body = await readFile(file);
     res.writeHead(200, { 'Content-Type': types[extname(file).toLowerCase()] ?? 'application/octet-stream', 'Cache-Control': 'no-store' });
     res.end(body);
