@@ -12,9 +12,17 @@ window.SITORA_CONFIG = {
   DEFAULT_FLOORS: 16,
   DEFAULT_APTS: 128,
   CONTACT: {
-    phone: '+992 00 000 00 00',
-    telegram: '@sitora_sales',
+    phone: '+992 98 363 70 70',
+    telegram: '@nekru01',
     address: 'Душанбе, пр. Рудаки, 124',
-    hours: '',
+    hours: 'Пн–Сб 9:00–19:00',
+    // Contact page: the manager who answers, and the office hours day by day (day keys: monFri, sat, sun; null — day off).
+    manager: 'Некру',
+    schedule: [['monFri', '9:00–19:00'], ['sat', '10:00–17:00'], ['sun', null]],
   },
+  // Apartment types on the landing when the API is unavailable; with the API the real areas and prices are shown.
+  // [rooms (0 — studio, 3 — three and more), area from, area to, price from]
+  DEFAULT_TYPES: [[0, 28, 35, 250000], [1, 45, 58, 340000], [2, 65, 80, 480000], [3, 90, 110, 650000]],
+  // Installment terms shown on the landing.
+  INSTALLMENT: { downFrom: 20, years: 5 },
 };

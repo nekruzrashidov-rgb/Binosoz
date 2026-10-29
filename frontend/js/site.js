@@ -23,7 +23,17 @@
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     chat: '<path d="M4 20l1.4-3.6A8 8 0 1 1 8.5 19z"/><path d="M9 10.5h6M9 13.5h4"/>',
     down: '<path d="m6 9 6 6 6-6"/>',
+    bed: '<path d="M3 18V6M21 18v-5a3 3 0 0 0-3-3H10v8"/><path d="M3 14h18"/><circle cx="6.5" cy="10.5" r="1.8"/>',
+    car: '<path d="M5 16V11l2-5h10l2 5v5"/><path d="M3 16h18v2H3z"/><circle cx="7.5" cy="13" r="1"/><circle cx="16.5" cy="13" r="1"/>',
+    play: '<path d="M4 21V9l5-5 5 5v12"/><path d="M14 13h4a3 3 0 0 1 3 3v5"/><path d="M7.5 21v-4h3v4"/>',
+    shield: '<path d="M12 3 5 6v5c0 4.5 3 8.3 7 10 4-1.7 7-5.5 7-10V6z"/><path d="m9 12 2 2 4-4"/>',
+    leaf: '<path d="M5 19c0-8 5-13 15-14-1 10-6 15-14 15"/><path d="M5 19 13 11"/>',
+    lock: '<rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
+    clipboard: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/>',
+    percent: '<circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/><path d="M19 5 5 19"/>',
+    calendar: '<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
   };
+  const AMENITIES = [['car', 'about.parking'], ['play', 'about.playground'], ['shield', 'about.guard'], ['leaf', 'about.green']];
   function landIcon(name) {
     const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('fill', 'none'); s.setAttribute('stroke', 'currentColor'); s.setAttribute('stroke-width', '1.8');
@@ -89,7 +99,10 @@
     return h('footer', { class: 'footer lux-footer' }, h('div', { class: 'wrap' },
       h('div', { class: 'foot-grid' },
         h('div', { class: 'foot-brand' }, h('a', { class: 'row', href: '/', style: { gap: '10px' } }, S.logo(), h('b', null, 'Sitora Residence')), h('p', null, t('foot.tagline')),
-          h('a', { class: 'btn ghost sm', href: '/login' }, t('foot.login'))),
+          h('div', { class: 'foot-social' },
+            c.telegram ? h('a', { class: 'soc tg', href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener', 'aria-label': 'Telegram', title: 'Telegram' }, landIcon('send')) : null,
+            c.phone ? h('a', { class: 'soc wa', href: 'https://wa.me/' + phoneDigits(c.phone), target: '_blank', rel: 'noopener', 'aria-label': 'WhatsApp', title: 'WhatsApp' }, landIcon('chat')) : null,
+            h('a', { class: 'btn ghost sm', href: '/login' }, t('foot.login')))),
         col(t('foot.apts'), h('a', { href: '/apartments' }, t('foot.catalog')), h('a', { href: '/apartments#calc' }, t('foot.calc')), h('a', { href: '/apartments' }, t('foot.3d'))),
         col(t('foot.info'), h('a', { href: '/#why' }, t('foot.why')), h('a', { href: '/#steps' }, t('foot.steps')), h('a', { href: '/login' }, t('foot.cabinet'))),
         col(t('foot.contacts'), h('span', null, c.address || ''), c.phone ? h('a', { href: 'tel:+' + phoneDigits(c.phone) }, c.phone) : null, c.telegram ? h('a', { href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, c.telegram) : null, h('a', { href: '/contact' }, t('foot.write')))),
@@ -108,6 +121,10 @@
     const page = h('div', { class: 'page-in landing-page lux' });
     root.appendChild(page);
     page.appendChild(pageHead(t('cat.title'), t('cat.sub')));
+    const cc = contacts();
+    page.appendChild(h('div', { class: 'wrap' }, h('div', { class: 'cat-banner' },
+      h('span', null, landIcon('key'), t('cat.banner')),
+      cc.phone ? h('a', { class: 'cat-phone', href: 'tel:+' + phoneDigits(cc.phone) }, landIcon('phone'), cc.phone) : null)));
 
     const houseBox = h('div', { class: 'house3d', id: 'house3d' });
     const tip = h('div', { class: 'tip', hidden: true });
@@ -372,7 +389,12 @@
     const cfg = window.SITORA_CONFIG || {};
     const c = contacts();
     // config.js numbers until the building loads, and when the API is unavailable.
-    const d = { floors: cfg.DEFAULT_FLOORS || 16, apts: cfg.DEFAULT_APTS || 128, year: cfg.DEFAULT_YEAR || 2026, minPrice: cfg.DEFAULT_MIN_PRICE || 325700, free: null, list: null };
+    const d = {
+      floors: cfg.DEFAULT_FLOORS || 16, apts: cfg.DEFAULT_APTS || 128, year: cfg.DEFAULT_YEAR || 2026, minPrice: cfg.DEFAULT_MIN_PRICE || 325700, free: null, list: null,
+      // Apartment types: { rooms, areaFrom, areaTo, priceFrom }.
+      types: (cfg.DEFAULT_TYPES || []).map(([rooms, areaFrom, areaTo, priceFrom]) => ({ rooms, areaFrom, areaTo, priceFrom })),
+    };
+    const plan = cfg.INSTALLMENT || { downFrom: 20, years: 5 };
     let alive = true;
     const page = h('div', { class: 'page-in lux lux-home' });
     root.appendChild(page);
@@ -393,7 +415,8 @@
           chips,
           h('div', { class: 'lux-cta' }, h('a', { class: 'btn gold lg', href: '/apartments' }, t('home.cta1')), h('a', { class: 'btn ghost lg', href: '/apartments#calc' }, t('home.cta2')))),
         h('div', { class: 'lux-hero-side' }, freeCard,
-          h('div', { class: 'float-card glass second' }, landIcon('phone'), h('div', null, h('small', null, t('home.showing')), h('b', null, c.phone ? h('a', { href: 'tel:+' + phoneDigits(c.phone) }, c.phone) : t('home.call')))))),
+          c.phone ? h('a', { class: 'float-card glass second', href: 'tel:+' + phoneDigits(c.phone) }, landIcon('phone'), h('div', null, h('small', null, t('home.call')), h('b', null, c.phone))) : null,
+          c.telegram ? h('a', { class: 'float-card glass tg', href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, landIcon('send'), h('div', null, h('small', null, t('home.tgCard')), h('b', null, c.telegram))) : null)),
       h('button', { class: 'scroll-hint', type: 'button', 'aria-label': t('home.scroll'), onclick: () => document.getElementById('numbers').scrollIntoView({ behavior: 'smooth' }) }, landIcon('down')));
 
     // 2. Numbers.
@@ -417,6 +440,32 @@
         h('span', { class: 'step-no' }, '0' + n), h('h3', null, t('steps.' + n)), h('p', null, t('steps.' + n + '.d')),
         n === 1 ? h('a', { class: 'btn gold', href: '/apartments' }, t('steps.cta')) : null)))));
 
+    // About the complex: the numbers on the left, the description and amenities on the right.
+    const aboutStats = h('div', { class: 'about-stats reveal' });
+    const about = h('section', { class: 'section lux-sec', id: 'about' }, h('div', { class: 'wrap about-grid' },
+      aboutStats,
+      h('div', { class: 'about-text reveal' },
+        h('span', { class: 'lux-kicker' }, t('about.kicker')),
+        h('h2', null, h('span', { class: 'gold-text' }, 'Sitora'), ' Residence'),
+        h('p', null, t('about.text')),
+        h('ul', { class: 'amenities' }, AMENITIES.map(([ic, k]) => h('li', null, h('span', { class: 'am-ic' }, landIcon(ic)), t(k)))))));
+
+    // Layouts: one card per apartment type.
+    const layoutGrid = h('div', { class: 'layout-grid reveal' });
+    const layouts = h('section', { class: 'section lux-sec alt-band', id: 'layouts' }, h('div', { class: 'wrap' },
+      h('div', { class: 'lux-head reveal' }, h('h2', null, accentFirst(t('layouts.title'))), h('p', null, t('layouts.sub'))),
+      layoutGrid));
+
+    // Installment terms.
+    const term = (ic, label, value) => h('div', { class: 'plan-cell' }, h('span', { class: 'plan-ic' }, landIcon(ic)), h('small', null, label), h('b', null, value));
+    const installment = h('section', { class: 'lux-plan', id: 'installment' }, h('div', { class: 'wrap' },
+      h('div', { class: 'lux-head reveal' }, h('h2', null, accentFirst(t('plan.title'))), h('p', null, t('plan.sub'))),
+      h('div', { class: 'plan-grid reveal' },
+        term('card', t('plan.down'), t('plan.downV', { n: plan.downFrom })),
+        term('calendar', t('plan.term'), t('plan.termV', { n: counted(plan.years, 'plan.years') })),
+        term('percent', t('plan.over'), '0%')),
+      h('div', { class: 'teaser-more' }, h('a', { class: 'btn gold lg', href: '/apartments#calc' }, t('plan.cta')))));
+
     // 5. Apartments teaser.
     const aptGrid = h('div', { class: 'teaser-grid' });
     const allBtn = h('a', { class: 'btn ghost lg', href: '/apartments' });
@@ -436,7 +485,7 @@
         c.telegram ? h('a', { class: 'btn gold lg', href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, landIcon('send'), t('cta.tg')) : null),
       callBox));
 
-    page.append(hero, numbers, why, steps, teaser, contactBand, siteFooter());
+    page.append(hero, numbers, why, steps, about, layouts, installment, teaser, contactBand, siteFooter());
     renderData(); renderCall();
     const stopReveal = revealIn(page, (el) => { if (el.closest('#numbers')) count(); });
 
@@ -451,10 +500,25 @@
         h('span', { class: 'chip-lux' }, counted(d.apts, 'home.chip.apts')),
         h('span', { class: 'chip-lux' }, t('home.chip.year', { y: d.year })),
         h('span', { class: 'chip-lux' }, t('home.chip.from', { p: S.fmt.money(d.minPrice, 'TJS') })));
-      freeCard.replaceChildren(h('i', { class: 'live-dot' }), h('div', null, h('small', null, t('home.freeNow')), h('b', null, d.free === null ? '—' : counted(d.free, 'home.chip.apts'))));
+      freeCard.replaceChildren(h('i', { class: 'live-dot' }), h('div', null, h('small', null, t('home.freeNow')), h('b', null, d.free === null ? t('home.freeSome') : counted(d.free, 'home.chip.apts'))));
       allBtn.textContent = t('teaser.all', { n: S.fmt.n(d.apts) });
       aptGrid.replaceChildren(...(d.list ? d.list.map(aptCard) : [0, 1, 2].map(typeCard)));
+      const big = (v, l) => h('div', { class: 'about-num' }, h('b', null, v), h('span', null, l));
+      aboutStats.replaceChildren(big(S.fmt.n(d.floors), plural(d.floors, 'about.floors')), big(S.fmt.n(d.apts), plural(d.apts, 'about.apts')),
+        big(String(d.types.length || 4), plural(d.types.length || 4, 'about.types')), big(String(d.year), t('about.year')));
+      layoutGrid.replaceChildren(...d.types.map(layoutCard));
       if (numbers.querySelector('.reveal.in')) count();
+    }
+    // A layout card: type, area range, price from; the bed icon shows the number of rooms.
+    function layoutCard(x) {
+      const beds = Math.max(1, Math.min(3, x.rooms || 1));
+      const area = x.areaFrom === x.areaTo ? S.fmt.n(x.areaFrom) : S.fmt.n(x.areaFrom) + '–' + S.fmt.n(x.areaTo);
+      return h('a', { class: 'layout-card', href: '/apartments' },
+        h('span', { class: 'layout-ic', 'aria-hidden': 'true' }, Array.from({ length: beds }, () => landIcon('bed'))),
+        h('b', { class: 'layout-type' }, t('layouts.type' + Math.min(3, x.rooms))),
+        h('span', { class: 'layout-area' }, area + ' ' + t('u.m2')),
+        h('span', { class: 'layout-price' }, t('home.chip.from', { p: S.fmt.money(x.priceFrom, 'TJS') })),
+        h('span', { class: 'apt-lux-more' }, t('layouts.cta')));
     }
     function aptCard(a) {
       return h('a', { class: 'apt-lux', href: '/apartments' },
@@ -510,6 +574,14 @@
         d.list = free.filter((a) => (seen.has(a.rooms) ? false : seen.add(a.rooms))).slice(0, 3);
         if (d.list.length < 3) d.list = d.list.concat(free.filter((a) => !d.list.includes(a))).slice(0, 3);
         if (!d.list.length) d.list = null;
+        // Types from the real apartments: area range of all, price from the free ones (else from all). 3 — three rooms and more.
+        const types = [0, 1, 2, 3].map((rooms) => {
+          const all = apts.filter((a) => (rooms === 3 ? a.rooms >= 3 : a.rooms === rooms));
+          if (!all.length) return null;
+          const priced = all.filter((a) => a.status === 'free').length ? all.filter((a) => a.status === 'free') : all;
+          return { rooms, areaFrom: Math.floor(Math.min(...all.map((a) => a.area))), areaTo: Math.ceil(Math.max(...all.map((a) => a.area))), priceFrom: Math.min(...priced.map((a) => a.price)) };
+        }).filter(Boolean);
+        if (types.length) d.types = types;
         renderData();
       } catch (e) { /* the page stays on the numbers from config.js */ }
     }
@@ -531,19 +603,34 @@
     root.appendChild(page);
 
     const line = (ic, label, ...value) => h('div', { class: 'ct-card' }, h('span', { class: 'ct-ic' }, landIcon(ic)), h('div', null, h('small', null, label), h('div', { class: 'ct-val' }, ...value)));
+    const schedule = c.schedule || [];
     const left = h('div', { class: 'ct-left' },
       h('a', { class: 'back-link', href: '/' }, '← ' + t('nav.home')),
       h('h1', null, accentFirst(t('ct.title'))), h('p', { class: 'muted-lux' }, t('ct.sub')),
+      c.manager ? h('div', { class: 'ct-manager' }, h('span', { class: 'ct-avatar', 'aria-hidden': 'true' }, S.fmt.initials(c.manager)),
+        h('div', null, h('b', null, t('ct.manager', { n: c.manager })), h('small', null, h('i', { class: 'live-dot' }), t('ct.managerSub')))) : null,
       h('div', { class: 'ct-cards' },
         line('pin', t('ct.address'), c.address || ''),
         line('phone', t('ct.phone'), c.phone ? h('a', { href: 'tel:+' + phoneDigits(c.phone) }, c.phone) : '', c.phone ? h('button', { class: 'btn ghost sm', type: 'button', onclick: () => S.copy(c.phone) }, t('common.copy')) : null),
         c.telegram ? line('send', 'Telegram', h('a', { href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, c.telegram)) : null,
-        line('clock', t('ct.hours'), c.hours || t('ct.hoursVal'))),
-      h('div', { class: 'ct-buttons' },
-        c.telegram ? h('a', { class: 'btn gold lg', href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, landIcon('send'), 'Telegram') : null,
-        c.phone ? h('a', { class: 'btn lg wa', href: 'https://wa.me/' + phoneDigits(c.phone), target: '_blank', rel: 'noopener' }, landIcon('chat'), 'WhatsApp') : null));
+        // Day by day when the schedule is set, otherwise the one line of hours.
+        schedule.length
+          ? h('div', { class: 'ct-card ct-hours' }, h('span', { class: 'ct-ic' }, landIcon('clock')), h('div', null, h('small', null, t('ct.hours')),
+            h('dl', null, schedule.map(([day, time]) => [h('dt', null, t('day.' + day)), h('dd', { class: time ? '' : 'off' }, time || t('day.off'))]))))
+          : line('clock', t('ct.hours'), c.hours || t('ct.hoursVal'))),
+      // A map card: the office address on a stylised city plan.
+      h('div', { class: 'ct-map', role: 'img', 'aria-label': c.address || '' },
+        h('div', { class: 'ct-map-pin' }, landIcon('pin')), h('b', null, t('ct.city') + ', ' + (c.address || '').replace(/^Душанбе,\s*/, '')),
+        h('a', { class: 'btn ghost sm', href: 'https://www.openstreetmap.org/search?query=' + encodeURIComponent(c.address || ''), target: '_blank', rel: 'noopener' }, t('ct.route'))));
 
-    const right = h('div', { class: 'ct-right' });
+    // Above the form — straight to the messengers; under it — why it is safe to write.
+    const formHost = h('div');
+    const right = h('div', { class: 'ct-right' }, h('div', { class: 'ct-form-wrap' },
+      (c.telegram || c.phone) ? h('div', { class: 'ct-direct' }, h('span', null, t('ct.direct')), h('div', { class: 'ct-buttons' },
+        c.telegram ? h('a', { class: 'btn gold', href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, landIcon('send'), 'Telegram') : null,
+        c.phone ? h('a', { class: 'btn wa', href: 'https://wa.me/' + phoneDigits(c.phone), target: '_blank', rel: 'noopener' }, landIcon('chat'), 'WhatsApp') : null)) : null,
+      formHost,
+      h('ul', { class: 'trust' }, [['lock', 'ct.trust1'], ['check', 'ct.trust2'], ['clipboard', 'ct.trust3']].map(([ic, k]) => h('li', null, landIcon(ic), t(k))))));
     page.append(h('section', { class: 'ct-split' }, left, right), siteFooter());
 
     // Floating labels: the label sits in the field and moves up when the field has focus or a value.
@@ -552,12 +639,15 @@
       const name = h('input', { class: 'inp', name: 'name', placeholder: ' ', autocomplete: 'name', maxlength: 200 });
       const phone = h('input', { class: 'inp', name: 'phone', type: 'tel', placeholder: ' ', value: '+992', autocomplete: 'tel' });
       const kind = h('select', { class: 'inp', name: 'kind' }, ['buy', 'plan', 'other'].map((k) => h('option', { value: k }, t('ct.kind.' + k))));
+      const when = h('select', { class: 'inp', name: 'when' }, ['morning', 'day', 'evening'].map((k) => h('option', { value: k }, t('ct.when.' + k))));
       const cm = h('textarea', { class: 'inp', name: 'comment', placeholder: ' ', maxlength: 800, rows: 4 });
       const agree = h('input', { type: 'checkbox', name: 'agree' });
       const btn = h('button', { class: 'btn gold lg block', type: 'submit' }, t('ct.send'));
       const form = h('form', { class: 'ct-form', novalidate: true },
         h('h2', null, t('ct.formTitle')),
-        fl(name, t('f.name'), true), fl(phone, t('f.phone'), true), h('label', { class: 'fl fixed' }, kind, h('span', null, t('ct.kind'))), fl(cm, t('f.comment')),
+        fl(name, t('f.name'), true), fl(phone, t('f.phone'), true),
+        h('div', { class: 'fl-row' }, h('label', { class: 'fl fixed' }, kind, h('span', null, t('ct.kind'))), h('label', { class: 'fl fixed' }, when, h('span', null, t('ct.when')))),
+        fl(cm, t('f.comment')),
         h('label', { class: 'check ct-agree' }, agree, h('span', null, t('ct.agree')), h('em', { class: 'fl-err' })), btn);
       const fail = (el, msg) => { const box = el.closest('label'); box.classList.add('err'); box.querySelector('.fl-err').textContent = msg; };
       form.addEventListener('input', (e) => { const box = e.target.closest('label'); if (box) box.classList.remove('err'); });
@@ -573,12 +663,12 @@
         await S.busy(btn, async () => {
           try {
             await siteBuilding();
-            await S.api.createLead({ name: name.value.trim(), phone: ph, comment: [t('ct.kind.' + kind.value), cm.value.trim()].filter(Boolean).join('. ') });
-            right.replaceChildren(successBlock(t('ct.done'), h('button', { class: 'btn ghost', type: 'button', onclick: renderForm }, t('ct.again'))));
+            await S.api.createLead({ name: name.value.trim(), phone: ph, comment: [t('ct.kind.' + kind.value), t('ct.when') + ': ' + t('ct.when.' + when.value), cm.value.trim()].filter(Boolean).join('. ') });
+            formHost.replaceChildren(successBlock(t('ct.done'), h('button', { class: 'btn ghost', type: 'button', onclick: renderForm }, t('ct.again'))));
           } catch (er) { S.showErrors(form, er); }
         });
       });
-      right.replaceChildren(form);
+      formHost.replaceChildren(form);
     }
     renderForm();
     siteBuilding().catch(() => {});
