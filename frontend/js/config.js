@@ -23,6 +23,6 @@ window.SITORA_CONFIG = {
   // Apartment types on the landing when the API is unavailable; with the API the real areas and prices are shown.
   // [rooms (0 — studio, 3 — three and more), area from, area to, price from]
   DEFAULT_TYPES: [[0, 28, 35, 250000], [1, 45, 58, 340000], [2, 65, 80, 480000], [3, 90, 110, 650000]],
-  // Installment terms shown on the landing.
-  INSTALLMENT: { downFrom: 20, years: 5 },
+  // Installment terms: the landing shows them, the catalog's calculator uses them as its limits.
+  INSTALLMENT: { downFrom: 10, years: 10 },
 };

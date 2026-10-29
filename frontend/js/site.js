@@ -57,6 +57,8 @@
   }
   const counted = (n, key) => S.fmt.n(n) + ' ' + plural(n, key);
   const contacts = () => (window.SITORA_CONFIG || {}).CONTACT || {};
+  // Installment terms, one source for the landing's text and the calculator's limits.
+  const installment = () => Object.assign({ downFrom: 10, years: 10 }, (window.SITORA_CONFIG || {}).INSTALLMENT);
   const telegramUrl = (tg) => 'https://t.me/' + String(tg || '').replace('@', '');
   const phoneDigits = (p) => String(p || '').replace(/\D/g, '');
 
@@ -358,12 +360,13 @@
 
     // ---------- calculator ----------
     function renderCalc() {
+      const plan = installment();
       const a = st.calcApt;
       const free = st.apts.filter((x) => x.status === 'free');
       const basePrice = a ? a.price : free.length ? Math.round(free.reduce((s, x) => s + x.price, 0) / free.length / 10000) * 10000 : 600000;
       const price = S.input('price', { type: 'number', min: 10000, step: 1000, value: basePrice });
-      const down = h('input', { class: 'range', type: 'range', id: 'c-down', min: 10, max: 90, step: 5, value: 30, 'aria-label': t('calc.down') });
-      const months = h('input', { class: 'range', type: 'range', id: 'c-months', min: 6, max: 120, step: 6, value: 60, 'aria-label': t('calc.months') });
+      const down = h('input', { class: 'range', type: 'range', id: 'c-down', min: plan.downFrom, max: 90, step: 5, value: Math.max(30, plan.downFrom), 'aria-label': t('calc.down') });
+      const months = h('input', { class: 'range', type: 'range', id: 'c-months', min: 6, max: plan.years * 12, step: 6, value: Math.min(60, plan.years * 12), 'aria-label': t('calc.months') });
       const dv = h('b', { class: 'num' }), mv = h('b', { class: 'num' });
       const out = h('div', { class: 'calc-out' });
       const upd = () => {
@@ -394,7 +397,7 @@
       // Apartment types: { rooms, areaFrom, areaTo, priceFrom }.
       types: (cfg.DEFAULT_TYPES || []).map(([rooms, areaFrom, areaTo, priceFrom]) => ({ rooms, areaFrom, areaTo, priceFrom })),
     };
-    const plan = cfg.INSTALLMENT || { downFrom: 20, years: 5 };
+    const plan = installment();
     let alive = true;
     const page = h('div', { class: 'page-in lux lux-home' });
     root.appendChild(page);
@@ -458,7 +461,7 @@
 
     // Installment terms.
     const term = (ic, label, value) => h('div', { class: 'plan-cell' }, h('span', { class: 'plan-ic' }, landIcon(ic)), h('small', null, label), h('b', null, value));
-    const installment = h('section', { class: 'lux-plan', id: 'installment' }, h('div', { class: 'wrap' },
+    const planBand = h('section', { class: 'lux-plan', id: 'installment' }, h('div', { class: 'wrap' },
       h('div', { class: 'lux-head reveal' }, h('h2', null, accentFirst(t('plan.title'))), h('p', null, t('plan.sub'))),
       h('div', { class: 'plan-grid reveal' },
         term('card', t('plan.down'), t('plan.downV', { n: plan.downFrom })),
@@ -485,7 +488,7 @@
         c.telegram ? h('a', { class: 'btn gold lg', href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, landIcon('send'), t('cta.tg')) : null),
       callBox));
 
-    page.append(hero, numbers, why, steps, about, layouts, installment, teaser, contactBand, siteFooter());
+    page.append(hero, numbers, why, steps, about, layouts, planBand, teaser, contactBand, siteFooter());
     renderData(); renderCall();
     const stopReveal = revealIn(page, (el) => { if (el.closest('#numbers')) count(); });
 
