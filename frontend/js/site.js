@@ -6,13 +6,27 @@
 
   const STATUS_VAR = { free: 'var(--good)', booked: 'var(--warn)', sold: 'var(--muted)', onrequest: 'var(--info)' };
   const STATUS_BG = { free: 'var(--good-soft)', booked: 'var(--warn-soft)', sold: 'var(--surface-3)', onrequest: 'var(--info-soft)' };
+  // Role cards of the landing: key, icon, where the button leads, button text.
+  const ROLES = [['buyer', 'home', '/cabinet', 'land.demo'], ['dev', 'building', '/crm', 'land.enter'], ['acc', 'chart', '/crm', 'land.enter']];
+  const SA_ICONS = ['plus', 'users', 'file', 'chart'];
 
   S.views.home = function (root) {
     const cfg = window.SITORA_CONFIG || {};
     const st = { building: null, floors: [], apts: [], rate: null, sel: null, floor: null, rooms: 'all', maxPrice: 0, sort: 'price', onlyFree: true, shown: 12, overlay: true, time: 'dusk' };
-    let house = null, alive = true;
+    let house = null, alive = true, io = null;
     const page = h('div', { class: 'page-in' });
     root.appendChild(page);
+
+    // Platform hero above the 3D tower: what Binosoz is, before the showroom of one building.
+    const landStats = h('div', { class: 'land-stats glass reveal' });
+    page.appendChild(h('section', { class: 'land-hero', id: 'landing' }, h('div', { class: 'wrap' },
+      h('span', { class: 'land-eyebrow reveal' }, S.icon('building'), t('land.eyebrow')),
+      h('h1', { class: 'reveal' }, t('land.title')),
+      h('p', { class: 'reveal' }, t('land.sub')),
+      h('div', { class: 'land-cta reveal' },
+        h('button', { class: 'btn gold lg', onclick: () => scrollTo('contact') }, t('land.cta1')),
+        h('button', { class: 'btn ghost lg', onclick: () => scrollTo('home') }, t('land.cta2'))),
+      landStats)));
 
     const houseBox = h('div', { class: 'house3d', id: 'house3d' });
     const tip = h('div', { class: 'tip', hidden: true });
@@ -41,10 +55,14 @@
     page.appendChild(hero);
 
     const aptSection = h('section', { class: 'section', id: 'apartments' });
+    const rolesSection = h('section', { class: 'section alt', id: 'roles' });
+    const superSection = h('section', { class: 'section', id: 'platform-owner' });
     const calcSection = h('section', { class: 'section alt', id: 'calc' });
     const aboutSection = h('section', { class: 'section', id: 'about' });
     const contactSection = h('section', { class: 'section alt', id: 'contact' });
-    page.append(aptSection, calcSection, aboutSection, contactSection, footer());
+    page.append(aptSection, rolesSection, superSection, calcSection, aboutSection, contactSection, footer());
+    // These do not depend on the building's data, so they show even while it loads or when the API is down.
+    renderLandStats(); renderRoles(); renderSuper(); reveal();
 
     // ---------- data ----------
     async function load() {
@@ -90,7 +108,36 @@
     function pushToHouse() { if (!house) return; house.setData(st.apts.map((a) => ({ id: a.id, floor: a.floor, planSlot: a.planSlot, number: a.number, status: a.status, rooms: a.rooms, area: a.area, price: a.price }))); if (st.sel) house.selectApartment(st.sel.id); else if (st.floor !== null) house.selectFloor(st.floor); }
 
     // ---------- render ----------
-    function renderAll() { renderHero(); renderFloors(); renderSheet(); renderApartments(); renderCalc(); renderAbout(); renderContact(); }
+    function renderAll() { renderLandStats(); renderHero(); renderFloors(); renderSheet(); renderApartments(); renderCalc(); renderAbout(); renderContact(); }
+
+    // ---------- landing ----------
+    function renderLandStats() {
+      const b = st.building;
+      const floors = b ? b.floorsCount || Math.max(0, ...st.floors.map((f) => f.number)) : 0;
+      const ls = (v, l) => h('div', { class: 'ls' }, h('b', null, v), h('span', null, l));
+      landStats.replaceChildren(ls(floors ? S.fmt.n(floors) : '—', t('land.floors')), ls(st.apts.length ? S.fmt.n(st.apts.length) : '—', t('land.apts')), ls('3', t('land.roles')));
+    }
+    function renderRoles() {
+      rolesSection.replaceChildren(h('div', { class: 'wrap' },
+        h('div', { class: 'sec-head reveal' }, h('div', null, h('h2', null, t('roles.title')), h('p', null, t('roles.sub')))),
+        h('div', { class: 'grid g3' }, ROLES.map(([k, ic, href, cta], i) => h('article', { class: 'role-card reveal', 'data-role': k, style: { transitionDelay: i * 90 + 'ms' } },
+          h('div', { class: 'role-ic' }, S.icon(ic)),
+          h('h3', null, t('roles.' + k)),
+          h('ul', { class: 'role-list' }, [1, 2, 3, 4].map((n) => h('li', null, t('roles.' + k + '.' + n)))),
+          h('a', { class: 'btn ghost', href }, t(cta)))))));
+    }
+    function renderSuper() {
+      superSection.replaceChildren(h('div', { class: 'wrap' }, h('div', { class: 'sa-card reveal' },
+        h('div', { class: 'sa-text' }, h('span', { class: 'sa-badge' }, S.icon('shield'), 'Super Admin'), h('h2', null, t('sa.title')), h('p', null, t('sa.sub')), h('a', { class: 'btn gold lg', href: '/platform' }, t('sa.cta'))),
+        h('ul', { class: 'sa-list' }, SA_ICONS.map((ic, i) => h('li', null, h('span', { class: 'sa-ic' }, S.icon(ic)), t('sa.' + (i + 1))))))));
+    }
+    // Sections fade in as they scroll into view; without IntersectionObserver they are simply shown.
+    function reveal() {
+      const els = S.$$('.reveal:not(.in)', page);
+      if (!('IntersectionObserver' in window)) { els.forEach((el) => el.classList.add('in')); return; }
+      io = io || new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.12 });
+      els.forEach((el) => io.observe(el));
+    }
 
     function minPrice() { const f = st.apts.filter((a) => a.status === 'free'); return f.length ? Math.min(...f.map((a) => a.price)) : 0; }
     function renderHero() {
@@ -293,6 +340,6 @@
     S.scrollTo = scrollTo;
 
     load();
-    return () => { alive = false; if (house) house.destroy(); };
+    return () => { alive = false; if (io) io.disconnect(); if (house) house.destroy(); };
   };
 })();

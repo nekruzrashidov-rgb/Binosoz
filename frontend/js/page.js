@@ -42,7 +42,7 @@
     const link = (href, label, on) => h('a', { class: on ? 'on' : '', href }, label);
     const section = (id, label) => h('button', { type: 'button', onclick: () => { menu.classList.remove('open'); S.scrollTo(id); } }, label);
     const menu = page === 'home'
-      ? h('nav', { class: 'nav', 'aria-label': t('nav.main') }, section('home', t('nav.home')), section('apartments', t('nav.apartments')), section('calc', t('nav.calc')), section('about', t('nav.about')), section('contact', t('nav.contact')))
+      ? h('nav', { class: 'nav', 'aria-label': t('nav.main') }, section('landing', t('nav.home')), section('apartments', t('nav.apartments')), section('calc', t('nav.calc')), section('about', t('nav.about')), section('contact', t('nav.contact')))
       : h('nav', { class: 'nav', 'aria-label': t('nav.main') }, link('/', t('nav.home')),
         S.api.isCustomer() ? link('/cabinet', t('nav.cabinet'), page === 'cabinet') : null,
         S.api.isStaff() ? link('/crm', t('nav.crm'), page === 'crm') : null,
