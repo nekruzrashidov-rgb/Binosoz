@@ -18,7 +18,7 @@
 - [x] `dotnet build --warnaserror` без предупреждений; `dotnet test` — 189 из 189 (через `SITORA_TEST_DB`), новые тесты в `Security/FrontendTests.cs`.
 - [x] В браузере (Development): главная с данными API, редирект на `/login`, вход менеджера → CRM, сделка, чат через SignalR, RU/TJ, выход, старые хеш-ссылки.
 - [x] PR #1 `feat/multipage-frontend` → `main` смёржен на зелёном CI. Первый в истории прогон CI: сборка, тесты на Linux через Testcontainers и Docker-образ с новым контекстом прошли; проверка compose-файлов падала из-за не заданных в CI переменных почты — исправлено.
-- [x] Маршруты Vercel: `cleanUrls` и адреса `/login`, `/cabinet`, `/crm`, `/platform` в `frontend/vercel.json` и в корневом `vercel.json` (проект `binosoz`, привязанный к GitHub, собирается из корня).
+- [x] Маршруты Vercel: `cleanUrls` и адреса `/login`, `/cabinet`, `/crm`, `/platform` в `frontend/vercel.json`. Проект Vercel `binosoz` собирается из папки `frontend/`; строки `"buildCommand": null` и `"framework": null` в этом файле обязательны — без них Vercel запускает `vite build` и деплой падает.
 
 **Отличия от ТЗ этапа.** Наборы скриптов шире, иначе страницы падают: `crm.js` и `platform.js` берут `S.homeFor` из `cabinet.js` и `S.workspace` из `panels.js`, чату нужен SignalR. `mock.js` не грузится, поэтому `page.js` по умолчанию ставит `API_BASE = '/api/v1'`. Вместо перехвата всех адресов в `MapWhen` — отдельные адреса страниц, чтобы `/health`, `/swagger` и ошибки API не отдавали `index.html`. `COPY ../frontend` в Docker невозможен (вне контекста сборки), поэтому контекст перенесён в корень.
 

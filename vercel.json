@@ -1,10 +1,3 @@
 {
-  "outputDirectory": "frontend",
-  "cleanUrls": true,
-  "rewrites": [
-    { "source": "/login", "destination": "/login.html" },
-    { "source": "/cabinet", "destination": "/cabinet.html" },
-    { "source": "/crm", "destination": "/crm.html" },
-    { "source": "/platform", "destination": "/platform.html" }
-  ]
+  "outputDirectory": "frontend"
 }
