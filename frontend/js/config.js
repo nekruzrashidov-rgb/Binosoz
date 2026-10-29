@@ -8,6 +8,9 @@ window.SITORA_CONFIG = {
   API_BASE: '',
   ORG_SLUG: 'sitora',
   DEFAULT_BUILDING_ID: null,
+  // Numbers for the landing's stats bar when the API is unavailable; with the API the real ones are shown.
+  DEFAULT_FLOORS: 16,
+  DEFAULT_APTS: 128,
   CONTACT: {
     phone: '+992 00 000 00 00',
     telegram: '@sitora_sales',

@@ -80,6 +80,7 @@
         st.priceCap = st.maxPrice;
       } catch (e) {
         if (!alive) return;
+        renderLandStats(true);
         loading.replaceChildren(h('div', { class: 'card', style: { maxWidth: '460px', background: 'rgba(255,255,255,.08)', color: '#fff' } }, h('h3', null, t('err.loadTitle')), h('p', { style: { margin: '8px 0 14px' } }, e.message), h('button', { class: 'btn', onclick: () => { loading.replaceChildren(t('hero.loading')); load(); } }, t('common.retry')), h('button', { class: 'btn ghost', style: { marginLeft: '8px', color: '#fff' }, onclick: () => S.openSettings() }, t('settings.title'))));
         return;
       }
@@ -111,11 +112,13 @@
     function renderAll() { renderLandStats(); renderHero(); renderFloors(); renderSheet(); renderApartments(); renderCalc(); renderAbout(); renderContact(); }
 
     // ---------- landing ----------
-    function renderLandStats() {
+    // Dashes while the building loads; if the API is unavailable — the numbers from config.js, so the hero is never empty.
+    function renderLandStats(offline) {
       const b = st.building;
-      const floors = b ? b.floorsCount || Math.max(0, ...st.floors.map((f) => f.number)) : 0;
+      const floors = b ? b.floorsCount || Math.max(0, ...st.floors.map((f) => f.number)) : offline ? cfg.DEFAULT_FLOORS || 16 : 0;
+      const apts = st.apts.length || (offline ? cfg.DEFAULT_APTS || 128 : 0);
       const ls = (v, l) => h('div', { class: 'ls' }, h('b', null, v), h('span', null, l));
-      landStats.replaceChildren(ls(floors ? S.fmt.n(floors) : '—', t('land.floors')), ls(st.apts.length ? S.fmt.n(st.apts.length) : '—', t('land.apts')), ls('3', t('land.roles')));
+      landStats.replaceChildren(ls(floors ? S.fmt.n(floors) : '—', t('land.floors')), ls(apts ? S.fmt.n(apts) : '—', t('land.apts')), ls('3', t('land.roles')));
     }
     function renderRoles() {
       rolesSection.replaceChildren(h('div', { class: 'wrap' },
