@@ -2,5 +2,12 @@
   "buildCommand": null,
   "outputDirectory": ".",
   "installCommand": null,
-  "framework": null
+  "framework": null,
+  "rewrites": [
+    { "source": "/login", "destination": "/login.html" },
+    { "source": "/cabinet", "destination": "/cabinet.html" },
+    { "source": "/crm", "destination": "/crm.html" },
+    { "source": "/platform", "destination": "/platform.html" },
+    { "source": "/", "destination": "/index.html" }
+  ]
 }

@@ -131,17 +131,6 @@ public class AuthTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFactor
         Assert.Contains("/api/v1/auth/login", await response.Content.ReadAsStringAsync());
     }
 
-    [Fact]
-    public async Task Root_RedirectsToSwagger()
-    {
-        var client = factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-
-        var response = await client.GetAsync("/");
-
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.Equal("/swagger", response.Headers.Location?.OriginalString);
-    }
-
     private async Task<AuthResponse> LoginAdminAsync()
     {
         var response = await _client.PostAsJsonAsync("/api/v1/auth/login",

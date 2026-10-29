@@ -57,7 +57,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Сборка образа (без публикации)
-        run: docker build --file backend/src/Sitora.WebApi/Dockerfile --tag sitora-webapi:ci backend
+        run: docker build --file backend/src/Sitora.WebApi/Dockerfile --tag sitora-webapi:ci .
 
       # Значения-заглушки нужны только для разбора файлов: compose требует обязательные переменные.
       - name: Проверка compose-файлов
@@ -67,6 +67,9 @@ jobs:
           ENCRYPTION_KEY: ci
           API_DOMAIN: api.example.test
           SITE_ORIGIN: https://example.test
+          EMAIL_PROVIDER: Dev
+          EMAIL_FROM: noreply@example.test
+          EMAIL_INVITE_URL: https://example.test/login#invite=
         run: |
           docker compose -f docker-compose.yml config --quiet
           docker compose -f docker-compose.prod.yml config --quiet

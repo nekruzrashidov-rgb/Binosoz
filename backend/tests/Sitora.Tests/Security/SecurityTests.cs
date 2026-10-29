@@ -117,7 +117,10 @@ public class ProductionTests(ProductionFactory factory) : IClassFixture<Producti
         Assert.Contains("max-age=31536000", secure.Headers.GetValues("Strict-Transport-Security").Single());
 
         Assert.Equal(HttpStatusCode.NotFound, (await https.GetAsync("/swagger/v1/swagger.json")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await https.GetAsync("/")).StatusCode);
+        // Корень в Production — сайт, а не Swagger.
+        var root = await https.GetAsync("/");
+        Assert.Equal(HttpStatusCode.OK, root.StatusCode);
+        Assert.Contains("data-page=\"home\"", await root.Content.ReadAsStringAsync());
     }
 }
 
