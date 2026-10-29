@@ -18,12 +18,13 @@
     root.appendChild(page);
 
     // Platform hero above the 3D tower: what Binosoz is, before the showroom of one building.
-    const landStats = h('div', { class: 'land-stats glass reveal' });
+    // It is on screen at once, so it rises with a CSS animation instead of waiting for the scroll observer.
+    const landStats = h('div', { class: 'land-stats glass' });
     page.appendChild(h('section', { class: 'land-hero', id: 'landing' }, h('div', { class: 'wrap' },
-      h('span', { class: 'land-eyebrow reveal' }, S.icon('building'), t('land.eyebrow')),
-      h('h1', { class: 'reveal' }, t('land.title')),
-      h('p', { class: 'reveal' }, t('land.sub')),
-      h('div', { class: 'land-cta reveal' },
+      h('span', { class: 'land-eyebrow' }, S.icon('building'), t('land.eyebrow')),
+      h('h1', null, t('land.title')),
+      h('p', null, t('land.sub')),
+      h('div', { class: 'land-cta' },
         h('button', { class: 'btn gold lg', onclick: () => scrollTo('contact') }, t('land.cta1')),
         h('button', { class: 'btn ghost lg', onclick: () => scrollTo('home') }, t('land.cta2'))),
       landStats)));
@@ -80,7 +81,6 @@
         st.priceCap = st.maxPrice;
       } catch (e) {
         if (!alive) return;
-        renderLandStats(true);
         loading.replaceChildren(h('div', { class: 'card', style: { maxWidth: '460px', background: 'rgba(255,255,255,.08)', color: '#fff' } }, h('h3', null, t('err.loadTitle')), h('p', { style: { margin: '8px 0 14px' } }, e.message), h('button', { class: 'btn', onclick: () => { loading.replaceChildren(t('hero.loading')); load(); } }, t('common.retry')), h('button', { class: 'btn ghost', style: { marginLeft: '8px', color: '#fff' }, onclick: () => S.openSettings() }, t('settings.title'))));
         return;
       }
@@ -112,13 +112,13 @@
     function renderAll() { renderLandStats(); renderHero(); renderFloors(); renderSheet(); renderApartments(); renderCalc(); renderAbout(); renderContact(); }
 
     // ---------- landing ----------
-    // Dashes while the building loads; if the API is unavailable — the numbers from config.js, so the hero is never empty.
-    function renderLandStats(offline) {
+    // The numbers from config.js until the building loads (and when the API is unavailable), then the real ones.
+    function renderLandStats() {
       const b = st.building;
-      const floors = b ? b.floorsCount || Math.max(0, ...st.floors.map((f) => f.number)) : offline ? cfg.DEFAULT_FLOORS || 16 : 0;
-      const apts = st.apts.length || (offline ? cfg.DEFAULT_APTS || 128 : 0);
+      const floors = (b && (b.floorsCount || Math.max(0, ...st.floors.map((f) => f.number)))) || cfg.DEFAULT_FLOORS || 16;
+      const apts = st.apts.length || cfg.DEFAULT_APTS || 128;
       const ls = (v, l) => h('div', { class: 'ls' }, h('b', null, v), h('span', null, l));
-      landStats.replaceChildren(ls(floors ? S.fmt.n(floors) : '—', t('land.floors')), ls(apts ? S.fmt.n(apts) : '—', t('land.apts')), ls('3', t('land.roles')));
+      landStats.replaceChildren(ls(S.fmt.n(floors), t('land.floors')), ls(S.fmt.n(apts), t('land.apts')), ls('3', t('land.roles')));
     }
     function renderRoles() {
       rolesSection.replaceChildren(h('div', { class: 'wrap' },

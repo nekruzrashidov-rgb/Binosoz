@@ -430,6 +430,11 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
   background-size: 44px 44px;
   -webkit-mask-image: radial-gradient(ellipse 80% 70% at 30% 20%, #000 30%, transparent 78%); mask-image: radial-gradient(ellipse 80% 70% at 30% 20%, #000 30%, transparent 78%);
 }
+.land-hero .wrap > * { animation: rise 0.8s cubic-bezier(.2, .8, .2, 1) both; }
+.land-hero .wrap > :nth-child(2) { animation-delay: 0.08s; }
+.land-hero .wrap > :nth-child(3) { animation-delay: 0.16s; }
+.land-hero .wrap > :nth-child(4) { animation-delay: 0.24s; }
+.land-hero .wrap > :nth-child(5) { animation-delay: 0.32s; }
 .land-eyebrow {
   display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px;
   font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
