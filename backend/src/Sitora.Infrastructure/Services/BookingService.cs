@@ -76,7 +76,7 @@ public class BookingService(
             await transaction.CommitAsync(ct);
         }
 
-        cache.Invalidate();
+        await cache.InvalidateAsync(ct);
         await NotifyAsync($"Новая бронь{(isStaff ? "" : " с сайта")}: {clientName}, {clientPhone}, кв. №{apartment.Number}, " +
                           $"до {booking.ExpiresAt.Add(DushanbeOffset):dd.MM.yyyy HH:mm} (Душанбе)", ct);
 
@@ -113,7 +113,7 @@ public class BookingService(
             await SaveAsync(ct);
             await transaction.CommitAsync(ct);
 
-            cache.Invalidate();
+            await cache.InvalidateAsync(ct);
             return ToResponse(booking, apartment.Number);
         }
     }
@@ -136,7 +136,7 @@ public class BookingService(
 
         if (expired > 0)
         {
-            cache.Invalidate();
+            await cache.InvalidateAsync(ct);
             logger.LogInformation("Снято просроченных броней: {Count}", expired);
         }
 

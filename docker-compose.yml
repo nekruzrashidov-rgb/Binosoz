@@ -17,6 +17,18 @@ services:
       timeout: 5s
       retries: 10
 
+  # Общий кэш каталога, второго фактора и отметок «в сети». Без него API работает на кэше в памяти.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   webapi:
     build:
       context: .
@@ -25,6 +37,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ConnectionStrings__Default: Host=db;Port=5432;Database=sitora;Username=sitora;Password=${POSTGRES_PASSWORD}
+      Redis__ConnectionString: redis:6379,abortConnect=false
       Jwt__Key: ${JWT_KEY:?Задайте JWT_KEY в файле .env}
       Encryption__Key: ${ENCRYPTION_KEY:?Задайте ENCRYPTION_KEY в файле .env}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
@@ -38,6 +51,8 @@ services:
     ports:
       - "8080:8080"
     depends_on:
+      redis:
+        condition: service_healthy
       db:
         condition: service_healthy
 

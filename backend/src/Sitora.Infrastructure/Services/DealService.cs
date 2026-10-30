@@ -112,7 +112,7 @@ public class DealService(
         }
 
         if (apartment.Status != statusBefore)
-            cache.Invalidate();
+            await cache.InvalidateAsync(ct);
         return await GetByIdAsync(deal.Id, ct);
     }
 
@@ -142,7 +142,7 @@ public class DealService(
         }
 
         if (apartment.Status != statusBefore)
-            cache.Invalidate();
+            await cache.InvalidateAsync(ct);
         return await GetByIdAsync(id, ct);
     }
 

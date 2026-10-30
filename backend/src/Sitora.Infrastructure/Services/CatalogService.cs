@@ -219,7 +219,7 @@ public class CatalogService(
     {
         var result = await importer.ImportAsync(buildingId, excelFile, ct);
         if (result.Succeeded)
-            cache.Invalidate();
+            await cache.InvalidateAsync(ct);
         return result;
     }
 
@@ -240,7 +240,7 @@ public class CatalogService(
             throw new ConflictException(conflictMessage);
         }
 
-        cache.Invalidate();
+        await cache.InvalidateAsync(ct);
     }
 
     // У квартиры два уникальных правила на этаже: номер и позиция на плане.
@@ -257,7 +257,7 @@ public class CatalogService(
                 : $"Квартира №{number} уже есть на этом этаже");
         }
 
-        cache.Invalidate();
+        await cache.InvalidateAsync(ct);
     }
 
     private static void EnsureFloorNumber(Building building, int number)

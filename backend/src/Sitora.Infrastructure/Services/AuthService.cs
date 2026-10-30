@@ -1,9 +1,9 @@
-using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -27,7 +27,7 @@ public class AuthService(
     IBrandService brands,
     IAuditService audit,
     ICurrentUser currentUser,
-    IMemoryCache cache,
+    IDistributedCache cache,
     IOptions<IdentityOptions> identityOptions,
     IOptions<AuthOptions> authOptions,
     TimeProvider timeProvider,
@@ -320,7 +320,7 @@ public class AuthService(
 
         var token = Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
         var expiresAt = Now.Add(ChallengeLifetime);
-        cache.Set(ChallengeKey(token), new StrongBox<(Guid UserId, int Attempts)>((user.Id, 0)), ChallengeLifetime);
+        await SaveCachedAsync(ChallengeKey(token), new Challenge(user.Id, 0, expiresAt));
         return new SecondFactorChallenge(token, expiresAt, methods,
             "Код принят. Подтвердите вход паролем или кодом из приложения-аутентификатора");
     }
@@ -328,13 +328,14 @@ public class AuthService(
     public async Task<AuthResponse> CompleteSecondFactorAsync(SecondFactorRequest request, CancellationToken ct = default)
     {
         var key = ChallengeKey(request.ChallengeToken);
-        if (!cache.TryGetValue(key, out StrongBox<(Guid UserId, int Attempts)>? challenge) || challenge is null)
+        var challenge = await ReadCachedAsync<Challenge>(key, ct);
+        if (challenge is null || challenge.ExpiresAt <= Now)
             throw new UnauthorizedException(InvalidChallenge);
 
-        var user = await userManager.FindByIdAsync(challenge.Value.UserId.ToString());
+        var user = await userManager.FindByIdAsync(challenge.UserId.ToString());
         if (user is null || !user.IsActive || !await userManager.IsInRoleAsync(user, RoleNames.PlatformOwner))
         {
-            cache.Remove(key);
+            await cache.RemoveAsync(key, ct);
             throw new UnauthorizedException(InvalidChallenge);
         }
 
@@ -355,14 +356,17 @@ public class AuthService(
 
         if (!ok)
         {
-            challenge.Value = (challenge.Value.UserId, challenge.Value.Attempts + 1);
-            if (challenge.Value.Attempts >= MaxChallengeAttempts)
-                cache.Remove(key);
+            // Число попыток хранится вместе с запросом и живёт до того же срока, что и он.
+            var attempts = challenge.Attempts + 1;
+            if (attempts >= MaxChallengeAttempts)
+                await cache.RemoveAsync(key, ct);
+            else
+                await SaveCachedAsync(key, challenge with { Attempts = attempts });
             logger.LogWarning("Неверный второй фактор создателя платформы {UserId}", user.Id);
             throw new UnauthorizedException("Неверный пароль или код");
         }
 
-        cache.Remove(key);
+        await cache.RemoveAsync(key, ct);
         await userManager.ResetAccessFailedCountAsync(user);
         logger.LogInformation("Создатель платформы {UserId} вошёл с двумя факторами", user.Id);
         return await IssueTokensAsync(user, ct);
@@ -517,7 +521,7 @@ public class AuthService(
         var user = await userManager.FindByEmailAsync(address);
         // Создатель платформы по паролю не входит: только код из почты и второй фактор.
         if (user is null || !user.IsActive || await userManager.IsInRoleAsync(user, RoleNames.PlatformOwner))
-            throw UnknownAccountFailure(address, request.Password);
+            throw await UnknownAccountFailureAsync(address, request.Password, ct);
 
         if (await userManager.IsLockedOutAsync(user))
             throw new UnauthorizedException(LockedOut);
@@ -537,21 +541,42 @@ public class AuthService(
 
     // Для несуществующей или отключённой почты ведём такой же счётчик ошибок, как Identity для настоящей,
     // и так же тратим время на проверку пароля: иначе по ответу или по задержке можно узнать, кто сотрудник.
-    private UnauthorizedException UnknownAccountFailure(string address, string password)
+    // Счётчик живёт в общем кэше (Redis), чтобы блокировка действовала на всех экземплярах API; окно — как у Identity.
+    // Чтение и запись не атомарны: при одновременных попытках счёт может отстать на единицу — для блокировки это допустимо.
+    private async Task<UnauthorizedException> UnknownAccountFailureAsync(string address, string password, CancellationToken ct)
     {
         userManager.PasswordHasher.VerifyHashedPassword(DummyUser, DummyPasswordHash.Value, password);
 
         var lockout = identityOptions.Value.Lockout;
-        var failures = cache.GetOrCreate("login-failures:" + address.ToUpperInvariant(), entry =>
-        {
-            entry.AbsoluteExpirationRelativeToNow = lockout.DefaultLockoutTimeSpan;
-            return new StrongBox<int>();
-        })!;
-        if (failures.Value >= lockout.MaxFailedAccessAttempts)
+        var key = "login-failures:" + address.ToUpperInvariant();
+        var failures = await ReadCachedAsync<LoginFailures>(key, ct);
+        if (failures is null || failures.ExpiresAt <= Now)
+            failures = new LoginFailures(0, Now.Add(lockout.DefaultLockoutTimeSpan));
+        if (failures.Count >= lockout.MaxFailedAccessAttempts)
             return new UnauthorizedException(LockedOut);
 
-        Interlocked.Increment(ref failures.Value);
+        await SaveCachedAsync(key, failures with { Count = failures.Count + 1 });
         return new UnauthorizedException(InvalidCredentials);
+    }
+
+    // Запрос второго фактора и неудачные входы на несуществующую почту — в общем кэше, а не в памяти процесса:
+    // код, принятый одним экземпляром API, можно подтвердить на другом.
+    private sealed record Challenge(Guid UserId, int Attempts, DateTime ExpiresAt);
+
+    private sealed record LoginFailures(int Count, DateTime ExpiresAt);
+
+    private async Task<T?> ReadCachedAsync<T>(string key, CancellationToken ct) where T : class
+    {
+        var bytes = await cache.GetAsync(key, ct);
+        return bytes is null ? null : JsonSerializer.Deserialize<T>(bytes);
+    }
+
+    // Запись живёт до своего срока ExpiresAt, а не «ещё столько же» после каждого обновления.
+    private Task SaveCachedAsync<T>(string key, T value) where T : class
+    {
+        var expiresAt = value switch { Challenge c => c.ExpiresAt, LoginFailures f => f.ExpiresAt, _ => Now.AddMinutes(5) };
+        return cache.SetAsync(key, JsonSerializer.SerializeToUtf8Bytes(value),
+            new DistributedCacheEntryOptions { AbsoluteExpiration = new DateTimeOffset(expiresAt, TimeSpan.Zero) });
     }
 
     private static readonly AppUser DummyUser = new();

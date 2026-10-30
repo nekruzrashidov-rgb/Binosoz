@@ -26,9 +26,9 @@ public interface IChatNotifier
 }
 
 // Когда сотрудник последний раз обращался к API — для отметки «в сети» в чате покупателя.
-// Хранится в памяти процесса: после перезапуска API все считаются «не в сети», пока не сделают запрос.
+// Хранится в общем кэше (Redis) 6 минут: после этого сотрудник считается «не в сети» и время не показывается.
 public interface IPresenceTracker
 {
-    void Touch(Guid userId);
-    DateTime? LastSeen(Guid userId);
+    Task TouchAsync(Guid userId, CancellationToken ct = default);
+    Task<DateTime?> LastSeenAsync(Guid userId, CancellationToken ct = default);
 }

@@ -233,7 +233,7 @@ public class BrandService(
     private async Task SaveAsync(CancellationToken ct)
     {
         await db.SaveChangesAsync(ct);
-        catalogCache.Invalidate();
+        await catalogCache.InvalidateAsync(ct);
     }
 
     private static string? Clean(string? value, int max, string field)

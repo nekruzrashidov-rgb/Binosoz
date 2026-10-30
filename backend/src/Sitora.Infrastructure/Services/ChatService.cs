@@ -57,7 +57,7 @@ public class ChatService(
         var manager = await db.Deals.AsNoTracking().Where(d => d.Id == dealId)
             .Select(d => new { d.ManagerId, d.Manager.FullName })
             .SingleAsync(ct);
-        var lastSeen = presence.LastSeen(manager.ManagerId);
+        var lastSeen = await presence.LastSeenAsync(manager.ManagerId, ct);
         var online = lastSeen is { } seen && timeProvider.GetUtcNow().UtcDateTime - seen <= OnlineWindow;
         return new ChatUnreadResponse(unread, manager.FullName, online, lastSeen);
     }

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Sitora.Domain.Entities;
 using Sitora.Domain.Interfaces;
 using Sitora.Infrastructure.Data;
@@ -58,7 +59,10 @@ public static class DependencyInjection
             .BindConfiguration(EmailOptions.SectionName)
             .ValidateDataAnnotations();
 
-        services.AddMemoryCache();
+        // Redis, если задан Redis__ConnectionString, иначе кэш в памяти. Как и строку подключения к базе,
+        // настройку читаем при создании, а не при регистрации, чтобы её можно было подменить в тестах.
+        services.AddOptions<RedisOptions>().BindConfiguration(RedisOptions.SectionName);
+        services.AddSingleton(sp => RedisOptions.CreateCache(sp.GetRequiredService<IOptions<RedisOptions>>().Value));
         services.AddSingleton<CatalogCache>();
         services.AddSingleton<EncryptionService>();
 
