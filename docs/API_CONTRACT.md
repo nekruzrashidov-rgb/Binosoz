@@ -87,6 +87,15 @@ SecondFactorChallenge = { challengeToken, expiresAt, methods: ["password", "totp
 | POST | `/platform/impersonate/stop` | `AccessTokenResponse` — обычный токен создателя платформы |
 | GET | `/platform/totp` | `{ sharedKey, authenticatorUri }` для приложения-аутентификатора |
 | POST | `/platform/totp/enable` | `{ code }` → 204; после этого вторым фактором подходит и код из приложения |
+| GET | `/platform/applications?status=&page=&pageSize=` | `PagedResult` заявок застройщиков: `{ id, companyName, contactEmail, contactPhone, ownerFullName, comment, status, reviewNote, createdAt, reviewedAt, organizationId }`. `status`: `Pending`, `Approved`, `Rejected`; без него — все |
+| POST | `/platform/applications/{id}/approve` | `{ organizationSlug }` → `{ organizationId, message }`: создаётся организация с владельцем (как `POST /platform/organizations`), владельцу уходит письмо со входом. Уже рассмотренная заявка или занятое короткое имя — 409 |
+| POST | `/platform/applications/{id}/reject` | `{ reason }` → 204, заявителю уходит письмо с причиной. Уже рассмотренная — 409 |
+
+Заявка застройщика без входа (страница `/register`):
+
+| Метод | Путь | Тело / ответ |
+| --- | --- | --- |
+| POST | `/public/applications` | `{ companyName, contactEmail, contactPhone, ownerFullName, comment? }` → `{ applicationId, message }`. Телефон приводится к `+992…`, неверный — 422; неверный формат почты или названия — 400; ещё одна заявка с той же почты, пока прежняя на рассмотрении (24 часа), — 409. Лимит публичных форм |
 
 В режиме «как владелец»:
 - в каждом ответе есть заголовок `X-Impersonated-By: <id создателя платформы>`;
