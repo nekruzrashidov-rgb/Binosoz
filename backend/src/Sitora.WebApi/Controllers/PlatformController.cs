@@ -28,6 +28,17 @@ public class PlatformController(IPlatformService platform) : ControllerBase
         StatusCode(StatusCodes.Status201Created, await platform.CreateOrganizationAsync(request, ct));
 
     /// <summary>Короткое имя (поддомен) и свой домен организации; пустой домен — без своего домена.</summary>
+    /// <summary>Приостановить или снова открыть организацию. При приостановке вход её сотрудникам закрыт, их сессии отзываются.</summary>
+    [HttpPatch("organizations/{organizationId:guid}/status")]
+    [Authorize(Roles = Roles.PlatformOwner)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SetStatus(Guid organizationId, OrganizationStatusRequest request, CancellationToken ct)
+    {
+        await platform.SetOrganizationActiveAsync(organizationId, request.IsActive, ct);
+        return NoContent();
+    }
+
     [HttpPut("organizations/{organizationId:guid}/domain")]
     [Authorize(Roles = Roles.PlatformOwner)]
     [ProducesResponseType<BrandResponse>(StatusCodes.Status200OK)]

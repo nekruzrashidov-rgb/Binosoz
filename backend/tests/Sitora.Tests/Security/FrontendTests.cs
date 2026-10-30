@@ -40,6 +40,17 @@ public class FrontendTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFa
     }
 
     [Fact]
+    public async Task UnknownSitePath_IsNotFoundPage()
+    {
+        var response = await factory.CreateClient().GetAsync("/no-such-page");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("data-page=\"notfound\"", await response.Content.ReadAsStringAsync());
+        Assert.Contains("script-src 'self' https://cdnjs.cloudflare.com;", response.Headers.GetValues("Content-Security-Policy").Single());
+    }
+
+    [Fact]
     public async Task UnknownApiPath_IsNotFound_NotSitePage()
     {
         var response = await factory.CreateClient().GetAsync("/api/v1/no-such-thing");

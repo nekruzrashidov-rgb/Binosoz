@@ -9,7 +9,7 @@
   const page = document.body.dataset.page;
   const guarded = page === 'cabinet' || page === 'crm' || page === 'platform';
   // The buyer-facing pages are always dark: the design of the showroom is built for it.
-  const isPublic = page === 'home' || page === 'apartments' || page === 'contact' || page === 'register' || page === 'accept-invite';
+  const isPublic = page === 'home' || page === 'apartments' || page === 'contact' || page === 'register' || page === 'accept-invite' || page === 'notfound';
   const app = document.getElementById('app');
   const header = h('header', { class: 'top' });
   const main = h('div', { id: 'view' });
@@ -85,6 +85,7 @@
   function view() {
     if (page === 'login') return S.views.login;
     if (page === 'accept-invite') return S.views.acceptInvite;
+    if (page === 'notfound') return (root) => { root.appendChild(S.errorCard()); };
     return S.views[page];
   }
 
@@ -92,7 +93,7 @@
     if (cleanup) { try { cleanup(); } catch (e) { console.error(e); } cleanup = null; }
     S.clear(main); drawHeader();
     window.scrollTo(0, 0);
-    try { const c = view()(main); cleanup = typeof c === 'function' ? c : null; } catch (e) { console.error(e); main.appendChild(h('div', { class: 'wrap', style: { paddingTop: '40px' } }, h('div', { class: 'form-err' }, e.message))); }
+    try { const c = view()(main); cleanup = typeof c === 'function' ? c : null; } catch (e) { console.error(e); main.replaceChildren(S.errorCard(e)); }
   }
 
   // Links of the SPA (#crm, #invite=...) still arrive at the site root, e.g. from invitation letters.
@@ -100,6 +101,19 @@
     const r = (location.hash || '').replace(/^#\/?/, '').split(/[?/=]/)[0];
     return r !== 'home' && PAGES[r] ? PAGES[r] + (r === 'invite' ? location.hash : '') : null;
   }
+
+  // An API error nobody caught (a section loading its data): 401 sends to the login page; a section that is still
+  // only placeholders gets an error card in its place; otherwise a short message is enough.
+  window.addEventListener('unhandledrejection', (ev) => {
+    const e = ev.reason;
+    if (!e || typeof e.status !== 'number') return;
+    ev.preventDefault();
+    if (e.status === 401) { if (!isPublic && page !== 'login') { S.api.clearAuth(); location.replace('/login'); } return; }
+    const area = document.getElementById('ws-main') || main;
+    const loading = S.$('.skel', area) && !S.$('.tbl, form, .card:not(.skel)', area);
+    if (loading && (e.status === 0 || e.status === 404 || e.status >= 500)) area.replaceChildren(S.errorCard(e));
+    else S.err(e);
+  });
 
   async function boot() {
     if (page === 'home' && oldLink()) { location.replace(oldLink()); return; }

@@ -66,7 +66,7 @@
       const area = num(pick(a, ['area', 'totalArea', 'squareMeters'], 0)), pps = num(pick(a, ['pricePerM2', 'pricePerSqm', 'pricePerSquareMeter'], 0));
       return { id: a.id, floorId: pick(a, ['floorId'], null), buildingId: pick(a, ['buildingId'], null), floor: floorNo !== undefined ? floorNo : num(pick(a, ['floorNumber', 'floor'], 0)), number: pick(a, ['number', 'apartmentNumber'], ''), rooms: num(pick(a, ['rooms', 'roomsCount'], 0)), area, pricePerSqm: pps, price: num(pick(a, ['price', 'totalPrice'], area * pps)), status: normStatus(pick(a, ['status'], 'free')), planSlot: pick(a, ['planSlot'], null) === null ? null : num(a.planSlot), model3dId: pick(a, ['model3dId'], null) };
     },
-    lead(l) { return { id: l.id, name: pick(l, ['name', 'fullName', 'customerName'], ''), phone: pick(l, ['phone', 'phoneNumber'], ''), comment: pick(l, ['comment', 'message'], ''), status: leadStatus(pick(l, ['status'], 'New')), apiStatus: String(pick(l, ['status'], 'New')), managerId: pick(l, ['managerId'], null), assignee: pick(l, ['assignee', 'assignedTo', 'managerName', 'responsibleName'], ''), createdAt: pick(l, ['createdAt', 'created'], ''), apartmentId: pick(l, ['apartmentId'], null) }; },
+    lead(l) { return { id: l.id, name: pick(l, ['name', 'fullName', 'customerName'], ''), phone: pick(l, ['phone', 'phoneNumber'], ''), comment: pick(l, ['comment', 'message'], ''), status: leadStatus(pick(l, ['status'], 'New')), apiStatus: String(pick(l, ['status'], 'New')), managerId: pick(l, ['managerId'], null), assignee: pick(l, ['assignee', 'assignedTo', 'managerName', 'responsibleName'], ''), createdAt: pick(l, ['createdAt', 'created'], ''), apartmentId: pick(l, ['apartmentId'], null), source: String(pick(l, ['source'], 'Website')) }; },
     customer(c) { return { id: c.id, fullName: pick(c, ['fullName', 'name'], ''), phone: pick(c, ['phone'], ''), email: pick(c, ['email'], ''), passport: pick(c, ['passportData', 'passport', 'passportNumber'], ''), createdAt: pick(c, ['createdAt'], ''), dealsCount: pick(c, ['dealsCount'], null), deals: arr(c.deals).map(M.deal) }; },
     deal(d) {
       const apt = d.apartment || {}, cu = d.customer || {};
@@ -110,7 +110,7 @@
       return { id: u.id, email: pick(u, ['email'], ''), phone: pick(u, ['phone', 'phoneNumber'], ''), name: pick(u, ['fullName', 'name', 'userName'], ''), roles, role: primaryRole(u.role, roles), organizationId: pick(u, ['organizationId'], null), organizationName: pick(u, ['organizationName'], ''), buildingIds: arr(pick(u, ['buildingIds'], [])), impersonation: u.impersonation || null, status, blocked: active === false || /block|lock/i.test(status) || !!u.isBlocked };
     },
     invitation(i) { return { id: i.id, email: pick(i, ['email'], ''), name: pick(i, ['fullName', 'name'], ''), role: pick(i, ['role'], ''), buildingIds: arr(pick(i, ['buildingIds'], [])), expiresAt: pick(i, ['expiresAt'], ''), createdAt: pick(i, ['createdAt'], '') }; },
-    organization(o) { return { id: o.id, name: pick(o, ['name'], ''), slug: pick(o, ['slug'], ''), active: pick(o, ['isActive'], true) !== false, buildings: num(pick(o, ['buildingsCount'], 0)), users: num(pick(o, ['usersCount'], 0)), createdAt: pick(o, ['createdAt'], '') }; },
+    organization(o) { return { id: o.id, name: pick(o, ['name'], ''), slug: pick(o, ['slug'], ''), active: pick(o, ['isActive'], true) !== false, buildings: num(pick(o, ['buildingsCount'], 0)), users: num(pick(o, ['usersCount'], 0)), createdAt: pick(o, ['createdAt'], ''), logoUrl: pick(o, ['logoUrl'], null), domain: pick(o, ['customDomain'], null), owners: arr(o.ownerEmails), buildingNames: arr(o.buildingNames) }; },
     booking(b) { return { id: b.id, apartmentId: b.apartmentId, apartmentNumber: pick(b, ['apartmentNumber'], ''), name: pick(b, ['name', 'customerName', 'fullName'], ''), phone: pick(b, ['phone', 'customerPhone'], ''), status: String(pick(b, ['status'], 'Active')), createdAt: pick(b, ['createdAt'], ''), expiresAt: pick(b, ['expiresAt'], '') }; },
     audit(a) { return { id: a.id, at: pick(a, ['at', 'createdAt', 'timestamp'], ''), user: pick(a, ['userEmail', 'user', 'userName', 'actor'], '') || (S.t ? S.t('audit.system', null, 'система') : 'система'), action: pick(a, ['action'], ''), entity: pick(a, ['entity', 'entityType'], ''), entityId: pick(a, ['entityId'], ''), before: parseJson(pick(a, ['before', 'oldValues'], null)), after: parseJson(pick(a, ['after', 'newValues'], null)), viaPlatform: !!a.impersonatedById }; },
   });
@@ -303,6 +303,7 @@
     rejectApplication(id, reason) { return request('POST', '/platform/applications/' + id + '/reject', { body: { reason } }); },
     // platform owner
     async organizations() { return arr(await request('GET', '/platform/organizations')).map(M.organization); },
+    setOrganizationActive(id, isActive) { return request('PATCH', '/platform/organizations/' + id + '/status', { body: { isActive } }); },
     createOrganization(b) { return withFields(request('POST', '/platform/organizations', { body: { name: b.name, slug: b.slug, ownerEmail: b.ownerEmail, ownerFullName: b.ownerFullName } })).then(M.organization); },
     async impersonate(organizationId) {
       const d = await request('POST', '/platform/impersonate/' + organizationId);
@@ -455,6 +456,9 @@
     async documents(id) { return arr(await request('GET', '/deals/' + id + '/documents')).map(M.doc); },
     uploadDocument(id, file, type) { const f = new FormData(); f.append('file', file); f.append('type', type || 'Other'); return request('POST', '/deals/' + id + '/documents', { form: f, file }); },
     docLink(id) { return request('GET', '/documents/' + id + '/download'); },
+    // conversations of the staff (fresh first, unread from the buyer) and what is unread for the reader of one deal
+    chats(search) { return request('GET', '/chats', { query: search ? { search } : undefined }).then(arr); },
+    chatUnread(id) { return request('GET', '/deals/' + id + '/messages/unread'); },
     async messages(id) { return arr(await request('GET', '/deals/' + id + '/messages', { query: real() ? { page: 1, pageSize: 100 } : undefined })).map(M.message); },
     sendMessage(id, text) { return request('POST', '/deals/' + id + '/messages', { body: { text } }); },
     async stages(buildingId) { const r = await request('GET', '/buildings/' + buildingId + '/stages'); return arr(Array.isArray(r) ? r : r.stages).map(M.stage).sort((a, b) => a.order - b.order); },

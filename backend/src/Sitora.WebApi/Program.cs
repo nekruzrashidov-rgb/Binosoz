@@ -199,6 +199,7 @@ app.UseCors(SecuritySetup.CorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<ImpersonationAuditMiddleware>();
+app.UseMiddleware<PresenceMiddleware>();
 app.UseRateLimiter();
 
 app.MapControllers();

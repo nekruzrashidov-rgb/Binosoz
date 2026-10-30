@@ -11,10 +11,24 @@ public interface IChatService
     Task<PagedResult<ChatMessageResponse>> GetMessagesAsync(Guid dealId, int page, int pageSize, CancellationToken ct = default);
 
     Task<ChatMessageResponse> SendAsync(Guid dealId, string text, CancellationToken ct = default);
+
+    // Сколько сообщений другой стороны не прочитано; сами сообщения не отмечаются.
+    Task<ChatUnreadResponse> GetUnreadAsync(Guid dealId, CancellationToken ct = default);
+
+    // Для сотрудника: сделки с перепиской, свежие сверху; поиск по имени или телефону покупателя.
+    Task<IReadOnlyList<ChatConversationResponse>> GetConversationsAsync(string? search, CancellationToken ct = default);
 }
 
 // Доставка нового сообщения участникам в реальном времени (SignalR живёт в WebApi).
 public interface IChatNotifier
 {
     Task MessageCreatedAsync(ChatMessageResponse message, CancellationToken ct = default);
+}
+
+// Когда сотрудник последний раз обращался к API — для отметки «в сети» в чате покупателя.
+// Хранится в памяти процесса: после перезапуска API все считаются «не в сети», пока не сделают запрос.
+public interface IPresenceTracker
+{
+    void Touch(Guid userId);
+    DateTime? LastSeen(Guid userId);
 }

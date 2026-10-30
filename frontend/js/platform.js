@@ -21,24 +21,48 @@
     const views = {
       orgs(body) {
         const holder = h('div');
+        const search = S.input('search', { type: 'search', placeholder: t('plat.search'), 'aria-label': t('plat.search') });
+        const opened = new Set();
+        let list = [], focus = null;
+        // The logo is served by the API: a relative address needs the API's host when the site is elsewhere.
+        const src = (u) => (u && u.charAt(0) === '/' ? S.apiBase().replace(/\/api\/v1\/?$/, '') + u : u);
+        const own = (fn) => (e) => { e.stopPropagation(); fn(e); };
+        const toggle = (o) => own((e) => S.busy(e.currentTarget, async () => {
+          if (o.active && !(await S.confirm(t('plat.suspendText', { o: o.name }), t('plat.suspend'), true))) return;
+          try { await S.api.setOrganizationActive(o.id, !o.active); S.toast(t(o.active ? 'plat.suspended' : 'plat.activated', { o: o.name }), 'ok'); load(); } catch (er) { S.err(er); }
+        }));
+        const details = (o) => h('div', { class: 'org-details' },
+          h('div', null, h('small', { class: 'muted' }, t('plat.owners')), o.owners.length ? o.owners.map((e) => h('div', null, h('a', { href: 'mailto:' + e, onclick: (ev) => ev.stopPropagation() }, e))) : h('div', null, '—')),
+          h('div', null, h('small', { class: 'muted' }, t('plat.buildingList')), o.buildingNames.length ? h('ul', null, o.buildingNames.map((b) => h('li', null, b))) : h('div', null, t('plat.noBuildings'))),
+          o.domain ? h('div', null, h('small', { class: 'muted' }, t('plat.domain')), h('div', null, o.domain)) : null);
+        const draw = () => {
+          const q = search.value.trim().toLowerCase();
+          const rows = list.filter((o) => !q || o.name.toLowerCase().includes(q) || o.slug.includes(q) || o.owners.some((e) => e.toLowerCase().includes(q)));
+          holder.replaceChildren(S.tbl([
+            { label: t('plat.logo'), render: (o) => (o.logoUrl ? h('img', { class: 'org-logo', src: src(o.logoUrl), alt: '' }) : h('span', { class: 'avatar org-logo' }, S.fmt.initials(o.name))) },
+            { label: t('plat.name'), render: (o) => h('div', null, h('b', null, o.name), h('div', { class: 'app-note-toggle', 'aria-expanded': String(opened.has(o.id)) }, t(opened.has(o.id) ? 'plat.less' : 'plat.more')), opened.has(o.id) ? details(o) : null) },
+            { label: t('plat.slug'), render: (o) => h('code', null, o.slug) },
+            { label: t('plat.buildings'), r: true, num: true, render: (o) => o.buildings },
+            { label: t('plat.users'), r: true, num: true, render: (o) => o.users },
+            { label: t('deal.stage'), render: (o) => S.chip(o.active ? 'Active ok' : 'Blocked', t(o.active ? 'plat.active' : 'plat.off')) },
+            { label: t('plat.createdAt'), render: (o) => S.fmt.date(o.createdAt) },
+            { label: '', r: true, render: (o) => h('div', { class: 'row', style: { gap: '6px', justifyContent: 'flex-end', flexWrap: 'nowrap' } },
+              o.active ? h('button', { class: 'btn soft sm', onclick: own((e) => S.busy(e.currentTarget, async () => { try { await S.api.impersonate(o.id); S.toast(t('imp.started', { o: o.name }), 'ok'); S.go('crm'); } catch (er) { S.err(er); } })) }, t('plat.enter')) : null,
+              h('button', { class: 'btn sm ' + (o.active ? 'ghost' : ''), onclick: toggle(o) }, t(o.active ? 'plat.suspend' : 'plat.activate'))) },
+          ], rows, { empty: t(q ? 'plat.noMatch' : 'plat.none'), rowClass: (o) => 'app-row has-note' + (o.id === focus ? ' row-focus' : ''), onRow: (o) => { if (opened.has(o.id)) opened.delete(o.id); else opened.add(o.id); draw(); } }));
+        };
         const load = async () => {
           holder.replaceChildren(S.skeleton(4, 38));
           try {
-            const list = await S.api.organizations();
-            // Arrived from an approved application: its organization is highlighted and scrolled into view.
-            const focus = focusOrg; focusOrg = null;
-            holder.replaceChildren(S.tbl([
-              { label: t('plat.name'), render: (o) => h('b', null, o.name) },
-              { label: t('plat.slug'), render: (o) => h('code', null, o.slug) },
-              { label: t('plat.buildings'), r: true, num: true, render: (o) => o.buildings },
-              { label: t('plat.users'), r: true, num: true, render: (o) => o.users },
-              { label: t('deal.stage'), render: (o) => S.chip(o.active ? 'Active ok' : 'Blocked', t(o.active ? 'plat.active' : 'plat.off')) },
-              { label: '', r: true, render: (o) => (o.active ? h('button', { class: 'btn soft sm', onclick: (e) => S.busy(e.currentTarget, async () => { try { await S.api.impersonate(o.id); S.toast(t('imp.started', { o: o.name }), 'ok'); S.go('crm'); } catch (er) { S.err(er); } }) }, t('plat.enter')) : '') },
-            ], list, { empty: t('plat.none'), rowClass: (o) => (o.id === focus ? 'row-focus' : '') }));
+            list = await S.api.organizations();
+            // Arrived from an approved application: its organization is highlighted, opened and scrolled into view.
+            if (focusOrg) { focus = focusOrg; opened.add(focusOrg); focusOrg = null; }
+            draw();
             const row = S.$('.row-focus', holder); if (row) row.scrollIntoView({ block: 'center' });
           } catch (e) { holder.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
         };
-        body.replaceChildren(h('div', { class: 'toolbar' }, h('p', { class: 'hint' }, t('plat.enterHint')), h('span', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => orgForm(load) }, t('plat.new'))), holder);
+        search.addEventListener('input', draw);
+        body.replaceChildren(h('p', { class: 'hint' }, t('plat.enterHint')), h('div', { class: 'toolbar' }, h('div', { style: { minWidth: '240px', flex: '1', maxWidth: '380px' } }, search), h('span', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => orgForm(load) }, t('plat.new'))), holder);
         load();
       },
 

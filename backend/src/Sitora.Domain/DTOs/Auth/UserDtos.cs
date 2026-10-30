@@ -60,4 +60,10 @@ public record OrganizationResponse(
     int BuildingsCount,
     int UsersCount,
     DateTime CreatedAt,
-    string? CustomDomain = null);
+    string? CustomDomain = null,
+    string? LogoUrl = null,
+    IReadOnlyList<string>? OwnerEmails = null,
+    IReadOnlyList<string>? BuildingNames = null);
+
+// Приостановить (false) или снова открыть (true) организацию: при приостановке её сотрудники выходят из системы.
+public record OrganizationStatusRequest(bool IsActive);

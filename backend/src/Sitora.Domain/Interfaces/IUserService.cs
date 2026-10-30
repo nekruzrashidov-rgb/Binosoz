@@ -25,6 +25,7 @@ public interface IPlatformService
     Task<IReadOnlyList<OrganizationResponse>> GetOrganizationsAsync(CancellationToken ct = default);
     Task<OrganizationResponse> CreateOrganizationAsync(CreateOrganizationRequest request, CancellationToken ct = default);
     Task<UserResponse> AddOwnerAsync(Guid organizationId, AddOwnerRequest request, CancellationToken ct = default);
+    Task SetOrganizationActiveAsync(Guid organizationId, bool isActive, CancellationToken ct = default);
 
     // id — организация (войти «как её владелец») или пользователь (войти под ним самим).
     Task<AccessTokenResponse> ImpersonateAsync(Guid id, CancellationToken ct = default);

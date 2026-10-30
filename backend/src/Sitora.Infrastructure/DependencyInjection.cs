@@ -91,6 +91,7 @@ public static class DependencyInjection
         services.AddScoped<IFileLinkService, FileLinkService>();
         services.AddScoped<IReportService, ReportService>();
         services.AddScoped<IChatService, ChatService>();
+        services.AddSingleton<IPresenceTracker, PresenceTracker>();
 
         services.AddScoped<INotificationSender, TelegramNotificationSender>();
         services.AddSingleton<ISmsSender, SmsSender>();

@@ -100,6 +100,52 @@ public class ChatTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFactor
     }
 
     [Fact]
+    public async Task Unread_CountsWithoutMarkingRead_AndShowsManagerOnline()
+    {
+        var deal = await TestScenarios.CreateDealAsync(factory);
+        var customer = await factory.CreateCustomerClientAsync(deal.Phone);
+        var manager = await factory.CreateManagerClientAsync();
+        var url = $"/api/v1/deals/{deal.DealId}/messages";
+
+        await manager.PostAsJsonAsync(url, new SendMessageRequest("Документы готовы"));
+        await manager.PostAsJsonAsync(url, new SendMessageRequest("Ждём вас в офисе"));
+
+        var unread = await customer.GetFromJsonAsync<ChatUnreadResponse>(url + "/unread", TestJson.Options);
+        Assert.Equal(2, unread!.Unread);
+        Assert.False(string.IsNullOrEmpty(unread.ManagerName));
+        Assert.True(unread.ManagerOnline);
+        // Счётчик сам ничего не отмечает прочитанным — это делает только открытие переписки.
+        Assert.Equal(2, (await customer.GetFromJsonAsync<ChatUnreadResponse>(url + "/unread", TestJson.Options))!.Unread);
+
+        await customer.GetAsync(url);
+        Assert.Equal(0, (await customer.GetFromJsonAsync<ChatUnreadResponse>(url + "/unread", TestJson.Options))!.Unread);
+    }
+
+    [Fact]
+    public async Task Conversations_FreshFirst_WithUnread_AndSearch()
+    {
+        var older = await TestScenarios.CreateDealAsync(factory);
+        var newer = await TestScenarios.CreateDealAsync(factory);
+        var manager = await factory.CreateManagerClientAsync();
+        await (await factory.CreateCustomerClientAsync(older.Phone)).PostAsJsonAsync($"/api/v1/deals/{older.DealId}/messages", new SendMessageRequest("Первый вопрос"));
+        var newerCustomer = await factory.CreateCustomerClientAsync(newer.Phone);
+        await newerCustomer.PostAsJsonAsync($"/api/v1/deals/{newer.DealId}/messages", new SendMessageRequest("Второй вопрос"));
+        await newerCustomer.PostAsJsonAsync($"/api/v1/deals/{newer.DealId}/messages", new SendMessageRequest("И ещё один"));
+
+        var list = await manager.GetFromJsonAsync<List<ChatConversationResponse>>("/api/v1/chats", TestJson.Options);
+        var mine = list!.Where(c => c.DealId == older.DealId || c.DealId == newer.DealId).ToList();
+        Assert.Equal([newer.DealId, older.DealId], mine.Select(c => c.DealId));
+        Assert.Equal(("И ещё один", 2, true), (mine[0].LastMessage, mine[0].Unread, mine[0].LastFromCustomer));
+
+        var byPhone = await manager.GetFromJsonAsync<List<ChatConversationResponse>>("/api/v1/chats?search=" + Uri.EscapeDataString(newer.Phone[^7..]), TestJson.Options);
+        Assert.Contains(byPhone!, c => c.DealId == newer.DealId);
+        Assert.DoesNotContain(byPhone!, c => c.DealId == older.DealId);
+
+        var customerTries = await newerCustomer.GetAsync("/api/v1/chats");
+        Assert.Equal(HttpStatusCode.Forbidden, customerTries.StatusCode);
+    }
+
+    [Fact]
     public async Task Rest_AccessRules()
     {
         var mine = await TestScenarios.CreateDealAsync(factory);

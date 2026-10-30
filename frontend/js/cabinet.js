@@ -130,20 +130,24 @@
     }
     const page = h('div', { class: 'page-in' }); root.appendChild(page);
     let deals = [], deal = null, sched = null, stopSel = false;
+    // Unread messages from the manager and whether they are online — without marking anything as read.
+    let chat = { unread: 0 };
+    const refreshChat = () => S.api.chatUnread(deal.id).then((u) => { chat = u; if (ws) ws.setItems(items()); return u; }).catch(() => chat);
     const items = () => [
       { key: 'overview', label: t('cab.overview'), icon: 'home' }, { key: 'schedule', label: t('cab.schedule'), icon: 'wallet' }, { key: 'docs', label: t('cab.docs'), icon: 'file' },
-      { key: 'chat', label: t('cab.chat'), icon: 'send' }, { key: 'build', label: t('cab.build'), icon: 'hammer' },
+      { key: 'chat', label: t('cab.chat'), icon: 'send', badge: chat.unread || null }, { key: 'build', label: t('cab.build'), icon: 'hammer' },
     ];
     let ws = null;
     (async () => {
       page.appendChild(h('div', { class: 'wrap', style: { paddingTop: '40px' } }, S.skeleton(4, 60)));
-      try { deals = await S.api.myDeals(); } catch (e) { page.replaceChildren(h('div', { class: 'wrap', style: { paddingTop: '40px' } }, h('div', { class: 'form-err' }, e.message))); return; }
+      try { deals = await S.api.myDeals(); } catch (e) { page.replaceChildren(S.errorCard(e)); return; }
       if (stopSel) return;
-      if (!deals.length) { page.replaceChildren(h('div', { class: 'wrap' }, h('div', { class: 'card login-card login', style: { textAlign: 'center' } }, S.empty(t('cab.noDeals'), 'building'), h('button', { class: 'btn', onclick: () => S.go('home') }, t('cab.pick')))));  return; }
+      if (!deals.length) { page.replaceChildren(h('div', { class: 'wrap' }, h('div', { class: 'card login-card login cab-empty', style: { textAlign: 'center' } }, h('h2', null, t('cab.hello', { name: (S.api.user && S.api.user.name) || '' }) + '!'), S.empty(t('cab.noActive'), 'building'), h('p', { class: 'muted' }, t('cab.noDeals')), h('a', { class: 'btn', href: '/apartments' }, t('cab.seeApts'))))); return; }
       deal = deals[0];
       ws = S.workspace(items(), 'overview', (k, main) => show(k, main));
       page.replaceChildren(ws.el);
       show('overview', ws.main);
+      refreshChat();
     })();
 
     async function ensureSchedule() { if (sched && sched.dealId === deal.id) return sched; try { sched = await S.api.schedule(deal.id); sched.dealId = deal.id; } catch (e) { sched = { dealId: deal.id, none: true, error: e }; } return sched; }
@@ -157,13 +161,24 @@
     }
 
     async function show(k, main) {
-      main.replaceChildren(h('h1', null, items().find((i) => i.key === k).label), h('p', { class: 'sub' }, t('cab.hello', { name: (S.api.user && S.api.user.name) || '' }) + ' · ' + t('cab.aptLine', { n: deal.apartmentNumber, f: deal.floor })), dealPicker());
+      // The overview greets in its own card; the other sections keep the short line under the title.
+      main.replaceChildren(h('h1', null, items().find((i) => i.key === k).label), k === 'overview' ? null : h('p', { class: 'sub' }, t('cab.hello', { name: (S.api.user && S.api.user.name) || '' }) + ' · ' + t('cab.aptLine', { n: deal.apartmentNumber, f: deal.floor })), dealPicker());
       const body = h('div', { class: 'stack' }, S.skeleton(3, 80)); main.appendChild(body);
       try {
         if (k === 'overview') body.replaceChildren(...(await overview()));
         else if (k === 'schedule') { const s = await ensureSchedule(); body.replaceChildren(s.none ? S.empty(t('cab.noSchedule'), 'wallet') : h('div', null, S.panels.schedule(s), h('div', { class: 'row', style: { marginTop: '14px' } }, pdfBtn()))); }
         else if (k === 'docs') body.replaceChildren(S.panels.documents(deal.id, false));
-        else if (k === 'chat') body.replaceChildren(h('div', { class: 'card' }, S.panels.chat(deal.id, 'customer')));
+        else if (k === 'chat') {
+          // Who answers and whether they are here now (any action in the CRM during the last 5 minutes).
+          const head = h('div', { class: 'chat-head' });
+          const drawHead = (u) => head.replaceChildren(h('span', { class: 'avatar' }, S.fmt.initials(u.managerName || deal.managerName)),
+            h('span', null, h('b', null, u.managerName || deal.managerName || t('deal.manager')), h('small', { class: 'chat-presence' + (u.managerOnline ? ' on' : '') }, h('i', { 'aria-hidden': 'true' }),
+              u.managerOnline ? t('chat.online') : u.managerLastSeenAt ? t('chat.seen', { d: S.fmt.dt(u.managerLastSeenAt) }) : t('chat.offline'))));
+          drawHead(chat);
+          body.replaceChildren(h('div', { class: 'card' }, head, S.panels.chat(deal.id, 'customer')));
+          // Opening the chat reads the messages: refresh the presence now and clear the badge once the history has loaded.
+          refreshChat().then(drawHead); setTimeout(refreshChat, 1500);
+        }
         else if (k === 'build') body.replaceChildren(S.panels.stages(deal.buildingId || 1));
       } catch (e) { body.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
     }
@@ -185,8 +200,40 @@
       const info = h('div', { class: 'card' }, h('div', { class: 'row between' }, h('h3', null, t('apt.title', { n: deal.apartmentNumber })), S.stageChip(deal.stage)),
         h('dl', { class: 'kv' }, kv(t('floor.nLabel'), deal.floor), kv(t('f.rooms'), S.fmt.rooms(deal.rooms)), kv(t('f.area'), S.fmt.area(deal.area)), kv(t('deal.price'), S.fmt.money(deal.price, deal.currency)), deal.discount ? kv(t('deal.discount'), '− ' + S.fmt.money(deal.discount, deal.currency)) : null, kv(t('deal.manager'), deal.managerName || '—'), kv(t('deal.since'), S.fmt.date(deal.createdAt))));
       const pay = h('div', { class: 'card' }, h('h3', null, t('cab.payments')), h('div', { class: 'paybig' }, ring, h('div', { class: 'stack', style: { gap: '4px' } }, h('div', { class: 'muted' }, t('sch.paid')), h('div', { class: 'big', style: { fontSize: '24px' } }, S.fmt.money(paid, deal.currency)), h('div', { class: 'muted' }, t('sch.left') + ': ' + S.fmt.money(left, deal.currency)), s.eq ? h('div', { class: 'hint' }, '≈ ' + S.fmt.money(s.eq.paid, s.eq.currency) + ' · ' + t('price.estimate')) : null)),
-        next ? h('div', { class: 'next', style: { marginTop: '14px' } }, h('div', null, h('div', { class: 'muted', style: { fontSize: '12px', fontWeight: 800, textTransform: 'uppercase' } }, t('cab.next')), h('b', null, S.fmt.date(next.dueDate)), next.status === 'Overdue' ? h('span', { style: { marginLeft: '8px' } }, S.chip('Overdue', t('pay.Overdue'))) : null), h('b', { class: 'big', style: { fontSize: '20px' } }, S.fmt.money(next.amountDue - next.amountPaid, deal.currency))) : null);
-      return [h('div', { class: 'deal-head' }, info, pay), s.none ? null : h('div', { class: 'row' }, pdfBtn()), s.none ? h('div', { class: 'card flat' }, t('cab.noSchedule')) : null];
+        countBox(s),
+        next ? h('div', { class: 'next' + (next.status === 'Overdue' ? ' overdue' : ''), style: { marginTop: '14px' } }, h('div', null, h('div', { class: 'muted', style: { fontSize: '12px', fontWeight: 800, textTransform: 'uppercase' } }, t('cab.next')), h('b', null, S.fmt.date(next.dueDate)), next.status === 'Overdue' ? h('span', { style: { marginLeft: '8px' } }, S.chip('Overdue', t('pay.Overdue'))) : null), h('b', { class: 'big', style: { fontSize: '20px' } }, S.fmt.money(next.amountDue - next.amountPaid, deal.currency))) : null);
+      // The whole name: in the CRM it is often written surname first, so the first word is not a safe "first name".
+      const firstName = (S.api.user && S.api.user.name) || '';
+      const welcome = h('div', { class: 'card cab-welcome' }, h('div', null, h('h2', null, t('cab.hi', { name: firstName })),
+        h('p', null, t('cab.yourApt', { b: deal.buildingName || t('cab.building'), n: deal.apartmentNumber, f: deal.floor }))),
+        h('a', { class: 'btn ghost sm', href: '/apartments' }, t('cab.seeApts')));
+      return [welcome, h('div', { class: 'deal-head' }, info, pay), buildCard(), s.none ? null : h('div', { class: 'row' }, pdfBtn()), s.none ? h('div', { class: 'card flat' }, t('cab.noSchedule')) : null];
+    }
+
+    // "Paid 4 of 12 payments" — by the schedule lines, next to the money ring.
+    function countBox(s) {
+      if (s.none || !s.items || !s.items.length) return null;
+      const done = s.items.filter((i) => i.status === 'Paid').length, all = s.items.length;
+      const pct = Math.round((done * 100) / all);
+      return h('div', { class: 'pay-count' }, h('div', { class: 'row between' }, h('span', null, t('cab.paidOf', { x: done, y: all })), h('b', { class: 'num' }, pct + '%')), S.bar(pct, 'gold'));
+    }
+
+    // The building's progress: the stage being built now, and the whole history on request.
+    function buildCard() {
+      const card = h('div', { class: 'card stack cab-build' }, S.skeleton(2, 24));
+      if (!deal.buildingId) return null;
+      S.api.stages(deal.buildingId).then((st) => {
+        if (!st.length) { card.remove(); return; }
+        const current = st.slice().reverse().find((x) => x.percent > 0 && x.percent < 100) || st.slice().reverse().find((x) => x.percent > 0) || st[0];
+        const all = h('div', { hidden: true });
+        const more = h('button', { class: 'btn ghost sm', type: 'button', 'aria-expanded': 'false', onclick: () => {
+          const open = all.hidden; all.hidden = !open; more.setAttribute('aria-expanded', String(open)); more.textContent = t(open ? 'cab.buildHide' : 'cab.buildHistory');
+          if (open && !all.firstChild) all.appendChild(S.panels.stages(deal.buildingId));
+        } }, t('cab.buildHistory'));
+        card.replaceChildren(h('div', { class: 'row between' }, h('h3', null, t('cab.build')), h('b', { class: 'num' }, current.percent + '%')),
+          h('div', { class: 'muted' }, t('cab.stageNow', { s: current.title, p: current.percent })), S.bar(current.percent, 'gold'), h('div', null, more), all);
+      }).catch(() => card.remove());
+      return card;
     }
     const kv = (k, v) => [h('dt', null, k), h('dd', null, v === undefined || v === null || v === '' ? '—' : v)];
     return () => { stopSel = true; };

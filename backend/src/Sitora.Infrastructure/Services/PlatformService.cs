@@ -28,12 +28,48 @@ public class PlatformService(
 {
     private const string AuthenticatorIssuer = "Sitora";
 
-    public async Task<IReadOnlyList<OrganizationResponse>> GetOrganizationsAsync(CancellationToken ct = default) =>
-        await db.Organizations.AsNoTracking()
+    // Организации с логотипом, почтами владельцев и названиями домов — для раскрывающейся строки в разделе платформы.
+    public async Task<IReadOnlyList<OrganizationResponse>> GetOrganizationsAsync(CancellationToken ct = default)
+    {
+        var rows = await db.Organizations.AsNoTracking()
             .OrderBy(o => o.Name)
-            .Select(o => new OrganizationResponse(o.Id, o.Name, o.Slug, o.IsActive,
-                o.Buildings.Count, db.Users.Count(u => u.OrganizationId == o.Id), o.CreatedAt, o.CustomDomain))
+            .Select(o => new
+            {
+                o.Id, o.Name, o.Slug, o.IsActive, o.CreatedAt, o.CustomDomain, o.LogoUrl,
+                Buildings = o.Buildings.OrderBy(b => b.NameRu).Select(b => b.NameRu).ToList(),
+                Users = db.Users.Count(u => u.OrganizationId == o.Id)
+            })
             .ToListAsync(ct);
+        var ownerRoleId = await db.Roles.Where(r => r.Name == RoleNames.Owner).Select(r => r.Id).SingleAsync(ct);
+        var owners = (await db.Users.AsNoTracking()
+                .Where(u => u.OrganizationId != null && db.UserRoles.Any(ur => ur.UserId == u.Id && ur.RoleId == ownerRoleId))
+                .Select(u => new { u.OrganizationId, u.Email })
+                .ToListAsync(ct))
+            .ToLookup(u => u.OrganizationId!.Value, u => u.Email ?? string.Empty);
+        return rows.Select(o => new OrganizationResponse(o.Id, o.Name, o.Slug, o.IsActive, o.Buildings.Count, o.Users, o.CreatedAt,
+            o.CustomDomain, o.LogoUrl, owners[o.Id].OrderBy(e => e).ToList(), o.Buildings)).ToList();
+    }
+
+    // Приостановка закрывает вход сотрудникам организации и её сайт; выданные сессии отзываются сразу.
+    public async Task SetOrganizationActiveAsync(Guid organizationId, bool isActive, CancellationToken ct = default)
+    {
+        await RequirePlatformOwnerAsync();
+        var organization = await db.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId, ct)
+            ?? throw new NotFoundException("Организация не найдена");
+        if (organization.IsActive == isActive)
+            return;
+
+        organization.IsActive = isActive;
+        audit.Record(nameof(Organization), organization.Id, isActive ? "Activated" : "Suspended",
+            new { IsActive = !isActive }, new { IsActive = isActive }, organization.Id);
+        await db.SaveChangesAsync(ct);
+
+        if (!isActive)
+            await db.RefreshTokens
+                .Where(t => t.RevokedAt == null && db.Users.Any(u => u.Id == t.UserId && u.OrganizationId == organizationId))
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, DateTime.UtcNow), ct);
+        logger.LogInformation("Организация {OrganizationId} {State}", organizationId, isActive ? "снова работает" : "приостановлена");
+    }
 
     // Новая организация сразу получает владельца; он входит по коду из почты.
     public async Task<OrganizationResponse> CreateOrganizationAsync(CreateOrganizationRequest request, CancellationToken ct = default)

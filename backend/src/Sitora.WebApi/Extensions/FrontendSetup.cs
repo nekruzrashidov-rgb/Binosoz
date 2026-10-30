@@ -32,6 +32,16 @@ public static class FrontendSetup
         app.MapGet("/", () => Results.File("index.html", Html)).ExcludeFromDescription();
         foreach (var page in Pages)
             app.MapGet("/" + page, () => Results.File(page + ".html", Html)).ExcludeFromDescription();
+
+        // Неизвестный адрес сайта — страница «не найдено» с кодом 404. Неизвестные адреса API отвечают как раньше (Problem Details).
+        app.MapFallback(context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            if (IsApiPath(context.Request.Path) || !HttpMethods.IsGet(context.Request.Method))
+                return Task.CompletedTask;
+            context.Response.ContentType = Html;
+            return context.Response.SendFileAsync(app.Environment.WebRootFileProvider.GetFileInfo("404.html"));
+        });
     }
 
     // Адреса API, а не сайта: им остаётся строгая политика безопасности без скриптов.

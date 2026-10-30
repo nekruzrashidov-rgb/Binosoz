@@ -81,7 +81,8 @@ SecondFactorChallenge = { challengeToken, expiresAt, methods: ["password", "totp
 
 | Метод | Путь | Тело / ответ |
 | --- | --- | --- |
-| GET | `/platform/organizations` | `[{ id, name, slug, isActive, buildingsCount, usersCount, createdAt }]` |
+| GET | `/platform/organizations` | `[{ id, name, slug, isActive, buildingsCount, usersCount, createdAt, customDomain, logoUrl, ownerEmails, buildingNames }]` |
+| PATCH | `/platform/organizations/{id}/status` | `{ isActive }` → 204. Приостановка (`false`): вход сотрудникам и сайт застройщика закрыты, refresh-токены сотрудников отзываются; `true` — снова работает. В аудите `Suspended` / `Activated` |
 | POST | `/platform/organizations` | `{ name, slug, ownerEmail, ownerFullName }` → 201. Владельцу уходит письмо, он входит по коду из почты. `slug`: латиница, цифры, дефис |
 | POST | `/platform/organizations/{id}/owners` | `{ email, fullName, password? }` → 201 `UserResponse`: ещё один владелец организации. Без пароля он входит по коду из почты |
 | POST | `/platform/impersonate/{id}` | `id` — организация: вход «как владелец» (`user.role = "Owner"`). `id` — пользователь: вход под ним самим, с его ролью и домами. Ответ — `AccessTokenResponse = { accessToken, accessTokenExpiresAt, user }` без refresh-токена, `user.impersonation` заполнено. Под создателем платформы войти нельзя (422) |
@@ -195,6 +196,8 @@ SecondFactorChallenge = { challengeToken, expiresAt, methods: ["password", "totp
 | GET | `/files?token=` | все, по ссылке | сам файл; подделанная или просроченная ссылка — 404 |
 | GET | `/deals/{id}/messages` | владелец, сотрудник сделки | страница `{ id, dealId, senderId, senderName, fromCustomer, text, createdAt, readAt }`, новые сверху |
 | POST | `/deals/{id}/messages` | владелец, сотрудник сделки | `{ text }` |
+| GET | `/deals/{id}/messages/unread` | владелец, сотрудник сделки | `{ unread, managerName, managerOnline, managerLastSeenAt }`: сколько сообщений другой стороны не прочитано — без отметки о прочтении; менеджер «в сети», если делал запросы к API за последние 5 минут (хранится в памяти процесса) |
+| GET | `/chats?search=` | сотрудники сделок | `[{ dealId, customerName, customerPhone, apartmentNumber, buildingName, lastMessage, lastMessageAt, lastFromCustomer, unread }]` — сделки с перепиской, свежие сверху, до 200; `search` — имя или телефон покупателя |
 | GET | `/buildings/{id}/stages` | покупатель с неотменённой сделкой, сотрудники | `{ overallPercent, stages[{ id, name, percent, sortOrder, updatedAt, photos[{ url, caption, takenAt }] }] }`. Ссылки на фото подписаны на 15 минут |
 | POST | `/buildings/{id}/stages`, PUT `/stages/{id}` | Content, руководители | `{ name, percent, sortOrder }` |
 | POST | `/stages/{id}/photos` | Content, руководители | form-data: `file` (PNG или JPG до 10 МБ), `caption?`, `takenAt?` |

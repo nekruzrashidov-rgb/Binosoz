@@ -155,6 +155,19 @@
 
   // ---------- misc ----------
   S.skeleton = (n, hgt) => h('div', { class: 'stack' }, Array.from({ length: n || 3 }, () => h('div', { class: 'skel', style: { height: (hgt || 18) + 'px' } })));
+  // A failed page instead of a blank one: not found (404), the server failed (5xx) or there is no connection.
+  // e — the API error (its status picks the text); without it the card is "not found".
+  S.errorCard = (e) => {
+    const status = e && e.status;
+    const kind = !e || status === 404 ? 'notFound' : status === 0 ? 'network' : 'server';
+    const face = h('div', { class: 'err-face', 'aria-hidden': 'true' });
+    face.innerHTML = '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="32" cy="32" r="27"/><circle cx="23" cy="26" r="1.6" fill="currentColor"/><circle cx="41" cy="26" r="1.6" fill="currentColor"/><path d="M21 44c3-4.5 7-6.5 11-6.5s8 2 11 6.5"/></svg>';
+    const action = kind === 'notFound'
+      ? h('a', { class: 'btn gold', href: '/' }, t('errp.home'))
+      : h('button', { class: 'btn gold', type: 'button', onclick: () => location.reload() }, t('errp.reload'));
+    return h('div', { class: 'wrap err-wrap page-in' }, h('div', { class: 'err-card', role: 'alert' }, face,
+      h('h1', null, t('errp.' + kind)), h('p', { class: 'err-msg' }, kind === 'notFound' && e && e.message ? e.message : t('errp.' + kind + 'Text')), action));
+  };
   S.empty = (title, icon) => h('div', { class: 'empty' }, (() => { const i = S.icon(icon || 'inbox'); i.setAttribute('width', 54); i.setAttribute('height', 54); i.setAttribute('stroke-width', 1.2); return i; })(), h('div', null, title));
   S.ring = (pct, size) => {
     const r = 21, c = 2 * Math.PI * r;
