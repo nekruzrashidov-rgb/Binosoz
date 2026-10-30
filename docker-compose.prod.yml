@@ -1,5 +1,7 @@
-# Продакшен на одном VPS: PostgreSQL 18 + API + Caddy (HTTPS с автоматическим сертификатом Let's Encrypt).
-# Запуск: docker compose -f docker-compose.prod.yml up -d --build. Подробно — docs/DEPLOY.md.
+# Продакшен на одном VPS: PostgreSQL 18 + Redis + API + Caddy (HTTPS с автоматическим сертификатом Let's Encrypt).
+# Образ API — готовый из GHCR (его публикует CI на каждый push в main, деплой — docs/VPS_SETUP.md):
+#   docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml run --rm migrate && docker compose -f docker-compose.prod.yml up -d
+# Конкретная версия: WEBAPI_IMAGE=ghcr.io/nekruzrashidov-rgb/binosoz-api:<sha коммита>. Собрать на сервере, как раньше: ... build migrate. Подробно — docs/DEPLOY.md.
 name: sitora
 
 services:
@@ -40,7 +42,7 @@ services:
     build:
       context: .
       dockerfile: backend/src/Sitora.WebApi/Dockerfile
-    image: sitora-webapi:latest
+    image: ${WEBAPI_IMAGE:-ghcr.io/nekruzrashidov-rgb/binosoz-api:latest}
     command: ["--migrate"]
     restart: "no"
     environment:
@@ -57,7 +59,7 @@ services:
         condition: service_healthy
 
   webapi:
-    image: sitora-webapi:latest
+    image: ${WEBAPI_IMAGE:-ghcr.io/nekruzrashidov-rgb/binosoz-api:latest}
     restart: unless-stopped
     environment:
       ASPNETCORE_ENVIRONMENT: Production

@@ -1,4 +1,4 @@
-# Сборка, тесты и проверка Docker-образа на каждый push в main и на каждый pull request.
+# Сборка, тесты и Docker-образ на каждый push и pull request; на push в main — образ в GHCR и деплой на VPS (docs/VPS_SETUP.md).
 name: CI
 
 on:
@@ -11,7 +11,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # В main прогон не прерывается: иначе новый push мог бы остановить деплой посреди миграции.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build-and-test:
@@ -53,11 +54,28 @@ jobs:
     name: Docker-образ и compose
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    # На push в main образ публикуется в GHCR с тегом коммита; тег latest ставит deploy, когда пройдут тесты.
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.name.outputs.image }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Сборка образа (без публикации)
-        run: docker build --file backend/src/Sitora.WebApi/Dockerfile --tag sitora-webapi:ci .
+      # Имя образа в GHCR — строчными буквами.
+      - name: Имя образа
+        id: name
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/binosoz-api" >> "$GITHUB_OUTPUT"
+
+      - name: Сборка образа
+        run: docker build --file backend/src/Sitora.WebApi/Dockerfile --tag sitora-webapi:ci --tag "${{ steps.name.outputs.image }}:${{ github.sha }}" .
+
+      - name: Публикация в GHCR (только main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker push "${{ steps.name.outputs.image }}:${{ github.sha }}"
 
       # Значения-заглушки нужны только для разбора файлов: compose требует обязательные переменные.
       - name: Проверка compose-файлов
@@ -69,7 +87,61 @@ jobs:
           SITE_ORIGIN: https://example.test
           EMAIL_PROVIDER: Dev
           EMAIL_FROM: noreply@example.test
-          EMAIL_INVITE_URL: https://example.test/login#invite=
+          EMAIL_INVITE_URL: https://example.test/accept-invite#token=
         run: |
           docker compose -f docker-compose.yml config --quiet
           docker compose -f docker-compose.prod.yml config --quiet
+
+  deploy:
+    name: Деплой на VPS
+    needs: [build-and-test, docker]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # Одновременно — только один деплой; новый ждёт, пока закончится предыдущий.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ${{ needs.docker.outputs.image }}
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+    steps:
+      # Тесты прошли: образ этого коммита становится latest (без пересборки).
+      - name: Тег latest
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker buildx imagetools create --tag "$IMAGE:latest" "$IMAGE:${{ github.sha }}"
+
+      # Пока секреты сервера не заданы (VPS_HOST, VPS_USER, VPS_SSH_KEY), шаг пропускается и CI остаётся зелёным.
+      # На сервере: свежие compose-файлы из git, образ этого коммита, бэкап, миграции отдельной командой, перезапуск.
+      # Если миграция упала, API остаётся на старой версии (up не выполняется).
+      - name: Обновление на сервере
+        if: env.VPS_HOST != ''
+        uses: appleboy/ssh-action@v1
+        env:
+          WEBAPI_IMAGE: ${{ needs.docker.outputs.image }}:${{ github.sha }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/sitora' }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          envs: WEBAPI_IMAGE,GHCR_USER,GHCR_TOKEN,DEPLOY_PATH
+          script: |
+            set -e
+            cd "$DEPLOY_PATH"
+            git pull --ff-only
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            export WEBAPI_IMAGE
+            docker compose -f docker-compose.prod.yml pull migrate webapi
+            ./scripts/backup.sh
+            docker compose -f docker-compose.prod.yml run --rm migrate
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            docker logout ghcr.io
+            docker image prune -f
+            docker compose -f docker-compose.prod.yml ps

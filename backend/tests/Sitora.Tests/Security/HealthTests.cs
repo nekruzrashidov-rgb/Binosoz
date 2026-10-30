@@ -165,3 +165,29 @@ public class HealthProbeTests
         return process.ExitCode;
     }
 }
+
+// Redis задан, но не отвечает (закрытый порт): API работает дальше, /health показывает проблему.
+public class UnreachableRedisFactory : SitoraApiFactory
+{
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.UseSetting("Redis:ConnectionString", "127.0.0.1:1,abortConnect=false,connectTimeout=300,syncTimeout=300");
+    }
+}
+
+public class UnreachableRedisTests(UnreachableRedisFactory factory) : IClassFixture<UnreachableRedisFactory>
+{
+    [Fact]
+    public async Task Health_ShowsRedisDegraded_AndCatalogStillWorks()
+    {
+        var client = factory.CreateClient();
+
+        var ready = await client.GetFromJsonAsync<HealthBody>("/health/ready", TestJson.Options);
+        Assert.Equal("Degraded", ready!.Status);
+        Assert.Equal("Degraded", ready.Checks.Single(c => c.Name == "redis").Status);
+
+        // Кэш каталога недоступен — данные берутся из базы.
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/buildings")).StatusCode);
+    }
+}

@@ -1,6 +1,6 @@
 # Деплой на VPS
 
-Инструкция для одного сервера с Ubuntu 24.04 LTS. В итоге на сервере работают три контейнера: PostgreSQL 18, API и Caddy, который выдаёт HTTPS-сертификат Let's Encrypt.
+Инструкция для одного сервера с Ubuntu 24.04 LTS. В итоге на сервере работают четыре контейнера: PostgreSQL 18, Redis, API (готовый образ из GHCR) и Caddy, который выдаёт HTTPS-сертификат Let's Encrypt. Автоматический деплой из GitHub Actions — [VPS_SETUP.md](VPS_SETUP.md).
 
 > **Статус:** инструкция целиком не проверена на чистой машине: при разработке не было Docker (нет WSL) и VPS. Без Docker проверены compose-файлы (`docker compose config`), опубликованная сборка в режиме Production за прокси и команды `pg_dump`/`pg_restore`/`tar` из скриптов бэкапа — подробности в README, раздел «Известные ограничения». При первом прохождении отметьте, что сработало, и поправьте шаги, которые разошлись с реальностью.
 
@@ -48,7 +48,7 @@ docker compose version
 
 ```bash
 sudo mkdir -p /opt/sitora && sudo chown $USER /opt/sitora
-git clone <адрес репозитория> /opt/sitora
+git clone https://github.com/nekruzrashidov-rgb/Binosoz.git /opt/sitora
 cd /opt/sitora
 cp .env.example .env
 chmod 600 .env
@@ -72,12 +72,16 @@ chmod 600 .env
 
 ## 3. Запуск
 
-Сначала соберите образ и примените миграции отдельной командой. Сервис `migrate` применяет миграции, создаёт роли и первого администратора (из `BOOTSTRAP_ADMIN_*`), после чего завершается:
+Образ API готовый: его собирает и публикует CI в GHCR (`ghcr.io/nekruzrashidov-rgb/binosoz-api`) на каждый push в `main`. Скачайте его и примените миграции отдельной командой. Сервис `migrate` применяет миграции, создаёт роли и первого администратора (из `BOOTSTRAP_ADMIN_*`), после чего завершается:
 
 ```bash
-docker compose -f docker-compose.prod.yml build migrate
+docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml run --rm migrate
 ```
+
+Если пакет в GHCR приватный, сначала войдите: `docker login ghcr.io -u <логин GitHub>` с токеном, у которого есть право `read:packages`. Собрать образ на самом сервере, как раньше, тоже можно: `docker compose -f docker-compose.prod.yml build migrate` (он получит то же имя и заменит скачанный).
+
+Дальнейшие обновления можно не делать руками: после настройки из [VPS_SETUP.md](VPS_SETUP.md) их выполняет CI.
 
 Затем запустите всё остальное:
 
@@ -140,11 +144,13 @@ cd /opt/sitora
 
 ## 7. Обновление
 
+Автоматически: push в `main` → тесты → образ в GHCR → задание «Деплой на VPS» делает на сервере то же, что ниже (настройка — [VPS_SETUP.md](VPS_SETUP.md)). Вручную:
+
 ```bash
 cd /opt/sitora
-./scripts/backup.sh
 git pull
-docker compose -f docker-compose.prod.yml build migrate
+docker compose -f docker-compose.prod.yml pull
+./scripts/backup.sh
 docker compose -f docker-compose.prod.yml run --rm migrate
 docker compose -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.prod.yml logs -f webapi
@@ -154,20 +160,21 @@ docker compose -f docker-compose.prod.yml logs -f webapi
 
 ## 8. Откат
 
-Если новая версия не стартует:
+Каждый образ в GHCR помечен коммитом. Если новая версия не стартует, верните предыдущую:
 
 ```bash
 git log --oneline -5
-git checkout <предыдущий коммит>
-docker compose -f docker-compose.prod.yml up -d --build
+WEBAPI_IMAGE=ghcr.io/nekruzrashidov-rgb/binosoz-api:<полный sha предыдущего коммита> docker compose -f docker-compose.prod.yml up -d
 ```
+
+Так API остаётся на старом образе до следующего деплоя. Без GHCR — `git checkout <предыдущий коммит>` и `docker compose -f docker-compose.prod.yml up -d --build`.
 
 Если новая версия успела применить миграцию, которая несовместима со старым кодом, восстановите базу из бэкапа, сделанного перед обновлением (раздел 6).
 
 ## Мониторинг
 
 - `GET /health/live` — процесс отвечает. По нему docker проверяет контейнер (`docker compose ps` показывает `healthy`), и Caddy ждёт его перед стартом.
-- `GET /health/ready` (и `/health`) — база, запись в хранилище файлов, сервер фоновых задач. Ответ: JSON со статусом каждой проверки; при проблеме с базой или файлами — 503, при остановленных фоновых задачах — `Degraded` с кодом 200.
+- `GET /health/ready` (и `/health`) — база, запись в хранилище файлов, сервер фоновых задач и Redis (если задан `Redis__ConnectionString`). Ответ: JSON со статусом каждой проверки; при проблеме с базой или файлами — 503, при остановленных фоновых задачах или недоступном Redis — `Degraded` с кодом 200.
 - Раз в 5 минут API сам проверяет `ready` и при смене состояния («не работает» / «снова работает») шлёт уведомление в канал менеджеров через `INotificationSender`. Пока Telegram — заглушка, сообщения видны только в логе и в таблице `Notifications`.
 - Если API упал целиком, он сам ни о чём не сообщит. Поэтому нужна внешняя проверка `https://api.sitora.tj/health/ready` раз в 1–5 минут — сервисом мониторинга доступности или cron-задачей на другом сервере.
 

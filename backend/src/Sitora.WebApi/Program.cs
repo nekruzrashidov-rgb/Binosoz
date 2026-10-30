@@ -14,6 +14,7 @@ using Sitora.Infrastructure;
 using Sitora.Infrastructure.Data;
 using Sitora.Infrastructure.Data.Seed;
 using Sitora.Infrastructure.Health;
+using Sitora.Infrastructure.Integrations;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Serilog.Events;
 using Sitora.Infrastructure.Security;
@@ -95,6 +96,9 @@ var healthChecks = builder.Services.AddHealthChecks()
 // Сервер фоновых задач проверяем там, где он запущен; его отказ не мешает отвечать на запросы — Degraded.
 if (hangfireServerEnabled)
     healthChecks.AddCheck<BackgroundJobsHealthCheck>("background-jobs", HealthStatus.Degraded, [HealthTags.Ready]);
+// Redis проверяем, только если он задан: кэш в памяти отказать не может.
+if (!string.IsNullOrWhiteSpace(builder.Configuration[$"{RedisOptions.SectionName}:{nameof(RedisOptions.ConnectionString)}"]))
+    healthChecks.AddCheck<CacheHealthCheck>("redis", HealthStatus.Degraded, [HealthTags.Ready]);
 
 builder.Services.AddSitoraRateLimiting();
 builder.Services.AddSitoraCors();

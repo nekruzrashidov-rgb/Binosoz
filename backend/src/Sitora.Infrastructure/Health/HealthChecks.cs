@@ -1,4 +1,5 @@
 using Hangfire;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Sitora.Domain.Interfaces;
 
@@ -41,5 +42,26 @@ public class BackgroundJobsHealthCheck(JobStorage storage, TimeProvider timeProv
         return Task.FromResult(alive
             ? HealthCheckResult.Healthy()
             : new HealthCheckResult(context.Registration.FailureStatus, "Сервер фоновых задач не отвечает"));
+    }
+}
+
+// Общий кэш (Redis) отвечает: пробная запись и чтение. Без него API продолжает работать, каталог читается из базы,
+// но вход создателя платформы и блокировки входа ломаются — поэтому Degraded, а не Unhealthy.
+public class CacheHealthCheck(IDistributedCache cache) : IHealthCheck
+{
+    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct = default)
+    {
+        var key = $"health:{Guid.NewGuid():N}";
+        try
+        {
+            await cache.SetStringAsync(key, "1", new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(30) }, ct);
+            var ok = await cache.GetStringAsync(key, ct) == "1";
+            await cache.RemoveAsync(key, ct);
+            return ok ? HealthCheckResult.Healthy() : new HealthCheckResult(context.Registration.FailureStatus, "Кэш не вернул записанное значение");
+        }
+        catch (Exception e)
+        {
+            return new HealthCheckResult(context.Registration.FailureStatus, "Redis недоступен", e);
+        }
     }
 }
