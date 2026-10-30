@@ -92,6 +92,22 @@ public class OrgApplicationTests(SitoraApiFactory factory) : IClassFixture<Sitor
     }
 
     [Fact]
+    public async Task Approve_WhenMailIsDown_StillCreatesOrganization()
+    {
+        var email = NewEmail();
+        var id = await SubmitIdAsync(email);
+        var platform = await factory.CreatePlatformOwnerClientAsync();
+        factory.Email.Failing[email] = true;
+
+        var approved = await TestScenarios.ReadAsync<ApproveApplicationResponse>(
+            await platform.PostAsJsonAsync($"/api/v1/platform/applications/{id}/approve",
+                new ApproveApplicationRequest("dev-" + Guid.NewGuid().ToString("N")[..8])));
+
+        var application = await factory.WithDbAsync(db => db.OrgApplications.SingleAsync(a => a.Id == id));
+        Assert.Equal((OrgApplicationStatus.Approved, approved.OrganizationId), (application.Status, application.OrganizationId));
+    }
+
+    [Fact]
     public async Task PlatformOwner_CanReject_SetsRejected_AndTakenSlugKeepsPending()
     {
         var platform = await factory.CreatePlatformOwnerClientAsync();

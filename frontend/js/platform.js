@@ -64,7 +64,7 @@
         };
         const done = () => { load(); countPending(); };
         body.replaceChildren(h('div', { class: 'toolbar' }, seg), holder);
-        load();
+        load(); countPending();
       },
 
       security(body) {

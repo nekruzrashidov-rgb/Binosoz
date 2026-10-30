@@ -69,9 +69,17 @@ public class PlatformService(
             new { organization.Name, organization.Slug, OwnerEmail = ownerEmail }, organization.Id);
         await db.SaveChangesAsync(ct);
 
-        await email.SendAsync(new EmailMessage(ownerEmail, $"Sitora: вы владелец «{organization.Name}»",
-            $"Здравствуйте, {owner.FullName}!\n\nДля вас создана организация «{organization.Name}» на платформе Sitora. " +
-            $"Входите по коду, который придёт на эту почту: {emailOptions.Value.InviteUrl.Split('#')[0]}"), ct);
+        // Организация уже сохранена, а владелец входит по коду и без этого письма: сбой почты не отменяет создание.
+        try
+        {
+            await email.SendAsync(new EmailMessage(ownerEmail, $"Sitora: вы владелец «{organization.Name}»",
+                $"Здравствуйте, {owner.FullName}!\n\nДля вас создана организация «{organization.Name}» на платформе Sitora. " +
+                $"Входите по коду, который придёт на эту почту: {emailOptions.Value.InviteUrl.Split('#')[0]}"), ct);
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "Не удалось отправить письмо владельцу {Email}", ownerEmail);
+        }
 
         logger.LogInformation("Создана организация {OrganizationId} ({Slug})", organization.Id, slug);
         return new OrganizationResponse(organization.Id, organization.Name, organization.Slug, organization.IsActive, 0, 1,

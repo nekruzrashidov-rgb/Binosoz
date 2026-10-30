@@ -17,7 +17,7 @@
         if (it.group !== undefined && it.group !== lastGroup) { lastGroup = it.group; if (it.group) side.appendChild(h('div', { class: 'grp' }, it.group)); }
         side.appendChild(h('button', { class: it.key === cur ? 'on' : '', onclick: () => go(it.key), 'aria-current': it.key === cur ? 'page' : null }, S.icon(it.icon || 'grid'), h('span', { class: 'grow' }, it.label), it.badge ? h('span', { class: 'badge' }, it.badge) : null));
       });
-      tabs.replaceChildren(...items.map((it) => h('button', { class: it.key === cur ? 'on' : '', role: 'tab', onclick: () => go(it.key) }, it.label)));
+      tabs.replaceChildren(...items.map((it) => h('button', { class: it.key === cur ? 'on' : '', role: 'tab', onclick: () => go(it.key) }, it.label, it.badge ? h('span', { class: 'badge' }, it.badge) : null)));
     };
     const go = (k) => { cur = k; draw(); onSelect(k, main); const m = document.getElementById('ws-main'); if (m && window.scrollY > 140) window.scrollTo({ top: 0, behavior: 'smooth' }); };
     const el = h('div', null, tabs, h('div', { class: 'ws' }, side, main));
