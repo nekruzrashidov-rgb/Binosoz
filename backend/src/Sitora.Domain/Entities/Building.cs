@@ -15,5 +15,9 @@ public class Building : BaseEntity
     public string? DescriptionTg { get; set; }
     public string? ModelUrl { get; set; }
 
+    // Год сдачи и сколько квартир задумано в доме — задаёт владелец при создании; заведённых квартир может быть меньше.
+    public int? CompletionYear { get; set; }
+    public int? PlannedApartments { get; set; }
+
     public List<Floor> Floors { get; set; } = [];
 }

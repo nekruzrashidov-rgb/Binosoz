@@ -275,12 +275,14 @@ public class CatalogService(
         building.DescriptionRu = EmptyToNull(request.DescriptionRu);
         building.DescriptionTg = EmptyToNull(request.DescriptionTg);
         building.ModelUrl = request.ModelUrl?.Trim();
+        building.CompletionYear = request.CompletionYear;
+        building.PlannedApartments = request.PlannedApartments;
     }
 
     private static string? EmptyToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static object Snapshot(Building b) =>
-        new { b.NameRu, b.NameTg, b.Address, b.FloorsCount, b.DescriptionRu, b.DescriptionTg, b.ModelUrl };
+        new { b.NameRu, b.NameTg, b.Address, b.FloorsCount, b.DescriptionRu, b.DescriptionTg, b.ModelUrl, b.CompletionYear, b.PlannedApartments };
 
     private static object Snapshot(Apartment a) =>
         new { a.Number, a.Rooms, a.Area, a.PricePerM2, a.Price, a.Currency, a.Status, a.PlanSlot, a.Model3dId };
@@ -297,7 +299,9 @@ public class CatalogService(
         b.DescriptionTg,
         b.ModelUrl,
         b.Floors.SelectMany(f => f.Apartments).Count(),
-        b.Floors.SelectMany(f => f.Apartments).Count(a => a.Status == ApartmentStatus.Free));
+        b.Floors.SelectMany(f => f.Apartments).Count(a => a.Status == ApartmentStatus.Free),
+        b.CompletionYear,
+        b.PlannedApartments);
 
     private static readonly Expression<Func<Floor, FloorResponse>> ToFloorResponse = f => new FloorResponse(
         f.Id,

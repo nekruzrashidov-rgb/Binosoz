@@ -15,7 +15,9 @@ public record BuildingResponse(
     string? DescriptionTg,
     string? ModelUrl,
     int TotalApartments,
-    int FreeApartments);
+    int FreeApartments,
+    int? CompletionYear = null,
+    int? PlannedApartments = null);
 
 public record FloorResponse(
     Guid Id,
@@ -48,7 +50,9 @@ public record SaveBuildingRequest(
     int FloorsCount,
     string? DescriptionRu,
     string? ModelUrl,
-    string? DescriptionTg = null);
+    string? DescriptionTg = null,
+    int? CompletionYear = null,
+    int? PlannedApartments = null);
 
 public record CreateFloorRequest(Guid BuildingId, int Number, string? PlanImageUrl);
 

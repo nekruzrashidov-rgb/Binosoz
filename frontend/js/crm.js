@@ -19,6 +19,14 @@
   S.views.crm = function (root) {
     if (!S.api.isAuthed) return S.views.login(root);
     if (!S.api.isStaff()) { root.appendChild(h('div', { class: 'wrap page-in' }, h('div', { class: 'card login-card login' }, h('h2', null, t('crm.notStaff')), h('div', { class: 'row', style: { marginTop: '14px' } }, h('button', { class: 'btn', onclick: () => S.go(S.homeFor(S.api.user)) }, t('cab.toCrm')))))); return () => {}; }
+    // A new owner without buildings gets the setup wizard instead of an empty workspace — once per organization.
+    const wizardKey = 'binosoz.wizard.done.' + S.api.user.organizationId;
+    if (S.api.isOwner() && !S.store.get(wizardKey)) {
+      const box = h('div', { class: 'wrap page-in' }, S.skeleton(3, 60)); root.appendChild(box);
+      const finish = () => { S.store.set(wizardKey, '1'); S.clear(root); S.views.crm(root); };
+      S.api.buildings().then((bs) => (bs.length ? finish() : wizard(box, finish)), finish);
+      return () => {};
+    }
     const page = h('div', { class: 'page-in' }); root.appendChild(page);
     // Which developer and which buildings this workspace is about.
     const ctx = h('div', { class: 'wrap ctx-line' });
@@ -35,10 +43,12 @@
     add('payments', t('crm.payments'), 'wallet', t('crm.g.finance'), has('Accountant'));
     add('debts', t('crm.debts'), 'shield', t('crm.g.finance'), has('Accountant'));
     add('rate', t('crm.rate'), 'chart', t('crm.g.finance'), has('Accountant'));
+    add('objects', t('obj.title'), 'home', t('crm.g.catalog'), S.api.isLeader());
     add('catalog', t('crm.catalog'), 'building', t('crm.g.catalog'), has('Content'));
     add('construction', t('crm.construction'), 'hammer', t('crm.g.catalog'), has('Content'));
     add('users', t('crm.users'), 'users', t('crm.g.system'), S.api.isLeader());
     add('audit', t('crm.audit'), 'shield', t('crm.g.system'), S.api.isOwner());
+    add('settings', t('set.title'), 'gear', t('crm.g.system'), S.api.isOwner());
     const user = S.api.user;
     const ws = S.workspace(items, items[0].key, (k, main) => { S.clear(main); main.append(h('h1', null, items.find((i) => i.key === k).label), h('p', { class: 'sub' }, t('crm.sub.' + k))); const body = h('div', { class: 'stack' }); main.appendChild(body); try { views[k](body); } catch (e) { body.appendChild(h('div', { class: 'form-err' }, e.message)); console.error(e); } });
     page.appendChild(ws.el);
@@ -167,6 +177,7 @@
         if (!bs.length) { body.replaceChildren(S.empty(t('cat.noBuildings'), 'building'), S.api.isOwner() ? h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => buildingForm(() => S.crmGo('catalog')) }, t('cat.newBuilding'))) : null); return; }
         const bid = pickBuilding(bs);
         const b = await S.api.building(bid).catch(() => bs.find((x) => x.id === bid)); const floors = await S.api.floors(b.id);
+        if (!floors.length) { body.replaceChildren(buildingBar(bs, bid, 'catalog'), noFloors(b, () => S.crmGo('catalog'))); return; }
         let floorId = (floors.find((f) => !f.commercial) || floors[0]).id; const holder = h('div');
         const nameRu = S.input('nameRu', { value: b.nameRu || b.name }), nameTg = S.input('nameTg', { value: b.nameTg }), addr = S.input('address', { value: b.address });
         const dRu = h('textarea', { class: 'inp', name: 'descriptionRu', id: 'b-dru' }); dRu.value = b.descriptionRu || b.description || ''; const dTg = h('textarea', { class: 'inp', name: 'descriptionTg', id: 'b-dtg' }); dTg.value = b.descriptionTg || '';
@@ -213,6 +224,146 @@
         const holder = h('div'); const sel = S.select('entity', [['', t('filter.all')], ['Deal', 'Deal'], ['Payment', 'Payment'], ['Apartment', 'Apartment'], ['Booking', 'Booking'], ['Lead', 'Lead'], [userEntity, 'User'], ['Impersonation', t('audit.viaPlatform')], ['Invitation', 'Invitation']], '');
         const load = async () => { holder.replaceChildren(S.skeleton(6, 34)); const l = await S.api.audit(sel.value); holder.replaceChildren(S.tbl([{ label: t('audit.when'), render: (a) => S.fmt.dt(a.at) }, { label: t('audit.who'), render: (a) => (a.viaPlatform ? h('span', null, a.user, ' ', S.chip('warn', t('audit.viaPlatform'))) : a.user) }, { label: t('audit.action'), render: (a) => h('b', null, a.action) }, { label: t('audit.entity'), render: (a) => a.entity + ' #' + shortId(a.entityId) }, { label: t('audit.change'), render: (a) => h('code', { style: { fontSize: '12px', color: 'var(--ink-2)' } }, [a.before ? JSON.stringify(a.before) : '', a.before && a.after ? ' → ' : '', a.after ? JSON.stringify(a.after) : ''].join('')) }], l, { empty: t('audit.none') })); };
         sel.addEventListener('change', load); body.replaceChildren(h('div', { class: 'toolbar' }, h('div', { style: { minWidth: '200px' } }, S.field(t('audit.entity'), sel))), holder); load();
+      },
+
+      // The organization's buildings as cards; a card opens the building: apartments, its people and the numbers.
+      async objects(body) {
+        let tab = 'apts';
+        const list = async () => {
+          body.replaceChildren(S.skeleton(3, 80));
+          const bs = await S.api.buildings(); S.crmBuildings = bs;
+          const add = S.api.isOwner() ? h('button', { class: 'btn', onclick: () => buildingForm(() => S.crmGo('objects')) }, t('cat.newBuilding')) : null;
+          if (!bs.length) { body.replaceChildren(S.empty(t('cat.noBuildings'), 'building'), add ? h('div', { class: 'row' }, add) : null); return; }
+          body.replaceChildren(h('div', { class: 'toolbar' }, h('p', { class: 'hint' }, t('obj.hint')), h('span', { class: 'spacer' }), add),
+            h('div', { class: 'obj-grid' }, bs.map((b) => h('button', { class: 'card obj-card', type: 'button', onclick: () => detail(b) },
+              h('b', { class: 'obj-name' }, b.name), h('span', { class: 'muted' }, b.address),
+              h('span', { class: 'obj-meta' }, h('span', null, t('obj.apts', { n: b.total }) + (b.plannedApartments ? ' / ' + b.plannedApartments : '')), h('span', null, t('obj.free', { n: b.free })), b.completionYear ? h('span', null, t('obj.year', { y: b.completionYear })) : null),
+              h('span', { class: 'obj-open' }, t('obj.open'))))));
+        };
+        const detail = (b) => {
+          const pane = h('div', { class: 'stack' });
+          const seg = h('div', { class: 'seg obj-tabs', role: 'tablist' }, [['apts', 'obj.tab.apts'], ['staff', 'obj.tab.staff'], ['stats', 'obj.tab.stats']].map(([k, key]) =>
+            h('button', { class: tab === k ? 'on' : '', role: 'tab', 'aria-selected': String(tab === k), 'data-k': k, onclick: () => { tab = k; S.$$('button', seg).forEach((x) => { x.classList.toggle('on', x.dataset.k === k); x.setAttribute('aria-selected', String(x.dataset.k === k)); }); show(); } }, t(key))));
+          const show = () => panes[tab](pane, b, () => detail(b)).catch((e) => pane.replaceChildren(h('div', { class: 'form-err' }, e.message)));
+          body.replaceChildren(h('button', { class: 'btn ghost sm', style: { alignSelf: 'flex-start' }, onclick: () => list() }, '← ' + t('obj.all')),
+            h('div', null, h('h2', { style: { margin: '0 0 4px' } }, b.name), h('p', { class: 'muted' }, [b.address, b.completionYear ? t('obj.year', { y: b.completionYear }) : '', t('obj.floors', { n: b.floorsCount })].filter(Boolean).join(' · '))),
+            seg, pane);
+          show();
+        };
+        const panes = {
+          async apts(pane, b, again) {
+            pane.replaceChildren(S.skeleton(5, 38));
+            const floors = await S.api.floors(b.id);
+            if (!floors.length) { pane.replaceChildren(noFloors(b, again)); return; }
+            const apts = await S.api.allApartments(floors);
+            const fsel = S.select('floor', [['', t('obj.allFloors')]].concat(floors.map((f) => [String(f.number), f.commercial ? t('floor.commercial') : t('floor.n', { n: f.number })])), '');
+            const ssel = S.select('status', [['', t('filter.all')]].concat(['free', 'booked', 'sold', 'onrequest'].map((s) => [s, t('status.' + s)])), '');
+            const holder = h('div');
+            const edit = has('Content');
+            const draw = () => {
+              const l = apts.filter((a) => (!fsel.value || String(a.floor) === fsel.value) && (!ssel.value || a.status === ssel.value)).sort((x, y) => x.floor - y.floor || x.number - y.number);
+              holder.replaceChildren(S.tbl([
+                { label: t('cat.floor'), render: (a) => (a.floor === 0 ? t('floor.commercial') : a.floor) },
+                { label: '№', render: (a) => h('b', null, a.number) },
+                { label: t('f.rooms'), render: (a) => S.fmt.rooms(a.rooms) },
+                { label: t('f.area'), r: true, num: true, render: (a) => S.fmt.area(a.area) },
+                { label: t('deal.price'), r: true, num: true, render: (a) => S.fmt.money(a.price, 'TJS') },
+                { label: t('deal.stage'), render: (a) => S.statusChip(a.status) },
+                edit ? { label: '', r: true, render: (a) => h('button', { class: 'btn ghost sm', onclick: () => aptForm(a, floors.find((f) => f.number === a.floor), again) }, t('common.edit')) } : null,
+              ].filter(Boolean), l, { empty: t(apts.length ? 'obj.noMatch' : 'cat.noApts') }));
+            };
+            [fsel, ssel].forEach((s) => s.addEventListener('change', draw));
+            const imp = h('input', { type: 'file', id: 'obj-imp', accept: '.xlsx', hidden: true });
+            imp.addEventListener('change', async () => { const f = imp.files[0]; imp.value = ''; if (!f) return; try { const r = await S.api.importApartments(b.id, f); S.toast(r && r.message ? r.message : t('cat.imported'), 'ok'); again(); } catch (er) { S.modal({ title: t('cat.importErr'), body: h('div', { class: 'stack' }, h('p', null, er.message), er.errors ? h('pre', { class: 'paper', style: { whiteSpace: 'pre-wrap' } }, JSON.stringify(er.errors, null, 1)) : null) }); } });
+            const floorFor = () => floors.find((f) => String(f.number) === fsel.value) || floors.find((f) => !f.commercial) || floors[0];
+            pane.replaceChildren(h('div', { class: 'toolbar' }, h('div', { style: { minWidth: '160px' } }, S.field(t('cat.floor'), fsel)), h('div', { style: { minWidth: '160px' } }, S.field(t('deal.stage'), ssel)), h('span', { class: 'spacer' }),
+              edit ? imp : null, edit ? h('label', { class: 'btn ghost', for: 'obj-imp' }, t('cat.import')) : null, edit ? h('button', { class: 'btn', onclick: () => aptForm(null, floorFor(), again) }, t('cat.addApt')) : null), holder);
+            draw();
+          },
+
+          // Everyone who works in this building: people with access to it (or to all buildings) and invitations not yet accepted.
+          async staff(pane, b, again) {
+            pane.replaceChildren(S.skeleton(4, 38));
+            const [users, inv] = await Promise.all([S.api.users(), S.api.invitations().catch(() => [])]);
+            const here = (ids) => !ids || !ids.length || ids.map(String).includes(String(b.id));
+            const rows = users.filter((u) => here(u.buildingIds)).map((u) => ({ kind: 'user', id: u.id, name: u.name, email: u.email, role: u.roles.map((r) => t('role.' + r)).join(', '), status: u.blocked ? 'blocked' : 'active', u }))
+              .concat(inv.filter((i) => here(i.buildingIds)).map((i) => ({ kind: 'inv', id: i.id, name: i.name, email: i.email, role: t('role.' + i.role, null, i.role), status: 'invited' })));
+            const ST = { active: ['Active ok', 'obj.st.active'], invited: ['warn', 'obj.st.invited'], blocked: ['Blocked', 'obj.st.blocked'] };
+            const run = (fn) => (e) => S.busy(e.currentTarget, async () => { try { await fn(); S.toast(t('common.saved'), 'ok'); again(); } catch (er) { S.err(er); } });
+            const act = (r) => (r.kind === 'inv' ? h('button', { class: 'btn ghost sm', onclick: run(() => S.api.revokeInvitation(r.id)) }, t('inv.revoke'))
+              : r.id === S.api.user.id || r.u.roles.includes('Owner') ? '' : h('button', { class: 'btn ghost sm', onclick: run(() => S.api.setUserBlocked(r.id, !r.u.blocked)) }, t(r.u.blocked ? 'obj.restore' : 'obj.revokeAccess')));
+            S.crmBuildings = S.crmBuildings || (await S.api.buildings());
+            pane.replaceChildren(h('div', { class: 'toolbar' }, h('p', { class: 'hint' }, t('obj.staffHint')), h('span', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => userForm(again, b.id) }, t('inv.new'))),
+              S.tbl([{ label: t('f.fullName'), render: (r) => h('b', null, r.name) }, { label: t('login.email'), render: (r) => r.email }, { label: t('users.role'), render: (r) => r.role }, { label: t('deal.stage'), render: (r) => S.chip(ST[r.status][0], t(ST[r.status][1])) }, { label: '', r: true, render: act }], rows, { empty: t('obj.noStaff') }));
+          },
+
+          // Apartment counts from the catalog; money from the payments report (all time, this building only).
+          async stats(pane, b) {
+            pane.replaceChildren(S.skeleton(3, 60));
+            const floors = await S.api.floors(b.id);
+            const apts = floors.length ? await S.api.allApartments(floors) : [];
+            const c = { free: 0, booked: 0, sold: 0, onrequest: 0 }; apts.forEach((a) => { c[a.status] = (c[a.status] || 0) + 1; });
+            const total = apts.length; const pct = (n) => (total ? Math.round((n * 1000) / total) / 10 : 0) + '%';
+            // The report covers at most 366 days, so the money shown is for the last twelve months.
+            let revenue = null, revenueErr = '';
+            try { const r = await S.api.reportPayments(S.addDays(-365), S.today()); revenue = r.rows.filter((p) => p.buildingName === b.name).reduce((s, p) => s + (p.reversal ? -p.amountTjs : p.amountTjs), 0); } catch (e) { revenueErr = e.status === 403 ? t('obj.revenueNo') : e.message; }
+            const kpi = (label, value, color, sub) => h('div', { class: 'card kpi', style: { '--k': color } }, h('span', null, label), h('b', null, value), sub ? h('div', { class: 'muted' }, sub) : null, h('i'));
+            const parts = [['free', 'var(--good)'], ['booked', 'var(--warn)'], ['sold', 'var(--info)']];
+            const split = h('div', { class: 'obj-split', role: 'img', 'aria-label': parts.map(([k]) => t('status.' + k) + ': ' + c[k]).join(', ') }, parts.map(([k, col]) => (c[k] ? h('i', { style: { flexGrow: c[k], background: col }, title: t('status.' + k) + ': ' + c[k] }) : null)));
+            pane.replaceChildren(
+              h('div', { class: 'grid g4' }, kpi(t('obj.total'), total, 'var(--accent)', b.plannedApartments ? t('obj.ofPlanned', { n: b.plannedApartments }) : null),
+                kpi(t('status.free'), c.free, 'var(--good)', pct(c.free)), kpi(t('status.booked'), c.booked, 'var(--warn)', pct(c.booked)), kpi(t('status.sold'), c.sold, 'var(--info)', pct(c.sold))),
+              total ? h('div', { class: 'card stack' }, h('h3', null, t('obj.split')), split, h('div', { class: 'row obj-legend' }, parts.map(([k, col]) => h('span', null, h('i', { style: { background: col } }), t('status.' + k) + ' — ' + c[k])))) : null,
+              h('div', { class: 'card kpi', style: { maxWidth: '420px', '--k': 'var(--gold)' } }, h('span', null, t('obj.revenue')), h('b', null, revenue === null ? '—' : S.fmt.money(revenue, 'TJS')), h('div', { class: 'muted' }, revenue === null ? revenueErr : t('obj.revenueHint')), h('i')));
+          },
+        };
+        list();
+      },
+
+      // The owner's settings: the developer's brand on the public site (name, contacts, colour, logo) and the plan.
+      async settings(body) {
+        body.replaceChildren(S.skeleton(4, 50));
+        let br;
+        try { br = await S.api.ownerBrand(); } catch (e) { body.replaceChildren(h('div', { class: 'form-err' }, e.message)); return; }
+        const bs = await S.api.buildings().catch(() => []);
+        const inp = (n, v, o) => S.input(n, Object.assign({ value: v || '' }, o || {}));
+        const name = inp('name', br.name), slug = inp('slug', br.slug), phone = inp('phone', br.phone, { type: 'tel', placeholder: '+992 …' }), tg = inp('telegram', br.telegram, { placeholder: '@company' }), addr = inp('address', br.address), email = inp('email', br.email, { type: 'email' });
+        const color = h('input', { type: 'color', class: 'color-inp', name: 'primaryColor', id: 'set-color', value: br.primaryColor || '#c9a227' });
+        const noColor = h('input', { type: 'checkbox', id: 'set-nocolor', checked: !br.primaryColor });
+        color.addEventListener('input', () => { noColor.checked = false; });
+        const btn = h('button', { class: 'btn', type: 'submit' }, t('common.save'));
+        const form = h('form', { class: 'card stack', novalidate: true }, h('h3', null, t('set.company')),
+          h('div', { class: 'grid g2' }, S.field(t('set.name'), name), S.field(t('plat.slug'), slug, t('set.slugHint'))),
+          h('div', { class: 'grid g2' }, S.field(t('f.phone'), phone), S.field('Telegram', tg)),
+          h('div', { class: 'grid g2' }, S.field(t('set.address'), addr), S.field(t('set.email'), email)),
+          h('div', { class: 'field', dataset: { name: 'primaryColor' } }, h('label', { for: 'set-color' }, t('set.color')), h('div', { class: 'row', style: { gap: '14px' } }, color, h('label', { class: 'row', style: { gap: '6px', fontWeight: 600 }, for: 'set-nocolor' }, noColor, t('set.noColor'))), h('div', { class: 'ferr' })),
+          h('div', null, btn));
+        form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try {
+          br = await S.api.saveOwnerBrand({ name: name.value.trim(), slug: slug.value.trim(), primaryColor: noColor.checked ? null : color.value, phone: phone.value.trim() || null, telegram: tg.value.trim() || null, address: addr.value.trim() || null, email: email.value.trim() || null });
+          S.toast(t('common.saved'), 'ok');
+        } catch (er) { S.showErrors(form, er); } }); });
+
+        // The logo is served by the API: a relative address needs the API's host when the site is elsewhere.
+        const src = (u) => (u && u.charAt(0) === '/' ? S.apiBase().replace(/\/api\/v1\/?$/, '') + u : u);
+        const logoBox = h('div', { class: 'logo-box' });
+        const drawLogo = () => logoBox.replaceChildren(br.logoUrl ? h('img', { src: src(br.logoUrl), alt: t('set.logo') }) : h('span', { class: 'muted' }, t('set.noLogo')));
+        const file = h('input', { type: 'file', id: 'set-logo', accept: 'image/png,image/jpeg', hidden: true });
+        const upload = h('label', { class: 'btn soft', for: 'set-logo' }, t('set.logoUpload'));
+        file.addEventListener('change', async () => {
+          const f = file.files[0]; file.value = ''; if (!f) return;
+          if (!/^image\/(png|jpeg)$/.test(f.type)) { S.err({ message: t('set.logoType') }); return; }
+          if (f.size > 2 * 1024 * 1024) { S.err({ message: t('set.logoSize') }); return; }
+          try { br = await S.api.uploadLogo(f); drawLogo(); S.toast(t('set.logoDone'), 'ok'); } catch (er) { S.err(er); }
+        });
+        const del = h('button', { class: 'btn ghost', type: 'button', onclick: (e) => S.busy(e.currentTarget, async () => { try { br = await S.api.deleteLogo(); drawLogo(); } catch (er) { S.err(er); } }) }, t('set.logoDelete'));
+        drawLogo();
+
+        const LIMIT = 3;
+        body.replaceChildren(h('div', { class: 'set-grid' }, form, h('div', { class: 'stack' },
+          h('div', { class: 'card stack' }, h('h3', null, t('set.logo')), logoBox, h('p', { class: 'hint' }, t('set.logoHint')), h('div', { class: 'row' }, file, upload, del)),
+          h('div', { class: 'card stack' }, h('h3', null, t('set.plan')),
+            h('dl', { class: 'kv' }, h('dt', null, t('set.tariff')), h('dd', null, t('set.standard')), h('dt', null, t('set.objects')), h('dd', null, t('set.objectsN', { n: bs.length, m: LIMIT }))),
+            S.bar((bs.length * 100) / LIMIT, bs.length >= LIMIT ? 'warn' : ''), h('p', { class: 'hint' }, t('set.planHint'))))));
       },
     };
     S.views.crm._views = views;
@@ -297,12 +448,20 @@
     }
 
     // Invite a person by e-mail: they get a link and then sign in with a code. A building admin invites only into their building.
-    function userForm(done) {
+    // A building without floors (created before floors were made automatically): offer to create 1..N in one go.
+    function noFloors(b, done) {
+      const btn = h('button', { class: 'btn', onclick: () => S.busy(btn, async () => {
+        try { await S.api.createFloors(b.id, b.floorsCount, (n) => { btn.lastChild.textContent = t('wiz.floorsN', { n, c: b.floorsCount }); }); S.toast(t('common.saved'), 'ok'); done(); } catch (er) { S.err(er); }
+      }) }, h('span', null, t('obj.makeFloors', { n: b.floorsCount })));
+      return h('div', { class: 'card stack', style: { alignItems: 'flex-start' } }, S.empty(t('obj.noFloors'), 'building'), btn);
+    }
+
+    function userForm(done, presetBuilding) {
       const u = S.api.user; const bs = S.crmBuildings || [];
       const roles = (S.api.isOwner() ? STAFF_POSITIONS : STAFF_POSITIONS.filter((r) => r !== 'ObjectAdmin'));
       const name = S.input('fullName'), email = S.input('email', { type: 'email' }), role = S.select('role', roles.map((r) => [r, t('role.' + r)]), 'Manager');
       const own = u.buildingIds.length ? bs.filter((b) => u.buildingIds.includes(b.id)) : bs;
-      const boxes = h('div', { class: 'stack', style: { gap: '6px' } }, own.map((b) => h('label', { class: 'row', style: { gap: '8px', flexWrap: 'nowrap' } }, h('input', { type: 'checkbox', value: b.id, checked: own.length === 1 }), b.name)));
+      const boxes = h('div', { class: 'stack', style: { gap: '6px' } }, own.map((b) => h('label', { class: 'row', style: { gap: '8px', flexWrap: 'nowrap' } }, h('input', { type: 'checkbox', value: b.id, checked: own.length === 1 || String(b.id) === String(presetBuilding) }), b.name)));
       const hint = h('div', { class: 'hint' });
       const syncHint = () => { hint.textContent = role.value === 'ObjectAdmin' ? t('inv.oneBuilding') : t('inv.allHint'); };
       role.addEventListener('change', syncHint); syncHint();
@@ -333,7 +492,7 @@
       const form = h('form', { class: 'stack', id: 'newbform', novalidate: true }, h('div', { class: 'grid g2' }, S.field(t('cat.nameRu'), nameRu), S.field(t('cat.nameTg'), nameTg)), S.field(t('f.address'), addr), S.field(t('cat.floorsCount'), floors));
       const btn = h('button', { class: 'btn', type: 'submit', form: 'newbform' }, t('common.save'));
       const md = S.modal({ title: t('cat.newBuilding'), body: form, actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
-      form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { const b = await S.api.createBuilding({ nameRu: nameRu.value.trim(), nameTg: nameTg.value.trim() || nameRu.value.trim(), address: addr.value.trim(), floorsCount: +floors.value }); S.crmBuildings = null; S.store.set('sitora.crmBuilding', b.id); S.toast(t('common.saved'), 'ok'); md.close(); done && done(); } catch (er) { S.showErrors(form, er); } }); });
+      form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { const b = await S.api.createBuilding({ nameRu: nameRu.value.trim(), nameTg: nameTg.value.trim() || nameRu.value.trim(), address: addr.value.trim(), floorsCount: +floors.value }); await S.api.createFloors(b.id, b.floorsCount || +floors.value); S.crmBuildings = null; S.store.set('sitora.crmBuilding', b.id); S.toast(t('common.saved'), 'ok'); md.close(); done && done(); } catch (er) { S.showErrors(form, er); } }); });
     }
 
     // The building the catalog and construction sections work on (remembered between visits).
@@ -423,4 +582,96 @@
 
     return () => {};
   };
+
+  /* ---------- first sign-in of a new owner ---------- */
+  // Welcome → the first building (with its floors, so apartments can be added at once) → invite a manager and an accountant.
+  const CITIES = ['dushanbe', 'khujand', 'bokhtar', 'other'];
+  function wizard(box, finish) {
+    const u = S.api.user;
+    let building = null, floorsDone = 0;
+    const steps = (n) => h('ol', { class: 'wiz-steps', 'aria-label': t('wiz.progress') }, [1, 2, 3].map((i) =>
+      h('li', { class: i < n ? 'done' : i === n ? 'on' : '', 'aria-current': i === n ? 'step' : null }, h('b', null, i < n ? '✓' : String(i)), h('span', null, t('wiz.step' + i)))));
+    const shell = (n, ...content) => { box.replaceChildren(h('div', { class: 'card wiz' }, steps(n), ...content)); window.scrollTo(0, 0); };
+
+    function welcome() {
+      shell(1, h('div', { class: 'wiz-hero' }, h('div', { class: 'wiz-ok', 'aria-hidden': 'true' }, '✓'), h('h1', null, t('wiz.welcome')),
+        h('p', { class: 'muted' }, t('wiz.approved', { o: u.organizationName || '' })),
+        h('button', { class: 'btn lg', type: 'button', onclick: buildingStep }, t('wiz.start'))));
+    }
+
+    function buildingStep() {
+      const nameRu = S.input('nameRu', { placeholder: 'Sitora Residence' }), nameTg = S.input('nameTg', { placeholder: 'Sitora Residence' });
+      const city = S.select('city', CITIES.map((c) => [c, t('wiz.city.' + c)]), 'dushanbe');
+      const cityOther = S.input('cityOther');
+      const other = h('div', { hidden: true }, S.field(t('wiz.cityName') + ' *', cityOther));
+      city.addEventListener('change', () => { other.hidden = city.value !== 'other'; });
+      const addr = S.input('address', { placeholder: t('wiz.addrPh') });
+      const floors = S.input('floorsCount', { type: 'number', min: 1, max: 50, value: 12, inputmode: 'numeric' });
+      const apts = S.input('plannedApartments', { type: 'number', min: 1, max: 1000, value: 96, inputmode: 'numeric' });
+      const year = S.input('completionYear', { type: 'number', min: 2024, max: 2035, value: Math.min(2035, new Date().getFullYear() + 2), inputmode: 'numeric' });
+      const desc = h('textarea', { class: 'inp', name: 'descriptionRu', id: 'wiz-desc', rows: 3, maxlength: 4000 });
+      const btn = h('button', { class: 'btn lg', type: 'submit' }, h('span', null, t('wiz.create')));
+      const form = h('form', { class: 'stack', novalidate: true },
+        h('div', { class: 'grid g2' }, S.field(t('cat.nameRu') + ' *', nameRu), S.field(t('cat.nameTg') + ' *', nameTg, t('wiz.tgHint'))),
+        h('div', { class: 'grid g2' }, S.field(t('wiz.city') + ' *', city), S.field(t('f.address') + ' *', addr)), other,
+        h('div', { class: 'grid g3' }, S.field(t('cat.floorsCount') + ' *', floors, '1–50'), S.field(t('wiz.apts') + ' *', apts, '1–1000'), S.field(t('wiz.year') + ' *', year, '2024–2035')),
+        S.field(t('wiz.desc'), desc, null, 'wiz-desc'),
+        h('div', { class: 'row between' }, h('button', { class: 'btn ghost', type: 'button', onclick: welcome }, '← ' + t('wiz.back')), btn));
+      const int = (el, min, max) => { const v = Number(el.value); return Number.isInteger(v) && v >= min && v <= max ? v : null; };
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault(); S.showErrors(form, null);
+        const errors = {};
+        if (!nameRu.value.trim()) errors.nameRu = [t('wiz.errName')];
+        if (!nameTg.value.trim()) errors.nameTg = [t('wiz.errName')];
+        if (city.value === 'other' && !cityOther.value.trim()) errors.cityOther = [t('wiz.errCity')];
+        if (!addr.value.trim()) errors.address = [t('wiz.errAddr')];
+        if (int(floors, 1, 50) === null) errors.floorsCount = [t('wiz.errRange', { a: 1, b: 50 })];
+        if (int(apts, 1, 1000) === null) errors.plannedApartments = [t('wiz.errRange', { a: 1, b: 1000 })];
+        if (int(year, 2024, 2035) === null) errors.completionYear = [t('wiz.errRange', { a: 2024, b: 2035 })];
+        if (Object.keys(errors).length) { S.showErrors(form, { message: t('wiz.errForm'), errors }); return; }
+        const cityName = city.value === 'other' ? cityOther.value.trim() : t('wiz.city.' + city.value);
+        await S.busy(btn, async () => {
+          try {
+            // A retry after a failure goes on from where it stopped instead of creating a second building.
+            if (!building) {
+              building = await S.api.createBuilding({ nameRu: nameRu.value.trim(), nameTg: nameTg.value.trim(), address: cityName + ', ' + addr.value.trim(), floorsCount: int(floors, 1, 50),
+                plannedApartments: int(apts, 1, 1000), completionYear: int(year, 2024, 2035), descriptionRu: desc.value.trim() });
+            }
+            await S.api.createFloors(building.id, building.floorsCount, (n) => { floorsDone = n; btn.lastChild.textContent = t('wiz.floorsN', { n, c: building.floorsCount }); }, floorsDone + 1);
+            S.crmBuildings = null; S.store.set('sitora.crmBuilding', building.id);
+            inviteStep();
+          } catch (er) { S.showErrors(form, er); }
+        });
+      });
+      shell(2, h('h2', null, t('wiz.buildingTitle')), h('p', { class: 'muted' }, t('wiz.buildingSub')), form);
+      setTimeout(() => nameRu.focus(), 30);
+    }
+
+    function inviteStep() {
+      const card = (role) => {
+        const name = S.input('fullName', { placeholder: t('wiz.namePh') }), email = S.input('email', { type: 'email', placeholder: 'name@company.tj', inputmode: 'email' });
+        const btn = h('button', { class: 'btn', type: 'submit' }, t('wiz.invite'));
+        const f = h('form', { class: 'card flat stack wiz-inv', novalidate: true }, h('h3', null, t('role.' + role)), h('p', { class: 'hint' }, t('wiz.inv.' + role)), S.field(t('f.fullName'), name), S.field(t('login.email'), email), btn);
+        f.addEventListener('submit', async (e) => {
+          e.preventDefault(); S.showErrors(f, null);
+          const errors = {};
+          if (!name.value.trim()) errors.fullName = [t('wiz.errPerson')];
+          if (!/^\S+@\S+\.\S+$/.test(email.value.trim())) errors.email = [t('val.email')];
+          if (Object.keys(errors).length) { S.showErrors(f, { message: t('wiz.errForm'), errors }); return; }
+          await S.busy(btn, async () => {
+            try {
+              await S.api.invite({ fullName: name.value.trim(), email: email.value.trim(), role, buildingIds: [building.id] });
+              f.replaceChildren(h('h3', null, t('role.' + role)), h('div', { class: 'wiz-sent', role: 'status' }, '✓ ' + t('wiz.sent', { e: email.value.trim() })));
+            } catch (er) { S.showErrors(f, er); }
+          });
+        });
+        return f;
+      };
+      shell(3, h('h2', null, t('wiz.created')), h('p', { class: 'muted' }, t('wiz.inviteSub', { b: building.name })),
+        h('div', { class: 'grid g2' }, card('Manager'), card('Accountant')),
+        h('div', { class: 'row between wiz-foot' }, h('button', { class: 'btn ghost', type: 'button', onclick: finish }, t('wiz.skip')), h('button', { class: 'btn', type: 'button', onclick: finish }, t('wiz.done'))));
+    }
+
+    welcome();
+  }
 })();

@@ -59,7 +59,7 @@
 
   const M = (S.map = {
     building(b) {
-      return { id: b.id, name: pick(b, ['name', 'title'], '') || pick(b, ['nameRu'], ''), nameRu: pick(b, ['nameRu'], ''), nameTg: pick(b, ['nameTg'], ''), description: pick(b, ['description'], '') || pick(b, ['descriptionRu'], ''), descriptionRu: pick(b, ['descriptionRu'], ''), descriptionTg: pick(b, ['descriptionTg'], ''), address: pick(b, ['address'], ''), deliveryDate: pick(b, ['deliveryDate', 'completionDate', 'deadline'], ''), floorsCount: num(pick(b, ['floorsCount', 'floors', 'floorCount'], 0)), modelUrl: pick(b, ['modelUrl'], null), total: num(pick(b, ['totalApartments', 'apartmentsCount', 'total'], 0)), free: num(pick(b, ['freeApartments', 'freeCount', 'free'], 0)) };
+      return { id: b.id, name: pick(b, ['name', 'title'], '') || pick(b, ['nameRu'], ''), nameRu: pick(b, ['nameRu'], ''), nameTg: pick(b, ['nameTg'], ''), description: pick(b, ['description'], '') || pick(b, ['descriptionRu'], ''), descriptionRu: pick(b, ['descriptionRu'], ''), descriptionTg: pick(b, ['descriptionTg'], ''), address: pick(b, ['address'], ''), deliveryDate: pick(b, ['deliveryDate', 'completionDate', 'deadline'], ''), floorsCount: num(pick(b, ['floorsCount', 'floors', 'floorCount'], 0)), modelUrl: pick(b, ['modelUrl'], null), total: num(pick(b, ['totalApartments', 'apartmentsCount', 'total'], 0)), free: num(pick(b, ['freeApartments', 'freeCount', 'free'], 0)), completionYear: pick(b, ['completionYear'], null), plannedApartments: pick(b, ['plannedApartments'], null) };
     },
     floor(f) { return { id: f.id, number: num(pick(f, ['number', 'floorNumber', 'level'], 0)), commercial: !!pick(f, ['isCommercial', 'commercial'], false), total: num(pick(f, ['totalApartments', 'apartmentsCount', 'total'], 0)), free: num(pick(f, ['freeApartments', 'freeCount', 'free'], 0)) }; },
     apt(a, floorNo) {
@@ -94,7 +94,7 @@
       const reversal = !!(pick(p, ['isReversal', 'reversal'], false) || p.reversalOfId);
       // Reversals may come with a minus sign; views add "−" themselves.
       const abs = (v) => (reversal ? Math.abs(num(v)) : num(v));
-      return { id: pick(p, ['id', 'paymentId'], null), dealId: p.dealId, date: day(pick(p, ['paidAt', 'date', 'createdAt'], '')), amount: abs(pick(p, ['amount'], 0)), currency: String(pick(p, ['currency'], 'TJS')), amountDeal: abs(pick(p, ['amountInDealCurrency', 'amountDeal', 'amountInContractCurrency'], pick(p, ['amount'], 0))), amountTjs: abs(pick(p, ['amountTjs', 'amountInTjs'], 0)), rate: pick(p, ['rateUsed', 'rate'], null), method: pick(p, ['method'], ''), reversal, reversedId: pick(p, ['reversalOfId', 'reversedId', 'reversedPaymentId'], null), isReversed: !!p.isReversed, comment: pick(p, ['comment', 'note'], ''), createdBy: pick(p, ['createdBy', 'author'], ''), customerName: pick(p, ['customerName'], ''), apartmentNumber: pick(p, ['apartmentNumber'], '') };
+      return { id: pick(p, ['id', 'paymentId'], null), dealId: p.dealId, buildingName: pick(p, ['buildingName'], ''), date: day(pick(p, ['paidAt', 'date', 'createdAt'], '')), amount: abs(pick(p, ['amount'], 0)), currency: String(pick(p, ['currency'], 'TJS')), amountDeal: abs(pick(p, ['amountInDealCurrency', 'amountDeal', 'amountInContractCurrency'], pick(p, ['amount'], 0))), amountTjs: abs(pick(p, ['amountTjs', 'amountInTjs'], 0)), rate: pick(p, ['rateUsed', 'rate'], null), method: pick(p, ['method'], ''), reversal, reversedId: pick(p, ['reversalOfId', 'reversedId', 'reversedPaymentId'], null), isReversed: !!p.isReversed, comment: pick(p, ['comment', 'note'], ''), createdBy: pick(p, ['createdBy', 'author'], ''), customerName: pick(p, ['customerName'], ''), apartmentNumber: pick(p, ['apartmentNumber'], '') };
     },
     message(m) {
       const fromCustomer = pick(m, ['fromCustomer'], null);
@@ -332,10 +332,18 @@
       if (S.isDemo()) return request('PUT', '/buildings/' + id, { body: b });
       // PUT replaces the whole building: fields the form does not show are taken from the current version.
       const cur = await request('GET', '/buildings/' + id);
-      const body = { nameRu: pick(b, ['nameRu'], cur.nameRu), nameTg: pick(b, ['nameTg'], cur.nameTg), address: pick(b, ['address'], cur.address), floorsCount: num(pick(b, ['floorsCount'], cur.floorsCount)), descriptionRu: pick(b, ['descriptionRu'], cur.descriptionRu) || null, descriptionTg: pick(b, ['descriptionTg'], cur.descriptionTg) || null, modelUrl: pick(b, ['modelUrl'], cur.modelUrl) || null };
+      const body = { nameRu: pick(b, ['nameRu'], cur.nameRu), nameTg: pick(b, ['nameTg'], cur.nameTg), address: pick(b, ['address'], cur.address), floorsCount: num(pick(b, ['floorsCount'], cur.floorsCount)), descriptionRu: pick(b, ['descriptionRu'], cur.descriptionRu) || null, descriptionTg: pick(b, ['descriptionTg'], cur.descriptionTg) || null, modelUrl: pick(b, ['modelUrl'], cur.modelUrl) || null, completionYear: pick(b, ['completionYear'], cur.completionYear) || null, plannedApartments: pick(b, ['plannedApartments'], cur.plannedApartments) || null };
       return request('PUT', '/buildings/' + id, { body }).then(M.building);
     },
-    createBuilding(b) { return withFields(request('POST', '/buildings', { body: { nameRu: b.nameRu, nameTg: b.nameTg, address: b.address, floorsCount: b.floorsCount, descriptionRu: null, modelUrl: null } })).then(M.building); },
+    createBuilding(b) { return withFields(request('POST', '/buildings', { body: { nameRu: b.nameRu, nameTg: b.nameTg, address: b.address, floorsCount: b.floorsCount, descriptionRu: b.descriptionRu || null, descriptionTg: b.descriptionTg || null, modelUrl: null, completionYear: b.completionYear || null, plannedApartments: b.plannedApartments || null } })).then(M.building); },
+    // Floors 1..n of a new building, so apartments can be added right away (the server does not create them by itself).
+    async createFloors(buildingId, count, onStep, from) { for (let n = from || 1; n <= count; n++) { await request('POST', '/floors', { body: { buildingId, number: n, planImageUrl: null } }); if (onStep) onStep(n); } },
+
+    // the owner's brand: name, short name, contacts, colour and logo of the developer's site
+    ownerBrand() { return request('GET', '/owner/brand'); },
+    saveOwnerBrand(b) { return withFields(request('PUT', '/owner/brand', { body: b })); },
+    uploadLogo(file) { const f = new FormData(); f.append('file', file); return request('POST', '/owner/brand/logo', { form: f, file }); },
+    deleteLogo() { return request('DELETE', '/owner/brand/logo'); },
     createApartment(b) { return withFields(request('POST', '/apartments', { body: Object.assign({}, b, { pricePerM2: pick(b, ['pricePerM2', 'pricePerSqm'], 0) }) })).then((a) => M.apt(a)); },
     updateApartment(id, b) { return withFields(request('PUT', '/apartments/' + id, { body: Object.assign({}, b, { pricePerM2: pick(b, ['pricePerM2', 'pricePerSqm'], 0) }) })).then((a) => M.apt(a)); },
     onRequest(id, on) { return request('PATCH', '/apartments/' + id + '/on-request', { body: { onRequest: on } }); },

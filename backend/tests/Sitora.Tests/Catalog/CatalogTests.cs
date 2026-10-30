@@ -115,6 +115,24 @@ public class CatalogTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
     }
 
     [Fact]
+    public async Task Building_KeepsCompletionYearAndPlannedApartments_AndChecksThem()
+    {
+        var client = await factory.CreateAdminClientAsync();
+
+        var created = await ReadAsync<BuildingResponse>(await client.PostAsJsonAsync("/api/v1/buildings",
+            NewBuilding("Дом с планом") with { CompletionYear = 2027, PlannedApartments = 96 }));
+        Assert.Equal((2027, 96), (created.CompletionYear, created.PlannedApartments));
+        var read = await ReadAsync<BuildingResponse>(await _guest.GetAsync($"/api/v1/buildings/{created.Id}"));
+        Assert.Equal((2027, 96), (read.CompletionYear, read.PlannedApartments));
+
+        var bad = await client.PostAsJsonAsync("/api/v1/buildings", NewBuilding("Дом с ошибкой") with { CompletionYear = 1990, PlannedApartments = 0 });
+        Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
+        var body = await bad.Content.ReadAsStringAsync();
+        Assert.Contains("Год сдачи", body);
+        Assert.Contains("Квартир в доме", body);
+    }
+
+    [Fact]
     public async Task BuildingDescription_DependsOnAcceptLanguage_WithRussianFallback()
     {
         var client = await factory.CreateAdminClientAsync();

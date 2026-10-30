@@ -17,6 +17,10 @@ public class SaveBuildingRequestValidator : AbstractValidator<SaveBuildingReques
         RuleFor(x => x.ModelUrl).MaximumLength(500)
             .Must(BeAbsoluteUrl).When(x => !string.IsNullOrWhiteSpace(x.ModelUrl))
             .WithMessage("Ссылка на 3D-модель должна быть полным адресом http(s)");
+        RuleFor(x => x.CompletionYear).InclusiveBetween(2000, 2100).When(x => x.CompletionYear is not null)
+            .WithMessage("Год сдачи — от 2000 до 2100");
+        RuleFor(x => x.PlannedApartments).InclusiveBetween(1, 5000).When(x => x.PlannedApartments is not null)
+            .WithMessage("Квартир в доме — от 1 до 5000");
     }
 
     private static bool BeAbsoluteUrl(string? url) =>

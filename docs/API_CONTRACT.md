@@ -216,14 +216,14 @@ SecondFactorChallenge = { challengeToken, expiresAt, methods: ["password", "totp
 | POST | `/invitations` | руководители | `{ email, fullName, role, buildingIds? }` → 201 `{ id, email, fullName, role, buildingIds, expiresAt, acceptedAt, createdAt }`. Письмо со ссылкой `EMAIL_INVITE_URL + token` живёт 7 дней |
 | GET | `/invitations` | руководители | непринятые приглашения |
 | DELETE | `/invitations/{id}` | руководители | 204 |
-| POST | `/buildings` | Owner | новый дом организации |
+| POST | `/buildings` | Owner | новый дом организации: те же поля, что в `PUT`. Этажи сам не создаёт — фронтенд создаёт их сразу после дома (`POST /floors` для 1…N) |
 
 Кого может назначить:
 - **Owner** — ObjectAdmin (ровно один дом), Manager, Accountant, Content (дома необязательны, пусто — все);
 - **ObjectAdmin** — Manager, Accountant, Content, только в свой дом: если дома не переданы, подставляется его дом;
 - владельцев заводит только создатель платформы.
 | GET | `/audit?entity=&from=&to=` | Owner | страница `{ userEmail, organizationId, impersonatedById, entity, entityId, action, before, after, at }`. `before` и `after` — JSON-строки. Имена сущностей — имена классов: `Deal`, `Payment`, `Apartment`, `AppUser`… |
-| PUT | `/buildings/{id}` | Content, руководители | полная замена: `{ nameRu, nameTg, address, floorsCount, descriptionRu, descriptionTg, modelUrl }`. Поля, которых нет в форме, `api.js` берёт из текущей версии |
+| PUT | `/buildings/{id}` | Content, руководители | полная замена: `{ nameRu, nameTg, address, floorsCount, descriptionRu, descriptionTg, modelUrl, completionYear?, plannedApartments? }` (год сдачи 2000–2100, квартир в доме 1–5000; они же приходят в ответе о доме). Поля, которых нет в форме, `api.js` берёт из текущей версии |
 | PUT | `/apartments/{id}`, POST `/apartments` | Content, руководители | `{ number, rooms, area, pricePerM2, planSlot, model3dId }` (+ `floorId` при создании) |
 | PATCH | `/apartments/{id}/on-request` | Content, руководители | `{ onRequest }` |
 | POST | `/apartments/import?buildingId=` | Content, руководители | form-data `file` (.xlsx) |
