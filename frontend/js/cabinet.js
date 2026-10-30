@@ -15,6 +15,10 @@
     const card = h('div', { class: 'card login-card login' });
     root.appendChild(h('div', { class: 'wrap page-in' }, card));
     let step = 'email', emailVal = '', timer = 0, tick = null, challenge = null;
+    // Buyer or staff: the same code flow, different hints; staff who set a password when joining may use it instead.
+    let who = S.store.get('sitora.loginAs') === 'staff' ? 'staff' : 'buyer';
+    const whoToggle = (email) => h('div', { class: 'seg login-who', role: 'group', 'aria-label': t('login.as') }, [['buyer', 'login.asBuyer'], ['staff', 'login.asStaff']].map(([k, key]) =>
+      h('button', { type: 'button', class: who === k ? 'on' : '', 'aria-pressed': String(who === k), onclick: () => { if (who === k) return; who = k; S.store.set('sitora.loginAs', k); emailVal = email.value.trim(); draw(); } }, t(key))));
 
     const startTick = () => {
       clearInterval(tick); timer = 60;
@@ -35,14 +39,30 @@
       if (step === 'email') {
         const email = S.input('email', { type: 'email', value: emailVal, placeholder: 'name@mail.tj', autocomplete: 'email', inputmode: 'email' });
         // The server answers the same for known and unknown addresses, so registration is offered as a link, not detected.
-        form.append(h('h2', null, t('login.title')), h('p', { class: 'muted' }, t('login.sub')), S.field(t('login.email'), email), btn,
-          h('p', { class: 'muted', style: { textAlign: 'center' } }, t('reg.ask'), ' ', h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { emailVal = email.value.trim(); step = 'register'; draw(); } }, t('reg.link'))));
+        form.append(h('h2', null, t('login.title')), h('p', { class: 'muted' }, t(who === 'staff' ? 'login.hintStaff' : 'login.hintBuyer')), S.field(t('login.email'), email), btn,
+          who === 'staff'
+            ? h('p', { class: 'muted', style: { textAlign: 'center' } }, h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { emailVal = email.value.trim(); step = 'password'; draw(); } }, t('login.byPassword')))
+            : h('p', { class: 'muted', style: { textAlign: 'center' } }, t('reg.ask'), ' ', h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { emailVal = email.value.trim(); step = 'register'; draw(); } }, t('reg.link'))),
+          whoToggle(email));
         submit = async () => {
           emailVal = email.value.trim();
           if (!/^\S+@\S+\.\S+$/.test(emailVal)) { S.showErrors(form, { message: t('val.email'), errors: { email: [t('val.email')] } }); return; }
           await send(); step = 'code'; draw();
         };
         setTimeout(() => email.focus(), 30);
+      } else if (step === 'password') {
+        // Staff who set a password when accepting the invitation (POST /auth/login); the platform owner cannot sign in this way.
+        const email = S.input('email', { type: 'email', value: emailVal, placeholder: 'name@mail.tj', autocomplete: 'username', inputmode: 'email' });
+        const pass = S.input('password', { type: 'password', autocomplete: 'current-password' });
+        btn.textContent = t('login.enter');
+        form.append(h('h2', null, t('login.passTitle')), h('p', { class: 'muted' }, t('login.passSub')), S.field(t('login.email'), email), S.field(t('login.password'), pass), btn,
+          h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { emailVal = email.value.trim(); step = 'email'; draw(); } }, t('login.byCode')));
+        submit = async () => {
+          emailVal = email.value.trim();
+          if (!/^\S+@\S+\.\S+$/.test(emailVal)) { S.showErrors(form, { message: t('val.email'), errors: { email: [t('val.email')] } }); return; }
+          enter(await S.api.passwordLogin(emailVal, pass.value));
+        };
+        setTimeout(() => (emailVal ? pass : email).focus(), 30);
       } else if (step === 'register') {
         const email = S.input('email', { type: 'email', value: emailVal, placeholder: 'name@mail.tj', autocomplete: 'email', inputmode: 'email' });
         const name = S.input('fullName', { autocomplete: 'name' });

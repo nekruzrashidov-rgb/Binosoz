@@ -372,13 +372,16 @@ public class AuthService(
 
     // ---------- Приглашение сотрудника ----------
 
+    // Недействительная ссылка — 404 с тем же текстом, что и при попытке её принять.
+    public async Task<InvitationInfoResponse> GetInvitationInfoAsync(string token, CancellationToken ct = default)
+    {
+        var invitation = await FindPendingInvitationAsync(token, ct) ?? throw new NotFoundException(InvalidInvitation);
+        return new InvitationInfoResponse(invitation.Organization.Name, invitation.FullName, invitation.Email, invitation.Role, invitation.ExpiresAt);
+    }
+
     public async Task<AuthResponse> AcceptInvitationAsync(AcceptInvitationRequest request, CancellationToken ct = default)
     {
-        var hash = JwtTokenService.HashToken(request.Token.Trim());
-        var invitation = await db.Invitations.IgnoreQueryFilters().Include(i => i.Organization)
-            .FirstOrDefaultAsync(i => i.TokenHash == hash, ct);
-        if (invitation is null || !invitation.IsPending(Now) || !invitation.Organization.IsActive)
-            throw new UnauthorizedException(InvalidInvitation);
+        var invitation = await FindPendingInvitationAsync(request.Token, ct) ?? throw new UnauthorizedException(InvalidInvitation);
         if (await userManager.FindByEmailAsync(invitation.Email) is not null)
             throw new ConflictException("Пользователь с такой почтой уже есть");
 
@@ -390,7 +393,9 @@ public class AuthService(
             FullName = invitation.FullName,
             OrganizationId = invitation.OrganizationId
         };
-        var result = await userManager.CreateAsync(user);
+        var result = string.IsNullOrEmpty(request.Password)
+            ? await userManager.CreateAsync(user)
+            : await userManager.CreateAsync(user, request.Password);
         if (!result.Succeeded)
             throw new BusinessRuleException(string.Join("; ", result.Errors.Select(e => e.Description)));
         await userManager.AddToRoleAsync(user, invitation.Role);
@@ -404,6 +409,15 @@ public class AuthService(
 
         logger.LogInformation("Принято приглашение {InvitationId}: сотрудник {UserId}", invitation.Id, user.Id);
         return await IssueTokensAsync(user, ct);
+    }
+
+    // Приглашение по токену из письма: не принятое, не отозванное, не просроченное, в работающую организацию.
+    private async Task<Invitation?> FindPendingInvitationAsync(string token, CancellationToken ct)
+    {
+        var hash = JwtTokenService.HashToken(token.Trim());
+        var invitation = await db.Invitations.IgnoreQueryFilters().Include(i => i.Organization)
+            .FirstOrDefaultAsync(i => i.TokenHash == hash, ct);
+        return invitation is not null && invitation.IsPending(Now) && invitation.Organization.IsActive ? invitation : null;
     }
 
     // ---------- Старый вход по SMS ----------

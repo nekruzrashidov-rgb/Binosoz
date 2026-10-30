@@ -27,6 +27,14 @@ public partial class FakeEmailSender : IEmailSender
 
     public int SentCount(string email) => _messages.TryGetValue(email, out var list) ? list.Count : 0;
 
+    public EmailMessage? LastMessage(string email)
+    {
+        if (!_messages.TryGetValue(email, out var list))
+            return null;
+        lock (list)
+            return list.Count > 0 ? list[^1] : null;
+    }
+
     public string? LastCode(string email) => Last(email, CodePattern());
 
     public string? LastInviteToken(string email) => Last(email, InvitePattern(), group: 1);
@@ -51,6 +59,6 @@ public partial class FakeEmailSender : IEmailSender
     [GeneratedRegex(@"(?<![0-9A-F])\d{6}(?![0-9A-F])")]
     private static partial Regex CodePattern();
 
-    [GeneratedRegex(@"#invite=([0-9A-F]{64})")]
+    [GeneratedRegex(@"#(?:invite|token)=([0-9A-F]{64})")]
     private static partial Regex InvitePattern();
 }

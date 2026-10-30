@@ -23,7 +23,12 @@ public class EmailOptions
     public string FromName { get; set; } = "Sitora";
 
     // Адрес страницы принятия приглашения; токен дописывается в конец.
-    public string InviteUrl { get; set; } = "http://localhost:5500/#invite=";
+    public string InviteUrl { get; set; } = "http://localhost:5500/accept-invite#token=";
+
+    // Страница входа на том же сайте, что и приглашения: для писем «входите по коду».
+    public string LoginUrl => Uri.TryCreate(InviteUrl, UriKind.Absolute, out var url)
+        ? url.GetLeftPart(UriPartial.Authority) + "/login"
+        : InviteUrl.Split('#')[0];
 
     public SmtpSettings Smtp { get; set; } = new();
     public ResendSettings Resend { get; set; } = new();
@@ -72,6 +77,8 @@ public class SmtpEmailSender(IOptions<EmailOptions> options) : IEmailSender
             Body = message.Text,
             IsBodyHtml = false
         };
+        if (message.Html is not null)
+            mail.AlternateViews.Add(AlternateView.CreateAlternateViewFromString(message.Html, System.Text.Encoding.UTF8, "text/html"));
         using var client = new SmtpClient(o.Smtp.Host, o.Smtp.Port) { EnableSsl = o.Smtp.UseSsl };
         if (!string.IsNullOrEmpty(o.Smtp.Username))
             client.Credentials = new NetworkCredential(o.Smtp.Username, o.Smtp.Password);
@@ -82,6 +89,10 @@ public class SmtpEmailSender(IOptions<EmailOptions> options) : IEmailSender
 // Resend (resend.com): HTTP API, ключ в Email__Resend__ApiKey.
 public class ResendEmailSender(HttpClient http, IOptions<EmailOptions> options) : IEmailSender
 {
+    // Письмо без HTML уходит без поля html, а не с html: null.
+    private static readonly System.Text.Json.JsonSerializerOptions OmitNulls =
+        new() { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
+
     public async Task SendAsync(EmailMessage message, CancellationToken ct = default)
     {
         var o = options.Value;
@@ -95,8 +106,9 @@ public class ResendEmailSender(HttpClient http, IOptions<EmailOptions> options) 
                 from = $"{o.FromName} <{o.From}>",
                 to = new[] { message.To },
                 subject = message.Subject,
-                text = message.Text
-            })
+                text = message.Text,
+                html = message.Html
+            }, options: OmitNulls)
         };
         request.Headers.Authorization = new("Bearer", o.Resend.ApiKey);
         using var response = await http.SendAsync(request, ct);

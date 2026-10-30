@@ -123,6 +123,7 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("RateLimiting:LoginPerMinute", "1000000");
         builder.UseSetting("RateLimiting:SmsPerHour", "1000000");
         builder.UseSetting("RateLimiting:PublicFormsPerHour", "1000000");
+        builder.UseSetting("RateLimiting:ApplicationsPerHour", "1000000");
         builder.UseSetting("RateLimiting:AnonymousPerMinute", "1000000");
         builder.UseSetting("RateLimiting:UserPerMinute", "1000000");
         // Лимиты кодов из почты проверяет EmailAuthTests со своей фабрикой; здесь покупатели входят много раз подряд.

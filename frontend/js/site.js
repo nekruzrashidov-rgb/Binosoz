@@ -110,12 +110,12 @@
           h('div', { class: 'foot-social' },
             c.telegram ? h('a', { class: 'soc tg', href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener', 'aria-label': 'Telegram', title: 'Telegram' }, landIcon('send')) : null,
             c.phone ? h('a', { class: 'soc wa', href: 'https://wa.me/' + phoneDigits(c.phone), target: '_blank', rel: 'noopener', 'aria-label': 'WhatsApp', title: 'WhatsApp' }, landIcon('chat')) : null,
-            h('a', { class: 'btn ghost sm', href: '/login' }, t('foot.login'))),
-          h('p', { class: 'foot-dev' }, t('foot.dev') + ' ', h('a', { href: '/register' }, t('foot.devLink')))),
+            h('a', { class: 'btn ghost sm', href: '/login' }, t('foot.login')))),
         col(t('foot.apts'), h('a', { href: '/apartments' }, t('foot.catalog')), h('a', { href: '/apartments#calc' }, t('foot.calc')), h('a', { href: '/apartments' }, t('foot.3d'))),
         col(t('foot.info'), h('a', { href: '/#why' }, t('foot.why')), h('a', { href: '/#steps' }, t('foot.steps')), h('a', { href: '/login' }, t('foot.cabinet'))),
         col(t('foot.contacts'), h('span', null, c.address || ''), c.phone ? h('a', { href: 'tel:+' + phoneDigits(c.phone) }, c.phone) : null, c.telegram ? h('a', { href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, c.telegram) : null, h('a', { href: '/contact' }, t('foot.write')))),
-      h('div', { class: 'foot-bottom' }, h('span', null, '© ' + new Date().getFullYear() + ' Sitora Residence. ' + t('footer.rights')), h('a', { href: '/login' }, t('foot.login')))));
+      h('div', { class: 'foot-bottom' }, h('span', null, '© ' + new Date().getFullYear() + ' Sitora Residence. ' + t('footer.rights')),
+        h('span', { class: 'foot-dev' }, t('foot.dev') + ' ', h('a', { href: '/register' }, t('foot.devLink'))))));
   }
 
   // Page head of the inner pages: a way back to the landing and the title.
@@ -786,6 +786,83 @@
       h('p', { class: 'muted-lux' }, t('reg2.sub')),
       h('ul', { class: 'reg-perks' }, ['reg2.perk1', 'reg2.perk2', 'reg2.perk3'].map((k) => h('li', null, landIcon('check'), t(k)))),
       form);
+    return () => {};
+  };
+
+  /* ---------- accept-invite: a staff member opens the link from the invitation letter ---------- */
+  // The letter links to /accept-invite#token=…; older letters carry #invite=…, and ?token=… is accepted too.
+  // The token stays in the hash where it can: the hash never reaches server logs.
+  const inviteToken = () => {
+    const m = location.hash.match(/(?:token|invite)=([^&]+)/);
+    return (m && decodeURIComponent(m[1])) || new URLSearchParams(location.search).get('token') || '';
+  };
+  // Same rules as the server (ASP.NET Identity): 8+ characters with a digit, a lowercase and an uppercase letter.
+  const strongPassword = (v) => v.length >= 8 && /\d/.test(v) && /\p{Ll}/u.test(v) && /\p{Lu}/u.test(v);
+
+  S.views.acceptInvite = function (root) {
+    const page = h('div', { class: 'page-in lux reg-page' });
+    root.appendChild(page);
+    const card = h('div', { class: 'reg-card inv-card' }, S.skeleton(4, 38));
+    page.append(h('section', { class: 'reg-wrap' }, card), siteFooter());
+    const brand = () => h('div', { class: 'reg-brand' }, S.logo(), h('b', null, 'BINOSOZ'));
+    const token = inviteToken();
+
+    const invalid = () => card.replaceChildren(brand(), h('div', { class: 'inv-bad' }, landIcon('lock'), h('h1', null, t('inv.badTitle')), h('p', { class: 'muted-lux' }, t('inv.badText')),
+      h('a', { class: 'btn gold', href: '/' }, '← ' + t('nav.home'))));
+
+    const fl = (field, label, extra) => h('label', { class: 'fl' }, field, h('span', null, label), extra || null, h('em', { class: 'fl-err' }));
+    const secret = (name, autocomplete) => {
+      const inp = h('input', { class: 'inp', name, type: 'password', placeholder: ' ', autocomplete, maxlength: 128 });
+      const eye = h('button', { class: 'pw-eye', type: 'button', 'aria-label': t('inv.show'), 'aria-pressed': 'false', onclick: () => {
+        const show = inp.type === 'password'; inp.type = show ? 'text' : 'password';
+        eye.setAttribute('aria-pressed', String(show)); eye.setAttribute('aria-label', t(show ? 'inv.hide' : 'inv.show')); eye.replaceChildren(S.icon(show ? 'eyeOff' : 'eye'));
+      } }, S.icon('eye'));
+      return [inp, eye];
+    };
+
+    function form(info) {
+      const role = t('inv.role.' + info.role, null, info.role);
+      const name = h('input', { class: 'inp', name: 'fullName', placeholder: ' ', value: info.fullName || '', readonly: !!info.fullName, autocomplete: 'name' });
+      const email = h('input', { class: 'inp', name: 'email', placeholder: ' ', value: info.email, readonly: true });
+      const [pass, eye1] = secret('password', 'new-password');
+      const [again, eye2] = secret('confirm', 'new-password');
+      const btn = h('button', { class: 'btn gold lg block', type: 'submit' }, t('inv.accept'));
+      const f = h('form', { class: 'ct-form reg-form', novalidate: true },
+        fl(name, t('inv.name')), fl(email, t('reg2.email')),
+        fl(pass, t('inv.password') + ' *', eye1), h('small', { class: 'fl-hint' }, t('inv.passHint')),
+        fl(again, t('inv.confirm') + ' *', eye2),
+        btn);
+      const fail = (el, msg) => { const box = el.closest('label'); box.classList.add('err'); box.querySelector('.fl-err').textContent = msg; };
+      f.addEventListener('input', (e) => { const box = e.target.closest('label'); if (box) box.classList.remove('err'); });
+      f.addEventListener('submit', async (e) => {
+        e.preventDefault(); S.showErrors(f, null);
+        S.$$('label.err', f).forEach((l) => l.classList.remove('err'));
+        let ok = true;
+        if (!strongPassword(pass.value)) { fail(pass, t('inv.errPass')); ok = false; }
+        if (again.value !== pass.value) { fail(again, t('inv.errMatch')); ok = false; }
+        if (!ok) return;
+        await S.busy(btn, async () => {
+          try {
+            const r = await S.api.acceptInvitation(token, pass.value);
+            S.toast(t('login.welcome'), 'ok');
+            location.replace(S.homeFor ? '/' + S.homeFor(r.user) : '/crm');
+          } catch (er) {
+            // Used or revoked while the page was open: the same screen as for a bad link.
+            if (er.status === 401) invalid(); else S.showErrors(f, er);
+          }
+        });
+      });
+      card.replaceChildren(
+        brand(),
+        h('h1', null, accentFirst(t('inv.title'))),
+        h('p', { class: 'inv-lead' }, t('inv.invited', { o: info.organizationName, r: role })),
+        h('p', { class: 'muted-lux' }, t('inv.sub')),
+        f);
+      setTimeout(() => pass.focus(), 30);
+    }
+
+    if (!token) invalid();
+    else S.api.invitationInfo(token).then(form, (er) => { if (er.status === 404 || er.status === 401 || er.status === 400) invalid(); else card.replaceChildren(brand(), h('div', { class: 'form-err' }, er.message)); });
     return () => {};
   };
 })();

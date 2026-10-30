@@ -28,6 +28,22 @@ public class OrgApplicationTests(SitoraApiFactory factory) : IClassFixture<Sitor
         var saved = await factory.WithDbAsync(db => db.OrgApplications.SingleAsync(a => a.Id == body.ApplicationId));
         Assert.Equal((OrgApplicationStatus.Pending, email, "+992983637070", "ООО Тест Строй"), (saved.Status, saved.ContactEmail, saved.ContactPhone, saved.CompanyName));
         Assert.Equal(1, factory.Email.SentCount(email));
+        var letter = factory.Email.LastMessage(email)!;
+        Assert.Equal("Заявка принята — Binosoz", letter.Subject);
+        Assert.Contains("<strong>ООО Тест Строй</strong>", letter.Html);
+        Assert.Contains("ООО Тест Строй", letter.Text);
+    }
+
+    [Fact]
+    public async Task ConfirmationLetter_EscapesWhatTheApplicantTyped()
+    {
+        var email = NewEmail();
+        (await _client.PostAsJsonAsync("/api/v1/public/applications",
+            new SubmitApplicationRequest("<b>Строй</b>", email, "+992983637070", "Иван <script>", null))).EnsureSuccessStatusCode();
+
+        var html = factory.Email.LastMessage(email)!.Html!;
+        Assert.DoesNotContain("<script>", html);
+        Assert.Contains("&lt;b&gt;Строй&lt;/b&gt;", html);
     }
 
     [Fact]
@@ -84,6 +100,8 @@ public class OrgApplicationTests(SitoraApiFactory factory) : IClassFixture<Sitor
         Assert.Equal(organization.Id, owner!.OrganizationId);
         Assert.True(await users.IsInRoleAsync(owner, "Owner"));
         Assert.Equal(2, factory.Email.SentCount(email));
+        // Письмо владельцу ведёт на страницу входа, а не на страницу приглашения без токена.
+        Assert.EndsWith("/login", factory.Email.LastMessage(email)!.Text.TrimEnd());
         Assert.True(await factory.WithDbAsync(db => db.AuditLogs.AnyAsync(l => l.Entity == nameof(OrgApplication) && l.EntityId == id && l.Action == "Approved")));
 
         // Рассмотренную заявку повторно не одобрить.

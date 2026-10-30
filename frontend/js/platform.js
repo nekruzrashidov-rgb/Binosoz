@@ -11,6 +11,7 @@
     const page = h('div', { class: 'page-in' }); root.appendChild(page);
     const items = [{ key: 'orgs', label: t('plat.orgs'), icon: 'building' }, { key: 'apps', label: t('apps.title'), icon: 'inbox' }, { key: 'security', label: t('plat.security'), icon: 'shield' }];
     // The number of applications waiting for a decision, on the section's label.
+    let focusOrg = null;
     const countPending = () => S.api.applications('Pending').then((l) => { items[1].badge = l.length || null; ws.redraw(); }).catch(() => {});
     const ws = S.workspace(items, 'orgs', (k, main) => { S.clear(main); main.append(h('h1', null, items.find((i) => i.key === k).label), h('p', { class: 'sub' }, t('plat.sub.' + k))); const body = h('div', { class: 'stack' }); main.appendChild(body); views[k](body); });
     page.appendChild(ws.el);
@@ -24,6 +25,8 @@
           holder.replaceChildren(S.skeleton(4, 38));
           try {
             const list = await S.api.organizations();
+            // Arrived from an approved application: its organization is highlighted and scrolled into view.
+            const focus = focusOrg; focusOrg = null;
             holder.replaceChildren(S.tbl([
               { label: t('plat.name'), render: (o) => h('b', null, o.name) },
               { label: t('plat.slug'), render: (o) => h('code', null, o.slug) },
@@ -31,7 +34,8 @@
               { label: t('plat.users'), r: true, num: true, render: (o) => o.users },
               { label: t('deal.stage'), render: (o) => S.chip(o.active ? 'Active ok' : 'Blocked', t(o.active ? 'plat.active' : 'plat.off')) },
               { label: '', r: true, render: (o) => (o.active ? h('button', { class: 'btn soft sm', onclick: (e) => S.busy(e.currentTarget, async () => { try { await S.api.impersonate(o.id); S.toast(t('imp.started', { o: o.name }), 'ok'); S.go('crm'); } catch (er) { S.err(er); } }) }, t('plat.enter')) : '') },
-            ], list, { empty: t('plat.none') }));
+            ], list, { empty: t('plat.none'), rowClass: (o) => (o.id === focus ? 'row-focus' : '') }));
+            const row = S.$('.row-focus', holder); if (row) row.scrollIntoView({ block: 'center' });
           } catch (e) { holder.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
         };
         body.replaceChildren(h('div', { class: 'toolbar' }, h('p', { class: 'hint' }, t('plat.enterHint')), h('span', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => orgForm(load) }, t('plat.new'))), holder);
@@ -41,28 +45,36 @@
       // Developers' applications from /register: approve (creates the organization and invites the owner) or reject.
       apps(body) {
         const STATUS = { Pending: ['warn', 'apps.pending'], Approved: ['good', 'apps.approved'], Rejected: ['bad', 'apps.rejected'] };
-        let filter = 'Pending';
+        const EMPTY = { '': ['apps.none', 'inbox'], Pending: ['apps.nonePending', 'file'], Approved: ['apps.noneApproved', 'building'], Rejected: ['apps.noneRejected', 'x'] };
+        let filter = 'Pending', list = [];
+        const opened = new Set();
         const holder = h('div');
         const seg = h('div', { class: 'seg', role: 'group', 'aria-label': t('apps.filter') }, [['', 'apps.all'], ['Pending', 'apps.pending'], ['Approved', 'apps.approvedMany'], ['Rejected', 'apps.rejectedMany']]
-          .map(([k, key]) => h('button', { class: filter === k ? 'on' : '', 'data-k': k, onclick: () => { filter = k; S.$$('button', seg).forEach((b) => b.classList.toggle('on', b.dataset.k === k)); load(); } }, t(key))));
+          .map(([k, key]) => h('button', { class: filter === k ? 'on' : '', 'data-k': k, onclick: () => setFilter(k) }, t(key))));
+        const setFilter = (k) => { filter = k; S.$$('button', seg).forEach((b) => b.classList.toggle('on', b.dataset.k === k)); load(); };
+        // Buttons and links inside a row do their own thing; a click elsewhere on the row opens its comment.
+        const own = (fn) => (e) => { e.stopPropagation(); if (fn) fn(e); };
+        const draw = () => holder.replaceChildren(S.tbl([
+          { label: t('apps.company'), render: (a) => h('div', null, h('b', null, a.companyName),
+            a.comment ? h('div', { class: 'app-note-toggle', 'aria-expanded': String(opened.has(a.id)) }, S.icon('file'), t(opened.has(a.id) ? 'apps.hideComment' : 'apps.showComment')) : null,
+            a.comment && opened.has(a.id) ? h('div', { class: 'app-note' }, a.comment) : null) },
+          { label: t('apps.owner'), render: (a) => a.ownerFullName },
+          { label: t('login.email'), render: (a) => h('a', { href: 'mailto:' + a.contactEmail, onclick: own() }, a.contactEmail) },
+          { label: t('f.phone'), render: (a) => h('a', { href: 'tel:' + a.contactPhone, onclick: own() }, a.contactPhone) },
+          { label: t('apps.date'), render: (a) => S.fmt.dt(a.createdAt) },
+          { label: t('deal.stage'), render: (a) => h('div', null, S.chip(STATUS[a.status][0], t(STATUS[a.status][1])), a.reviewNote ? h('div', { class: 'hint' }, a.reviewNote) : null) },
+          { label: '', r: true, render: (a) => (a.status === 'Pending' ? h('div', { class: 'row', style: { gap: '6px', justifyContent: 'flex-end', flexWrap: 'nowrap' } },
+            h('button', { class: 'btn sm', onclick: own(() => approveForm(a, approved)) }, t('apps.approve')),
+            h('button', { class: 'btn ghost sm', onclick: own(() => rejectForm(a, done)) }, t('apps.reject')))
+            : a.status === 'Approved' && a.organizationId ? h('button', { class: 'btn soft sm', onclick: own(() => { focusOrg = a.organizationId; ws.go('orgs'); }) }, t('apps.openOrg')) : '') },
+        ], list, { empty: t(EMPTY[filter][0]), emptyIcon: EMPTY[filter][1], rowClass: (a) => (a.comment ? 'app-row has-note' : 'app-row'), onRow: (a) => { if (!a.comment) return; if (opened.has(a.id)) opened.delete(a.id); else opened.add(a.id); draw(); } }));
         const load = async () => {
           holder.replaceChildren(S.skeleton(4, 38));
-          try {
-            const list = await S.api.applications(filter);
-            holder.replaceChildren(S.tbl([
-              { label: t('apps.company'), render: (a) => h('div', null, h('b', null, a.companyName), a.comment ? h('div', { class: 'hint', style: { maxWidth: '280px' } }, a.comment) : null) },
-              { label: t('apps.owner'), render: (a) => a.ownerFullName },
-              { label: t('login.email'), render: (a) => h('a', { href: 'mailto:' + a.contactEmail }, a.contactEmail) },
-              { label: t('f.phone'), render: (a) => h('a', { href: 'tel:' + a.contactPhone }, a.contactPhone) },
-              { label: t('apps.date'), render: (a) => S.fmt.dt(a.createdAt) },
-              { label: t('deal.stage'), render: (a) => h('div', null, S.chip(STATUS[a.status][0], t(STATUS[a.status][1])), a.reviewNote ? h('div', { class: 'hint' }, a.reviewNote) : null) },
-              { label: '', r: true, render: (a) => (a.status === 'Pending' ? h('div', { class: 'row', style: { gap: '6px', justifyContent: 'flex-end', flexWrap: 'nowrap' } },
-                h('button', { class: 'btn sm', onclick: () => approveForm(a, done) }, t('apps.approve')),
-                h('button', { class: 'btn ghost sm', onclick: () => rejectForm(a, done) }, t('apps.reject'))) : '') },
-            ], list, { empty: t('apps.none') }));
-          } catch (e) { holder.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
+          try { list = await S.api.applications(filter); draw(); } catch (e) { holder.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
         };
         const done = () => { load(); countPending(); };
+        // After approving, show the result: the approved list with the new organization's row.
+        const approved = () => { setFilter('Approved'); countPending(); };
         body.replaceChildren(h('div', { class: 'toolbar' }, seg), holder);
         load(); countPending();
       },

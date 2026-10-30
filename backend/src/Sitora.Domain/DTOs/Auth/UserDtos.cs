@@ -40,7 +40,11 @@ public record InvitationResponse(
     DateTime? AcceptedAt,
     DateTime CreatedAt);
 
-public record AcceptInvitationRequest(string Token);
+// Пароль необязателен: без него сотрудник входит только по коду из почты, с ним — ещё и через /auth/login.
+public record AcceptInvitationRequest(string Token, string? Password = null);
+
+// Что показать на странице приглашения до того, как его примут.
+public record InvitationInfoResponse(string OrganizationName, string FullName, string Email, string Role, DateTime ExpiresAt);
 
 // Организации — только для создателя платформы.
 // Ещё один владелец организации (создатель платформы). Пароль необязателен: владелец входит по коду из почты.

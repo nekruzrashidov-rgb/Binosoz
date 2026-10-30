@@ -61,7 +61,8 @@ public class InvitationService(
         await email.SendAsync(new EmailMessage(address, $"Приглашение в Sitora: {organizationName}",
             $"Здравствуйте, {invitation.FullName}!\n\nВас пригласили в «{organizationName}» на платформе Sitora. " +
             $"Чтобы принять приглашение, откройте ссылку:\n{emailOptions.Value.InviteUrl}{token}\n\n" +
-            $"Ссылка действует {Invitation.Lifetime.TotalDays:0} дней. Дальше входите по коду, который придёт на эту почту."), ct);
+            $"Ссылка действует {Invitation.Lifetime.TotalDays:0} дней. На странице задайте пароль — дальше входите по нему " +
+            "или по коду, который придёт на эту почту."), ct);
 
         return ToResponse(invitation);
     }

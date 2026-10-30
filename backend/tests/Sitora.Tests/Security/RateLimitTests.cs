@@ -22,6 +22,7 @@ public class LowRateLimitFactory : SitoraApiFactory
         builder.UseSetting("RateLimiting:LoginPerMinute", "3");
         builder.UseSetting("RateLimiting:SmsPerHour", "2");
         builder.UseSetting("RateLimiting:PublicFormsPerHour", "2");
+        builder.UseSetting("RateLimiting:ApplicationsPerHour", "3");
         builder.UseSetting("RateLimiting:AnonymousPerMinute", "20");
         builder.UseSetting("RateLimiting:UserPerMinute", "1000");
         builder.ConfigureTestServices(services => services.AddSingleton<IStartupFilter, TestClientIpFilter>());
@@ -102,6 +103,22 @@ public class RateLimitTests(LowRateLimitFactory factory) : IClassFixture<LowRate
 
         var limited = await client.PostAsJsonAsync("/api/v1/auth/sms/send", new SmsSendRequest(SitoraApiFactory.RandomPhone()));
         Assert.Equal(HttpStatusCode.TooManyRequests, limited.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeveloperApplications_AreLimitedToThreePerIpPerHour()
+    {
+        var guest = factory.CreateClientWithIp("10.0.4.1");
+        SubmitApplicationRequest Application() =>
+            new("ООО Лимит", $"limit-{Guid.NewGuid():N}@company.test", "+992901112233", "Тест Лимитов", null);
+
+        for (var i = 0; i < 3; i++)
+            Assert.Equal(HttpStatusCode.OK, (await guest.PostAsJsonAsync("/api/v1/public/applications", Application())).StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await guest.PostAsJsonAsync("/api/v1/public/applications", Application())).StatusCode);
+
+        // Счётчик свой: заявки на квартиры с того же IP не задеты.
+        Assert.Equal(HttpStatusCode.Created, (await guest.PostAsJsonAsync("/api/v1/leads",
+            new CreateLeadRequest("Гость", "+992901112233", null, null, null))).StatusCode);
     }
 
     [Fact]

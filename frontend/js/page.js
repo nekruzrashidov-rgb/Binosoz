@@ -5,11 +5,11 @@
   const S = (window.S = window.S || {});
   const h = (...a) => S.h(...a);
   const t = (...a) => S.t(...a);
-  const PAGES = { home: '/', apartments: '/apartments', contact: '/contact', register: '/register', login: '/login', cabinet: '/cabinet', crm: '/crm', platform: '/platform', invite: '/login' };
+  const PAGES = { home: '/', apartments: '/apartments', contact: '/contact', register: '/register', 'accept-invite': '/accept-invite', login: '/login', cabinet: '/cabinet', crm: '/crm', platform: '/platform', invite: '/accept-invite' };
   const page = document.body.dataset.page;
   const guarded = page === 'cabinet' || page === 'crm' || page === 'platform';
   // The buyer-facing pages are always dark: the design of the showroom is built for it.
-  const isPublic = page === 'home' || page === 'apartments' || page === 'contact' || page === 'register';
+  const isPublic = page === 'home' || page === 'apartments' || page === 'contact' || page === 'register' || page === 'accept-invite';
   const app = document.getElementById('app');
   const header = h('header', { class: 'top' });
   const main = h('div', { id: 'view' });
@@ -42,7 +42,7 @@
   function isDark() { const v = document.documentElement.dataset.theme; return v ? v === 'dark' : window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches; }
 
   function drawHeader() {
-    if (page === 'login') return;
+    if (page === 'login' || page === 'accept-invite') return;
     if (isPublic) { drawPublicHeader(); return; }
     const u = S.api.user;
     const link = (href, label, on) => h('a', { class: on ? 'on' : '', href }, label);
@@ -83,7 +83,8 @@
   }
 
   function view() {
-    if (page === 'login') return /invite=/.test(location.hash) ? S.views.invite : S.views.login;
+    if (page === 'login') return S.views.login;
+    if (page === 'accept-invite') return S.views.acceptInvite;
     return S.views[page];
   }
 
@@ -107,7 +108,9 @@
     app.replaceChildren(header, main);
     await S.api.restore();
     if (guarded && !S.api.isAuthed) { location.replace('/login'); return; }
-    if (page === 'login' && S.api.isAuthed && !/invite=/.test(location.hash)) { location.replace(PAGES[S.homeFor(S.api.user)]); return; }
+    // Invitation links of older letters (/login#invite=…) now open their own page.
+    if (page === 'login' && /invite=/.test(location.hash)) { location.replace(PAGES.invite + location.hash); return; }
+    if (page === 'login' && S.api.isAuthed) { location.replace(PAGES[S.homeFor(S.api.user)]); return; }
     render();
     // /#why from the footer of another page: the section exists only after render.
     if (location.hash.length > 1) { const el = document.getElementById(location.hash.slice(1)); if (el) setTimeout(() => el.scrollIntoView(), 50); }

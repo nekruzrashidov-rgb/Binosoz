@@ -283,9 +283,12 @@
     emailSend(email) { return request('POST', '/auth/email/send', { auth: false, body: { email } }); },
     // A buyer registers on the developer's site (ORG_SLUG); the code then comes by e-mail as usual.
     register(b) { return request('POST', '/auth/register', { auth: false, body: { email: b.email, fullName: b.fullName, phone: b.phone, organization: cfgSlug() || null } }); },
+    async passwordLogin(email, password) { return signedIn(await request('POST', '/auth/login', { auth: false, body: { email, password } })); },
     async emailVerify(email, code) { return signedIn(await request('POST', '/auth/email/verify', { auth: false, body: { email, code } })); },
     async secondFactor(token, password, totpCode) { return signedIn(await request('POST', '/auth/second-factor', { auth: false, body: { challengeToken: token, password: password || null, totpCode: totpCode || null } })); },
-    async acceptInvitation(token) { return signedIn(await request('POST', '/auth/invitations/accept', { auth: false, body: { token } })); },
+    // What the invitation is (organization, role, name) before accepting it; an optional password also allows /auth/login.
+    invitationInfo(token) { return request('GET', '/auth/invitations/' + encodeURIComponent(token), { auth: false }); },
+    async acceptInvitation(token, password) { return signedIn(await request('POST', '/auth/invitations/accept', { auth: false, body: { token, password: password || null } })); },
     async loadMe() { const u = M.user(await request('GET', '/auth/me')); auth.user = u; saveAuth(); S.bus.emit('auth', u); return u; },
     async logout() {
       if (auth && auth.platform) auth = Object.assign({}, auth.platform);

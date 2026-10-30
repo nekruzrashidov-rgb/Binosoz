@@ -14,6 +14,8 @@ public class RateLimitSettings
     public int LoginPerMinute { get; set; } = 10;
     public int SmsPerHour { get; set; } = 20;
     public int PublicFormsPerHour { get; set; } = 30;
+    // Заявки застройщиков с /register: каждую рассматривает человек, поэтому лимит строже.
+    public int ApplicationsPerHour { get; set; } = 3;
 
     // AI-помощник: каждое сообщение — платный запрос к Claude, поэтому лимит на пользователя.
     public int AiPerHour { get; set; } = 60;
@@ -30,6 +32,7 @@ public static class RateLimitPolicies
     public const string Sms = "sms";
     // Заявки и брони без входа; сотрудников не ограничиваем.
     public const string PublicForms = "public-forms";
+    public const string Applications = "applications";
     public const string Ai = "ai";
 }
 
@@ -70,6 +73,9 @@ public static class SecuritySetup
                 context.User.Identity?.IsAuthenticated == true
                     ? RateLimitPartition.GetNoLimiter("staff")
                     : PerIp(context, s => s.PublicFormsPerHour, TimeSpan.FromHours(1)));
+            // Свой счётчик, отдельный от заявок на квартиры и броней.
+            options.AddPolicy(RateLimitPolicies.Applications, context =>
+                PerIp(context, s => s.ApplicationsPerHour, TimeSpan.FromHours(1), "applications:"));
 
             options.AddPolicy(RateLimitPolicies.Ai, context =>
             {
@@ -125,10 +131,10 @@ public static class SecuritySetup
             options.KnownProxies.Clear();
         });
 
-    private static RateLimitPartition<string> PerIp(HttpContext context, Func<RateLimitSettings, int> limit, TimeSpan window)
+    private static RateLimitPartition<string> PerIp(HttpContext context, Func<RateLimitSettings, int> limit, TimeSpan window, string prefix = "")
     {
         var settings = context.RequestServices.GetRequiredService<IOptions<RateLimitSettings>>().Value;
-        return FixedWindow(ClientIp(context), limit(settings), window);
+        return FixedWindow(prefix + ClientIp(context), limit(settings), window);
     }
 
     private static RateLimitPartition<string> FixedWindow(string key, int permitLimit, TimeSpan window) =>

@@ -7,7 +7,8 @@ public interface ISmsSender
     Task SendAsync(string phone, string text, CancellationToken ct = default);
 }
 
-public record EmailMessage(string To, string Subject, string Text);
+// Html — необязательная оформленная версия; Text уходит всегда, для почтовых программ без HTML.
+public record EmailMessage(string To, string Subject, string Text, string? Html = null);
 
 public interface IEmailSender
 {

@@ -76,7 +76,19 @@ public class AuthController(IAuthService auth, IOptions<AuthOptions> options) : 
     public Task<AuthResponse> SecondFactor(SecondFactorRequest request, CancellationToken ct) =>
         auth.CompleteSecondFactorAsync(request, ct);
 
-    /// <summary>Принять приглашение по токену из письма: создаётся учётная запись сотрудника и выдаются токены.</summary>
+    /// <summary>Сведения о приглашении по токену из письма: организация, роль, имя и почта. Недействительное — 404.</summary>
+    [HttpGet("invitations/{token}")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Login)]
+    [ProducesResponseType<InvitationInfoResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public Task<InvitationInfoResponse> InvitationInfo(string token, CancellationToken ct) =>
+        auth.GetInvitationInfoAsync(token, ct);
+
+    /// <summary>
+    /// Принять приглашение по токену из письма: создаётся учётная запись сотрудника и выдаются токены.
+    /// Необязательный пароль (от 8 символов, цифра, строчная и заглавная буквы) открывает и вход через /auth/login.
+    /// </summary>
     [HttpPost("invitations/accept")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicies.Login)]

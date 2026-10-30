@@ -60,6 +60,7 @@
     zin: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M11 8v6M8 11h6"/>',
     zout: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M8 11h6"/>',
     eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+    eyeOff: '<path d="M9.9 5.2A10.6 10.6 0 0 1 12 5c6 0 10 7 10 7a17.7 17.7 0 0 1-3.2 3.9M6.6 6.6C3.9 8.4 2 12 2 12s4 7 10 7a9.9 9.9 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="M3 3l18 18"/>',
     gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
     send: '<path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/>',
     clip: '<path d="M21 12l-8.5 8.5a5 5 0 0 1-7-7L14 5a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 8"/>',
@@ -166,7 +167,7 @@
   S.tbl = (cols, rows, o) => {
     o = o || {};
     return h('div', { class: 'tbl-wrap' }, h('table', { class: 'tbl' }, h('thead', null, h('tr', null, cols.map((c) => h('th', { class: c.r ? 'r' : '' }, c.label)))),
-      h('tbody', null, rows.length ? rows.map((r) => { const tr = h('tr', { class: (o.onRow ? 'click ' : '') + (o.rowClass ? o.rowClass(r) : ''), onclick: o.onRow ? () => o.onRow(r) : null }, cols.map((c) => { const v = c.render ? c.render(r) : r[c.key]; return h('td', { class: (c.r ? 'r ' : '') + (c.num ? 'num' : '') }, v === undefined || v === null || v === '' ? '—' : v); })); return tr; }) : [h('tr', null, h('td', { colspan: cols.length }, S.empty(o.empty || t('common.nothing'))))])));
+      h('tbody', null, rows.length ? rows.map((r) => { const tr = h('tr', { class: (o.onRow ? 'click ' : '') + (o.rowClass ? o.rowClass(r) : ''), onclick: o.onRow ? () => o.onRow(r) : null }, cols.map((c) => { const v = c.render ? c.render(r) : r[c.key]; return h('td', { class: (c.r ? 'r ' : '') + (c.num ? 'num' : '') }, v === undefined || v === null || v === '' ? '—' : v); })); return tr; }) : [h('tr', null, h('td', { colspan: cols.length }, S.empty(o.empty || t('common.nothing'), o.emptyIcon)))])));
   };
   S.copy = (text) => { try { navigator.clipboard.writeText(text).then(() => S.toast(t('common.copied'), 'ok'), () => S.toast(text)); } catch (e) { S.toast(text); } };
   S.cd = (iso) => { const ms = new Date(iso).getTime() - Date.now(); return h('span', { class: 'cd-pill' + (ms < 6 * 3600000 ? ' red' : '') }, S.fmt.left(iso)); };

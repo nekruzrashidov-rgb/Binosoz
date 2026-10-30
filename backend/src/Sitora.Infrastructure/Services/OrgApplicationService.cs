@@ -52,9 +52,7 @@ public class OrgApplicationService(
             application.CompanyName, application.ContactEmail, application.OwnerFullName);
 
         // Заявка уже сохранена: сбой почты её не отменяет. В разработке письмо только пишется в лог.
-        await TrySendAsync(new EmailMessage(contactEmail, "Sitora: заявка принята",
-            $"Здравствуйте, {application.OwnerFullName}!\n\nЗаявка компании «{application.CompanyName}» на подключение к платформе Sitora принята. " +
-            "Мы свяжемся с вами в течение 1–2 рабочих дней."), ct);
+        await TrySendAsync(EmailTemplates.ApplicationReceived(contactEmail, application.OwnerFullName, application.CompanyName), ct);
 
         return new SubmitApplicationResponse(application.Id, AcceptedMessage);
     }

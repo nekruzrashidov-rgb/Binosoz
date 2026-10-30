@@ -35,7 +35,8 @@
 | POST | `/auth/register` | `{ email, fullName, phone, organization? }` | 200, как `/auth/email/send`: создаётся карточка клиента у застройщика `organization` (slug; без него — единственный застройщик платформы) и уходит код. Дальше — `/auth/email/verify`. Телефон из карточки с другой почтой — 409, неизвестный застройщик — 404 |
 | POST | `/auth/platform/login` | `{ email, code }` | только PlatformOwner: 202 `SecondFactorChallenge`, токен — после `/auth/second-factor`. Для других почт — 401, как на неверный код |
 | POST | `/auth/second-factor` | `{ challengeToken, password? , totpCode? }` | `AuthResponse` |
-| POST | `/auth/invitations/accept` | `{ token }` | `AuthResponse`; 401 — приглашение недействительно или использовано |
+| GET | `/auth/invitations/{token}` | — | `{ organizationName, fullName, email, role, expiresAt }` — что показать на странице приглашения; 404 — недействительно, использовано или просрочено |
+| POST | `/auth/invitations/accept` | `{ token, password? }` | `AuthResponse`; 401 — приглашение недействительно или использовано. Пароль необязателен (от 8 символов, цифра, строчная и заглавная буквы; иначе 422): с ним сотрудник входит и через `/auth/login` |
 | POST | `/auth/refresh` | `{ refreshToken }` | `AuthResponse` |
 | POST | `/auth/logout` | `{ refreshToken }` | 204 |
 | GET | `/auth/me` | — | `CurrentUser` |
@@ -95,7 +96,7 @@ SecondFactorChallenge = { challengeToken, expiresAt, methods: ["password", "totp
 
 | Метод | Путь | Тело / ответ |
 | --- | --- | --- |
-| POST | `/public/applications` | `{ companyName, contactEmail, contactPhone, ownerFullName, comment? }` → `{ applicationId, message }`. Телефон приводится к `+992…`, неверный — 422; неверный формат почты или названия — 400; ещё одна заявка с той же почты, пока прежняя на рассмотрении (24 часа), — 409. Лимит публичных форм |
+| POST | `/public/applications` | `{ companyName, contactEmail, contactPhone, ownerFullName, comment? }` → `{ applicationId, message }`. Телефон приводится к `+992…`, неверный — 422; неверный формат почты или названия — 400; ещё одна заявка с той же почты, пока прежняя на рассмотрении (24 часа), — 409. Не больше 3 заявок в час с одного IP (`RateLimiting:ApplicationsPerHour`), дальше 429. Заявителю уходит HTML-письмо «Заявка принята — Binosoz» |
 
 В режиме «как владелец»:
 - в каждом ответе есть заголовок `X-Impersonated-By: <id создателя платформы>`;
@@ -249,7 +250,7 @@ SecondFactorChallenge = { challengeToken, expiresAt, methods: ["password", "totp
    - Для ObjectAdmin — ровно один дом.
    - Список ожидающих приглашений с кнопкой «Отозвать».
    - Владельцу — «Дома сотрудника» (`PUT /users/{id}/buildings`).
-9. **Страница приглашения.** Адрес `#invite=<token>` → `POST /auth/invitations/accept { token }` → сохранить сессию, как после входа.
+9. **Страница приглашения.** Адрес `/accept-invite#token=<token>` (старые `#invite=<token>` тоже) → `GET /auth/invitations/{token}` → форма с паролем → `POST /auth/invitations/accept { token, password }` → сохранить сессию, как после входа.
 10. **Публичный сайт.**
     - Добавить `ORG_SLUG` в `config.js` и передавать `?organization=` в `/buildings`.
     - slug организации — в `/rates/current?organization=` (или её `organizationId`).

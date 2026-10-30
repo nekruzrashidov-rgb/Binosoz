@@ -16,7 +16,7 @@ public class PublicApplicationsController(IOrgApplicationService applications) :
 {
     /// <summary>Заявка застройщика на подключение к платформе. Повтор с той же почты в течение суток — 409.</summary>
     [HttpPost("applications")]
-    [EnableRateLimiting(RateLimitPolicies.PublicForms)]
+    [EnableRateLimiting(RateLimitPolicies.Applications)]
     [ProducesResponseType<SubmitApplicationResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]

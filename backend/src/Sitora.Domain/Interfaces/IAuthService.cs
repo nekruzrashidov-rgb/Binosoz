@@ -16,6 +16,7 @@ public interface IAuthService
     Task<EmailLoginResult> VerifyPlatformCodeAsync(EmailVerifyRequest request, CancellationToken ct = default);
     Task<AuthResponse> CompleteSecondFactorAsync(SecondFactorRequest request, CancellationToken ct = default);
 
+    Task<InvitationInfoResponse> GetInvitationInfoAsync(string token, CancellationToken ct = default);
     Task<AuthResponse> AcceptInvitationAsync(AcceptInvitationRequest request, CancellationToken ct = default);
 
     // Старый вход по SMS (выключен флагом Auth:SmsLoginEnabled).

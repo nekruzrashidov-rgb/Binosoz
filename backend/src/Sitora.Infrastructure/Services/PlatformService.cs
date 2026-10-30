@@ -74,7 +74,7 @@ public class PlatformService(
         {
             await email.SendAsync(new EmailMessage(ownerEmail, $"Sitora: вы владелец «{organization.Name}»",
                 $"Здравствуйте, {owner.FullName}!\n\nДля вас создана организация «{organization.Name}» на платформе Sitora. " +
-                $"Входите по коду, который придёт на эту почту: {emailOptions.Value.InviteUrl.Split('#')[0]}"), ct);
+                $"Входите по коду, который придёт на эту почту: {emailOptions.Value.LoginUrl}"), ct);
         }
         catch (Exception e)
         {

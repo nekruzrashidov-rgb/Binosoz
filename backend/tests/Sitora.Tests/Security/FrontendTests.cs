@@ -11,6 +11,7 @@ public class FrontendTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFa
     [InlineData("/apartments", "apartments")]
     [InlineData("/contact", "contact")]
     [InlineData("/register", "register")]
+    [InlineData("/accept-invite", "accept-invite")]
     [InlineData("/login", "login")]
     [InlineData("/cabinet", "cabinet")]
     [InlineData("/crm", "crm")]
