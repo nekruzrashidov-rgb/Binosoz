@@ -63,3 +63,20 @@ public class InvitationConfiguration : IEntityTypeConfiguration<Invitation>
         builder.HasOne(i => i.Organization).WithMany().HasForeignKey(i => i.OrganizationId).OnDelete(DeleteBehavior.Cascade);
     }
 }
+
+public class OrgApplicationConfiguration : IEntityTypeConfiguration<OrgApplication>
+{
+    public void Configure(EntityTypeBuilder<OrgApplication> builder)
+    {
+        builder.ToTable("OrgApplications");
+        builder.Property(a => a.CompanyName).HasMaxLength(200).IsRequired();
+        builder.Property(a => a.ContactEmail).HasMaxLength(256).IsRequired();
+        builder.Property(a => a.ContactPhone).HasMaxLength(20).IsRequired();
+        builder.Property(a => a.OwnerFullName).HasMaxLength(200).IsRequired();
+        builder.Property(a => a.Comment).HasMaxLength(1000);
+        builder.Property(a => a.ReviewNote).HasMaxLength(500);
+        // Повтор с той же почты и список заявок по статусу.
+        builder.HasIndex(a => new { a.ContactEmail, a.CreatedAt });
+        builder.HasIndex(a => new { a.Status, a.CreatedAt });
+    }
+}

@@ -68,6 +68,7 @@ public static class DependencyInjection
         services.AddScoped<StaffPolicy>();
         services.AddScoped<IInvitationService, InvitationService>();
         services.AddScoped<IPlatformService, PlatformService>();
+        services.AddScoped<IOrgApplicationService, OrgApplicationService>();
         services.AddScoped<IBrandService, BrandService>();
         services.AddSingleton<IChatModel, ClaudeChatModel>();
         services.AddScoped<IAiAssistant, AiAssistant>();

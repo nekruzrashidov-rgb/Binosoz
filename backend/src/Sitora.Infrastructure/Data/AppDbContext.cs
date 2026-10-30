@@ -23,6 +23,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider t
     public DbSet<UserBuilding> UserBuildings => Set<UserBuilding>();
     public DbSet<EmailCode> EmailCodes => Set<EmailCode>();
     public DbSet<Invitation> Invitations => Set<Invitation>();
+    public DbSet<OrgApplication> OrgApplications => Set<OrgApplication>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Building> Buildings => Set<Building>();
     public DbSet<Floor> Floors => Set<Floor>();

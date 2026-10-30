@@ -293,6 +293,11 @@
       clearAuth();
     },
 
+    // developer applications: the public form (/register) and their review by the platform owner
+    submitApplication(b) { return request('POST', '/public/applications', { auth: false, body: { companyName: b.companyName, contactEmail: b.contactEmail, contactPhone: b.contactPhone, ownerFullName: b.ownerFullName, comment: b.comment || null } }); },
+    async applications(status) { return all('/platform/applications', status ? { status } : undefined); },
+    approveApplication(id, slug) { return request('POST', '/platform/applications/' + id + '/approve', { body: { organizationSlug: slug } }); },
+    rejectApplication(id, reason) { return request('POST', '/platform/applications/' + id + '/reject', { body: { reason } }); },
     // platform owner
     async organizations() { return arr(await request('GET', '/platform/organizations')).map(M.organization); },
     createOrganization(b) { return withFields(request('POST', '/platform/organizations', { body: { name: b.name, slug: b.slug, ownerEmail: b.ownerEmail, ownerFullName: b.ownerFullName } })).then(M.organization); },

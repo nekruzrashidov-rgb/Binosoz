@@ -9,10 +9,13 @@
     if (!S.api.isAuthed) return S.views.login(root);
     if (!S.api.isPlatform()) { root.appendChild(h('div', { class: 'wrap page-in' }, h('div', { class: 'card login-card login' }, h('h2', null, t('plat.only')), h('div', { class: 'row', style: { marginTop: '14px' } }, h('button', { class: 'btn', onclick: () => S.go(S.homeFor(S.api.user)) }, t('cab.toCrm')))))); return () => {}; }
     const page = h('div', { class: 'page-in' }); root.appendChild(page);
-    const items = [{ key: 'orgs', label: t('plat.orgs'), icon: 'building' }, { key: 'security', label: t('plat.security'), icon: 'shield' }];
+    const items = [{ key: 'orgs', label: t('plat.orgs'), icon: 'building' }, { key: 'apps', label: t('apps.title'), icon: 'inbox' }, { key: 'security', label: t('plat.security'), icon: 'shield' }];
+    // The number of applications waiting for a decision, on the section's label.
+    const countPending = () => S.api.applications('Pending').then((l) => { items[1].badge = l.length || null; ws.redraw(); }).catch(() => {});
     const ws = S.workspace(items, 'orgs', (k, main) => { S.clear(main); main.append(h('h1', null, items.find((i) => i.key === k).label), h('p', { class: 'sub' }, t('plat.sub.' + k))); const body = h('div', { class: 'stack' }); main.appendChild(body); views[k](body); });
     page.appendChild(ws.el);
     queueMicrotask(() => ws.go('orgs'));
+    countPending();
 
     const views = {
       orgs(body) {
@@ -35,6 +38,35 @@
         load();
       },
 
+      // Developers' applications from /register: approve (creates the organization and invites the owner) or reject.
+      apps(body) {
+        const STATUS = { Pending: ['warn', 'apps.pending'], Approved: ['good', 'apps.approved'], Rejected: ['bad', 'apps.rejected'] };
+        let filter = 'Pending';
+        const holder = h('div');
+        const seg = h('div', { class: 'seg', role: 'group', 'aria-label': t('apps.filter') }, [['', 'apps.all'], ['Pending', 'apps.pending'], ['Approved', 'apps.approvedMany'], ['Rejected', 'apps.rejectedMany']]
+          .map(([k, key]) => h('button', { class: filter === k ? 'on' : '', 'data-k': k, onclick: () => { filter = k; S.$$('button', seg).forEach((b) => b.classList.toggle('on', b.dataset.k === k)); load(); } }, t(key))));
+        const load = async () => {
+          holder.replaceChildren(S.skeleton(4, 38));
+          try {
+            const list = await S.api.applications(filter);
+            holder.replaceChildren(S.tbl([
+              { label: t('apps.company'), render: (a) => h('div', null, h('b', null, a.companyName), a.comment ? h('div', { class: 'hint', style: { maxWidth: '280px' } }, a.comment) : null) },
+              { label: t('apps.owner'), render: (a) => a.ownerFullName },
+              { label: t('login.email'), render: (a) => h('a', { href: 'mailto:' + a.contactEmail }, a.contactEmail) },
+              { label: t('f.phone'), render: (a) => h('a', { href: 'tel:' + a.contactPhone }, a.contactPhone) },
+              { label: t('apps.date'), render: (a) => S.fmt.dt(a.createdAt) },
+              { label: t('deal.stage'), render: (a) => h('div', null, S.chip(STATUS[a.status][0], t(STATUS[a.status][1])), a.reviewNote ? h('div', { class: 'hint' }, a.reviewNote) : null) },
+              { label: '', r: true, render: (a) => (a.status === 'Pending' ? h('div', { class: 'row', style: { gap: '6px', justifyContent: 'flex-end', flexWrap: 'nowrap' } },
+                h('button', { class: 'btn sm', onclick: () => approveForm(a, done) }, t('apps.approve')),
+                h('button', { class: 'btn ghost sm', onclick: () => rejectForm(a, done) }, t('apps.reject'))) : '') },
+            ], list, { empty: t('apps.none') }));
+          } catch (e) { holder.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
+        };
+        const done = () => { load(); countPending(); };
+        body.replaceChildren(h('div', { class: 'toolbar' }, seg), holder);
+        load();
+      },
+
       security(body) {
         const holder = h('div', { class: 'card stack', style: { maxWidth: '520px' } }, S.skeleton(3, 30));
         body.replaceChildren(holder);
@@ -52,6 +84,22 @@
         })();
       },
     };
+
+    // Approving creates the organization: its short name goes into the site address, suggested from the company name.
+    function approveForm(a, done) {
+      const slug = S.input('organizationSlug', { value: S.slugify(a.companyName), placeholder: 'my-company' });
+      const form = h('form', { class: 'stack', id: 'approveform', novalidate: true }, h('p', { class: 'muted' }, t('apps.approveText', { c: a.companyName, e: a.contactEmail })), S.field(t('plat.slug'), slug, t('plat.slugHint')));
+      const btn = h('button', { class: 'btn', type: 'submit', form: 'approveform' }, t('apps.approve'));
+      const md = S.modal({ title: t('apps.approveTitle'), body: form, actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
+      form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { const r = await S.api.approveApplication(a.id, slug.value.trim()); S.toast(r.message || t('apps.approvedToast'), 'ok'); md.close(); done(); } catch (er) { S.showErrors(form, er); } }); });
+    }
+    function rejectForm(a, done) {
+      const reason = h('textarea', { class: 'inp', name: 'reason', id: 'reject-reason', maxlength: 500, rows: 3 });
+      const form = h('form', { class: 'stack', id: 'rejectform', novalidate: true }, h('p', { class: 'muted' }, t('apps.rejectText', { c: a.companyName })), S.field(t('apps.reason'), reason));
+      const btn = h('button', { class: 'btn danger', type: 'submit', form: 'rejectform' }, t('apps.reject'));
+      const md = S.modal({ title: t('apps.rejectTitle'), body: form, actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
+      form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await S.api.rejectApplication(a.id, reason.value.trim()); S.toast(t('apps.rejectedToast'), 'ok'); md.close(); done(); } catch (er) { S.showErrors(form, er); } }); });
+    }
 
     function orgForm(done) {
       const name = S.input('name'), slug = S.input('slug', { placeholder: 'my-company' }), email = S.input('ownerEmail', { type: 'email' }), owner = S.input('ownerFullName');

@@ -5,11 +5,11 @@
   const S = (window.S = window.S || {});
   const h = (...a) => S.h(...a);
   const t = (...a) => S.t(...a);
-  const PAGES = { home: '/', apartments: '/apartments', contact: '/contact', login: '/login', cabinet: '/cabinet', crm: '/crm', platform: '/platform', invite: '/login' };
+  const PAGES = { home: '/', apartments: '/apartments', contact: '/contact', register: '/register', login: '/login', cabinet: '/cabinet', crm: '/crm', platform: '/platform', invite: '/login' };
   const page = document.body.dataset.page;
   const guarded = page === 'cabinet' || page === 'crm' || page === 'platform';
   // The buyer-facing pages are always dark: the design of the showroom is built for it.
-  const isPublic = page === 'home' || page === 'apartments' || page === 'contact';
+  const isPublic = page === 'home' || page === 'apartments' || page === 'contact' || page === 'register';
   const app = document.getElementById('app');
   const header = h('header', { class: 'top' });
   const main = h('div', { id: 'view' });

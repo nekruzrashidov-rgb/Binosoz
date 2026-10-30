@@ -110,7 +110,8 @@
           h('div', { class: 'foot-social' },
             c.telegram ? h('a', { class: 'soc tg', href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener', 'aria-label': 'Telegram', title: 'Telegram' }, landIcon('send')) : null,
             c.phone ? h('a', { class: 'soc wa', href: 'https://wa.me/' + phoneDigits(c.phone), target: '_blank', rel: 'noopener', 'aria-label': 'WhatsApp', title: 'WhatsApp' }, landIcon('chat')) : null,
-            h('a', { class: 'btn ghost sm', href: '/login' }, t('foot.login')))),
+            h('a', { class: 'btn ghost sm', href: '/login' }, t('foot.login'))),
+          h('p', { class: 'foot-dev' }, t('foot.dev') + ' ', h('a', { href: '/register' }, t('foot.devLink')))),
         col(t('foot.apts'), h('a', { href: '/apartments' }, t('foot.catalog')), h('a', { href: '/apartments#calc' }, t('foot.calc')), h('a', { href: '/apartments' }, t('foot.3d'))),
         col(t('foot.info'), h('a', { href: '/#why' }, t('foot.why')), h('a', { href: '/#steps' }, t('foot.steps')), h('a', { href: '/login' }, t('foot.cabinet'))),
         col(t('foot.contacts'), h('span', null, c.address || ''), c.phone ? h('a', { href: 'tel:+' + phoneDigits(c.phone) }, c.phone) : null, c.telegram ? h('a', { href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, c.telegram) : null, h('a', { href: '/contact' }, t('foot.write')))),
@@ -725,6 +726,66 @@
     }
     renderForm();
     siteBuilding().catch(() => {});
+    return () => {};
+  };
+
+  /* ---------- register: a developer's application to join the platform ---------- */
+  // "+992 98 363 70 70" as the person types; 9 digits without the country code are taken as a Tajik number.
+  const formatPhone = (v) => {
+    const d = phoneDigits(v).replace(/^992/, '').slice(0, 9);
+    const parts = [d.slice(0, 2), d.slice(2, 5), d.slice(5, 7), d.slice(7, 9)].filter(Boolean);
+    return '+992' + (parts.length ? ' ' + parts.join(' ') : '');
+  };
+  const validPhone = (v) => { const d = phoneDigits(v); return /^992\d{9}$/.test(d) || /^\d{9}$/.test(d); };
+
+  S.views.register = function (root) {
+    const page = h('div', { class: 'page-in lux reg-page' });
+    root.appendChild(page);
+    const card = h('div', { class: 'reg-card' });
+    page.append(h('section', { class: 'reg-wrap' }, card), siteFooter());
+
+    const fl = (field, label, req) => h('label', { class: 'fl' }, field, h('span', null, label + (req ? ' *' : '')), h('em', { class: 'fl-err' }));
+    const company = h('input', { class: 'inp', name: 'companyName', placeholder: ' ', maxlength: 200, autocomplete: 'organization' });
+    const owner = h('input', { class: 'inp', name: 'ownerFullName', placeholder: ' ', maxlength: 200, autocomplete: 'name' });
+    const email = h('input', { class: 'inp', name: 'contactEmail', type: 'email', placeholder: ' ', maxlength: 256, autocomplete: 'email' });
+    const phone = h('input', { class: 'inp', name: 'contactPhone', type: 'tel', placeholder: ' ', value: '+992', autocomplete: 'tel' });
+    const comment = h('textarea', { class: 'inp', name: 'comment', placeholder: ' ', maxlength: 1000, rows: 4 });
+    phone.addEventListener('input', () => { phone.value = formatPhone(phone.value); });
+    const btn = h('button', { class: 'btn gold lg block', type: 'submit' }, t('reg2.send'));
+    const form = h('form', { class: 'ct-form reg-form', novalidate: true },
+      fl(company, t('reg2.company'), true), h('small', { class: 'fl-hint' }, t('reg2.companyPh')),
+      fl(owner, t('reg2.owner'), true),
+      fl(email, t('reg2.email'), true),
+      fl(phone, t('reg2.phone'), true),
+      fl(comment, t('reg2.comment')), h('small', { class: 'fl-hint' }, t('reg2.commentPh')),
+      btn);
+
+    const fail = (el, msg) => { const box = el.closest('label'); box.classList.add('err'); box.querySelector('.fl-err').textContent = msg; };
+    form.addEventListener('input', (e) => { const box = e.target.closest('label'); if (box) box.classList.remove('err'); });
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault(); S.showErrors(form, null);
+      S.$$('label.err', form).forEach((l) => l.classList.remove('err'));
+      let ok = true;
+      if (company.value.trim().length < 2) { fail(company, t('reg2.errCompany')); ok = false; }
+      if (owner.value.trim().length < 2) { fail(owner, t('reg2.errOwner')); ok = false; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())) { fail(email, t('reg2.errEmail')); ok = false; }
+      if (!validPhone(phone.value)) { fail(phone, t('ct.errPhone')); ok = false; }
+      if (!ok) return;
+      await S.busy(btn, async () => {
+        try {
+          await S.api.submitApplication({ companyName: company.value.trim(), ownerFullName: owner.value.trim(), contactEmail: email.value.trim(), contactPhone: phone.value, comment: comment.value.trim() });
+          card.replaceChildren(h('div', { class: 'reg-done' }, successBlock(t('reg2.done', { e: email.value.trim() }), h('a', { class: 'btn ghost', href: '/' }, '← ' + t('reg2.back')))));
+        } catch (er) { S.showErrors(form, er); }
+      });
+    });
+
+    card.append(
+      h('a', { class: 'back-link', href: '/' }, '← ' + t('nav.home')),
+      h('div', { class: 'reg-brand' }, S.logo(), h('b', null, 'BINOSOZ')),
+      h('h1', null, accentFirst(t('reg2.title'))),
+      h('p', { class: 'muted-lux' }, t('reg2.sub')),
+      h('ul', { class: 'reg-perks' }, ['reg2.perk1', 'reg2.perk2', 'reg2.perk3'].map((k) => h('li', null, landIcon('check'), t(k)))),
+      form);
     return () => {};
   };
 })();

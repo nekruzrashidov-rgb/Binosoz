@@ -7,6 +7,7 @@
   "rewrites": [
     { "source": "/apartments", "destination": "/apartments.html" },
     { "source": "/contact", "destination": "/contact.html" },
+    { "source": "/register", "destination": "/register.html" },
     { "source": "/login", "destination": "/login.html" },
     { "source": "/cabinet", "destination": "/cabinet.html" },
     { "source": "/crm", "destination": "/crm.html" },
