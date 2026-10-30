@@ -32,7 +32,13 @@
     clipboard: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/>',
     percent: '<circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/><path d="M19 5 5 19"/>',
     calendar: '<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+    image: '<rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-8 8.5"/>',
+    users: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 20a6 6 0 0 0-3-5.2"/>',
   };
+  const GALLERY = ['facade', 'living', 'playground', 'view'];
+  // Example reviews (key, stars): the section says they are examples until real buyers write theirs.
+  const REVIEWS = [['r1', 5], ['r2', 5], ['r3', 4]];
+  const FAQ = ['visit', 'down', 'delivery', 'booking', 'fees'];
   const AMENITIES = [['car', 'about.parking'], ['play', 'about.playground'], ['shield', 'about.guard'], ['leaf', 'about.green']];
   function landIcon(name) {
     const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -122,11 +128,15 @@
     let house = null, alive = true;
     const page = h('div', { class: 'page-in landing-page lux' });
     root.appendChild(page);
-    page.appendChild(pageHead(t('cat.title'), t('cat.sub')));
+    // Page hero: breadcrumbs, title, and the ways to reach the manager on the right.
     const cc = contacts();
-    page.appendChild(h('div', { class: 'wrap' }, h('div', { class: 'cat-banner' },
-      h('span', null, landIcon('key'), t('cat.banner')),
-      cc.phone ? h('a', { class: 'cat-phone', href: 'tel:+' + phoneDigits(cc.phone) }, landIcon('phone'), cc.phone) : null)));
+    page.appendChild(h('section', { class: 'cat-hero' }, h('div', { class: 'wrap cat-hero-in' },
+      h('div', { class: 'cat-hero-text' },
+        h('nav', { class: 'crumbs', 'aria-label': t('cat.crumbs') }, h('a', { href: '/' }, t('nav.home')), h('span', { 'aria-hidden': 'true' }, '/'), h('span', { 'aria-current': 'page' }, t('nav.apartments'))),
+        h('h1', null, accentFirst(t('cat.title'))), h('p', null, t('cat.sub'))),
+      (cc.phone || cc.telegram) ? h('div', { class: 'cat-hero-contact' },
+        cc.phone ? h('a', { class: 'cat-call', href: 'tel:+' + phoneDigits(cc.phone) }, h('span', { class: 'ct-ic' }, landIcon('phone')), h('span', null, h('small', null, t('home.call')), h('b', null, cc.phone))) : null,
+        cc.telegram ? h('a', { class: 'btn gold', href: telegramUrl(cc.telegram), target: '_blank', rel: 'noopener' }, landIcon('send'), 'Telegram') : null) : null)));
 
     const houseBox = h('div', { class: 'house3d', id: 'house3d' });
     const tip = h('div', { class: 'tip', hidden: true });
@@ -407,6 +417,7 @@
     const stars = h('div', { class: 'stars', 'aria-hidden': 'true' }, Array.from({ length: 60 }, () => { const s = (1 + rnd(1.6)).toFixed(1) + 'px'; return h('i', { style: { left: rnd(100).toFixed(1) + '%', top: rnd(62).toFixed(1) + '%', width: s, height: s, animationDelay: rnd(4).toFixed(2) + 's', animationDuration: (2.4 + rnd(3)).toFixed(2) + 's' } }); }));
     const mountains = h('div', { class: 'mountains', 'aria-hidden': 'true', html: '<svg viewBox="0 0 1440 320" preserveAspectRatio="none"><path fill="currentColor" opacity=".55" d="M0 230 120 150l70 40 110-110 90 70 80-50 120 120 90-60 140 90 100-80 120 70 110-100 130 110 80-40 80 50v120H0z"/><path fill="currentColor" d="M0 270 90 220l90 30 120-70 100 60 90-40 130 70 110-50 120 60 100-30 120 50 110-60 120 50 140-20v130H0z"/></svg>' });
     const chips = h('div', { class: 'hero-chips' });
+    const proof = h('p', { class: 'hero-proof', hidden: true });
     const freeCard = h('div', { class: 'float-card glass' });
     const hero = h('section', { class: 'lux-hero', id: 'top' }, stars, mountains,
       h('div', { class: 'wrap lux-hero-in' },
@@ -415,7 +426,7 @@
           h('h1', { class: 'lux-title' }, h('span', { class: 'gold-text' }, 'Sitora'), h('br'), 'Residence'),
           h('i', { class: 'gold-line', 'aria-hidden': 'true' }),
           h('p', { class: 'lux-tagline' }, t('home.tagline')),
-          chips,
+          chips, proof,
           h('div', { class: 'lux-cta' }, h('a', { class: 'btn gold lg', href: '/apartments' }, t('home.cta1')), h('a', { class: 'btn ghost lg', href: '/apartments#calc' }, t('home.cta2')))),
         h('div', { class: 'lux-hero-side' }, freeCard,
           c.phone ? h('a', { class: 'float-card glass second', href: 'tel:+' + phoneDigits(c.phone) }, landIcon('phone'), h('div', null, h('small', null, t('home.call')), h('b', null, c.phone))) : null,
@@ -461,6 +472,23 @@
 
     // Installment terms.
     const term = (ic, label, value) => h('div', { class: 'plan-cell' }, h('span', { class: 'plan-ic' }, landIcon(ic)), h('small', null, label), h('b', null, value));
+    // Gallery: places for the renders and photos, honest about not having them yet.
+    const gallery = h('section', { class: 'section lux-sec', id: 'gallery' }, h('div', { class: 'wrap' },
+      h('div', { class: 'lux-head reveal' }, h('h2', null, accentFirst(t('gal.title'))), h('p', null, t('gal.sub'))),
+      h('div', { class: 'gal-grid' }, GALLERY.map((k, i) => h('figure', { class: 'gal-card reveal', style: { transitionDelay: (i % 2) * 90 + 'ms' } },
+        h('span', { class: 'gal-ic' }, landIcon('image')), h('figcaption', null, t('gal.' + k))))),
+      h('p', { class: 'gal-note' }, t('gal.note')),
+      h('div', { class: 'teaser-more' }, h('a', { class: 'btn ghost lg', href: '/apartments' }, t('gal.cta')))));
+
+    // Reviews: example texts, marked as examples.
+    const reviews = h('section', { class: 'section lux-sec alt-band', id: 'reviews' }, h('div', { class: 'wrap' },
+      h('div', { class: 'lux-head reveal' }, h('h2', null, accentFirst(t('rev.title'))), h('p', null, t('rev.sub'))),
+      h('div', { class: 'rev-grid' }, REVIEWS.map(([k, stars], i) => h('article', { class: 'rev-card reveal', style: { transitionDelay: i * 90 + 'ms' } },
+        h('span', { class: 'rev-badge' }, t('rev.example')),
+        h('div', { class: 'rev-stars', 'aria-label': t('rev.stars', { n: stars }) }, '★'.repeat(stars) + '☆'.repeat(5 - stars)),
+        h('p', { class: 'rev-text' }, t('rev.' + k)),
+        h('footer', null, h('b', null, t('rev.' + k + '.who')), h('small', null, t('rev.' + k + '.when'))))))));
+
     const planBand = h('section', { class: 'lux-plan', id: 'installment' }, h('div', { class: 'wrap' },
       h('div', { class: 'lux-head reveal' }, h('h2', null, accentFirst(t('plan.title'))), h('p', null, t('plan.sub'))),
       h('div', { class: 'plan-grid reveal' },
@@ -488,7 +516,7 @@
         c.telegram ? h('a', { class: 'btn gold lg', href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, landIcon('send'), t('cta.tg')) : null),
       callBox));
 
-    page.append(hero, numbers, why, steps, about, layouts, planBand, teaser, contactBand, siteFooter());
+    page.append(hero, numbers, why, steps, about, layouts, gallery, planBand, reviews, teaser, contactBand, siteFooter());
     renderData(); renderCall();
     const stopReveal = revealIn(page, (el) => { if (el.closest('#numbers')) count(); });
 
@@ -506,6 +534,9 @@
       freeCard.replaceChildren(h('i', { class: 'live-dot' }), h('div', null, h('small', null, t('home.freeNow')), h('b', null, d.free === null ? t('home.freeSome') : counted(d.free, 'home.chip.apts'))));
       allBtn.textContent = t('teaser.all', { n: S.fmt.n(d.apts) });
       aptGrid.replaceChildren(...(d.list ? d.list.map(aptCard) : [0, 1, 2].map(typeCard)));
+      // Social proof from the real data: apartments already sold or booked. Hidden until it is known.
+      proof.replaceChildren(...(d.taken ? [h('span', { class: 'proof-ic' }, landIcon('users')), t('home.proof', { n: counted(d.taken, 'home.families') })] : []));
+      proof.hidden = !d.taken;
       const big = (v, l) => h('div', { class: 'about-num' }, h('b', null, v), h('span', null, l));
       aboutStats.replaceChildren(big(S.fmt.n(d.floors), plural(d.floors, 'about.floors')), big(S.fmt.n(d.apts), plural(d.apts, 'about.apts')),
         big(String(d.types.length || 4), plural(d.types.length || 4, 'about.types')), big(String(d.year), t('about.year')));
@@ -572,6 +603,7 @@
         if (b.deliveryDate) d.year = new Date(b.deliveryDate).getFullYear();
         if (free.length) d.minPrice = free[0].price;
         d.free = free.length;
+        d.taken = apts.filter((a) => a.status === 'sold' || a.status === 'booked').length;
         // One apartment of each room count, cheapest first.
         const seen = new Set();
         d.list = free.filter((a) => (seen.has(a.rooms) ? false : seen.add(a.rooms))).slice(0, 3);
@@ -634,7 +666,25 @@
         c.phone ? h('a', { class: 'btn wa', href: 'https://wa.me/' + phoneDigits(c.phone), target: '_blank', rel: 'noopener' }, landIcon('chat'), 'WhatsApp') : null)) : null,
       formHost,
       h('ul', { class: 'trust' }, [['lock', 'ct.trust1'], ['check', 'ct.trust2'], ['clipboard', 'ct.trust3']].map(([ic, k]) => h('li', null, landIcon(ic), t(k))))));
-    page.append(h('section', { class: 'ct-split' }, left, right), siteFooter());
+    // FAQ: one answer open at a time; the answers take the contacts and terms from config.js.
+    const cfg = window.SITORA_CONFIG || {};
+    const plan = installment();
+    const vars = { phone: c.phone || '', tg: c.telegram || '', down: plan.downFrom, years: counted(plan.years, 'plan.years'), year: cfg.DEFAULT_YEAR || 2026 };
+    const faqList = h('div', { class: 'faq-list' }, FAQ.map((k, i) => {
+      const id = 'faq-' + k;
+      const item = h('div', { class: 'faq-item' });
+      const q = h('button', { class: 'faq-q', type: 'button', 'aria-expanded': 'false', 'aria-controls': id, onclick: () => {
+        const open = !item.classList.contains('open');
+        S.$$('.faq-item.open', faqList).forEach((x) => { x.classList.remove('open'); x.querySelector('.faq-q').setAttribute('aria-expanded', 'false'); });
+        item.classList.toggle('open', open); q.setAttribute('aria-expanded', String(open));
+      } }, h('span', null, t('faq.' + k)), landIcon('down'));
+      item.append(q, h('div', { class: 'faq-a', id, role: 'region' }, h('div', null, h('p', null, t('faq.' + k + '.a', vars)))));
+      if (i === 0) { item.classList.add('open'); q.setAttribute('aria-expanded', 'true'); }
+      return item;
+    }));
+    const faq = h('section', { class: 'section lux-sec alt-band', id: 'faq' }, h('div', { class: 'wrap faq-wrap' },
+      h('div', { class: 'lux-head' }, h('h2', null, accentFirst(t('faq.title'))), h('p', null, t('faq.sub'))), faqList));
+    page.append(h('section', { class: 'ct-split' }, left, right), faq, siteFooter());
 
     // Floating labels: the label sits in the field and moves up when the field has focus or a value.
     const fl = (field, label, req) => h('label', { class: 'fl' }, field, h('span', null, label + (req ? ' *' : '')), h('em', { class: 'fl-err' }));

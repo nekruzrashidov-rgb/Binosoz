@@ -17,7 +17,7 @@ window.SITORA_CONFIG = {
     address: 'Душанбе, пр. Рудаки, 124',
     hours: 'Пн–Сб 9:00–19:00',
     // Contact page: the manager who answers, and the office hours day by day (day keys: monFri, sat, sun; null — day off).
-    manager: 'Некру',
+    manager: 'Некруз',
     schedule: [['monFri', '9:00–19:00'], ['sat', '10:00–17:00'], ['sun', null]],
   },
   // Apartment types on the landing when the API is unavailable; with the API the real areas and prices are shown.
