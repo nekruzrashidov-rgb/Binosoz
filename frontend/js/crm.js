@@ -34,7 +34,7 @@
     S.api.buildings().then((bs) => { S.crmBuildings = bs; const u = S.api.user; ctx.replaceChildren(h('b', null, u.organizationName || ''), h('span', { class: 'muted' }, ' · ' + t('role.' + u.role, null, u.role) + ' · ' + (u.buildingIds.length ? bs.filter((b) => u.buildingIds.includes(b.id)).map((b) => b.name).join(', ') : t('crm.allBuildings')))); }).catch(() => {});
     const items = [];
     const add = (key, label, icon, group, ok) => { if (ok) items.push({ key, label, icon, group }); };
-    add('dashboard', t('crm.dashboard'), 'chart', t('crm.g.sales'), has('Manager'));
+    add('dashboard', t('crm.dashboard'), 'chart', t('crm.g.sales'), has('Manager', 'Accountant'));
     add('pipeline', t('crm.pipeline'), 'kanban', t('crm.g.sales'), has('Manager'));
     add('leads', t('crm.leads'), 'inbox', t('crm.g.sales'), has('Manager'));
     // An accountant reads deals too (to post the first payment); creating deals and moving stages stays with sales.
@@ -66,24 +66,22 @@
     const views = {
       async dashboard(body) {
         body.replaceChildren(S.skeleton(4, 80));
+        // Statistics for everyone who sees the overview; the sales funnel below only for sales (an accountant has no access to it).
+        const [st, salesRows] = await Promise.all([S.api.stats(), S.api.statsSales().catch(() => [])]);
+        const statsPart = statsBlock(st, salesRows);
+        if (!has('Manager')) { body.replaceChildren(...statsPart); return; }
         const [sumRaw, rate] = await Promise.all([S.api.summary(), S.api.rate().catch(() => null)]);
         const r = sumRaw || {};
         const stages = toObj(S.pick(r, ['dealsByStage', 'stages', 'deals'], {}));
-        const apts = toObj(S.pick(r, ['apartmentsByStatus', 'apartments'], {}));
         const k = (key, def) => S.pick(r, key, def);
-        const sales = k(['salesTotalTjs', 'salesTotal', 'totalSales', 'salesAmount'], 0);
-        const kp = [[t('dash.leads'), k(['openLeads', 'leads', 'leadsCount', 'newLeads'], 0), 'var(--info)'], [t('dash.bookings'), k(['activeBookings', 'bookings'], 0), 'var(--warn)'], [t('dash.expiring'), k(['expiringBookings', 'expiring', 'expiringSoon'], 0), 'var(--bad)'], [t('dash.sales'), S.fmt.money(sales, 'TJS'), 'var(--good)']];
+        const kp = [[t('dash.leads'), k(['openLeads', 'leads', 'leadsCount', 'newLeads'], 0), 'var(--info)'], [t('dash.bookings'), k(['activeBookings', 'bookings'], 0), 'var(--warn)'], [t('dash.expiring'), k(['expiringBookings', 'expiring', 'expiringSoon'], 0), 'var(--bad)']];
         const total = Object.values(stages).reduce((s, x) => s + (+x || 0), 0) || 1;
-        const aptTotal = Object.values(apts).reduce((s, x) => s + (+x || 0), 0) || 1;
-        const col = { Free: '#2fd6a3', Booked: '#ffb030', Sold: '#6a7696', Onrequest: '#6f8bff', OnRequest: '#6f8bff' };
-        body.replaceChildren(
+        body.replaceChildren(...statsPart,
+          h('h3', { class: 'dash-section' }, t('stats.funnel')),
           h('div', { class: 'kpis' }, kp.map(([l, v, c]) => h('div', { class: 'card kpi', style: { '--k': c } }, h('span', null, l), h('b', null, v), h('i')))),
-          h('div', { class: 'grid g2' },
-            h('div', { class: 'card' }, h('h3', null, t('dash.byStage')), STAGES.map((s) => { const n = +stages[s] || 0; return h('div', { class: 'hbar' }, S.stageChip(s), S.bar((n / total) * 100), h('b', { class: 'num', style: { textAlign: 'right' } }, n)); })),
-            h('div', { class: 'card' }, h('h3', null, t('dash.byStatus')), h('div', { style: { display: 'flex', height: '16px', borderRadius: '8px', overflow: 'hidden', margin: '10px 0 16px', background: 'var(--surface-3)' } }, ['Free', 'Booked', 'Sold', 'OnRequest'].map((s) => h('div', { title: t('status.' + s.toLowerCase()), style: { width: ((+(apts[s] || apts[s === 'OnRequest' ? 'Onrequest' : s]) || 0) / aptTotal) * 100 + '%', background: col[s], transition: 'width 1s' } }))),
-              h('div', { class: 'grid g2' }, ['Free', 'Booked', 'Sold', 'OnRequest'].map((s) => h('div', { class: 'row', style: { gap: '8px' } }, h('i', { style: { width: '11px', height: '11px', borderRadius: '3px', background: col[s], display: 'inline-block' } }), h('span', null, t('status.' + s.toLowerCase())), h('b', { class: 'num', style: { marginLeft: 'auto' } }, apts[s] || apts[s === 'OnRequest' ? 'Onrequest' : s] || 0)))),
-              rate && rate.rate ? h('p', { class: 'hint', style: { marginTop: '14px' } }, t('dash.rate', { r: rate.rate, d: S.fmt.date(rate.date) })) : h('p', { class: 'hint', style: { marginTop: '14px' } }, t('dash.noRate')),
-              r.salesNote === 'usdWithoutRate' ? h('p', { class: 'hint' }, t('dash.usdNoRate')) : null)));
+          h('div', { class: 'card' }, h('h3', null, t('dash.byStage')), STAGES.map((s) => { const n = +stages[s] || 0; return h('div', { class: 'hbar' }, S.stageChip(s), S.bar((n / total) * 100), h('b', { class: 'num', style: { textAlign: 'right' } }, n)); }),
+            rate && rate.rate ? h('p', { class: 'hint', style: { marginTop: '14px' } }, t('dash.rate', { r: rate.rate, d: S.fmt.date(rate.date) })) : h('p', { class: 'hint', style: { marginTop: '14px' } }, t('dash.noRate')),
+            r.salesNote === 'usdWithoutRate' ? h('p', { class: 'hint' }, t('dash.usdNoRate')) : null));
       },
 
       async pipeline(body) {
@@ -332,24 +330,41 @@
               S.tbl([{ label: t('f.fullName'), render: (r) => h('b', null, r.name) }, { label: t('login.email'), render: (r) => r.email }, { label: t('users.role'), render: (r) => r.role }, { label: t('deal.stage'), render: (r) => S.chip(ST[r.status][0], t(ST[r.status][1])) }, { label: '', r: true, render: act }], rows, { empty: t('obj.noStaff') }));
           },
 
-          // Apartment counts from the catalog; money from the payments report (all time, this building only).
+          // Leaders get the building's figures from /stats/buildings (with money); a manager — the apartments from the catalog.
           async stats(pane, b) {
             pane.replaceChildren(S.skeleton(3, 60));
-            const floors = await S.api.floors(b.id);
-            const apts = floors.length ? await S.api.allApartments(floors) : [];
-            const c = { free: 0, booked: 0, sold: 0, onrequest: 0 }; apts.forEach((a) => { c[a.status] = (c[a.status] || 0) + 1; });
-            const total = apts.length; const pct = (n) => (total ? Math.round((n * 1000) / total) / 10 : 0) + '%';
-            // The report covers at most 366 days, so the money shown is for the last twelve months.
-            let revenue = null, revenueErr = '';
-            try { const r = await S.api.reportPayments(S.addDays(-365), S.today()); revenue = r.rows.filter((p) => p.buildingName === b.name).reduce((s, p) => s + (p.reversal ? -p.amountTjs : p.amountTjs), 0); } catch (e) { revenueErr = e.status === 403 ? t('obj.revenueNo') : e.message; }
+            let row = null;
+            if (S.api.isLeader()) { try { row = (await S.api.statsBuildings()).find((x) => String(x.buildingId) === String(b.id)) || null; } catch (e) { row = null; } }
+            if (!row) {
+              const floors = await S.api.floors(b.id);
+              const apts = floors.length ? await S.api.allApartments(floors) : [];
+              const n = (s) => apts.filter((a) => a.status === s).length;
+              row = { totalApartments: apts.length, free: n('free'), booked: n('booked'), sold: n('sold'), onRequest: n('onrequest'), occupancyRate: apts.length ? (n('booked') + n('sold')) / apts.length : 0, revenue: null, collected: null };
+            }
+            const total = row.totalApartments;
+            const pct = (v) => (total ? Math.round((v * 1000) / total) / 10 : 0) + '%';
             const kpi = (label, value, color, sub) => h('div', { class: 'card kpi', style: { '--k': color } }, h('span', null, label), h('b', null, value), sub ? h('div', { class: 'muted' }, sub) : null, h('i'));
-            const parts = [['free', 'var(--good)'], ['booked', 'var(--warn)'], ['sold', 'var(--info)']];
-            const split = h('div', { class: 'obj-split', role: 'img', 'aria-label': parts.map(([k]) => t('status.' + k) + ': ' + c[k]).join(', ') }, parts.map(([k, col]) => (c[k] ? h('i', { style: { flexGrow: c[k], background: col }, title: t('status.' + k) + ': ' + c[k] }) : null)));
+            const parts = [['free', row.free, 'var(--good)'], ['booked', row.booked, 'var(--warn)'], ['sold', row.sold, 'var(--info)'], ['onrequest', row.onRequest, 'var(--muted)']];
+            // Occupancy donut: arcs of a conic gradient, one per status, in proportion to the apartments.
+            let at = 0;
+            const stops = parts.filter(([, v]) => v > 0).map(([, v, col]) => { const from = at; at += (v * 100) / (total || 1); return col + ' ' + from + '% ' + at + '%'; });
+            const donut = h('div', { class: 'occ-donut', style: { background: total ? 'conic-gradient(' + stops.join(', ') + ')' : 'var(--surface-3)' }, role: 'img', 'aria-label': parts.map(([k, v]) => t('status.' + k) + ': ' + v).join(', ') },
+              h('div', null, h('b', null, Math.round((+row.occupancyRate || 0) * 100) + '%'), h('small', null, t('stats.occupancy'))));
+            let money;
+            if (row.revenue) {
+              const sum = statTjs(row.revenue), got = statTjs(row.collected) || 0;
+              const share = sum ? Math.min(100, Math.round((got * 100) / sum)) : 0;
+              money = h('div', { class: 'card stack' }, h('h3', null, t('stats.money')),
+                h('div', { class: 'row between' }, h('span', null, t('stats.collected') + ': ', h('b', null, statMoney(row.collected))), h('b', { class: 'num' }, share + '%')),
+                S.bar(share, 'gold'), h('div', { class: 'muted' }, t('stats.contracts') + ': ' + statMoney(row.revenue)));
+            } else money = h('div', { class: 'card flat hint' }, t('stats.moneyLeaders'));
             pane.replaceChildren(
               h('div', { class: 'grid g4' }, kpi(t('obj.total'), total, 'var(--accent)', b.plannedApartments ? t('obj.ofPlanned', { n: b.plannedApartments }) : null),
-                kpi(t('status.free'), c.free, 'var(--good)', pct(c.free)), kpi(t('status.booked'), c.booked, 'var(--warn)', pct(c.booked)), kpi(t('status.sold'), c.sold, 'var(--info)', pct(c.sold))),
-              total ? h('div', { class: 'card stack' }, h('h3', null, t('obj.split')), split, h('div', { class: 'row obj-legend' }, parts.map(([k, col]) => h('span', null, h('i', { style: { background: col } }), t('status.' + k) + ' — ' + c[k])))) : null,
-              h('div', { class: 'card kpi', style: { maxWidth: '420px', '--k': 'var(--gold)' } }, h('span', null, t('obj.revenue')), h('b', null, revenue === null ? '—' : S.fmt.money(revenue, 'TJS')), h('div', { class: 'muted' }, revenue === null ? revenueErr : t('obj.revenueHint')), h('i')));
+                kpi(t('status.free'), row.free, 'var(--good)', pct(row.free)), kpi(t('status.booked'), row.booked, 'var(--warn)', pct(row.booked)), kpi(t('status.sold'), row.sold, 'var(--info)', pct(row.sold))),
+              h('div', { class: 'grid g2' },
+                h('div', { class: 'card' }, h('h3', null, t('obj.split')), h('div', { class: 'occ-wrap' }, donut,
+                  h('div', { class: 'obj-legend stack' }, parts.map(([k, v, col]) => h('span', null, h('i', { style: { background: col } }), t('status.' + k) + ' — ' + v))))),
+                money));
           },
         };
         list();
@@ -532,6 +547,43 @@
     }
 
     // Invite a person by e-mail: they get a link and then sign in with a code. A building admin invites only into their building.
+    // Money from the statistics: in somoni when it can be counted, otherwise by currency ("120 000 TJS + 5 000 USD").
+    const statMoney = (m) => (m && m.tjs !== null && m.tjs !== undefined ? S.fmt.money(m.tjs, 'TJS')
+      : m && m.byCurrency && m.byCurrency.length ? m.byCurrency.map((x) => S.fmt.money(x.amount, x.currency)).join(' + ') : S.fmt.money(0, 'TJS'));
+    const statTjs = (m) => (m && m.tjs !== null && m.tjs !== undefined ? +m.tjs : null);
+    const canExport = () => S.api.isOwner() || (S.api.user.roles || []).includes('Accountant');
+
+    // The overview's statistics: apartments, contract money (a CSS ring), sales by month (CSS bars), overdue payments.
+    function statsBlock(st, rows) {
+      const total = statTjs(st.totalRevenue), got = statTjs(st.collectedRevenue);
+      const pct = total ? Math.min(100, Math.round(((got || 0) * 100) / total)) : 0;
+      const ring = h('div', { class: 'money-ring', style: { '--p': pct }, role: 'img', 'aria-label': t('stats.collectedPct', { p: pct }) }, h('b', null, pct + '%'), h('small', null, t('stats.collected')));
+      const months = t('stats.months').split(',');
+      const value = (row) => statTjs(row.revenue) || 0;
+      const max = Math.max(...rows.map(value), 0);
+      const bars = h('div', { class: 'sales-bars', role: 'list' }, rows.map((row) => {
+        const [y, m] = row.month.split('-').map(Number);
+        const height = max ? Math.max(4, Math.round((value(row) * 100) / max)) : 4;
+        return h('div', { class: 'sales-bar', role: 'listitem', title: t('stats.barTitle', { m: months[m - 1] + ' ' + y, d: row.deals, s: statMoney(row.revenue) }) },
+          h('span', { class: 'sales-bar-n' }, row.deals), h('i', { style: { height: height + '%' } }), h('small', null, months[m - 1]));
+      }));
+      const head = h('div', { class: 'toolbar' },
+        st.overduePayments > 0 ? S.chip('Overdue', t('stats.overdue', { n: st.overduePayments })) : S.chip('Active ok', t('stats.noOverdue')),
+        h('span', { class: 'hint' }, t('stats.week', { l: st.newLeadsThisWeek, d: st.newDealsThisMonth, c: Math.round((+st.conversionRate || 0) * 100) })),
+        h('span', { class: 'spacer' }),
+        canExport() ? h('button', { class: 'btn ghost', onclick: (e) => S.busy(e.currentTarget, () => S.api.openDoc('/stats/export', null, 'Excel').catch(S.err)) }, t('stats.export')) : null);
+      const card = (label, n, color) => h('div', { class: 'card kpi', style: { '--k': color } }, h('span', null, label), h('b', null, n), h('i'));
+      return [head,
+        h('div', { class: 'kpis' }, card(t('stats.total'), st.totalApartments, 'var(--accent)'), card(t('status.free'), st.free, 'var(--good)'), card(t('status.booked'), st.booked, 'var(--warn)'), card(t('status.sold'), st.sold, 'var(--info)')),
+        h('div', { class: 'grid g2' },
+          h('div', { class: 'card' }, h('h3', null, t('stats.money')), h('div', { class: 'money-wrap' }, ring,
+            h('dl', { class: 'kv money-legend' }, h('dt', null, t('stats.contracts')), h('dd', null, statMoney(st.totalRevenue)),
+              h('dt', null, h('i', { class: 'dot gold' }), t('stats.collected')), h('dd', null, statMoney(st.collectedRevenue)),
+              h('dt', null, h('i', { class: 'dot' }), t('stats.remaining')), h('dd', null, statMoney(st.remaining)))),
+            total === null ? h('p', { class: 'hint' }, t('dash.usdNoRate')) : null),
+          h('div', { class: 'card' }, h('h3', null, t('stats.sales')), rows.length ? bars : S.empty(t('stats.noSales'), 'chart'), h('p', { class: 'hint' }, t('stats.salesHint'))))];
+    }
+
     // A building without floors (created before floors were made automatically): offer to create 1..N in one go.
     function noFloors(b, done) {
       const btn = h('button', { class: 'btn', onclick: () => S.busy(btn, async () => {

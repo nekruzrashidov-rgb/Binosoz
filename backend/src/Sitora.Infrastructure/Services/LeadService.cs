@@ -18,6 +18,7 @@ public class LeadService(
     ICurrentUser currentUser,
     INotificationSender notifications,
     IAuditService audit,
+    StatsCache stats,
     ILogger<LeadService> logger) : ILeadService
 {
     public async Task<LeadResponse> CreateAsync(CreateLeadRequest request, CancellationToken ct = default)
@@ -49,6 +50,8 @@ public class LeadService(
         db.Leads.Add(lead);
         audit.Record(nameof(Lead), lead.Id, "Created", null, new { lead.Name, lead.Phone, lead.Source, lead.BuildingId }, organizationId);
         await db.SaveChangesAsync(ct);
+
+        await stats.InvalidateAsync(ct);
 
         // Заявка уже сохранена; сбой канала уведомлений не должен терять её.
         try

@@ -19,6 +19,7 @@ public class PaymentService(
     IAuditService audit,
     INotificationSender notifications,
     TimeProvider timeProvider,
+    StatsCache stats,
     ILogger<PaymentService> logger) : IPaymentService
 {
     private const string DealNotFound = "Сделка не найдена";
@@ -60,6 +61,7 @@ public class PaymentService(
             await transaction.CommitAsync(ct);
         }
 
+        await stats.InvalidateAsync(ct);
         return await GetScheduleAsync(dealId, ct);
     }
 
@@ -166,6 +168,7 @@ public class PaymentService(
             customerUserId = await CustomerUserIdAsync(dealId, ct);
         }
 
+        await stats.InvalidateAsync(ct);
         await NotifyCustomerAsync(customerUserId,
             $"Получен платёж {payment.Amount:0.00} {payment.Currency} от {payment.PaidAt:dd.MM.yyyy}", ct);
         return ToResponse(payment, false);
@@ -220,6 +223,7 @@ public class PaymentService(
             await transaction.CommitAsync(ct);
         }
 
+        await stats.InvalidateAsync(ct);
         return ToResponse(reversal, false);
     }
 

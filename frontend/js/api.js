@@ -403,6 +403,10 @@
     },
     createDeal(b) { return withFields(request('POST', '/deals', { body: { customerId: b.customerId || null, apartmentId: b.apartmentId || null, currency: b.currency || 'TJS', discount: b.discount || null, discountReason: b.discountReason || null, stage: b.stage || null } })).then(M.deal); },
     setStage(id, stage, reason) { return request('PATCH', '/deals/' + id + '/stage', { body: { stage, reason: reason || null } }); },
+    // statistics of the buildings this employee sees (5-minute cache on the server)
+    stats() { return request('GET', '/stats/dashboard'); },
+    statsSales(from, to) { return request('GET', '/stats/sales', { query: from ? { from, to } : undefined }).then(arr); },
+    statsBuildings() { return request('GET', '/stats/buildings').then(arr); },
     async summary() {
       const r = await request('GET', '/crm/summary');
       if (S.isDemo()) return r;

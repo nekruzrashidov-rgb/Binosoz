@@ -17,7 +17,8 @@ public class DealService(
     IAuditService audit,
     IExchangeRateService rates,
     TimeProvider timeProvider,
-    CatalogCache cache) : IDealService
+    CatalogCache cache,
+    StatsCache stats) : IDealService
 {
     private const string DealNotFound = "Сделка не найдена";
     private const string OpenDealExists = "По этой квартире уже есть открытая сделка";
@@ -113,6 +114,8 @@ public class DealService(
 
         if (apartment.Status != statusBefore)
             await cache.InvalidateAsync(ct);
+        // Этап и цена договора меняют выручку и конверсию, даже если статус квартиры тот же.
+        await stats.InvalidateAsync(ct);
         return await GetByIdAsync(deal.Id, ct);
     }
 
@@ -143,6 +146,8 @@ public class DealService(
 
         if (apartment.Status != statusBefore)
             await cache.InvalidateAsync(ct);
+        // Этап и цена договора меняют выручку и конверсию, даже если статус квартиры тот же.
+        await stats.InvalidateAsync(ct);
         return await GetByIdAsync(id, ct);
     }
 

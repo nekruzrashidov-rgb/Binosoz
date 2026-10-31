@@ -64,6 +64,8 @@ public static class DependencyInjection
         services.AddOptions<RedisOptions>().BindConfiguration(RedisOptions.SectionName);
         services.AddSingleton(sp => RedisOptions.CreateCache(sp.GetRequiredService<IOptions<RedisOptions>>().Value));
         services.AddSingleton<CatalogCache>();
+        services.AddSingleton<StatsCache>();
+        services.AddScoped<IStatsService, StatsService>();
         services.AddSingleton<EncryptionService>();
 
         services.AddScoped<JwtTokenService>();
