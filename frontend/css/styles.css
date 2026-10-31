@@ -1005,3 +1005,5 @@ a.float-card.tg:hover { border-color: rgba(34, 158, 217, 0.75); background: rgba
 /* crm: AI assistant inside a deal */
 .ai-log { max-height: 360px; }
 .ai-log .msg { white-space: pre-wrap; }
+.export-range { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.export-range .input { width: auto; }

@@ -553,6 +553,15 @@
     const statTjs = (m) => (m && m.tjs !== null && m.tjs !== undefined ? +m.tjs : null);
     const canExport = () => S.api.isOwner() || (S.api.user.roles || []).includes('Accountant');
 
+    // Excel export for a period: the current year up to today by default.
+    function exportRange() {
+      const today = new Date().toISOString().slice(0, 10);
+      const from = h('input', { type: 'date', class: 'input', value: today.slice(0, 4) + '-01-01', max: today, 'aria-label': t('stats.from') });
+      const to = h('input', { type: 'date', class: 'input', value: today, max: today, 'aria-label': t('stats.to') });
+      return h('span', { class: 'export-range' }, from, '—', to,
+        h('button', { class: 'btn ghost', onclick: (e) => S.busy(e.currentTarget, () => S.api.openDoc('/stats/export', { from: from.value || undefined, to: to.value || undefined }, 'Excel').catch(S.err)) }, t('stats.export')));
+    }
+
     // The overview's statistics: apartments, contract money (a CSS ring), sales by month (CSS bars), overdue payments.
     function statsBlock(st, rows) {
       const total = statTjs(st.totalRevenue), got = statTjs(st.collectedRevenue);
@@ -571,7 +580,7 @@
         st.overduePayments > 0 ? S.chip('Overdue', t('stats.overdue', { n: st.overduePayments })) : S.chip('Active ok', t('stats.noOverdue')),
         h('span', { class: 'hint' }, t('stats.week', { l: st.newLeadsThisWeek, d: st.newDealsThisMonth, c: Math.round((+st.conversionRate || 0) * 100) })),
         h('span', { class: 'spacer' }),
-        canExport() ? h('button', { class: 'btn ghost', onclick: (e) => S.busy(e.currentTarget, () => S.api.openDoc('/stats/export', null, 'Excel').catch(S.err)) }, t('stats.export')) : null);
+        canExport() ? exportRange() : null);
       const card = (label, n, color) => h('div', { class: 'card kpi', style: { '--k': color } }, h('span', null, label), h('b', null, n), h('i'));
       return [head,
         h('div', { class: 'kpis' }, card(t('stats.total'), st.totalApartments, 'var(--accent)'), card(t('status.free'), st.free, 'var(--good)'), card(t('status.booked'), st.booked, 'var(--warn)'), card(t('status.sold'), st.sold, 'var(--info)')),

@@ -58,6 +58,7 @@ public class StatsTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFacto
         Assert.Equal(6, sales.Count);
         Assert.Equal(today.ToString("yyyy-MM"), sales[^1].Month);
         Assert.Equal(lastMonth.ToString("yyyy-MM"), sales[^2].Month);
+        Assert.True(sales[^1].Deals >= 1); // сделка из начала теста — в текущем месяце
         Assert.Equal(beforeSales[^1].Revenue.Tjs + 2500m, sales[^1].Revenue.Tjs);
         Assert.Equal(beforeSales[^2].Revenue.Tjs + 1000m, sales[^2].Revenue.Tjs);
 

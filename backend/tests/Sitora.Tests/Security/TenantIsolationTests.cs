@@ -9,6 +9,7 @@ using Sitora.Domain.DTOs.Common;
 using Sitora.Domain.DTOs.Construction;
 using Sitora.Domain.DTOs.Documents;
 using Sitora.Domain.DTOs.Payments;
+using Sitora.Domain.DTOs.Reports;
 using Sitora.Domain.DTOs.Sales;
 using Sitora.Domain.Entities;
 using Sitora.Domain.Enums;
@@ -183,6 +184,8 @@ public class TenantIsolationTests(SitoraApiFactory factory) : IClassFixture<Sito
         Assert.DoesNotContain(neighbourCustomer.Id, customers!.Items.Select(c => c.Id));
         Assert.Equal(HttpStatusCode.OK, (await objectAdmin.GetAsync($"/api/v1/deals/{mine.DealId}")).StatusCode);
 
+        var stats = await objectAdmin.GetFromJsonAsync<List<BuildingStatsRow>>("/api/v1/stats/buildings", TestJson.Options);
+        Assert.Equal([myBuilding], stats!.Select(r => r.BuildingId));
         AssertHidden(await objectAdmin.GetAsync($"/api/v1/buildings/{neighbour.Id}"), "дом соседа");
         AssertHidden(await objectAdmin.GetAsync($"/api/v1/deals/{neighbourDeal.Id}"), "сделка соседа");
         AssertHidden(await objectAdmin.GetAsync($"/api/v1/customers/{neighbourCustomer.Id}"), "клиент соседа");
