@@ -483,7 +483,11 @@
     setUserBlocked(id, blocked) { return request('PATCH', '/users/' + id + '/status', { body: { isActive: !blocked, blocked } }); },
     async audit(entity) { return (await all('/audit', { entity: entity || undefined }, 1)).map(M.audit); },
     // AI assistant: the server chooses the prompt by role; history = [{ role: 'user'|'assistant', content }].
-    aiChat(message, history) { return request('POST', '/ai/chat', { body: { message, history: history || [] } }); },
+    // dealId — only for staff: the deal's buyer, apartment, price, stage and payments go into the assistant's prompt.
+    aiChat(message, history, dealId) { return request('POST', '/ai/chat', { body: { message, history: history || [] }, query: dealId ? { dealId } : undefined }); },
+    // AI reading of documents and receipts (Claude); nothing in the deal changes until a person acts on the result.
+    verifyDocument(id) { return request('POST', '/documents/' + id + '/verify'); },
+    readReceipt(dealId, file) { const f = new FormData(); f.append('file', file); return request('POST', '/deals/' + dealId + '/payments/read-receipt', { form: f, file }); },
     async health() { return S.isDemo() ? request('GET', '/health/ready', { auth: false }) : request('GET', '/health/ready', { auth: false, absolute: true }); },
 
     /* Opens a PDF in a tab or downloads Excel: real API -> file from the server; demo -> in-page preview */

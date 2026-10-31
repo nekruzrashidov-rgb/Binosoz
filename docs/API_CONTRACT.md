@@ -76,6 +76,10 @@ SecondFactorChallenge = { challengeToken, expiresAt, methods: ["password", "totp
 | Метод | Путь | Тело | Ответ |
 | --- | --- | --- | --- |
 | POST | `/ai/chat` | `{ message, history: [{ role: "user"|"assistant", content }] }` | `{ reply }`. Только для вошедших. Промпт выбирается по роли из токена: покупателю — вопросы о квартире, сделке и сроках, сотрудникам — документы, CRM, письма. Ответы на русском. Модель `claude-haiku-5-5`, до 1000 токенов. История хранится только в браузере (до 20 реплик). 503 — нет ключа `Claude:ApiKey` («AI помощник не настроен») или Claude недоступен. Не больше 60 сообщений в час на пользователя |
+| POST | `/ai/chat?dealId=` | то же | Необязательный `dealId` (только сотрудникам): в начало промпта сотрудника — покупатель, квартира и этаж, дом, цена, этап, платежи «оплачено / всего» и срок следующего. Чужая сделка — 404; у покупателя параметр не учитывается |
+| POST | `/documents/{id}/verify?expectedFullName=` | — | Manager, руководители. `{ isValid, extractedFullName, expiryDate, nameMatches, isExpired, issue, rawResponse }` — Claude читает загруженный документ (изображение или PDF); ФИО по умолчанию — покупателя сделки. `isValid` = ФИО совпадает и срок не истёк (срок сверяется с сегодняшней датой на сервере). Аудит `Document` / `AiVerified` — только вывод проверки. 503 — ИИ не настроен или недоступен; лимит как у чата |
+| POST | `/deals/{dealId}/documents/verify` | multipart `file` (JPG, PNG, GIF, WebP до 5 МБ или PDF до 10 МБ), `expectedFullName?` | Manager, руководители. То же для нового файла; файл не сохраняется, аудит `Deal` / `AiDocumentVerified` |
+| POST | `/deals/{dealId}/payments/read-receipt` | multipart `file` | Manager, Accountant, руководители. `{ receipt: { isReadable, amount, currency, paymentDate, description, bankName, rawResponse }, suggestedScheduleItemId, suggestedDueDate, suggestedAmount, suggestedCurrency }`. Подходящий пункт графика — неоплаченный, остаток отличается от суммы чека меньше чем на 1 %, срок в пределах 30 дней от даты оплаты, та же валюта. Платёж не создаётся: его вносит бухгалтер обычным `POST /deals/{id}/payments` |
 
 ## Платформа (только PlatformOwner)
 

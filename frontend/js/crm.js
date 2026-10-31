@@ -648,6 +648,8 @@
     // hint — a report row with the client and apartment: an accountant cannot open the deal card itself.
     function dealDrawer(id, done, hint, firstTab) {
       let d = null, sched = null; let tab = firstTab || 'overview';
+      // The AI conversation about this deal lives only while the card is open.
+      const aiHistory = [];
       const body = h('div', null, S.skeleton(4, 60));
       const md = S.modal({ side: true, body, onClose: () => done && done(), noFocus: true });
       (async function init() {
@@ -656,7 +658,7 @@
       })();
       async function reload() { d = await S.api.deal(id, hint); sched = null; draw(); }
       async function getSched() { if (sched) return sched; try { sched = await S.api.schedule(id); } catch (e) { sched = { none: true }; } return sched; }
-      const tabsDef = () => [['overview', t('deal.tab.overview')], ['schedule', t('deal.tab.schedule')], ['payments', t('deal.tab.payments')], ['docs', t('deal.tab.docs')], ['chat', t('deal.tab.chat')]];
+      const tabsDef = () => [['overview', t('deal.tab.overview')], ['schedule', t('deal.tab.schedule')], ['payments', t('deal.tab.payments')], ['docs', t('deal.tab.docs')], ['chat', t('deal.tab.chat')], ['ai', t('deal.tab.ai')]];
       function draw() {
         const content = h('div', { class: 'stack' });
         body.replaceChildren(h('div', { class: 'row between', style: { paddingRight: '40px', marginBottom: '14px' } }, h('div', null, h('h2', { style: { margin: 0, padding: 0 } }, t('deal.title', { n: d.apartmentNumber })), h('div', { class: 'muted', style: { fontWeight: 600 } }, (d.customerName || '—') + ' · #' + shortId(d.id))), d.readOnly ? null : S.stageChip(d.stage)),
@@ -684,10 +686,10 @@
         async payments(c) {
           c.replaceChildren(S.skeleton(3, 40));
           const canPay = money();
-          const parts = [];
+          const parts = [receiptCard(canPay)];
           if (canPay) {
             const sc = await getSched();
-            if (sc.none) { c.replaceChildren(S.empty(t('pay.needPlan'), 'wallet')); return; }
+            if (sc.none) { c.replaceChildren(...parts, S.empty(t('pay.needPlan'), 'wallet')); return; }
             const amount = S.input('amount', { type: 'number', min: 1, step: '0.01' }), cur = S.select('currency', [['TJS', 'TJS'], ['USD', 'USD']], d.currency), date = S.input('date', { type: 'date', value: S.today(), max: S.today() }), cm = S.input('comment');
             const btn = h('button', { class: 'btn', type: 'submit' }, t('pay.add'));
             const f = h('form', { class: 'card flat stack', novalidate: true }, h('h3', null, t('pay.new')), h('div', { class: 'grid g2' }, S.field(t('pay.amount'), amount), S.field(t('deal.currency'), cur, d.currency === cur.value ? null : t('pay.convHint'))), h('div', { class: 'grid g2' }, S.field(t('doc.date'), date), S.field(t('pay.comment'), cm)), btn);
@@ -700,10 +702,62 @@
           else parts.push(h('p', { class: 'muted' }, t('pay.readOnly')), h('div', { class: 'row' }, h('button', { class: 'btn ghost', onclick: (e) => S.busy(e.currentTarget, () => S.api.openDoc('/deals/' + id + '/statement.pdf', { date: S.today() }, 'PDF').catch(S.err)) }, t('cab.pdfAct'))));
           c.replaceChildren(...parts);
         },
-        docs(c) { c.append(S.panels.documents(id, true)); },
+        docs(c) { c.append(S.panels.documents(id, true, { verify: sales() })); },
         chat(c) { c.append(h('div', { class: 'card flat' }, S.panels.chat(id, 'staff'))); },
+        // The assistant already knows this deal: the server puts the buyer, apartment, price, stage and payments into its prompt.
+        ai(c) {
+          const log = h('div', { class: 'chat ai-log', 'aria-live': 'polite' }, h('div', { class: 'muted', style: { padding: '14px', textAlign: 'center' } }, t('ai.deal.hint')));
+          const input = h('textarea', { class: 'inp', id: 'ai-in-' + id, rows: 2, maxlength: 2000, placeholder: t('ai.deal.ph') });
+          const btn = h('button', { class: 'btn', type: 'submit', 'aria-label': t('chat.send') }, S.icon('send'));
+          const form = h('form', { class: 'row', style: { flexWrap: 'nowrap', marginTop: '10px', alignItems: 'flex-end' } }, input, btn);
+          const add = (role, text) => { if (!aiHistory.length) log.replaceChildren(); log.appendChild(h('div', { class: 'msg' + (role === 'user' ? ' me' : '') }, text)); log.scrollTop = log.scrollHeight; };
+          aiHistory.forEach((m) => log.appendChild(h('div', { class: 'msg' + (m.role === 'user' ? ' me' : '') }, m.content)));
+          form.addEventListener('submit', async (e) => {
+            e.preventDefault(); const text = input.value.trim(); if (!text) return;
+            add('user', text); input.value = '';
+            await S.busy(btn, async () => {
+              try { const r = await S.api.aiChat(text, aiHistory.slice(), id); aiHistory.push({ role: 'user', content: text }, { role: 'assistant', content: r.reply }); add('assistant', r.reply); }
+              catch (er) { log.appendChild(h('div', { class: 'form-err' }, er.message)); }
+            });
+          });
+          input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } });
+          c.append(h('div', { class: 'card flat' }, log, form, h('p', { class: 'hint' }, t('ai.deal.note'))));
+          setTimeout(() => input.focus(), 30);
+        },
       };
       const kv = (k, v) => [h('dt', null, k), h('dd', null, v === undefined || v === null || v === '' ? '—' : v)];
+
+      // A photo of a bank receipt: the AI reads the amount, date and bank and finds the unpaid schedule line it pays.
+      // The payment itself is posted only by the accountant's click.
+      function receiptCard(canPay) {
+        const out = h('div');
+        const inp = h('input', { type: 'file', id: 'rcpt-' + id, accept: 'image/png,image/jpeg,image/gif,image/webp,application/pdf', hidden: true });
+        inp.addEventListener('change', async () => {
+          const f = inp.files[0]; inp.value = ''; if (!f) return;
+          if (f.size > 10 * 1024 * 1024) { S.err({ message: t('ai.rc.tooBig') }); return; }
+          out.replaceChildren(S.skeleton(2, 28));
+          try {
+            const r = await S.api.readReceipt(id, f); const rc = r.receipt;
+            if (!rc.isReadable) { out.replaceChildren(h('div', { class: 'form-err' }, t('ai.rc.unread'))); return; }
+            const items = [h('b', null, [t('ai.rc.amount') + ': ' + (rc.amount != null ? S.fmt.money(rc.amount, rc.currency || d.currency) : '—'),
+              t('ai.rc.date') + ': ' + (rc.paymentDate ? S.fmt.date(rc.paymentDate) : '—'), t('ai.rc.bank') + ': ' + (rc.bankName || '—')].join(' | ')),
+              rc.description ? h('div', { class: 'muted' }, rc.description) : null];
+            if (r.suggestedScheduleItemId) {
+              items.push(h('div', { class: 'hint' }, t('ai.rc.match', { d: S.fmt.date(r.suggestedDueDate), s: S.fmt.money(r.suggestedAmount, r.suggestedCurrency) })));
+              items.push(canPay
+                ? h('div', null, h('button', { class: 'btn', type: 'button', onclick: (e) => S.busy(e.currentTarget, async () => {
+                  try {
+                    await S.api.addPayment(id, { amount: rc.amount, currency: rc.currency || d.currency, date: rc.paymentDate && rc.paymentDate <= S.today() ? rc.paymentDate : S.today(), method: 'BankTransfer', comment: t('ai.rc.comment', { b: rc.bankName || '' }).trim() });
+                    S.toast(t('pay.added'), 'ok'); await reload();
+                  } catch (er) { S.err(er); }
+                }) }, '✅ ' + t('ai.rc.confirm')))
+                : h('div', { class: 'hint' }, t('ai.rc.toAccountant')));
+            } else items.push(h('div', { class: 'hint' }, t('ai.rc.noMatch')));
+            out.replaceChildren(h('div', { class: 'card flat stack' }, ...items));
+          } catch (er) { out.replaceChildren(h('div', { class: 'form-err' }, er.message)); }
+        });
+        return h('div', { class: 'stack' }, h('div', { class: 'row' }, inp, h('label', { class: 'btn ghost', for: inp.id }, '📷 ' + t('ai.rc.upload')), h('span', { class: 'hint' }, t('ai.rc.hint'))), out);
+      }
       function planFormEl() {
         const down = S.input('downPaymentPercent', { type: 'number', min: 0, max: 90, value: 30 }), months = S.input('months', { type: 'number', min: 1, max: 360, value: 60 }), day = S.input('paymentDay', { type: 'number', min: 1, max: 28, value: 10 });
         const preview = h('div', { class: 'next' }); const btn = h('button', { class: 'btn', type: 'submit' }, t('plan.build'));

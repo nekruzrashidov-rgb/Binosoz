@@ -20,6 +20,12 @@ public class ClaudeOptions
     public string Model { get; set; } = "claude-haiku-5-5";
 
     public int MaxTokens { get; set; } = 1000;
+
+    // Чтение паспортов и чеков по изображению. Лимит с запасом: в него входит и рассуждение модели,
+    // а обрезанный JSON — это непрочитанный документ.
+    public string VisionModel { get; set; } = "claude-haiku-5-5";
+
+    public int VisionMaxTokens { get; set; } = 1024;
 }
 
 // Запрос к Claude через официальный SDK. Ключ берётся из настроек, в код и в браузер не попадает.

@@ -49,7 +49,25 @@
   /* Documents */
   const DOC_TYPES = ['Contract', 'Annex', 'Act', 'Invoice', 'Receipt', 'Other'];
   const DOC_TYPE_RU = { Contract: 'Договор', Annex: 'Приложение', Act: 'Акт', Invoice: 'Счёт', Receipt: 'Квитанция', Other: 'Другое' };
-  S.panels.documents = (dealId, canUpload) => {
+  // "Check with AI": the document is read by Claude on the server; the result is a hint next to the file, the deal does not change.
+  function aiVerify(d) {
+    const slot = h('span');
+    const btn = h('button', { class: 'btn ghost sm', type: 'button', onclick: (e) => S.busy(e.currentTarget, async () => {
+      try {
+        const r = await S.api.verifyDocument(d.id);
+        const mismatch = !r.isValid && !r.nameMatches && !!r.extractedFullName && !r.isExpired;
+        const text = r.isValid ? t('ai.doc.valid') : mismatch ? t('ai.doc.nameMismatch', { n: r.extractedFullName }) : t('ai.doc.invalid', { i: r.issue || t('ai.doc.unread') });
+        const kind = r.isValid ? 'Active ok' : mismatch ? 'warn' : 'Overdue';
+        slot.replaceChildren(S.chip(kind, (r.isValid ? '✅ ' : kind === 'warn' ? '⚠️ ' : '❌ ') + text));
+        slot.title = [r.extractedFullName, r.expiryDate ? t('ai.doc.until', { d: S.fmt.date(r.expiryDate) }) : ''].filter(Boolean).join(' · ');
+      } catch (er) { S.err(er); }
+    }) }, '🔍 ' + t('ai.doc.check'));
+    slot.appendChild(btn);
+    return slot;
+  }
+
+  // opts.verify — staff may have an identity document read by the AI (name of the buyer, expiry date).
+  S.panels.documents = (dealId, canUpload, opts) => {
     const box = h('div', { class: 'stack' });
     const list = h('div');
     const load = async () => {
@@ -60,7 +78,9 @@
           { label: t('doc.name'), render: (d) => h('span', { class: 'row', style: { gap: '8px', flexWrap: 'nowrap' } }, S.icon('file'), d.name, DOC_TYPE_RU[d.type] ? h('span', { class: 'muted', style: { fontSize: '12.5px' } }, t('doc.type.' + d.type, null, DOC_TYPE_RU[d.type])) : null) },
           { label: t('doc.date'), render: (d) => S.fmt.date(d.createdAt) },
           { label: t('doc.size'), render: (d) => S.fmt.size(d.size) },
-          { label: '', r: true, render: (d) => h('button', { class: 'btn soft sm', onclick: (e) => S.busy(e.currentTarget, async () => { try { await S.api.openSigned(d.id, d.name); } catch (er) { S.err(er); } }) }, t('doc.open')) },
+          { label: '', r: true, render: (d) => h('span', { class: 'row', style: { gap: '6px', justifyContent: 'flex-end', flexWrap: 'nowrap' } },
+            opts && opts.verify && /^(image\/|application\/pdf)/.test(d.contentType || '') ? aiVerify(d) : null,
+            h('button', { class: 'btn soft sm', onclick: (e) => S.busy(e.currentTarget, async () => { try { await S.api.openSigned(d.id, d.name); } catch (er) { S.err(er); } }) }, t('doc.open'))) },
         ], docs, { empty: t('doc.none') }));
       } catch (e) { list.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
     };

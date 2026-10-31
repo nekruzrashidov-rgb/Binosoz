@@ -6,6 +6,9 @@ namespace Sitora.Domain.Interfaces;
 public interface IAiAssistant
 {
     Task<AiChatResponse> ChatAsync(AiChatRequest request, CancellationToken ct = default);
+
+    // Сотруднику — с данными сделки в начале промпта (покупатель, квартира, цена, этап, платежи). Чужая сделка — 404.
+    Task<AiChatResponse> ChatWithContextAsync(AiChatRequest request, Guid? dealId, CancellationToken ct = default);
 }
 
 // Один запрос к языковой модели: системный промпт и диалог, где реплики чередуются (user, assistant, …, user).

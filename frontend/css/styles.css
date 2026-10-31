@@ -1001,3 +1001,7 @@ a.float-card.tg:hover { border-color: rgba(34, 158, 217, 0.75); background: rgba
 .occ-donut b { font-size: 24px; line-height: 1; }
 .occ-donut small { color: var(--muted); font-weight: 600; }
 .obj-legend.stack { gap: 8px; }
+
+/* crm: AI assistant inside a deal */
+.ai-log { max-height: 360px; }
+.ai-log .msg { white-space: pre-wrap; }

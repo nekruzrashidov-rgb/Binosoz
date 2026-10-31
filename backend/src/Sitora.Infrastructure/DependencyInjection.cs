@@ -96,6 +96,8 @@ public static class DependencyInjection
         services.AddSingleton<FileLinkSigner>();
         services.AddScoped<IFileLinkService, FileLinkService>();
         services.AddScoped<IReportService, ReportService>();
+        services.AddScoped<IDocumentVerifier, ClaudeDocumentVerifier>();
+        services.AddScoped<IAiDocumentService, AiDocumentService>();
         services.AddScoped<IChatService, ChatService>();
         services.AddSingleton<IPresenceTracker, PresenceTracker>();
 

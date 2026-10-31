@@ -16,12 +16,13 @@ public class AiController(IAiAssistant assistant) : ControllerBase
 {
     /// <summary>
     /// Сообщение помощнику. history — предыдущие реплики { role: user|assistant, content } (хранятся только в браузере).
+    /// dealId (необязательно, только сотрудникам) — данные сделки попадают в начало промпта; чужая сделка — 404.
     /// 503 — помощник не настроен (нет ключа Claude:ApiKey) или временно недоступен.
     /// </summary>
     [HttpPost("chat")]
     [EnableRateLimiting(RateLimitPolicies.Ai)]
     [ProducesResponseType<AiChatResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
-    public Task<AiChatResponse> Chat(AiChatRequest request, CancellationToken ct) =>
-        assistant.ChatAsync(request, ct);
+    public Task<AiChatResponse> Chat(AiChatRequest request, Guid? dealId, CancellationToken ct) =>
+        assistant.ChatWithContextAsync(request, dealId, ct);
 }
