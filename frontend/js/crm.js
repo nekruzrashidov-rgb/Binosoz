@@ -18,7 +18,7 @@
 
   S.views.crm = function (root) {
     if (!S.api.isAuthed) return S.views.login(root);
-    if (!S.api.isStaff()) { root.appendChild(h('div', { class: 'wrap page-in' }, h('div', { class: 'card login-card login' }, h('h2', null, t('crm.notStaff')), h('div', { class: 'row', style: { marginTop: '14px' } }, h('button', { class: 'btn', onclick: () => S.go(S.homeFor(S.api.user)) }, t('cab.toCrm')))))); return () => {}; }
+    if (!S.api.isStaff()) { root.appendChild(h('div', { class: 'wrap page-in' }, h('div', { class: 'card login-card login' }, h('h2', null, t('crm.notStaff')), h('div', { class: 'row', style: { marginTop: '14px' } }, h('button', { class: 'btn', onclick: () => S.go(S.homeFor(S.api.user)) }, S.api.isPlatform() ? '← ' + t('nav.platform') : t('cab.toCrm')))))); return () => {}; }
     // A new owner without buildings gets the setup wizard instead of an empty workspace — once per organization.
     const wizardKey = 'binosoz.wizard.done.' + S.api.user.organizationId;
     if (S.api.isOwner() && !S.store.get(wizardKey)) {

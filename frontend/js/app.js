@@ -45,10 +45,19 @@
       h('button', { class: 'btn sm', onclick: (e) => S.busy(e.currentTarget, async () => { await S.api.stopImpersonation(); S.toast(t('imp.stopped'), 'ok'); S.go('platform'); }) }, t('imp.stop'))));
   }
 
+  // Demo backend in the browser: a strip at the bottom, so nobody takes the data for real. Settings can switch it either way.
+  function demoBar() {
+    let bar = document.getElementById('demo-bar');
+    document.body.classList.toggle('has-demo-bar', S.isDemo());
+    if (!S.isDemo()) { if (bar) bar.remove(); return; }
+    if (!bar) { bar = h('div', { id: 'demo-bar', role: 'status' }); document.body.appendChild(bar); }
+    bar.textContent = '🟡 ' + t('demo.bar');
+  }
+
   function render() {
     const my = ++token;
     if (cleanup) { try { cleanup(); } catch (e) { console.error(e); } cleanup = null; }
-    S.clear(main); drawHeader();
+    S.clear(main); drawHeader(); demoBar();
     const r = route(); const view = S.views[r];
     window.scrollTo(0, 0);
     try { const c = view(main); cleanup = typeof c === 'function' ? c : null; } catch (e) { console.error(e); main.appendChild(h('div', { class: 'wrap', style: { paddingTop: '40px' } }, h('div', { class: 'form-err' }, e.message))); }

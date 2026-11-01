@@ -118,6 +118,7 @@ button { cursor: pointer; }
   .nav { display: none; position: absolute; top: 62px; left: 0; right: 0; background: var(--surface); border-bottom: 1px solid var(--line); flex-direction: column; padding: 10px max(18px, env(safe-area-inset-left, 0px)); margin: 0; box-shadow: var(--shadow); }
   .nav.open { display: flex; }
   .nav a, .nav button { text-align: left; border-radius: 10px; }
+  .nav a, .nav button { white-space: normal; overflow-wrap: anywhere; }
   .menu-btn { display: inline-grid; }
 }
 .userchip { display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-weight: 700; font-size: 13px; }
@@ -365,6 +366,9 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .pay-ring b { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--display); font-size: 22px; font-weight: 600; }
 .next { padding: 14px; border-radius: var(--r-sm); background: var(--accent-soft); display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; }
 .settings-fab { position: fixed; z-index: 30; right: max(14px, env(safe-area-inset-right, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+#demo-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 9999; background: #3d2c0c; color: #ffb030; text-align: center; padding: 8px 16px calc(8px + env(safe-area-inset-bottom, 0px)); font: 700 13px/1.4 system-ui, sans-serif; border-top: 1px solid #554010; pointer-events: none; }
+body.has-demo-bar { padding-bottom: 38px; }
+body.has-demo-bar .settings-fab { bottom: calc(52px + env(safe-area-inset-bottom, 0px)); }
 .cd-pill { font-weight: 800; font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--warn-soft); color: var(--warn); }
 .cd-pill.red { background: var(--bad-soft); color: var(--bad); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; } }

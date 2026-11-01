@@ -12,7 +12,7 @@
   // Everyone signs in with a code from e-mail (always 123456 here); the platform owner also gives a password.
   const ORG = { id: 'org1', name: 'Ситора Девелопмент', slug: 'sitora' };
   const PLATFORM_PASSWORD = 'Platform123!';
-  const DEMO_CUSTOMER_EMAIL = 'demo@sitora.tj';
+  const DEMO_CUSTOMER_EMAIL = 'customer@sitora.tj';
   const STAFF = [
     { id: 'u0', email: 'nekrashidov@gmail.com', password: PLATFORM_PASSWORD, name: 'Создатель платформы', roles: ['PlatformOwner'], platform: true },
     { id: 'u1', email: 'admin@sitora.tj', password: 'Admin123!', name: 'Фирдавс Назаров', roles: ['Owner'] },
@@ -52,7 +52,7 @@
     }
     const names = ['Фарҳод Раҳимов', 'Мадина Холиқова', 'Умед Ҷураев', 'Зарина Назарова', 'Сухроб Каримов', 'Дилором Шарипова', 'Бахтиёр Азизов', 'Гулнора Мирзоева', 'Парвиз Одинаев', 'Саодат Юсупова'];
     db.customers = names.map((n, i) => ({ id: i + 1, fullName: n, phone: '+99290000000' + (i + 1 > 9 ? '' : '') + (i + 1 > 9 ? '10' : i + 1), email: i % 3 === 0 ? 'client' + (i + 1) + '@mail.tj' : '', passport: 'A' + (1200000 + i * 1311), createdAt: iso(Date.now() - (30 + i * 9) * DAY) }));
-    // Demo buyer signs in as demo@sitora.tj with code 123456.
+    // Demo buyer signs in as customer@sitora.tj with code 123456.
     db.customers[0].email = DEMO_CUSTOMER_EMAIL;
     db.customers[9].phone = '+992900000010';
     db.leads = [

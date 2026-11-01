@@ -198,6 +198,7 @@
 
     function initHouse() {
       const floors = st.floors.filter((f) => !f.commercial).map((f) => f.number);
+      try {
       house = S.House3D.create(houseBox, {
         floors: Math.max(...st.floors.map((f) => f.number), 1), time: st.time,
         onSelectApartment: (a) => { st.sel = st.apts.find((x) => x.id === a.id) || null; st.floor = st.sel ? st.sel.floor : st.floor; renderSheet(); renderFloors(); },
@@ -209,6 +210,11 @@
           tip.style.left = Math.min(x, houseBox.clientWidth - 260) + 'px'; tip.style.top = y + 'px'; tip.hidden = false;
         },
       });
+      } catch (e) {
+        console.error(e); house = null;
+        houseBox.replaceChildren(h('div', { class: 'empty', style: { padding: '60px 16px', textAlign: 'center' } }, t('house.no3d')));
+        return;
+      }
       pushToHouse();
       void floors;
     }
