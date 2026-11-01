@@ -43,6 +43,7 @@
     add('chats', t('chats.title'), 'send', t('crm.g.sales'), has('Manager', 'Accountant'));
     add('payments', t('crm.payments'), 'wallet', t('crm.g.finance'), has('Accountant'));
     add('debts', t('crm.debts'), 'shield', t('crm.g.finance'), has('Accountant'));
+    add('cash', t('cash.title'), 'wallet', t('crm.g.finance'), has('Accountant') && !S.isDemo());
     add('rate', t('crm.rate'), 'chart', t('crm.g.finance'), has('Accountant'));
     // Leaders manage buildings; a manager uses the apartment lists to book and sell.
     add('objects', t('obj.title'), 'home', t('crm.g.catalog'), S.api.isLeader() || has('Manager'));
@@ -165,6 +166,77 @@
         async function load() {
           holder.replaceChildren(S.skeleton(4, 38));
           try { const r = await S.api.reportDebts(asOf.value); holder.replaceChildren(S.tbl([{ label: t('deal.customer'), render: (d) => h('b', null, d.customerName) }, { label: t('f.phone'), render: (d) => d.phone }, { label: t('deal.apt'), render: (d) => '№ ' + d.apartmentNumber }, { label: t('debt.amount'), r: true, num: true, render: (d) => S.chip('Overdue', S.fmt.money(d.overdue, d.currency)) }, { label: t('debt.since'), render: (d) => S.fmt.date(d.since) }, { label: t('debt.days'), r: true, num: true, render: (d) => d.days }, { label: t('sch.left'), r: true, num: true, render: (d) => S.fmt.money(d.remaining, d.currency) }], r.rows, { onRow: (d) => dealDrawer(d.dealId, null, d), empty: t('debt.none') })); } catch (e) { holder.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
+        }
+        load();
+      },
+
+      // Cash book: income and expenses of a building; entries are never edited, a mistake is reversed.
+      async cash(body) {
+        const bs = S.crmBuildings || (await S.api.buildings());
+        if (!bs.length) { body.replaceChildren(h('p', { class: 'muted' }, t('cash.noBuildings'))); return; }
+        const bsel = S.select('building', bs.map((b) => [b.id, b.name]), bs[0].id);
+        const from = S.input('from', { type: 'date', value: S.today().slice(0, 8) + '01' }), to = S.input('to', { type: 'date', value: S.today() });
+        const holder = h('div');
+        const range = () => ({ from: from.value || undefined, to: to.value || undefined });
+        const go = h('button', { class: 'btn', onclick: (e) => S.busy(e.currentTarget, load) }, t('rep.show'));
+        const xl = h('button', { class: 'btn ghost', onclick: (e) => S.busy(e.currentTarget, () => S.api.openDoc('/buildings/' + bsel.value + '/cash/export.xlsx', range(), 'Excel').catch(S.err)) }, t('cash.excel'));
+        const plus = h('button', { class: 'btn gold', onclick: () => addForm() }, '+ ' + t('cash.add'));
+        bsel.addEventListener('change', load);
+        body.replaceChildren(h('div', { class: 'toolbar' }, bs.length > 1 ? S.field(t('cash.building'), bsel) : null, S.field(t('rep.from'), from), S.field(t('rep.to'), to),
+          h('div', { style: { alignSelf: 'flex-end', display: 'flex', gap: '8px', flexWrap: 'wrap' } }, go, xl, plus)), holder);
+
+        async function load() {
+          holder.replaceChildren(S.skeleton(5, 38));
+          try {
+            const r = await S.api.cashBook(bsel.value, range().from, range().to);
+            const kpi = (label, v, color) => h('div', { class: 'card kpi', style: { '--k': color } }, h('span', null, label), h('b', { style: { fontSize: '22px' } }, S.fmt.money(v, 'TJS')), h('i'));
+            const signed = (x) => (x.amount < 0 ? '− ' : '+ ') + S.fmt.money(Math.abs(x.amount), x.currency);
+            holder.replaceChildren(
+              h('div', { class: 'grid g3', style: { marginBottom: '14px' } }, kpi(t('cash.income'), r.totalIncomeTjs, 'var(--good)'), kpi(t('cash.expense'), r.totalExpenseTjs, 'var(--bad)'), kpi(t('cash.balance'), r.balanceTjs, 'var(--gold)')),
+              S.tbl([
+                { label: t('doc.date'), render: (x) => S.fmt.date(x.operationDate) },
+                { label: t('cash.direction'), render: (x) => (x.direction === 'Income' ? '🟢 ' + t('cash.income') : '🔴 ' + t('cash.expense')) },
+                { label: t('cash.category'), render: (x) => t('cash.cat.' + x.category) },
+                { label: t('cash.description'), render: (x) => h('span', null, x.isReversal ? h('b', null, t('cash.reverse') + ': ') : null, x.description) },
+                { label: t('pay.amount'), r: true, num: true, render: (x) => h('span', { title: x.currency !== 'TJS' ? S.fmt.money(x.amountTjs, 'TJS') : null }, signed(x)) },
+                { label: '', r: true, render: (x) => h('div', { class: 'row', style: { gap: '6px', justifyContent: 'flex-end', flexWrap: 'nowrap' } },
+                  h('button', { class: 'btn ghost sm', onclick: (e) => S.busy(e.currentTarget, () => S.api.openDoc('/buildings/' + bsel.value + '/cash/' + x.id + '/receipt.pdf', null, 'PDF').catch(S.err)) }, '📄 ' + t('cash.receipt')),
+                  !x.isReversal && !x.isReversed ? h('button', { class: 'btn danger sm', onclick: () => reverse(x) }, '↩ ' + t('cash.reverse')) : null) },
+              ], r.transactions, { rowClass: (x) => (x.isReversal || x.isReversed ? 'rev cash-rev' : ''), empty: t('cash.none') }));
+          } catch (e) { holder.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
+        }
+
+        async function reverse(x) {
+          const reason = await S.askReason(t('cash.reverse'), t('cash.reverseConfirm'));
+          if (reason === null) return;
+          try { await S.api.reverseCash(bsel.value, x.id, reason); S.toast(t('cash.reversed'), 'ok'); load(); } catch (er) { S.err(er); }
+        }
+
+        function addForm() {
+          const INCOME = ['ApartmentPayment', 'Rent', 'OtherIncome'], EXPENSE = ['Construction', 'Materials', 'Salaries', 'Marketing', 'Utilities', 'Tax', 'OtherExpense'];
+          const dir = S.select('direction', [['Income', t('cash.income')], ['Expense', t('cash.expense')]], 'Income');
+          const cat = S.select('category', [], undefined);
+          const fillCats = () => cat.replaceChildren(...(dir.value === 'Income' ? INCOME : EXPENSE).map((c) => h('option', { value: c }, t('cash.cat.' + c))));
+          dir.addEventListener('change', fillCats); fillCats();
+          const amount = S.input('amount', { type: 'number', step: '0.01', min: '0.01', inputmode: 'decimal' });
+          const cur = S.select('currency', [['TJS', 'TJS'], ['USD', 'USD']], 'TJS');
+          const date = S.input('operationDate', { type: 'date', value: S.today(), max: S.today() });
+          const desc = h('textarea', { class: 'inp', name: 'description', maxlength: 500, rows: 3 });
+          const deal = S.input('dealId', { placeholder: t('cash.dealHint') });
+          const btn = h('button', { class: 'btn', type: 'submit' }, t('common.save'));
+          const form = h('form', { class: 'stack', novalidate: true },
+            h('div', { class: 'grid g2' }, S.field(t('cash.direction'), dir), S.field(t('cash.category'), cat), S.field(t('pay.amount'), amount), S.field(t('cash.currency'), cur)),
+            S.field(t('doc.date'), date), S.field(t('cash.description'), desc), S.field(t('cash.deal'), deal), btn);
+          const md = S.modal({ title: t('cash.add'), body: form });
+          form.addEventListener('submit', async (e) => {
+            e.preventDefault(); S.showErrors(form, null);
+            await S.busy(btn, async () => {
+              try {
+                await S.api.addCash(bsel.value, { amount: +amount.value, currency: cur.value, direction: dir.value, category: cat.value, description: desc.value.trim(), operationDate: date.value, dealId: deal.value.trim() || null });
+                md.close(); S.toast(t('cash.added'), 'ok'); load();
+              } catch (er) { S.showErrors(form, er); }
+            });
+          });
         }
         load();
       },

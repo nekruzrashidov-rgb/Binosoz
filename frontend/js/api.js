@@ -445,6 +445,10 @@
     },
     addPayment(id, b) { return withFields(request('POST', '/deals/' + id + '/payments', { body: { amount: b.amount, currency: b.currency, paidAt: b.date || b.paidAt, date: b.date || b.paidAt, method: b.method || 'Cash', comment: b.comment || null } })); },
     reversePayment(id, reason) { return request('POST', '/payments/' + id + '/reverse', { body: { reason } }); },
+    // Cash book of a building (the real API only).
+    cashBook(buildingId, from, to) { return request('GET', '/buildings/' + buildingId + '/cash', { query: { from, to } }); },
+    addCash(buildingId, b) { return withFields(request('POST', '/buildings/' + buildingId + '/cash', { body: b })); },
+    reverseCash(buildingId, id, reason) { return request('POST', '/buildings/' + buildingId + '/cash/' + id + '/reverse', { body: { reason } }); },
     // Each developer has its own manual rate: staff get theirs from the token, the public site names its organization.
     async rate() { const r = await request('GET', '/rates/current', { auth: api.isStaff(), query: real() ? { currency: 'USD', organization: api.isStaff() ? undefined : cfgSlug() || undefined } : undefined }); return { rate: num(pick(r, ['rateToTjs', 'rate', 'value', 'usdRate'], 0)), date: day(pick(r, ['date', 'rateDate'], '')), source: pick(r, ['source'], '') }; },
     setRate(rate, date) { return withFields(request('PUT', '/rates', { body: { date, currency: 'USD', rateToTjs: rate, rate } })); },

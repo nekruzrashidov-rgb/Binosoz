@@ -304,6 +304,8 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .tbl tbody tr:hover { background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
 .tbl td.r, .tbl th.r { text-align: right; }
 .tbl tr.rev td { color: var(--muted); }
+.tbl tr.cash-rev td { background: rgba(127, 127, 127, 0.08); }
+.tbl tr.cash-rev td:nth-child(5) { text-decoration: line-through; }
 .tbl tr.dim td { opacity: 0.55; }
 
 /* ---------- workspace (cabinet + crm) ---------- */

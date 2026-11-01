@@ -3,6 +3,7 @@ using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using Sitora.Domain.Common;
+using Sitora.Domain.DTOs.Cash;
 using Sitora.Domain.DTOs.Payments;
 using Sitora.Domain.Enums;
 using Sitora.Domain.Interfaces;
@@ -176,6 +177,62 @@ public class QuestPdfGenerator : IPdfGenerator
             Footer(page, data.GeneratedAtUtc);
         })).GeneratePdf();
     }
+
+    // Кассовая квитанция на A5: приходный или расходный ордер; у сторно — красная полоса «СТОРНО» поверх.
+    public byte[] RenderCashReceipt(CashReceiptData data)
+    {
+        var tx = data.Transaction;
+        var income = tx.Direction == CashDirection.Income;
+        return QuestDocument.Create(container => container.Page(page =>
+        {
+            page.Size(PageSizes.A5);
+            page.Margin(1.2f, Unit.Centimetre);
+            page.DefaultTextStyle(style => style.FontSize(10).FontFamily("Lato"));
+
+            page.Header().Column(column =>
+            {
+                column.Item().Text(data.OrganizationName).SemiBold();
+                column.Item().Text(data.BuildingName).FontSize(9);
+                column.Item().PaddingTop(8).Text(income ? "Приходный кассовый ордер" : "Расходный кассовый ордер").FontSize(14).Bold();
+                column.Item().Text($"№ {data.Number} от {tx.OperationDate:dd.MM.yyyy}");
+            });
+
+            page.Content().PaddingVertical(12).Column(column =>
+            {
+                column.Spacing(5);
+                Line(column, "Статья", data.CategoryText);
+                Line(column, "Основание", tx.Description);
+                if (data.DealText is not null)
+                    Line(column, "Сделка", data.DealText);
+                if (data.ReversalOfNumber is not null)
+                    Line(column, "Сторно операции", $"№ {data.ReversalOfNumber}");
+                column.Item().PaddingTop(6).Text(t =>
+                {
+                    t.Span("Сумма: ").SemiBold();
+                    t.Span($"{Money(Math.Abs(tx.Amount))} {tx.Currency}").FontSize(14).Bold();
+                });
+                if (tx.Currency != Currency.TJS)
+                    Line(column, "В сомони по курсу на дату операции", $"{Money(Math.Abs(tx.AmountTjs))} TJS");
+                Line(column, "Внёс в кассовую книгу", tx.CreatedByName);
+
+                column.Item().PaddingTop(28).Row(row =>
+                {
+                    row.RelativeItem().Text("Кассир ____________________");
+                    row.RelativeItem().AlignRight().Text(income ? "Принято от ____________________" : "Получил ____________________");
+                });
+            });
+
+            if (tx.IsReversal)
+                page.Foreground().AlignMiddle().AlignCenter().Rotate(-20)
+                    .Background(Colors.Red.Medium).PaddingVertical(6).PaddingHorizontal(40)
+                    .Text("СТОРНО").FontSize(32).Bold().FontColor(Colors.White);
+
+            Footer(page, data.GeneratedAtUtc);
+        })).GeneratePdf();
+    }
+
+    private static void Line(ColumnDescriptor column, string title, string value) =>
+        column.Item().Text(t => { t.Span($"{title}: ").SemiBold(); t.Span(value); });
 
     private static void DealHeaderLines(ColumnDescriptor column, DealHeader deal, Currency currency)
     {

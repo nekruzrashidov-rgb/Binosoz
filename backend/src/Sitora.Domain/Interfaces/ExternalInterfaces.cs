@@ -1,3 +1,4 @@
+using Sitora.Domain.DTOs.Cash;
 using Sitora.Domain.DTOs.Payments;
 
 namespace Sitora.Domain.Interfaces;
@@ -32,4 +33,5 @@ public interface IPdfGenerator
 {
     byte[] RenderStatement(StatementData data);
     byte[] RenderSchedule(ScheduleDocumentData data);
+    byte[] RenderCashReceipt(CashReceiptData data);
 }

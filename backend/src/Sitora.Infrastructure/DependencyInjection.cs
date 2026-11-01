@@ -91,6 +91,7 @@ public static class DependencyInjection
         services.AddScoped<IExchangeRateService, ExchangeRateService>();
         services.AddScoped<StatementService>();
         services.AddScoped<IPaymentService, PaymentService>();
+        services.AddScoped<ICashService, CashService>();
         services.AddScoped<IDocumentService, DocumentService>();
         services.AddScoped<IConstructionService, ConstructionService>();
         services.AddSingleton<FileLinkSigner>();

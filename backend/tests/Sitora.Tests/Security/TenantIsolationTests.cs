@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Sitora.Domain.DTOs.Auth;
+using Sitora.Domain.DTOs.Cash;
 using Sitora.Domain.DTOs.Catalog;
 using Sitora.Domain.DTOs.Chat;
 using Sitora.Domain.DTOs.Common;
@@ -61,6 +62,7 @@ public class TenantIsolationTests(SitoraApiFactory factory) : IClassFixture<Sito
             $"/api/v1/deals/{a.Deal.DealId}/schedule", $"/api/v1/deals/{a.Deal.DealId}/schedule.pdf",
             $"/api/v1/deals/{a.Deal.DealId}/statement.pdf", $"/api/v1/deals/{a.Deal.DealId}/documents",
             $"/api/v1/deals/{a.Deal.DealId}/messages", $"/api/v1/documents/{a.DocumentId}/download",
+            $"/api/v1/buildings/{a.BuildingId}/cash", $"/api/v1/buildings/{a.BuildingId}/cash/export.xlsx",
             $"/api/v1/deals?customerId={a.Deal.CustomerId}"
         ];
         foreach (var url in reads)
@@ -87,6 +89,7 @@ public class TenantIsolationTests(SitoraApiFactory factory) : IClassFixture<Sito
             (HttpMethod.Post, $"/api/v1/apartments/{a.ApartmentId}/bookings", new CreateBookingRequest("Чужой", SitoraApiFactory.RandomPhone(), null, null)),
             (HttpMethod.Patch, $"/api/v1/deals/{a.Deal.DealId}/stage", new ChangeDealStageRequest(DealStage.Cancelled, "захват")),
             (HttpMethod.Post, $"/api/v1/deals/{a.Deal.DealId}/plan", new CreatePlanRequest(10, 5, 5, TestScenarios.Today)),
+            (HttpMethod.Post, $"/api/v1/buildings/{a.BuildingId}/cash", new CreateCashTransactionRequest(10m, Currency.TJS, CashDirection.Income, CashCategory.Rent, "Чужая касса", TestScenarios.Today, null)),
             (HttpMethod.Post, $"/api/v1/deals/{a.Deal.DealId}/payments", new CreatePaymentRequest(1m, Currency.TJS, TestScenarios.Today, PaymentMethod.Cash, null)),
             (HttpMethod.Post, $"/api/v1/payments/{a.PaymentId}/reverse", new ReversePaymentRequest("захват")),
             (HttpMethod.Post, $"/api/v1/deals/{a.Deal.DealId}/messages", new SendMessageRequest("привет")),
@@ -187,6 +190,7 @@ public class TenantIsolationTests(SitoraApiFactory factory) : IClassFixture<Sito
         var stats = await objectAdmin.GetFromJsonAsync<List<BuildingStatsRow>>("/api/v1/stats/buildings", TestJson.Options);
         Assert.Equal([myBuilding], stats!.Select(r => r.BuildingId));
         AssertHidden(await objectAdmin.GetAsync($"/api/v1/buildings/{neighbour.Id}"), "дом соседа");
+        AssertHidden(await objectAdmin.GetAsync($"/api/v1/buildings/{neighbour.Id}/cash"), "касса соседа");
         AssertHidden(await objectAdmin.GetAsync($"/api/v1/deals/{neighbourDeal.Id}"), "сделка соседа");
         AssertHidden(await objectAdmin.GetAsync($"/api/v1/customers/{neighbourCustomer.Id}"), "клиент соседа");
         AssertHidden(await objectAdmin.GetAsync($"/api/v1/apartments/{apartment.Id}"), "квартира соседа");
