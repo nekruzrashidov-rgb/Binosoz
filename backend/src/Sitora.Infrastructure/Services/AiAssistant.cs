@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Sitora.Domain.Common;
 using Sitora.Domain.DTOs.Ai;
 using Sitora.Domain.Enums;
 using Sitora.Domain.Exceptions;
@@ -11,27 +12,37 @@ namespace Sitora.Infrastructure.Services;
 
 // Помощник: покупателю — вопросы о квартире, сделке и сроках; сотрудникам — документы, CRM и письма.
 // История диалога приходит из браузера и в базе не хранится.
-public class AiAssistant(IChatModel model, ICurrentUser currentUser, IOptions<ClaudeOptions> options, AppDbContext db, DealAccess access) : IAiAssistant
+public class AiAssistant(IChatModel model, ICurrentUser currentUser, IOptions<ClaudeOptions> options, AppDbContext db, DealAccess access, TimeProvider time) : IAiAssistant
 {
     public const string NotConfigured = "AI помощник не настроен";
     private const int MaxMessageLength = 2000;
     private const int MaxHistory = 20;
+    private const int MaxCustomerDeals = 3;
+
+    // Общее для обоих промптов: страна, валюта и язык. Без этого модель пишет «руб.» и ссылается на российские законы.
+    private const string Region =
+        "Застройщик работает в Таджикистане (Душанбе). Цены и платежи — в сомони (TJS) и долларах США (USD), " +
+        "рубли не упоминай. Если речь о законах, имей в виду законодательство Республики Таджикистан, а не России. " +
+        "Отвечай на языке вопроса: на русском или на таджикском.";
 
     public const string CustomerPrompt =
-        "Ты помощник жилого комплекса Sitora Residence. Отвечай только на русском языке. " +
+        "Ты помощник жилого комплекса Sitora Residence. " + Region + " " +
         "Помогай покупателям с вопросами о квартирах, документах, рассрочке и сроках сдачи. " +
+        "Если выше есть данные сделок покупателя, отвечай по ним: суммы, даты, просрочки. " +
+        "Чего в данных нет, не придумывай, а предложи уточнить у менеджера. " +
         "Не давай юридических советов. Будь вежливым и кратким.";
 
     public const string StaffPrompt =
-        "Ты помощник для сотрудников застройщика. Отвечай только на русском языке. " +
+        "Ты помощник для сотрудников застройщика. " + Region + " " +
         "Помогай создавать документы (договоры, акты, счета), анализировать данные CRM, " +
-        "составлять шаблоны писем клиентам. Будь профессиональным и точным.";
+        "составлять шаблоны писем клиентам. Если выше есть данные сделки, опирайся на них и не придумывай недостающие цифры. " +
+        "Будь профессиональным и точным.";
 
     public Task<AiChatResponse> ChatAsync(AiChatRequest request, CancellationToken ct = default) =>
         ChatWithContextAsync(request, null, ct);
 
     // Сотруднику с открытой сделкой в начало промпта добавляются её данные, чтобы не пересказывать их в каждом вопросе.
-    // Покупатель всегда получает свой промпт без контекста: свою сделку он и так знает, чужие ему недоступны.
+    // Покупателю — данные его действующих сделок: dealId от него не принимается, чужие сделки в контекст не попадают.
     public async Task<AiChatResponse> ChatWithContextAsync(AiChatRequest request, Guid? dealId, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(options.Value.ApiKey))
@@ -46,44 +57,89 @@ public class AiAssistant(IChatModel model, ICurrentUser currentUser, IOptions<Cl
         // Покупатель получает свой промпт; все роли застройщика и платформы — промпт сотрудника.
         string system;
         if (currentUser.IsInRole(RoleNames.Customer))
-            system = CustomerPrompt;
+            system = await CustomerContextAsync(ct) is { } mine ? mine + "\n\n" + CustomerPrompt : CustomerPrompt;
+        else if (dealId is { } id)
+        {
+            if (!await access.CanViewAsync(id, ct))
+                throw new NotFoundException("Сделка не найдена");
+            system = "Текущая сделка: " + await DealContextAsync(id, ct) + "\n\n" + StaffPrompt;
+        }
         else
-            system = dealId is { } id ? await DealContextAsync(id, ct) + "\n\n" + StaffPrompt : StaffPrompt;
+            system = StaffPrompt;
 
         var messages = Conversation(request.History, message);
         var reply = await model.CompleteAsync(system, messages, ct);
         return new AiChatResponse(reply);
     }
 
+    private async Task<string?> CustomerContextAsync(CancellationToken ct)
+    {
+        if (currentUser.UserId is not { } userId)
+            return null;
+        var ids = await db.Deals.AsNoTracking()
+            .Where(d => d.Customer.UserId == userId && d.Stage != DealStage.Cancelled)
+            .OrderByDescending(d => d.CreatedAt).Select(d => d.Id).Take(MaxCustomerDeals)
+            .ToListAsync(ct);
+        if (ids.Count == 0)
+            return null;
+
+        var lines = new List<string>();
+        foreach (var id in ids)
+            lines.Add("- " + await DealContextAsync(id, ct));
+        return "Сделки покупателя:\n" + string.Join("\n", lines);
+    }
+
+    // Сделка одной строкой: квартира, дом и стройка, цена, оплачено и остаток, просрочка, следующий платёж.
+    // Права проверяет вызывающий: сотрудника — DealAccess, покупателя — выборка по его учётной записи.
     private async Task<string> DealContextAsync(Guid dealId, CancellationToken ct)
     {
-        if (!await access.CanViewAsync(dealId, ct))
-            throw new NotFoundException("Сделка не найдена");
-
         var deal = await db.Deals.AsNoTracking().Where(d => d.Id == dealId)
             .Select(d => new
             {
                 Buyer = d.Customer.FullName,
                 Apartment = d.Apartment.Number,
                 Floor = d.Apartment.Floor.Number,
+                d.Apartment.Floor.BuildingId,
                 Building = d.Apartment.Floor.Building.NameRu,
+                d.Apartment.Floor.Building.CompletionYear,
                 Price = d.Price - d.Discount,
                 d.Currency,
                 d.Stage
             })
             .SingleAsync(ct);
         var items = await db.PaymentScheduleItems.AsNoTracking().Where(i => i.Plan.DealId == dealId)
+            .OrderBy(i => i.DueDate)
             .Select(i => new { i.DueDate, i.AmountDue, i.AmountPaid })
             .ToListAsync(ct);
+        var stages = await db.ConstructionStages.AsNoTracking().Where(s => s.BuildingId == deal.BuildingId)
+            .Select(s => s.Percent).ToListAsync(ct);
 
-        var paid = items.Count(i => i.AmountPaid >= i.AmountDue);
-        var next = items.Where(i => i.AmountPaid < i.AmountDue).OrderBy(i => i.DueDate).Select(i => (DateOnly?)i.DueDate).FirstOrDefault();
-        var price = deal.Price.ToString("N2", Russian);
-        var context = $"Текущая сделка: {deal.Buyer}, квартира {deal.Apartment} этаж {deal.Floor}, {deal.Building}, " +
-                      $"цена {price} {deal.Currency}, статус {StageText(deal.Stage)}.";
-        context += items.Count == 0
-            ? " Графика платежей нет."
-            : $" Платежей: {paid}/{items.Count}, следующий {(next is { } due ? due.ToString("dd.MM.yyyy", Russian) : "—")}.";
+        string Money(decimal amount) => amount.ToString("N2", Russian) + " " + deal.Currency;
+        string Date(DateOnly date) => date.ToString("dd.MM.yyyy", Russian);
+
+        var context = $"покупатель {deal.Buyer}, квартира {deal.Apartment}, этаж {deal.Floor}, {deal.Building}";
+        if (deal.CompletionYear is { } year)
+            context += $", плановая сдача дома — {year} год";
+        if (stages.Count > 0)
+            context += $", готовность стройки {Math.Round(stages.Average())}%";
+        context += $". Цена {Money(deal.Price)}, этап сделки: {StageText(deal.Stage)}.";
+        if (items.Count == 0)
+            return context + " Графика платежей нет.";
+
+        var today = DushanbeTime.Today(time.GetUtcNow().UtcDateTime);
+        var paid = items.Sum(i => i.AmountPaid);
+        var open = items.Where(i => i.AmountPaid < i.AmountDue).ToList();
+        var overdue = open.Where(i => i.DueDate < today).ToList();
+        var next = open.FirstOrDefault(i => i.DueDate >= today);
+
+        context += $" Оплачено {Money(paid)}, остаток {Money(items.Sum(i => i.AmountDue) - paid)}; " +
+                   $"закрыто платежей по графику: {items.Count - open.Count} из {items.Count}.";
+        context += overdue.Count == 0
+            ? " Просрочек нет."
+            : $" Просрочено платежей: {overdue.Count} на {Money(overdue.Sum(i => i.AmountDue - i.AmountPaid))}, самый ранний — с {Date(overdue[0].DueDate)}.";
+        context += next is null
+            ? " Будущих платежей нет."
+            : $" Следующий платёж по графику: {Date(next.DueDate)}, {Money(next.AmountDue - next.AmountPaid)}.";
         return context;
     }
 
