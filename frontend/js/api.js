@@ -444,6 +444,9 @@
       const r = await api.reportPayments(S.addDays(-365), S.today()); return r.rows.filter((p) => String(p.dealId) === String(id));
     },
     addPayment(id, b) { return withFields(request('POST', '/deals/' + id + '/payments', { body: { amount: b.amount, currency: b.currency, paidAt: b.date || b.paidAt, date: b.date || b.paidAt, method: b.method || 'Cash', comment: b.comment || null } })); },
+    notifications() { return request('GET', '/notifications'); },
+    readNotification(id) { return request('POST', '/notifications/' + id + '/read'); },
+    readAllNotifications() { return request('POST', '/notifications/read-all'); },
     reversePayment(id, reason) { return request('POST', '/payments/' + id + '/reverse', { body: { reason } }); },
     // Cash book of a building (the real API only).
     cashBook(buildingId, from, to) { return request('GET', '/buildings/' + buildingId + '/cash', { query: { from, to } }); },

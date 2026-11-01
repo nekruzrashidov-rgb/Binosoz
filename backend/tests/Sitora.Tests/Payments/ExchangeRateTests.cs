@@ -115,13 +115,25 @@ public class ExchangeRateTests(SitoraApiFactory factory) : IClassFixture<SitoraA
     }
 
     [Fact]
-    public async Task UpdateRatesJob_WithStubProvider_KeepsManualRates()
+    public async Task UpdateRatesJob_SavesNbtRate_ButKeepsManualOne()
     {
+        // НБТ не ответил — ничего не меняется.
         var before = await factory.WithDbAsync(db => db.ExchangeRates.CountAsync());
-
         await factory.WithServiceAsync<UpdateRatesJob>(job => job.RunAsync(CancellationToken.None));
-
         Assert.Equal(before, await factory.WithDbAsync(db => db.ExchangeRates.CountAsync()));
+
+        // Курс получен: общий курс на сегодня — от НБТ, если бухгалтер не ввёл его вручную (ручной не перезаписывается).
+        factory.Rates.Usd = 9.2086m;
+        try
+        {
+            await factory.WithServiceAsync<UpdateRatesJob>(job => job.RunAsync(CancellationToken.None));
+        }
+        finally
+        {
+            factory.Rates.Usd = null;
+        }
+        var rate = await factory.WithDbAsync(db => db.ExchangeRates.SingleAsync(r => r.OrganizationId == null && r.Currency == Currency.USD && r.Date == Today));
+        Assert.True(rate.Source == RateSource.Manual || rate.RateToTjs == 9.2086m, $"{rate.Source} {rate.RateToTjs}");
     }
 
     internal static async Task SetRateAsync(HttpClient accountant, DateOnly date, decimal rate)

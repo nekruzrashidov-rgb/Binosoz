@@ -40,6 +40,7 @@
 
   // ---------- icons ----------
   const ICONS = {
+    bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
     moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
     menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
@@ -92,6 +93,47 @@
 
   // ---------- chips ----------
   S.chip = (kind, text) => h('span', { class: 'chip ' + kind }, text);
+
+  // Bell in the header: unread count, a list of the latest notifications; asks the API every 60 seconds.
+  let bellTimer = null;
+  S.notifBell = () => {
+    clearInterval(bellTimer);
+    const badge = h('span', { class: 'bell-badge', hidden: true });
+    const list = h('div', { class: 'bell-list', role: 'list' });
+    const panel = h('div', { class: 'bell-panel', hidden: true }, h('div', { class: 'row between bell-head' }, h('b', null, t('notif.title')),
+      h('button', { class: 'btn ghost sm', onclick: async () => { await S.api.readAllNotifications().catch(S.err); refresh(); } }, t('notif.readAll'))), list);
+    const btn = h('button', { class: 'icon-btn bell-btn', title: t('notif.title'), 'aria-label': t('notif.title'), 'aria-expanded': 'false', onclick: (e) => { e.stopPropagation(); toggle(); } }, S.icon('bell'), badge);
+    const box = h('div', { class: 'bell' }, btn, panel);
+    const icon = (n) => (n.kind === 'overdue_payment' ? '🔴' : n.kind === 'payment_reminder' ? '🟡' : '🔔');
+    function draw(r) {
+      const unread = r.unreadCount || 0;
+      badge.hidden = !unread; badge.textContent = unread > 99 ? '99+' : String(unread);
+      btn.setAttribute('aria-label', t('notif.title') + (unread ? ' (' + unread + ')' : ''));
+      list.replaceChildren(...(r.items.length ? r.items.map((n) => h('button', { class: 'bell-item' + (n.isRead ? '' : ' unread'), role: 'listitem', onclick: () => open(n) },
+        h('span', { class: 'bell-ic', 'aria-hidden': 'true' }, icon(n)),
+        h('span', { class: 'bell-txt' }, n.title ? h('b', null, n.title) : null, h('span', null, n.text), h('small', { class: 'muted' }, S.fmt.date(n.createdAt))))) : [h('p', { class: 'muted bell-empty' }, t('notif.empty'))]));
+    }
+    async function refresh() {
+      if (!box.isConnected && bellTimer) { clearInterval(bellTimer); return; }
+      try { draw(await S.api.notifications()); } catch (e) { /* the bell is optional: a failed poll leaves the old list */ }
+    }
+    async function open(n) {
+      if (!n.isRead) await S.api.readNotification(n.id).catch(() => {});
+      close();
+      if (n.dealId) S.go(S.homeFor(S.api.user)); else refresh();
+    }
+    const onDoc = (e) => { if (!box.contains(e.target)) close(); };
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    function close() { panel.hidden = true; btn.setAttribute('aria-expanded', 'false'); document.removeEventListener('click', onDoc); document.removeEventListener('keydown', onKey); }
+    function toggle() {
+      if (!panel.hidden) { close(); return; }
+      panel.hidden = false; btn.setAttribute('aria-expanded', 'true'); refresh();
+      document.addEventListener('click', onDoc); document.addEventListener('keydown', onKey);
+    }
+    refresh();
+    bellTimer = setInterval(() => { if (!document.hidden) refresh(); }, 60000);
+    return box;
+  };
   S.statusChip = (s) => S.chip(s, t('status.' + s));
   S.stageChip = (s) => S.chip(s, t('stage.' + s));
 

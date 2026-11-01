@@ -1093,6 +1093,19 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("DealId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly?>("DueDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Kind")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("SentAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1100,6 +1113,10 @@ namespace Sitora.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1109,7 +1126,13 @@ namespace Sitora.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("DealId");
+
+                    b.HasIndex("UserId", "CreatedAt");
+
+                    b.HasIndex("UserId", "Kind", "DealId", "DueDate")
+                        .IsUnique()
+                        .HasFilter("\"Kind\" IS NOT NULL");
 
                     b.ToTable("Notifications", (string)null);
                 });
@@ -1793,6 +1816,11 @@ namespace Sitora.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("Sitora.Domain.Entities.Notification", b =>
                 {
+                    b.HasOne("Sitora.Domain.Entities.Deal", null)
+                        .WithMany()
+                        .HasForeignKey("DealId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("Sitora.Domain.Entities.AppUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")

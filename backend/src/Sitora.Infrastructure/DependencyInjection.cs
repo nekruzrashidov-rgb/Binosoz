@@ -105,6 +105,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationSender, TelegramNotificationSender>();
         services.AddSingleton<ISmsSender, SmsSender>();
         AddEmailSender(services);
+        services.AddHttpClient(NbtRateProvider.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(20));
         services.AddSingleton<IRateProvider, NbtRateProvider>();
         services.AddSingleton<IFileStorage, LocalFileStorage>();
         services.AddSingleton<IPdfGenerator, QuestPdfGenerator>();
@@ -117,6 +118,10 @@ public static class DependencyInjection
         services.AddScoped<ExpireBookingsJob>();
         services.AddScoped<UpdateRatesJob>();
         services.AddScoped<HealthAlertJob>();
+        services.AddScoped<PaymentAlertService>();
+        services.AddScoped<OverduePaymentJob>();
+        services.AddScoped<PaymentReminderJob>();
+        services.AddScoped<INotificationService, NotificationService>();
         services.AddSingleton<HealthAlertState>();
 
         return services;
@@ -128,6 +133,8 @@ public static class DependencyInjection
         jobs.AddOrUpdate<ExpireBookingsJob>(ExpireBookingsJob.Id, job => job.RunAsync(CancellationToken.None), ExpireBookingsJob.Schedule);
         jobs.AddOrUpdate<UpdateRatesJob>(UpdateRatesJob.Id, job => job.RunAsync(CancellationToken.None), UpdateRatesJob.Schedule);
         jobs.AddOrUpdate<HealthAlertJob>(HealthAlertJob.Id, job => job.RunAsync(CancellationToken.None), HealthAlertJob.Schedule);
+        jobs.AddOrUpdate<OverduePaymentJob>(OverduePaymentJob.Id, job => job.RunAsync(CancellationToken.None), OverduePaymentJob.Schedule);
+        jobs.AddOrUpdate<PaymentReminderJob>(PaymentReminderJob.Id, job => job.RunAsync(CancellationToken.None), PaymentReminderJob.Schedule);
     }
 
     // Почтовый сервис выбирается настройкой Email__Provider: Smtp, Resend или Dev (письма в лог, только для разработки).

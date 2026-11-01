@@ -199,6 +199,16 @@ SecondFactorChallenge = { challengeToken, expiresAt, methods: ["password", "totp
 - Отдельного списка платежей сделки нет: история берётся из `schedule.payments`.
 - PDF и Excel скачиваются с токеном. PDF открывается в новой вкладке, Excel сохраняется под именем из `Content-Disposition`.
 
+## Уведомления (колокольчик)
+
+| Метод | Путь | Роли | Примечание |
+| --- | --- | --- | --- |
+| GET | `/notifications` | любой вошедший | `{ unreadCount, items[] }` — последние 50 своих уведомлений, новые сверху: `{ id, title, text, kind, dealId, isRead, createdAt }`. `kind`: `overdue_payment` (просрочка), `payment_reminder` (за 3 дня до срока) или null (сообщения о платежах, документах, чате) |
+| POST | `/notifications/{id}/read` | любой вошедший | 204; чужое уведомление — 404 |
+| POST | `/notifications/read-all` | любой вошедший | 204 — все свои отмечены прочитанными |
+
+Фоновые задачи (Hangfire, время UTC): `update-rates` — 04:00 и 06:00 (09:00 и 11:00 Душанбе), курс USD с nbt.tj (`export_xml.php?date=ГГГГ-ММ-ДД&export=xmlout`), ручной курс не перезаписывается; `overdue-payments` — 05:00, уведомления о просрочке покупателю и бухгалтерам дома; `payment-reminders` — 05:00, напоминание покупателю за 3 дня. Каждое напоминание — один раз на пункт графика и получателя.
+
 ## Документы, файлы, чат, стройка
 
 | Метод | Путь | Роли | Примечание |

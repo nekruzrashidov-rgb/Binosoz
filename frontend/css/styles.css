@@ -121,6 +121,18 @@ button { cursor: pointer; }
   .nav a, .nav button { white-space: normal; overflow-wrap: anywhere; }
   .menu-btn { display: inline-grid; }
 }
+.bell { position: relative; }
+.bell-btn { position: relative; }
+.bell-badge { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--bad); color: #fff; font-size: 11px; font-weight: 800; line-height: 18px; text-align: center; }
+.bell-panel { position: absolute; right: 0; top: calc(100% + 8px); z-index: 60; width: min(360px, calc(100vw - 32px)); max-height: 70vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+.bell-head { padding: 10px 12px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--surface); }
+.bell-item { display: flex; gap: 10px; width: 100%; text-align: left; padding: 10px 12px; background: none; border: 0; border-bottom: 1px solid var(--line); color: var(--ink); cursor: pointer; font: inherit; }
+.bell-item:hover { background: rgba(127, 127, 127, 0.08); }
+.bell-item.unread { background: rgba(201, 162, 39, 0.08); }
+.bell-item.unread .bell-txt > :first-child::after { content: ''; display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%; background: var(--bad); vertical-align: middle; }
+.bell-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; font-size: 13px; }
+.bell-empty { padding: 14px 12px; margin: 0; }
+@media (max-width: 560px) { .bell-panel { position: fixed; left: 16px; right: 16px; top: 64px; width: auto; } }
 .userchip { display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-weight: 700; font-size: 13px; }
 .avatar { width: 30px; height: 30px; border-radius: 50%; display: inline-grid; place-items: center; background: linear-gradient(135deg, var(--accent), var(--info)); color: #fff; font-size: 12px; font-weight: 800; }
 @media (max-width: 560px) { .userchip span.nm { display: none; } .userchip { padding: 4px; } }

@@ -141,6 +141,7 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         {
             services.AddSingleton<ISmsSender>(Sms);
             services.AddSingleton<IEmailSender>(Email);
+            services.AddSingleton<IRateProvider>(Rates);
         });
     }
 
@@ -150,6 +151,7 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public string PlatformOwnerPassword { get; } = GeneratePassword();
 
     public FakeSmsSender Sms { get; } = new();
+    public FakeRateProvider Rates { get; } = new();
     public FakeEmailSender Email { get; } = new();
 
     public string ConnectionString => _connectionString;
