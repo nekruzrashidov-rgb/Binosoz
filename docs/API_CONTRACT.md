@@ -193,6 +193,10 @@ SecondFactorChallenge = { challengeToken, expiresAt, methods: ["password", "totp
 | POST | `/buildings/{id}/cash` | Accountant, руководители | `{ amount (> 0), currency, direction, category, description (до 500), operationDate (не в будущем), dealId? }` → 201 операция. Статьи прихода: `ApartmentPayment`, `Rent`, `OtherIncome`; расхода: `Construction`, `Materials`, `Salaries`, `Marketing`, `Utilities`, `Tax`, `OtherExpense` — статья не того направления, сделка не из этого дома, USD без курса на дату — 422. Аудит `CashTransaction` / `Created` |
 | POST | `/buildings/{id}/cash/{txId}/reverse` | Accountant, руководители | `{ reason }` → 201: обратная запись с той же статьёй и направлением, сумма с обратным знаком, дата — сегодня, `reversalOfId` — исходная. Второе сторно и сторно сторно — 422. Аудит `CashTransaction` / `Reversed` |
 | GET | `/buildings/{id}/cash/{txId}/receipt.pdf` | Accountant, руководители | Приходный или расходный кассовый ордер A5; у сторно — красная полоса «СТОРНО» |
+| GET | `/buildings/{id}/reports/weekly` | Accountant, руководители | Еженедельные отчёты дома, новые сверху: `[{ id, buildingId, periodStart, periodEnd, generatedAt, isManual }]`. Чужой или несуществующий дом — 404 |
+| GET | `/buildings/{id}/reports/weekly/{reportId}/excel` | Accountant, руководители | `.xlsx`: «Сводка» (касса за неделю в TJS: поступления, расходы, прибыль; новые сделки; просрочек на понедельник после недели; готовность стройки — среднее по этапам), «Платежи» (оплаты и сторно за неделю), «Касса», «Просрочки». Отчёт другого дома — 404 |
+| GET | `/buildings/{id}/reports/weekly/{reportId}/pdf` | Accountant, руководители | PDF A4: «Binosoz» золотом (#c9a227), сводка карточками, топ-5 должников (по давности, затем по сумме) |
+| POST | `/buildings/{id}/reports/weekly/generate` | Owner, PlatformOwner | 201 → отчёт за последнюю завершённую неделю пн–вс по Душанбе. Готовый за ту же неделю перезаписывается (один отчёт на дом и неделю). Аудит `WeeklyReport` / `Generate` |
 
 Подробности:
 - Пункт графика: `kind` (`DownPayment` или `Monthly`), `status` (`Pending`, `PartiallyPaid` или `Paid`) и признак `isOverdue`. Интерфейс показывает «Просрочен» по `isOverdue`.
@@ -208,6 +212,8 @@ SecondFactorChallenge = { challengeToken, expiresAt, methods: ["password", "totp
 | POST | `/notifications/read-all` | любой вошедший | 204 — все свои отмечены прочитанными |
 
 Фоновые задачи (Hangfire, время UTC): `update-rates` — 04:00 и 06:00 (09:00 и 11:00 Душанбе), курс USD с nbt.tj (`export_xml.php?date=ГГГГ-ММ-ДД&export=xmlout`), ручной курс не перезаписывается; `overdue-payments` — 05:00, уведомления о просрочке покупателю и бухгалтерам дома; `payment-reminders` — 05:00, напоминание покупателю за 3 дня. Каждое напоминание — один раз на пункт графика и получателя.
+
+Еженедельный отчёт (Hangfire): `weekly-owner-report` — понедельник 04:00 UTC (09:00 Душанбе), за прошлую неделю для каждого дома организации, где есть активный владелец (Owner); дом, у которого отчёт за эту неделю уже есть, пропускается. Excel и PDF хранятся в таблице `WeeklyReports` (`bytea`), диск не нужен.
 
 ## Документы, файлы, чат, стройка
 

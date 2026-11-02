@@ -63,6 +63,7 @@ public class TenantIsolationTests(SitoraApiFactory factory) : IClassFixture<Sito
             $"/api/v1/deals/{a.Deal.DealId}/statement.pdf", $"/api/v1/deals/{a.Deal.DealId}/documents",
             $"/api/v1/deals/{a.Deal.DealId}/messages", $"/api/v1/documents/{a.DocumentId}/download",
             $"/api/v1/buildings/{a.BuildingId}/cash", $"/api/v1/buildings/{a.BuildingId}/cash/export.xlsx",
+            $"/api/v1/buildings/{a.BuildingId}/reports/weekly",
             $"/api/v1/deals?customerId={a.Deal.CustomerId}"
         ];
         foreach (var url in reads)

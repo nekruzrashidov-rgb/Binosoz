@@ -5,6 +5,7 @@ using QuestPDF.Infrastructure;
 using Sitora.Domain.Common;
 using Sitora.Domain.DTOs.Cash;
 using Sitora.Domain.DTOs.Payments;
+using Sitora.Domain.DTOs.Reports;
 using Sitora.Domain.Enums;
 using Sitora.Domain.Interfaces;
 using QuestDocument = QuestPDF.Fluent.Document;
@@ -230,6 +231,82 @@ public class QuestPdfGenerator : IPdfGenerator
             Footer(page, data.GeneratedAtUtc);
         })).GeneratePdf();
     }
+
+    // Еженедельный отчёт владельцу на A4: сводка карточками и топ-5 должников.
+    public byte[] RenderWeeklyReport(WeeklyReportData data)
+    {
+        const string gold = "#c9a227";
+        var s = data.Summary;
+        return QuestDocument.Create(container => container.Page(page =>
+        {
+            page.Size(PageSizes.A4);
+            page.Margin(1.5f, Unit.Centimetre);
+            page.DefaultTextStyle(style => style.FontSize(10).FontFamily("Lato"));
+
+            page.Header().Column(column =>
+            {
+                column.Item().Row(row =>
+                {
+                    row.RelativeItem().Text("Binosoz").FontSize(22).Bold().FontColor(gold);
+                    row.RelativeItem().AlignRight().AlignBottom().Text(s.OrganizationName).FontSize(9).FontColor(Colors.Grey.Darken1);
+                });
+                column.Item().PaddingTop(6).Text($"Еженедельный отчёт: {s.BuildingName}").FontSize(15).Bold();
+                column.Item().Text($"Неделя {s.PeriodStart:dd.MM.yyyy} — {s.PeriodEnd:dd.MM.yyyy}").FontColor(Colors.Grey.Darken2);
+                column.Item().PaddingTop(6).LineHorizontal(1.5f).LineColor(gold);
+            });
+
+            page.Content().PaddingVertical(14).Column(column =>
+            {
+                column.Spacing(14);
+                column.Item().Row(row =>
+                {
+                    row.Spacing(10);
+                    Card(row.RelativeItem(), "Поступления по кассе", $"{Money(s.IncomeTjs)} TJS", Colors.Green.Darken2);
+                    Card(row.RelativeItem(), "Расходы по кассе", $"{Money(s.ExpenseTjs)} TJS", Colors.Red.Darken2);
+                    Card(row.RelativeItem(), "Чистая прибыль", $"{Money(s.ProfitTjs)} TJS", s.ProfitTjs < 0 ? Colors.Red.Darken2 : Colors.Black);
+                });
+                column.Item().Row(row =>
+                {
+                    row.Spacing(10);
+                    Card(row.RelativeItem(), "Новых сделок", s.NewDeals.ToString(CultureInfo.InvariantCulture), Colors.Black);
+                    Card(row.RelativeItem(), $"Просрочек на {s.AsOf:dd.MM.yyyy}", s.OverdueItems.ToString(CultureInfo.InvariantCulture), s.OverdueItems > 0 ? Colors.Red.Darken2 : Colors.Black);
+                    Card(row.RelativeItem(), "Готовность стройки", $"{s.ConstructionPercent}%", Colors.Black);
+                });
+                column.Item().Text($"Платежей покупателей за неделю: {data.Payments.Count(p => !p.IsReversal)}, операций по кассе: {data.Cash.Count}. Подробности — в Excel-файле отчёта.")
+                    .FontSize(9).FontColor(Colors.Grey.Darken1);
+
+                column.Item().Text($"Топ-{data.TopDebtors.Count} должников").FontSize(12).Bold();
+                if (data.TopDebtors.Count == 0)
+                    column.Item().Text("Просроченных платежей нет.");
+                else
+                    column.Item().Table(table =>
+                    {
+                        table.ColumnsDefinition(c => { c.RelativeColumn(4); c.RelativeColumn(1.4f); c.RelativeColumn(2.6f); c.RelativeColumn(1.6f); });
+                        table.Header(h =>
+                        {
+                            foreach (var title in new[] { "Покупатель", "Кв.", "Просрочено", "Дней" })
+                                h.Cell().Background(gold).Padding(4).Text(title).SemiBold().FontColor(Colors.White);
+                        });
+                        foreach (var d in data.TopDebtors)
+                        {
+                            table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(d.Customer);
+                            table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(d.Apartment.ToString(CultureInfo.InvariantCulture));
+                            table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).Padding(4).AlignRight().Text($"{Money(d.Left)} {d.Currency}");
+                            table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).Padding(4).AlignRight().Text(d.MaxDaysOverdue.ToString(CultureInfo.InvariantCulture));
+                        }
+                    });
+            });
+
+            Footer(page, data.GeneratedAtUtc);
+        })).GeneratePdf();
+    }
+
+    private static void Card(IContainer container, string title, string value, string color) =>
+        container.Border(0.75f).BorderColor(Colors.Grey.Lighten2).Background(Colors.Grey.Lighten5).Padding(10).Column(c =>
+        {
+            c.Item().Text(title).FontSize(8.5f).FontColor(Colors.Grey.Darken1);
+            c.Item().PaddingTop(3).Text(value).FontSize(14).Bold().FontColor(color);
+        });
 
     private static void Line(ColumnDescriptor column, string title, string value) =>
         column.Item().Text(t => { t.Span($"{title}: ").SemiBold(); t.Span(value); });

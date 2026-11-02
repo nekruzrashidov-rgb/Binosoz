@@ -92,6 +92,8 @@ public static class DependencyInjection
         services.AddScoped<StatementService>();
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<ICashService, CashService>();
+        services.AddScoped<IWeeklyReportService, WeeklyReportService>();
+        services.AddScoped<WeeklyOwnerReportJob>();
         services.AddScoped<IDocumentService, DocumentService>();
         services.AddScoped<IConstructionService, ConstructionService>();
         services.AddSingleton<FileLinkSigner>();
@@ -135,6 +137,7 @@ public static class DependencyInjection
         jobs.AddOrUpdate<HealthAlertJob>(HealthAlertJob.Id, job => job.RunAsync(CancellationToken.None), HealthAlertJob.Schedule);
         jobs.AddOrUpdate<OverduePaymentJob>(OverduePaymentJob.Id, job => job.RunAsync(CancellationToken.None), OverduePaymentJob.Schedule);
         jobs.AddOrUpdate<PaymentReminderJob>(PaymentReminderJob.Id, job => job.RunAsync(CancellationToken.None), PaymentReminderJob.Schedule);
+        jobs.AddOrUpdate<WeeklyOwnerReportJob>(WeeklyOwnerReportJob.Id, job => job.RunAsync(CancellationToken.None), WeeklyOwnerReportJob.Schedule);
     }
 
     // Почтовый сервис выбирается настройкой Email__Provider: Smtp, Resend или Dev (письма в лог, только для разработки).

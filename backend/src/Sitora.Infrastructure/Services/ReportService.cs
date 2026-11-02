@@ -188,7 +188,7 @@ public class ReportService(AppDbContext db, TimeProvider timeProvider) : IReport
         return stream.ToArray();
     }
 
-    private static string MethodText(PaymentMethod method) => method switch
+    public static string MethodText(PaymentMethod method) => method switch
     {
         PaymentMethod.Cash => "наличные",
         PaymentMethod.BankTransfer => "перевод",
