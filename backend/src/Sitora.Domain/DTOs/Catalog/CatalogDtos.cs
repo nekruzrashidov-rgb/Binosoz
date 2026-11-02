@@ -71,3 +71,6 @@ public record ImportResult(int Created, int Updated, IReadOnlyList<ImportError> 
 {
     public bool Succeeded => Errors.Count == 0;
 }
+
+// План этажа: SVG, где каждая квартира — <rect id="apt-{apartmentId}">.
+public record SaveFloorPlanRequest(string SvgTemplate);

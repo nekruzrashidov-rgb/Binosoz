@@ -449,6 +449,8 @@
     readAllNotifications() { return request('POST', '/notifications/read-all'); },
     reversePayment(id, reason) { return request('POST', '/payments/' + id + '/reverse', { body: { reason } }); },
     // Cash book of a building (the real API only).
+    floorPlanFloors(buildingId) { return request('GET', '/buildings/' + buildingId + '/floorplan'); },
+    async floorPlan(buildingId, floor) { return (await request('GET', '/buildings/' + buildingId + '/floorplan/' + floor, { raw: true })).text(); },
     cashBook(buildingId, from, to) { return request('GET', '/buildings/' + buildingId + '/cash', { query: { from, to } }); },
     addCash(buildingId, b) { return withFields(request('POST', '/buildings/' + buildingId + '/cash', { body: b })); },
     reverseCash(buildingId, id, reason) { return request('POST', '/buildings/' + buildingId + '/cash/' + id + '/reverse', { body: { reason } }); },

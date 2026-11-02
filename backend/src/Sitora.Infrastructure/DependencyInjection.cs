@@ -93,6 +93,7 @@ public static class DependencyInjection
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<ICashService, CashService>();
         services.AddScoped<IWeeklyReportService, WeeklyReportService>();
+        services.AddScoped<IFloorPlanService, FloorPlanService>();
         services.AddScoped<WeeklyOwnerReportJob>();
         services.AddScoped<IDocumentService, DocumentService>();
         services.AddScoped<IConstructionService, ConstructionService>();

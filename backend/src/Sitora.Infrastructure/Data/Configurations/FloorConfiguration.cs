@@ -17,3 +17,14 @@ public class FloorConfiguration : IEntityTypeConfiguration<Floor>
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+public class FloorPlanConfiguration : IEntityTypeConfiguration<FloorPlan>
+{
+    public void Configure(EntityTypeBuilder<FloorPlan> builder)
+    {
+        builder.ToTable("FloorPlans");
+        // Один план на этаж дома.
+        builder.HasIndex(x => new { x.BuildingId, x.Floor }).IsUnique();
+        builder.HasOne(x => x.Building).WithMany().HasForeignKey(x => x.BuildingId).OnDelete(DeleteBehavior.Cascade);
+    }
+}

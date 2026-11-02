@@ -958,6 +958,36 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.ToTable("Floors", (string)null);
                 });
 
+            modelBuilder.Entity("Sitora.Domain.Entities.FloorPlan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BuildingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Floor")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SvgTemplate")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BuildingId", "Floor")
+                        .IsUnique();
+
+                    b.ToTable("FloorPlans", (string)null);
+                });
+
             modelBuilder.Entity("Sitora.Domain.Entities.Invitation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1816,6 +1846,17 @@ namespace Sitora.Infrastructure.Data.Migrations
                         .WithMany("Floors")
                         .HasForeignKey("BuildingId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Building");
+                });
+
+            modelBuilder.Entity("Sitora.Domain.Entities.FloorPlan", b =>
+                {
+                    b.HasOne("Sitora.Domain.Entities.Building", "Building")
+                        .WithMany()
+                        .HasForeignKey("BuildingId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Building");

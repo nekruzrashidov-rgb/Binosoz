@@ -121,6 +121,18 @@ button { cursor: pointer; }
   .nav a, .nav button { white-space: normal; overflow-wrap: anywhere; }
   .menu-btn { display: inline-grid; }
 }
+.fp-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.fp-floors { display: flex; gap: 6px; flex-wrap: wrap; }
+.fp-floors .btn { min-width: 38px; justify-content: center; }
+.fp-floors .btn.has-plan { border-color: var(--gold, #c9a227); }
+.fp-floors .btn.on { background: var(--gold, #c9a227); color: #1b1405; }
+.fp-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.fp-host { position: relative; }
+.fp-stage { overflow-x: auto; padding: 12px; }
+.fp-stage svg { display: block; max-width: 100%; height: auto; }
+.fp-apt { cursor: pointer; transition: opacity .15s; }
+.fp-apt:hover, .fp-apt:focus { opacity: .8; outline: none; stroke-width: 3; }
+.fp-tip { position: absolute; z-index: 5; pointer-events: none; padding: 6px 10px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); font-size: 13px; white-space: nowrap; }
 .bell { position: relative; }
 .bell-btn { position: relative; }
 .bell-badge { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--bad); color: #fff; font-size: 11px; font-weight: 800; line-height: 18px; text-align: center; }

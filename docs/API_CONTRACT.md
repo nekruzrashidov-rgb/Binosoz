@@ -154,6 +154,14 @@ SecondFactorChallenge = { challengeToken, expiresAt, methods: ["password", "totp
 - `ApartmentResponse`: `id, floorId, buildingId, floorNumber, number, rooms, area, pricePerM2, price, currency, status, planSlot (0–7), model3dId`.
 - `BuildingResponse`: `name` на языке запроса, `nameRu/Tg`, `descriptionRu/Tg`, `totalApartments`, `freeApartments`.
 
+### Планы этажей
+
+| Метод | Путь | Роли | Примечание |
+| --- | --- | --- | --- |
+| GET | `/buildings/{id}/floorplan` | Manager, Accountant, Content, руководители | Номера этажей, для которых есть план: `[1, 5]` |
+| GET | `/buildings/{id}/floorplan/{floor}` | то же | `image/svg+xml`: у `<rect id="apt-{apartmentId}">` — `fill` по статусу (Free `#22c55e`, Booked `#f59e0b`, Sold `#ef4444`, OnRequest `#6b7280`), `<title>` «Кв. N, площадь м², цена валюта», `class="fp-apt"`, `data-apartment-id`, `data-number`, `data-status` (`free`/`booked`/`sold`/`onrequest`), `data-deal-id` (действующая сделка, у брони и продажи). Квартира другого дома в шаблоне — серая, без данных. Нет плана или этажа — 404 |
+| PUT | `/buildings/{id}/floorplan/{floor}` | Owner, ObjectAdmin, PlatformOwner | `{ svgTemplate }` (до 200 тыс. символов) → 204. Разрешены `svg, g, rect, text, tspan, title, desc, line, path, polygon, polyline, circle, ellipse`; `<script>`, `<foreignObject>` и прочее — 422; атрибуты `on*`, `href` и `url()` в `style` удаляются. Этаж должен существовать (иначе 404). Аудит `FloorPlan` / `Updated` |
+
 ## CRM
 
 | Метод | Путь | Роли | Примечание для фронтенда |

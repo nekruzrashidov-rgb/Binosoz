@@ -39,6 +39,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider t
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<CashTransaction> CashTransactions => Set<CashTransaction>();
     public DbSet<WeeklyReport> WeeklyReports => Set<WeeklyReport>();
+    public DbSet<FloorPlan> FloorPlans => Set<FloorPlan>();
     public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
     public DbSet<Document> Documents => Set<Document>();
     public DbSet<SmsCode> SmsCodes => Set<SmsCode>();
@@ -77,6 +78,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider t
         ByBuilding<Payment>(builder, x => x.Deal.Apartment.Floor.Building.OrganizationId, x => x.Deal.Apartment.Floor.BuildingId);
         ByBuilding<CashTransaction>(builder, x => x.Building.OrganizationId, x => x.BuildingId);
         ByBuilding<WeeklyReport>(builder, x => x.Building.OrganizationId, x => x.BuildingId);
+        ByBuilding<FloorPlan>(builder, x => x.Building.OrganizationId, x => x.BuildingId);
         ByBuilding<Document>(builder, x => x.Deal.Apartment.Floor.Building.OrganizationId, x => x.Deal.Apartment.Floor.BuildingId);
         ByBuilding<ChatMessage>(builder, x => x.Deal.Apartment.Floor.Building.OrganizationId, x => x.Deal.Apartment.Floor.BuildingId);
         ByBuilding<ConstructionStage>(builder, x => x.Building.OrganizationId, x => x.BuildingId);

@@ -47,6 +47,8 @@
     add('rate', t('crm.rate'), 'chart', t('crm.g.finance'), has('Accountant'));
     // Leaders manage buildings; a manager uses the apartment lists to book and sell.
     add('objects', t('obj.title'), 'home', t('crm.g.catalog'), S.api.isLeader() || has('Manager'));
+    // Floor plans: leaders and managers book from the drawing (the demo backend has no plans).
+    add('plan', t('fplan.title'), 'grid', t('crm.g.catalog'), (S.api.isLeader() || has('Manager')) && !S.isDemo());
     add('catalog', t('crm.catalog'), 'building', t('crm.g.catalog'), has('Content'));
     add('construction', t('crm.construction'), 'hammer', t('crm.g.catalog'), has('Content'));
     add('users', t('crm.users'), 'users', t('crm.g.system'), S.api.isLeader());
@@ -171,6 +173,58 @@
       },
 
       // Cash book: income and expenses of a building; entries are never edited, a mistake is reversed.
+      async plan(body) {
+        const bs = S.crmBuildings || (await S.api.buildings());
+        if (!bs.length) { body.replaceChildren(h('p', { class: 'muted' }, t('cash.noBuildings'))); return; }
+        const bsel = S.select('building', bs.map((b) => [b.id, b.name]), bs[0].id);
+        const floorsRow = h('div', { class: 'fp-floors', role: 'group', 'aria-label': t('fplan.floor') });
+        const stage = h('div', { class: 'fp-stage card flat' });
+        const tip = h('div', { class: 'fp-tip', hidden: true, role: 'tooltip' });
+        const legend = h('div', { class: 'fp-legend' }, [['free', '🟢'], ['booked', '🟡'], ['sold', '🔴'], ['onrequest', '⚫']].map(([k, dot]) => h('span', null, dot + ' ' + t('fplan.st.' + k))));
+        let floor = null, withPlan = [];
+        const building = () => bs.find((b) => String(b.id) === String(bsel.value));
+        async function loadFloors() {
+          withPlan = await S.api.floorPlanFloors(bsel.value).catch(() => []);
+          const n = Math.max(building().floorsCount || 0, ...withPlan, 1);
+          floor = withPlan[0] || 1;
+          floorsRow.replaceChildren(...Array.from({ length: n }, (_, i) => i + 1).map((f) => h('button', { type: 'button', class: 'btn sm ' + (withPlan.includes(f) ? 'ghost has-plan' : 'ghost'), 'data-floor': f, onclick: () => { floor = f; draw(); } }, String(f))));
+          draw();
+        }
+        async function draw() {
+          floorsRow.querySelectorAll('button').forEach((b) => b.classList.toggle('on', +b.dataset.floor === floor));
+          tip.hidden = true;
+          if (!withPlan.includes(floor)) { stage.replaceChildren(h('p', { class: 'muted' }, t('fplan.none'))); return; }
+          stage.replaceChildren(S.skeleton(1, 120));
+          try {
+            // The server colours the drawing and strips scripts when the template is saved; parse it as SVG, not HTML.
+            const doc = new DOMParser().parseFromString(await S.api.floorPlan(bsel.value, floor), 'image/svg+xml');
+            if (doc.querySelector('parsererror')) throw new Error(t('fplan.bad'));
+            const svg = document.importNode(doc.documentElement, true);
+            svg.querySelectorAll('.fp-apt').forEach((r) => { r.setAttribute('tabindex', '0'); r.setAttribute('role', 'button'); r.setAttribute('aria-label', (r.querySelector('title') || {}).textContent || ''); });
+            stage.replaceChildren(svg);
+          } catch (e) { stage.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
+        }
+        function open(r) {
+          const st = r.dataset.status, dealId = r.dataset.dealId;
+          if (st === 'free') bookForm({ id: r.dataset.apartmentId, number: r.dataset.number }, draw);
+          else if (dealId) dealDrawer(dealId, draw);
+          else S.toast(st === 'booked' ? t('fplan.noDeal') : t('fplan.unavailable'), 'info');
+        }
+        stage.addEventListener('click', (e) => { const r = e.target.closest('.fp-apt'); if (r) open(r); });
+        stage.addEventListener('keydown', (e) => { const r = e.target.closest && e.target.closest('.fp-apt'); if (r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(r); } });
+        stage.addEventListener('mousemove', (e) => {
+          const r = e.target.closest('.fp-apt');
+          if (!r) { tip.hidden = true; return; }
+          tip.textContent = (r.querySelector('title') || {}).textContent || '';
+          const box = tip.parentNode.getBoundingClientRect();
+          tip.style.left = (e.clientX - box.left + 12) + 'px'; tip.style.top = (e.clientY - box.top + 12) + 'px'; tip.hidden = false;
+        });
+        stage.addEventListener('mouseleave', () => { tip.hidden = true; });
+        bsel.addEventListener('change', loadFloors);
+        body.replaceChildren(h('div', { class: 'toolbar' }, bs.length > 1 ? S.field(t('cash.building'), bsel) : null), h('div', { class: 'fp-bar' }, h('b', null, t('fplan.floor')), floorsRow), legend, h('div', { class: 'fp-host' }, stage, tip));
+        await loadFloors();
+      },
+
       async cash(body) {
         const bs = S.crmBuildings || (await S.api.buildings());
         if (!bs.length) { body.replaceChildren(h('p', { class: 'muted' }, t('cash.noBuildings'))); return; }
