@@ -17,6 +17,7 @@ public class LeadService(
     UserManager<AppUser> userManager,
     ICurrentUser currentUser,
     INotificationSender notifications,
+    TelegramAlertService telegram,
     IAuditService audit,
     StatsCache stats,
     ILogger<LeadService> logger) : ILeadService
@@ -62,6 +63,7 @@ public class LeadService(
         {
             logger.LogError(e, "Не удалось отправить уведомление о заявке {LeadId}", lead.Id);
         }
+        await telegram.LeadCreatedAsync(lead.Id, ct);
 
         return ToResponse(lead);
     }

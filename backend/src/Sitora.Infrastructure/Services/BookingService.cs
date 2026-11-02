@@ -16,6 +16,7 @@ public class BookingService(
     IAuditService audit,
     CatalogCache cache,
     INotificationSender notifications,
+    TelegramAlertService telegram,
     TimeProvider timeProvider,
     ILogger<BookingService> logger) : IBookingService
 {
@@ -79,6 +80,7 @@ public class BookingService(
         await cache.InvalidateAsync(ct);
         await NotifyAsync($"Новая бронь{(isStaff ? "" : " с сайта")}: {clientName}, {clientPhone}, кв. №{apartment.Number}, " +
                           $"до {booking.ExpiresAt.Add(DushanbeOffset):dd.MM.yyyy HH:mm} (Душанбе)", ct);
+        await telegram.BookingCreatedAsync(booking.Id, ct);
 
         return ToResponse(booking, apartment.Number);
     }

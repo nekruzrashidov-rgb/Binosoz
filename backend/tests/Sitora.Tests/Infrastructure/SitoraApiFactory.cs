@@ -142,6 +142,7 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.AddSingleton<ISmsSender>(Sms);
             services.AddSingleton<IEmailSender>(Email);
             services.AddSingleton<IRateProvider>(Rates);
+            services.AddSingleton<ITelegramNotifier>(Telegram);
         });
     }
 
@@ -152,6 +153,7 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public FakeSmsSender Sms { get; } = new();
     public FakeRateProvider Rates { get; } = new();
+    public FakeTelegramNotifier Telegram { get; } = new();
     public FakeEmailSender Email { get; } = new();
 
     public string ConnectionString => _connectionString;

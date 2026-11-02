@@ -4,6 +4,12 @@ using Sitora.Domain.DTOs.Reports;
 
 namespace Sitora.Domain.Interfaces;
 
+// Сообщение в личный чат Telegram (Markdown). Без токена бота или с chatId = 0 ничего не отправляется и не падает.
+public interface ITelegramNotifier
+{
+    Task SendAsync(long chatId, string message, CancellationToken ct = default);
+}
+
 public interface ISmsSender
 {
     Task SendAsync(string phone, string text, CancellationToken ct = default);

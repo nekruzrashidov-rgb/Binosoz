@@ -18,6 +18,10 @@ public class AppUser : IdentityUser<Guid>, IHasTimestamps
 
     // Дома, доступные сотруднику; пусто — все дома организации.
     public List<UserBuilding> Buildings { get; set; } = [];
+
+    // Личный чат в Telegram для уведомлений; null — не привязан.
+    public long? TelegramChatId { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

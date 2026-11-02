@@ -4,3 +4,6 @@ namespace Sitora.Domain.DTOs.Common;
 public record NotificationResponse(Guid Id, string? Title, string Text, string? Kind, Guid? DealId, bool IsRead, DateTime CreatedAt);
 
 public record NotificationListResponse(int UnreadCount, IReadOnlyList<NotificationResponse> Items);
+
+// chatId — из бота @userinfobot; null — отвязать Telegram.
+public record TelegramChatRequest(long? ChatId);

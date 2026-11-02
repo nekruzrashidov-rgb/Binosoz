@@ -18,6 +18,7 @@ public class PaymentService(
     ICurrentUser currentUser,
     IAuditService audit,
     INotificationSender notifications,
+    TelegramAlertService telegram,
     TimeProvider timeProvider,
     StatsCache stats,
     ILogger<PaymentService> logger) : IPaymentService
@@ -171,6 +172,7 @@ public class PaymentService(
         await stats.InvalidateAsync(ct);
         await NotifyCustomerAsync(customerUserId,
             $"Получен платёж {payment.Amount:0.00} {payment.Currency} от {payment.PaidAt:dd.MM.yyyy}", ct);
+        await telegram.PaymentReceivedAsync(payment.Id, ct);
         return ToResponse(payment, false);
     }
 

@@ -13,12 +13,13 @@ namespace Sitora.Infrastructure.Services;
 
 // Еженедельный отчёт владельцу: касса, новые сделки, платежи, просрочки и стройка за неделю пн–вс по Душанбе.
 // Какие дома видны, решают фильтры организации и домов в AppDbContext: чужой дом — 404.
-// Из фоновой задачи пользователя нет, фильтры не действуют — видны все дома.
+// Из фоновой задачи пользователя нет, фильтры не действуют — видны все дома. О готовом отчёте по расписанию владельцу пишет Telegram.
 public class WeeklyReportService(
     AppDbContext db,
     ICurrentUser currentUser,
     IAuditService audit,
     IPdfGenerator pdf,
+    TelegramAlertService telegram,
     TimeProvider timeProvider,
     ILogger<WeeklyReportService> logger) : IWeeklyReportService
 {
@@ -63,7 +64,10 @@ public class WeeklyReportService(
             .ToListAsync(ct);
 
         foreach (var building in buildings)
-            await SaveAsync(building, (start, end), null, ct);
+        {
+            var report = await SaveAsync(building, (start, end), null, ct);
+            await telegram.WeeklyReportReadyAsync(report.Id, ct);
+        }
         if (buildings.Count > 0)
             logger.LogInformation("Еженедельных отчётов сформировано: {Count} за {Start:dd.MM.yyyy}–{End:dd.MM.yyyy}", buildings.Count, start, end);
         return buildings.Count;

@@ -37,5 +37,14 @@ public class NotificationService(AppDbContext db, ICurrentUser currentUser, Time
             .ExecuteUpdateAsync(s => s.SetProperty(n => n.ReadAt, now), ct);
     }
 
+    public async Task SetTelegramChatAsync(long? chatId, CancellationToken ct = default)
+    {
+        if (chatId == 0)
+            throw new BusinessRuleException("Неверный chat id Telegram");
+        var userId = UserId;
+        if (await db.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(s => s.SetProperty(u => u.TelegramChatId, chatId), ct) == 0)
+            throw new NotFoundException("Пользователь не найден");
+    }
+
     private Guid UserId => currentUser.UserId ?? throw new UnauthorizedException("Требуется вход");
 }

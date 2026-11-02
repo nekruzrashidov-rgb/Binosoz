@@ -280,6 +280,9 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("text");
 
+                    b.Property<long?>("TelegramChatId")
+                        .HasColumnType("bigint");
+
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("boolean");
 

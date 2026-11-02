@@ -8,4 +8,7 @@ public interface INotificationService
     Task<NotificationListResponse> GetMineAsync(CancellationToken ct = default);
     Task MarkReadAsync(Guid id, CancellationToken ct = default);
     Task MarkAllReadAsync(CancellationToken ct = default);
+
+    // Личный чат Telegram для уведомлений текущего пользователя; null — отвязать.
+    Task SetTelegramChatAsync(long? chatId, CancellationToken ct = default);
 }

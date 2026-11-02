@@ -105,6 +105,11 @@ public static class DependencyInjection
         services.AddSingleton<IPresenceTracker, PresenceTracker>();
 
         services.AddScoped<INotificationSender, TelegramNotificationSender>();
+        services.AddOptions<TelegramOptions>().BindConfiguration(TelegramOptions.SectionName);
+        services.AddHttpClient(TelegramBotTransport.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(15));
+        services.AddSingleton<ITelegramTransport, TelegramBotTransport>();
+        services.AddSingleton<ITelegramNotifier, TelegramNotifier>();
+        services.AddScoped<TelegramAlertService>();
         services.AddSingleton<ISmsSender, SmsSender>();
         AddEmailSender(services);
         services.AddHttpClient(NbtRateProvider.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(20));
