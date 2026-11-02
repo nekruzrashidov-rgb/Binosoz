@@ -423,6 +423,10 @@ body.has-demo-bar .settings-fab { bottom: calc(52px + env(safe-area-inset-bottom
   .top-in .icon-btn { width: 34px; height: 34px; }
   .top-in .btn.sm { padding: 8px 12px; }
 }
+/* The workspace header (language, theme, bell, user, logout, menu) is wider than a small phone: the logo stays, the word goes. */
+@media (max-width: 440px) {
+  header:not(.lux-top) .top-in .brand span { display: none; }
+}
 
 /* Organizations and roles */
 .userchip .nm { display: inline-flex; flex-direction: column; line-height: 1.15; }
