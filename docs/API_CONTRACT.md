@@ -40,6 +40,8 @@
 | GET | `/auth/me` | — | `CurrentUser` |
 | POST | `/auth/login` | `{ email, password }` | сотрудник: 200 `AuthResponse`, с включённой 2FA — 200 `TwoFactorRequired`. Покупатель — 400 «Используйте вход по коду». Неверный пароль или незнакомая почта — 401 «Неверная почта или пароль»; после 5 ошибок подряд — блокировка на 15 минут (401 «Слишком много неудачных попыток…», даже с верным паролем) |
 | POST | `/auth/2fa/verify` | `{ tempToken, code }` | `AuthResponse`. `tempToken` живёт 5 минут, 5 попыток; неверный код — 401 |
+| POST | `/auth/password/reset-request` | `{ email }` | 200 `{ message }` — всегда одинаковый. Письмо со ссылкой `…/login#reset=<token>` уходит только активному сотруднику; ссылка живёт 24 часа, новая отменяет прежние |
+| POST | `/auth/password/reset` | `{ token, newPassword }` | 204: пароль сменён, все сессии сотрудника закрыты, блокировка входа снята. Пароль — от 8 символов, с цифрой, строчной и заглавной; слабый пароль, использованная или устаревшая ссылка — 422 |
 | GET | `/auth/2fa/setup` | — | сотрудник: `{ qrCodeUri, manualKey }`, `qrCodeUri = otpauth://totp/Binosoz:{email}?secret={key}&issuer=Binosoz`. 2FA уже включена — 409; покупатель — 403 |
 | POST | `/auth/2fa/enable` | `{ code }` | 204; дальше вход по паролю спрашивает код. Неверный код — 422. Аудит `TwoFactorEnabled` |
 | POST | `/auth/2fa/disable` | `{ code }` | 204, ключ сбрасывается. Неверный код или 2FA не включена — 422. Аудит `TwoFactorDisabled` |

@@ -14,6 +14,7 @@ using Sitora.Domain.Enums;
 using Sitora.Domain.Exceptions;
 using Sitora.Domain.Interfaces;
 using Sitora.Infrastructure.Data;
+using Sitora.Infrastructure.Integrations;
 using Sitora.Infrastructure.Security;
 
 namespace Sitora.Infrastructure.Services;
@@ -30,6 +31,7 @@ public class AuthService(
     IDistributedCache cache,
     IOptions<IdentityOptions> identityOptions,
     IOptions<AuthOptions> authOptions,
+    IOptions<EmailOptions> emailOptions,
     TimeProvider timeProvider,
     IHostEnvironment environment,
     ILogger<AuthService> logger) : IAuthService
@@ -375,6 +377,86 @@ public class AuthService(
     }
 
     private static string ChallengeKey(string token) => "2fa:" + JwtTokenService.HashToken(token);
+
+    // ---------- Восстановление пароля (сотрудники) ----------
+
+    private const string ResetRequested = "Если почта принадлежит сотруднику, мы отправили на неё ссылку для смены пароля";
+    private const string InvalidResetToken = "Ссылка для смены пароля недействительна или устарела. Запросите новую";
+
+    // Ответ одинаковый для любой почты; письмо уходит только активному сотруднику. Новая ссылка отменяет прежние.
+    public async Task<MessageResponse> RequestPasswordResetAsync(PasswordResetRequest request, CancellationToken ct = default)
+    {
+        var address = EmailAddress.Normalize(request.Email) ?? throw new BusinessRuleException("Неверный адрес почты");
+        var user = await userManager.FindByEmailAsync(address);
+        if (user is null || !user.IsActive || !await IsStaffAsync(user))
+        {
+            logger.LogInformation("Ссылка для смены пароля не отправлена: почта не найдена среди сотрудников");
+            return new MessageResponse(ResetRequested);
+        }
+
+        var now = Now;
+        await db.PasswordResetTokens.Where(t => t.UserId == user.Id && t.UsedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, now), ct);
+        var token = Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
+        db.PasswordResetTokens.Add(new PasswordResetToken
+        {
+            UserId = user.Id,
+            TokenHash = JwtTokenService.HashToken(token),
+            ExpiresAt = now.Add(PasswordResetToken.Lifetime)
+        });
+        audit.Record(nameof(AppUser), user.Id, "PasswordResetRequested", null, null, user.OrganizationId);
+        await db.SaveChangesAsync(ct);
+
+        // Сбой почты не меняет ответ: иначе по ошибке было бы видно, что почта принадлежит сотруднику.
+        try
+        {
+            await email.SendAsync(new EmailMessage(address, "Binosoz: смена пароля",
+                $"Здравствуйте, {user.FullName}!\n\nЧтобы задать новый пароль, откройте ссылку:\n{emailOptions.Value.LoginUrl}#reset={token}\n\n" +
+                $"Ссылка действует {PasswordResetToken.Lifetime.TotalHours:0} часа и срабатывает один раз. " +
+                "Если вы не просили сменить пароль, просто удалите это письмо: старый пароль продолжает работать."), ct);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            logger.LogError(e, "Письмо со ссылкой для смены пароля не отправлено");
+        }
+
+        return new MessageResponse(ResetRequested);
+    }
+
+    // Новый пароль закрывает все сессии сотрудника и снимает блокировку входа после неудачных попыток.
+    public async Task ResetPasswordAsync(PasswordResetConfirmRequest request, CancellationToken ct = default)
+    {
+        var now = Now;
+        var hash = JwtTokenService.HashToken((request.Token ?? "").Trim());
+        var stored = await db.PasswordResetTokens.Include(t => t.User).FirstOrDefaultAsync(t => t.TokenHash == hash, ct);
+        if (stored is null || !stored.IsUsable(now) || !stored.User.IsActive)
+            throw new BusinessRuleException(InvalidResetToken);
+        if (string.IsNullOrEmpty(request.NewPassword) || request.NewPassword.Length < 8)
+            throw new BusinessRuleException("Пароль — не короче 8 символов");
+
+        var user = stored.User;
+        foreach (var validator in userManager.PasswordValidators)
+        {
+            var check = await validator.ValidateAsync(userManager, user, request.NewPassword);
+            if (!check.Succeeded)
+                throw new BusinessRuleException(string.Join("; ", check.Errors.Select(e => e.Description)));
+        }
+
+        // Правила пароля проверены выше, поэтому между удалением старого и записью нового ошибки быть не должно.
+        if (await userManager.HasPasswordAsync(user))
+            await userManager.RemovePasswordAsync(user);
+        var result = await userManager.AddPasswordAsync(user, request.NewPassword);
+        if (!result.Succeeded)
+            throw new BusinessRuleException(string.Join("; ", result.Errors.Select(e => e.Description)));
+        await userManager.SetLockoutEndDateAsync(user, null);
+        await userManager.ResetAccessFailedCountAsync(user);
+
+        stored.UsedAt = now;
+        audit.Record(nameof(AppUser), user.Id, "PasswordReset", null, null, user.OrganizationId);
+        await db.SaveChangesAsync(ct);
+        await RevokeAllAsync(user.Id, now, ct);
+        logger.LogInformation("Сотрудник {UserId} задал новый пароль по ссылке", user.Id);
+    }
 
     // ---------- Настройка 2FA ----------
 

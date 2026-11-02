@@ -42,6 +42,9 @@ public partial class FakeEmailSender : IEmailSender
     // Пароль из письма «Вы приглашены в Binosoz».
     public string? LastPassword(string email) => Last(email, PasswordPattern(), group: 1);
 
+    // Токен из ссылки «Забыли пароль?» (…/login#reset=<token>).
+    public string? LastResetToken(string email) => Last(email, ResetPattern(), group: 1);
+
     private string? Last(string email, Regex pattern, int group = 0)
     {
         if (!_messages.TryGetValue(email, out var list))
@@ -67,4 +70,7 @@ public partial class FakeEmailSender : IEmailSender
 
     [GeneratedRegex(@"Пароль: (\S+)")]
     private static partial Regex PasswordPattern();
+
+    [GeneratedRegex(@"#reset=([A-Za-z0-9_-]+)")]
+    private static partial Regex ResetPattern();
 }

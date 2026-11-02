@@ -95,6 +95,30 @@ public class AuthController(IAuthService auth, IOptions<AuthOptions> options) : 
     public Task<AuthResponse> VerifyTwoFactor(TwoFactorVerifyRequest request, CancellationToken ct) =>
         auth.VerifyTwoFactorAsync(request, ct);
 
+    /// <summary>«Забыли пароль?» сотрудника: письмо со ссылкой на смену пароля (24 часа, один раз). Ответ одинаковый для любой почты.</summary>
+    [HttpPost("password/reset-request")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Sms)]
+    [ProducesResponseType<MessageResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
+    public Task<MessageResponse> RequestPasswordReset(PasswordResetRequest request, CancellationToken ct) =>
+        auth.RequestPasswordResetAsync(request, ct);
+
+    /// <summary>
+    /// Новый пароль по токену из письма: от 8 символов, с цифрой, строчной и заглавной буквами. Все сессии сотрудника закрываются,
+    /// блокировка входа снимается. Недействительная или использованная ссылка, слабый пароль — 422.
+    /// </summary>
+    [HttpPost("password/reset")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Login)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> ResetPassword(PasswordResetConfirmRequest request, CancellationToken ct)
+    {
+        await auth.ResetPasswordAsync(request, ct);
+        return NoContent();
+    }
+
     /// <summary>
     /// Ключ для приложения-аутентификатора (Google Authenticator и т. п.): qrCodeUri для QR-кода и manualKey для ручного ввода.
     /// Только сотрудникам; если 2FA уже включена — 409 (сначала отключить).

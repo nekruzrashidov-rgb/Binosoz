@@ -8,6 +8,10 @@ public interface IAuthService
     Task<LoginResult> LoginAsync(LoginRequest request, CancellationToken ct = default);
     Task<AuthResponse> VerifyTwoFactorAsync(TwoFactorVerifyRequest request, CancellationToken ct = default);
 
+    // Восстановление пароля сотрудника: письмо со ссылкой, затем новый пароль по токену.
+    Task<MessageResponse> RequestPasswordResetAsync(PasswordResetRequest request, CancellationToken ct = default);
+    Task ResetPasswordAsync(PasswordResetConfirmRequest request, CancellationToken ct = default);
+
     // 2FA (TOTP) сотрудника: ключ для приложения, включить и отключить — кодом из приложения.
     Task<TwoFactorSetupResponse> GetTwoFactorSetupAsync(Guid userId, CancellationToken ct = default);
     Task EnableTwoFactorAsync(Guid userId, TwoFactorCodeRequest request, CancellationToken ct = default);

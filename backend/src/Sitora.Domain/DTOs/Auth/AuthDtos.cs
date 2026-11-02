@@ -53,6 +53,14 @@ public record LoginResult(AuthResponse? Auth, TwoFactorRequiredResponse? TwoFact
 // Токен без refresh-токена: режим «войти как владелец» и выход из него.
 public record AccessTokenResponse(string AccessToken, DateTime AccessTokenExpiresAt, CurrentUserResponse User);
 
+// «Забыли пароль?» сотрудника: письмо со ссылкой (24 часа). Ответ одинаковый для любой почты.
+public record PasswordResetRequest(string Email);
+
+// Новый пароль по токену из ссылки: от 8 символов, с цифрой, строчной и заглавной буквами.
+public record PasswordResetConfirmRequest(string Token, string NewPassword);
+
+public record MessageResponse(string Message);
+
 // Настройка 2FA: qrCodeUri — для QR-кода (otpauth://totp/Binosoz:{email}?secret=…&issuer=Binosoz), manualKey — ввести руками.
 public record TwoFactorSetupResponse(string QrCodeUri, string ManualKey);
 
