@@ -11,9 +11,12 @@
   const enter = (r) => { S.toast(t('login.welcome'), 'ok'); S.go(S.homeFor(r.user)); };
 
   // One form for everyone: e-mail, then the code from the letter. Only the platform owner gets a third step.
+  // The login pages have no site header: the logo above the card leads back to the site.
+  const loginBrand = () => h('a', { class: 'login-brand', href: '/', 'aria-label': 'Binosoz' }, S.logo(), h('span', null, 'BINOSOZ'));
+
   S.views.login = function (root) {
     const card = h('div', { class: 'card login-card login' });
-    root.appendChild(h('div', { class: 'wrap page-in' }, card));
+    root.appendChild(h('div', { class: 'wrap page-in' }, loginBrand(), card));
     let step = 'email', emailVal = '', timer = 0, tick = null, challenge = null;
     // Buyer or staff: the same code flow, different hints; staff who set a password when joining may use it instead.
     let who = S.store.get('sitora.loginAs') === 'staff' ? 'staff' : 'buyer';
@@ -110,7 +113,7 @@
   S.views.invite = function (root) {
     const token = (location.hash.match(/invite=([0-9A-Fa-f]+)/) || [])[1] || '';
     const card = h('div', { class: 'card login-card login' });
-    root.appendChild(h('div', { class: 'wrap page-in' }, card));
+    root.appendChild(h('div', { class: 'wrap page-in' }, loginBrand(), card));
     const btn = h('button', { class: 'btn lg block' }, t('invite.accept'));
     const msg = h('div');
     btn.addEventListener('click', () => S.busy(btn, async () => {
@@ -197,8 +200,11 @@
       const ring = h('div', { class: 'pay-ring' }); ring.innerHTML = '<svg viewBox="0 0 108 108"><defs><linearGradient id="gold-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f2c46a"/><stop offset="1" stop-color="#cf9a33"/></linearGradient></defs><circle class="bg" cx="54" cy="54" r="46"/><circle class="fg" cx="54" cy="54" r="46" stroke-dasharray="' + c + '" stroke-dashoffset="' + c + '"/></svg><b>' + pct + '%</b>';
       requestAnimationFrame(() => requestAnimationFrame(() => { const fg = S.$('.fg', ring); if (fg) fg.style.strokeDashoffset = c * (1 - pct / 100); }));
       const left = deal.remaining !== undefined && !s.none ? s.remaining : price - paid;
+      // The deal itself carries only the manager's id; the name comes with the chat's presence info.
+      const manager = h('span', null, deal.managerName || chat.managerName || '—');
+      if (!deal.managerName && !chat.managerName) refreshChat().then((u) => { if (u && u.managerName) manager.textContent = u.managerName; });
       const info = h('div', { class: 'card' }, h('div', { class: 'row between' }, h('h3', null, t('apt.title', { n: deal.apartmentNumber })), S.stageChip(deal.stage)),
-        h('dl', { class: 'kv' }, kv(t('floor.nLabel'), deal.floor), kv(t('f.rooms'), S.fmt.rooms(deal.rooms)), kv(t('f.area'), S.fmt.area(deal.area)), kv(t('deal.price'), S.fmt.money(deal.price, deal.currency)), deal.discount ? kv(t('deal.discount'), '− ' + S.fmt.money(deal.discount, deal.currency)) : null, kv(t('deal.manager'), deal.managerName || '—'), kv(t('deal.since'), S.fmt.date(deal.createdAt))));
+        h('dl', { class: 'kv' }, kv(t('floor.nLabel'), deal.floor), kv(t('f.rooms'), S.fmt.rooms(deal.rooms)), kv(t('f.area'), S.fmt.area(deal.area)), kv(t('deal.price'), S.fmt.money(deal.price, deal.currency)), deal.discount ? kv(t('deal.discount'), '− ' + S.fmt.money(deal.discount, deal.currency)) : null, kv(t('deal.manager'), manager), kv(t('deal.since'), S.fmt.date(deal.createdAt))));
       const pay = h('div', { class: 'card' }, h('h3', null, t('cab.payments')), h('div', { class: 'paybig' }, ring, h('div', { class: 'stack', style: { gap: '4px' } }, h('div', { class: 'muted' }, t('sch.paid')), h('div', { class: 'big', style: { fontSize: '24px' } }, S.fmt.money(paid, deal.currency)), h('div', { class: 'muted' }, t('sch.left') + ': ' + S.fmt.money(left, deal.currency)), s.eq ? h('div', { class: 'hint' }, '≈ ' + S.fmt.money(s.eq.paid, s.eq.currency) + ' · ' + t('price.estimate')) : null)),
         countBox(s),
         next ? h('div', { class: 'next' + (next.status === 'Overdue' ? ' overdue' : ''), style: { marginTop: '14px' } }, h('div', null, h('div', { class: 'muted', style: { fontSize: '12px', fontWeight: 800, textTransform: 'uppercase' } }, t('cab.next')), h('b', null, S.fmt.date(next.dueDate)), next.status === 'Overdue' ? h('span', { style: { marginLeft: '8px' } }, S.chip('Overdue', t('pay.Overdue'))) : null), h('b', { class: 'big', style: { fontSize: '20px' } }, S.fmt.money(next.amountDue - next.amountPaid, deal.currency))) : null);
@@ -230,8 +236,10 @@
           const open = all.hidden; all.hidden = !open; more.setAttribute('aria-expanded', String(open)); more.textContent = t(open ? 'cab.buildHide' : 'cab.buildHistory');
           if (open && !all.firstChild) all.appendChild(S.panels.stages(deal.buildingId));
         } }, t('cab.buildHistory'));
-        card.replaceChildren(h('div', { class: 'row between' }, h('h3', null, t('cab.build')), h('b', { class: 'num' }, current.percent + '%')),
-          h('div', { class: 'muted' }, t('cab.stageNow', { s: current.title, p: current.percent })), S.bar(current.percent, 'gold'), h('div', null, more), all);
+        // The big number and the bar are the whole building (as on the "Construction" page); the line below is the stage now.
+        const total = Math.round(st.reduce((s, x) => s + x.percent, 0) / st.length);
+        card.replaceChildren(h('div', { class: 'row between' }, h('h3', null, t('cab.build')), h('b', { class: 'num' }, total + '%')),
+          h('div', { class: 'muted' }, t('cab.stageNow', { s: current.title, p: current.percent })), S.bar(total, 'gold'), h('div', null, more), all);
       }).catch(() => card.remove());
       return card;
     }

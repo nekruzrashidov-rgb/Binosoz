@@ -10,8 +10,34 @@
 
   const bubble = h('button', { class: 'ai-fab', type: 'button', title: t('ai.open'), 'aria-label': t('ai.open'), onclick: () => toggle(true) }, '✦');
 
+  // Replies come as light Markdown: paragraphs, "1." / "-" lists, headings, **bold** and `code`. Built as DOM nodes, never as HTML.
+  function inline(text) {
+    return text.split(/(\*\*[^*]+\*\*|`[^`]+`)/).filter(Boolean).map((p) =>
+      p.length > 4 && p.startsWith('**') && p.endsWith('**') ? h('b', null, p.slice(2, -2))
+        : p.length > 2 && p.startsWith('`') && p.endsWith('`') ? h('code', null, p.slice(1, -1)) : p);
+  }
+  function rich(text) {
+    const out = []; let listEl = null;
+    for (const raw of String(text || '').split('\n')) {
+      const line = raw.trim();
+      if (!line) continue; // a blank line between list items keeps the list going
+      const item = line.match(/^(\d+)[.)]\s+(.*)$/) || line.match(/^()[-*•]\s+(.*)$/);
+      if (item) {
+        const tag = item[1] ? 'ol' : 'ul';
+        if (!listEl || listEl.tagName.toLowerCase() !== tag) { listEl = h(tag, item[1] && item[1] !== '1' ? { start: item[1] } : null); out.push(listEl); }
+        listEl.appendChild(h('li', null, inline(item[2])));
+        continue;
+      }
+      listEl = null;
+      const head = line.match(/^#{1,4}\s+(.*)$/);
+      out.push(h('p', null, head ? h('b', null, head[1].replace(/\*\*/g, '')) : inline(line)));
+    }
+    return out;
+  }
+
   function addMessage(role, text) {
-    const el = h('div', { class: 'ai-msg ' + (role === 'user' ? 'me' : role === 'error' ? 'err' : 'bot') }, text);
+    const bot = role !== 'user' && role !== 'error';
+    const el = h('div', { class: 'ai-msg ' + (role === 'user' ? 'me' : role === 'error' ? 'err' : 'bot') + (bot ? ' rich' : '') }, bot ? rich(text) : text);
     list.appendChild(el);
     list.scrollTop = list.scrollHeight;
     return el;

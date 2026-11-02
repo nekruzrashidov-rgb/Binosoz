@@ -232,7 +232,7 @@
         h('p', null, S.lang === 'tg' && b.descriptionTg ? b.descriptionTg : (b.description || t('hero.sub'))),
         h('div', { class: 'hero-cta pe' }, h('button', { class: 'btn gold lg', onclick: () => scrollTo('apartments') }, t('hero.cta1')), h('button', { class: 'btn ghost lg', style: { color: '#fff', borderColor: 'rgba(255,255,255,.4)' }, onclick: () => scrollTo('calc') }, t('hero.cta2'))));
       stats.replaceChildren(
-        stat(S.fmt.n(free), t('stat.free')), stat(S.fmt.money(minPrice(), 'TJS'), t('stat.from')), stat(b.deliveryDate ? S.fmt.date(b.deliveryDate).slice(3) : '—', t('stat.delivery')));
+        stat(S.fmt.n(free), t('stat.free')), stat(S.fmt.money(minPrice(), 'TJS'), t('stat.from')), stat(b.deliveryDate ? S.fmt.date(b.deliveryDate).slice(3) : b.completionYear ? String(b.completionYear) : '—', t('stat.delivery')));
     }
     const stat = (v, l) => h('div', { class: 'stat glass' }, h('b', null, v), h('span', null, l));
 
@@ -423,6 +423,12 @@
     // 1. Fullscreen hero: night sky, Tajik mountains, the name of the complex.
     const stars = h('div', { class: 'stars', 'aria-hidden': 'true' }, Array.from({ length: 60 }, () => { const s = (1 + rnd(1.6)).toFixed(1) + 'px'; return h('i', { style: { left: rnd(100).toFixed(1) + '%', top: rnd(62).toFixed(1) + '%', width: s, height: s, animationDelay: rnd(4).toFixed(2) + 's', animationDuration: (2.4 + rnd(3)).toFixed(2) + 's' } }); }));
     const mountains = h('div', { class: 'mountains', 'aria-hidden': 'true', html: '<svg viewBox="0 0 1440 320" preserveAspectRatio="none"><path fill="currentColor" opacity=".55" d="M0 230 120 150l70 40 110-110 90 70 80-50 120 120 90-60 140 90 100-80 120 70 110-100 130 110 80-40 80 50v120H0z"/><path fill="currentColor" d="M0 270 90 220l90 30 120-70 100 60 90-40 130 70 110-50 120 60 100-30 120 50 110-60 120 50 140-20v130H0z"/></svg>' });
+    // The complex's name from the API (config's default until it loads): the first word in gold.
+    const nameParts = () => { const w = String(d.name || 'Sitora Residence').trim().split(/\s+/); return [h('span', { class: 'gold-text' }, w[0]), w.length > 1 ? w.slice(1).join(' ') : null]; };
+    const heroTitle = h('h1', { class: 'lux-title' });
+    const aboutTitle = h('h2');
+    const drawName = () => { const [first, rest] = nameParts(); heroTitle.replaceChildren(first, rest ? h('br') : null, rest); const [f2, r2] = nameParts(); aboutTitle.replaceChildren(f2, r2 ? ' ' + r2 : null); };
+    drawName();
     const chips = h('div', { class: 'hero-chips' });
     const proof = h('p', { class: 'hero-proof', hidden: true });
     const freeCard = h('div', { class: 'float-card glass' });
@@ -430,7 +436,7 @@
       h('div', { class: 'wrap lux-hero-in' },
         h('div', { class: 'lux-hero-text' },
           h('span', { class: 'lux-pill' }, landIcon('pin'), t('home.place')),
-          h('h1', { class: 'lux-title' }, h('span', { class: 'gold-text' }, 'Sitora'), h('br'), 'Residence'),
+          heroTitle,
           h('i', { class: 'gold-line', 'aria-hidden': 'true' }),
           h('p', { class: 'lux-tagline' }, t('home.tagline')),
           chips, proof,
@@ -467,7 +473,7 @@
       aboutStats,
       h('div', { class: 'about-text reveal' },
         h('span', { class: 'lux-kicker' }, t('about.kicker')),
-        h('h2', null, h('span', { class: 'gold-text' }, 'Sitora'), ' Residence'),
+        aboutTitle,
         h('p', null, t('about.text')),
         h('ul', { class: 'amenities' }, AMENITIES.map(([ic, k]) => h('li', null, h('span', { class: 'am-ic' }, landIcon(ic)), t(k)))))));
 
@@ -533,6 +539,7 @@
     window.addEventListener('scroll', onScroll, { passive: true });
 
     function renderData() {
+      drawName();
       chips.replaceChildren(
         h('span', { class: 'chip-lux' }, counted(d.floors, 'home.chip.floors')),
         h('span', { class: 'chip-lux' }, counted(d.apts, 'home.chip.apts')),
@@ -608,6 +615,8 @@
         d.floors = b.floorsCount || Math.max(0, ...floors.map((f) => f.number)) || d.floors;
         d.apts = apts.length || d.apts;
         if (b.deliveryDate) d.year = new Date(b.deliveryDate).getFullYear();
+        else if (b.completionYear) d.year = b.completionYear;
+        if (b.name) d.name = b.name;
         if (free.length) d.minPrice = free[0].price;
         d.free = free.length;
         d.taken = apts.filter((a) => a.status === 'sold' || a.status === 'booked').length;

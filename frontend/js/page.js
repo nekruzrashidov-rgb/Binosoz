@@ -71,7 +71,15 @@
     const toggle = h('button', { class: 'icon-btn menu-btn', 'aria-label': t('nav.menu'), 'aria-expanded': 'false', onclick: () => { const open = menu.classList.toggle('open'); toggle.setAttribute('aria-expanded', String(open)); document.body.classList.toggle('menu-open', open); } }, S.icon('menu'));
     header.className = 'top lux-top';
     header.replaceChildren(h('div', { class: 'wrap top-in' }, h('a', { class: 'brand', href: '/', 'aria-label': 'Binosoz' }, S.logo(), h('span', null, 'BINOSOZ')), menu, h('span', { class: 'spacer' }),
-      lang, h('a', { class: 'btn sm gold', href: '/login' }, t('nav.login')), toggle));
+      lang, accountLink(), toggle));
+  }
+
+  // Signed in: the gold button leads to the person's own workspace instead of the login page.
+  function accountLink() {
+    const u = S.api.isAuthed && S.api.user;
+    if (!u) return h('a', { class: 'btn sm gold', href: '/login' }, t('nav.login'));
+    const home = u.role === 'PlatformOwner' ? 'platform' : u.role === 'Customer' ? 'cabinet' : 'crm';
+    return h('a', { class: 'btn sm gold', href: PAGES[home], title: u.name || '' }, t('nav.' + home));
   }
 
   // Working "as owner" of an organization: a strip that cannot be missed, with a way back.
@@ -89,7 +97,17 @@
     return S.views[page];
   }
 
+  // The tab title in the chosen language: the page's name and the brand (the landing keeps the complex's name).
+  const TITLES = { apartments: 'nav.apartments', contact: 'nav.contact', login: 'nav.login', cabinet: 'nav.cabinet', crm: 'nav.crm', platform: 'nav.platform' };
+  const htmlTitle = document.title;
+  function setTitle() {
+    if (S.lang !== 'tg') { document.title = htmlTitle; return; }
+    const brand = htmlTitle.split(' — ').pop();
+    document.title = page === 'home' ? 'Sitora Residence — ' + t('home.tagline') : TITLES[page] ? t(TITLES[page]) + ' — ' + brand : document.title;
+  }
+
   function render() {
+    setTitle();
     if (cleanup) { try { cleanup(); } catch (e) { console.error(e); } cleanup = null; }
     S.clear(main); drawHeader();
     window.scrollTo(0, 0);

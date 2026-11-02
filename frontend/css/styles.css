@@ -1,5 +1,6 @@
 /* Layout concept: showroom. A full-width 3D tower is the hero; floating glass panels carry the actions.
-   Cabinet and CRM reuse the same tokens in a calm, dense workspace. Lapis blue + pyrite gold, from Badakhshan. */
+   Cabinet and CRM reuse the same tokens in a calm, dense workspace. Lapis blue + pyrite gold, from Badakhshan;
+   the dark theme takes the brand's night navy #060d1f with gold #c9a227 as its accent, like the public site. */
 :root {
   --bg: #f1f3f8;
   --surface: #ffffff;
@@ -35,28 +36,28 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #080d1c; --surface: #111933; --surface-2: #19234a; --surface-3: #223060;
+    --bg: #060d1f; --surface: #111933; --surface-2: #19234a; --surface-3: #223060;
     --ink: #e9edfa; --ink-2: #b9c3e3; --muted: #8894ba; --line: #26325e;
-    --accent: #5b86ff; --accent-ink: #061030; --accent-soft: #1b2a5c;
-    --gold: #e8b65a; --gold-soft: #3a2f16;
+    --accent: #c9a227; --accent-ink: #1b1405; --accent-soft: #3a2f16;
+    --gold: #c9a227; --gold-soft: #3a2f16;
     --good: #35d6a1; --good-soft: #0e3a2e; --warn: #ffb030; --warn-soft: #3d2c0c; --bad: #ff7a6b; --bad-soft: #43201c;
     --info: #8d9bff; --info-soft: #232b66;
-    --glass: rgba(15, 22, 46, 0.66); --glass-line: rgba(140, 160, 255, 0.22);
+    --glass: rgba(15, 22, 46, 0.66); --glass-line: rgba(201, 162, 39, 0.18);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 32px rgba(0, 0, 0, 0.45);
-    --glow: 0 0 0 4px rgba(91, 134, 255, 0.25), 0 8px 30px rgba(91, 134, 255, 0.45);
+    --glow: 0 0 0 4px rgba(201, 162, 39, 0.22), 0 8px 30px rgba(201, 162, 39, 0.35);
     color-scheme: dark;
   }
 }
 :root[data-theme='dark'] {
-  --bg: #080d1c; --surface: #111933; --surface-2: #19234a; --surface-3: #223060;
+  --bg: #060d1f; --surface: #111933; --surface-2: #19234a; --surface-3: #223060;
   --ink: #e9edfa; --ink-2: #b9c3e3; --muted: #8894ba; --line: #26325e;
-  --accent: #5b86ff; --accent-ink: #061030; --accent-soft: #1b2a5c;
-  --gold: #e8b65a; --gold-soft: #3a2f16;
+  --accent: #c9a227; --accent-ink: #1b1405; --accent-soft: #3a2f16;
+  --gold: #c9a227; --gold-soft: #3a2f16;
   --good: #35d6a1; --good-soft: #0e3a2e; --warn: #ffb030; --warn-soft: #3d2c0c; --bad: #ff7a6b; --bad-soft: #43201c;
   --info: #8d9bff; --info-soft: #232b66;
-  --glass: rgba(15, 22, 46, 0.66); --glass-line: rgba(140, 160, 255, 0.22);
+  --glass: rgba(15, 22, 46, 0.66); --glass-line: rgba(201, 162, 39, 0.18);
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 32px rgba(0, 0, 0, 0.45);
-  --glow: 0 0 0 4px rgba(91, 134, 255, 0.25), 0 8px 30px rgba(91, 134, 255, 0.45);
+  --glow: 0 0 0 4px rgba(201, 162, 39, 0.22), 0 8px 30px rgba(201, 162, 39, 0.35);
   color-scheme: dark;
 }
 
@@ -379,6 +380,9 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .msg small { display: block; opacity: 0.7; font-size: 11px; margin-top: 3px; font-weight: 600; }
 .login { max-width: 440px; margin: 56px auto; }
 .login-card { padding: 28px; }
+.login-brand { display: flex; width: fit-content; align-items: center; gap: 10px; margin: 44px auto 0; color: var(--ink); font-family: var(--display); font-weight: 700; letter-spacing: 0.04em; }
+.login-brand svg { width: 30px; height: 30px; }
+.login-brand + .login { margin-top: 20px; }
 .login h2 { font-size: 24px; margin-bottom: 6px; }
 .demo-box { margin-top: 16px; padding: 12px 14px; border-radius: var(--r-sm); background: var(--gold-soft); color: var(--ink-2); font-size: 13px; font-weight: 600; }
 .demo-box button { display: inline; background: none; border: 0; color: var(--accent); font-weight: 800; padding: 2px 0; text-decoration: underline; }
@@ -440,6 +444,12 @@ body.has-demo-bar .settings-fab { bottom: calc(52px + env(safe-area-inset-bottom
 .ai-msg.bot { align-self: flex-start; background: var(--surface-3); border-bottom-left-radius: 4px; }
 .ai-msg.me { align-self: flex-end; background: var(--gold); color: #1b1405; border-bottom-right-radius: 4px; }
 .ai-msg.err { align-self: flex-start; background: var(--bad-soft); color: var(--bad); }
+.ai-msg.rich { white-space: normal; }
+.ai-msg.rich p { margin: 0 0 6px; }
+.ai-msg.rich ol, .ai-msg.rich ul { margin: 0 0 6px; padding-left: 20px; }
+.ai-msg.rich li { margin: 2px 0; }
+.ai-msg.rich > :last-child { margin-bottom: 0; }
+.ai-msg.rich code { font-size: 12.5px; padding: 1px 5px; border-radius: 5px; background: var(--surface-2); }
 .ai-msg.typing { color: var(--muted); font-style: italic; }
 .ai-form { display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); }
 .ai-input { resize: none; min-height: 42px; }

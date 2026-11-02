@@ -129,9 +129,19 @@
         body.replaceChildren(bar, holder);
         const draw = () => holder.replaceChildren(S.tbl([
           { label: '#', render: (d) => shortId(d.id) }, { label: t('deal.apt'), render: (d) => h('b', null, '№ ' + d.apartmentNumber) }, { label: t('deal.customer'), render: (d) => d.customerName }, { label: t('deal.stage'), render: (d) => S.stageChip(d.stage) },
-          { label: t('deal.price'), r: true, num: true, render: (d) => S.fmt.money(d.price - d.discount, d.currency) }, { label: t('sch.paid'), r: true, num: true, render: (d) => S.fmt.money(d.paid, d.currency) }, { label: t('deal.manager'), render: (d) => d.managerName }],
+          { label: t('deal.price'), r: true, num: true, render: (d) => S.fmt.money(d.price - d.discount, d.currency) },
+          // The real API's list has no paid sum (it is in each deal's schedule): the column shows only when it is known.
+          list.some((d) => d.paid !== null) ? { label: t('sch.paid'), r: true, num: true, render: (d) => S.fmt.money(d.paid, d.currency) } : null,
+          { label: t('deal.manager'), render: (d) => d.managerName || managers[d.managerId] || '' }].filter(Boolean),
           list.filter((d) => (stage === 'all' || d.stage === stage) && (!q || (d.customerName + ' ' + d.apartmentNumber + ' ' + d.id).toLowerCase().includes(q))), { onRow: (d) => dealDrawer(d.id, load), empty: t('deal.none') }));
-        async function load() { holder.replaceChildren(S.skeleton(5, 38)); list = await S.api.deals(); draw(); } load();
+        // The list carries the manager's id only: names come from the staff list (leaders may read it) and from the signed-in user.
+        let managers = {};
+        const loadManagers = async () => {
+          const me = S.api.user || {}; const names = me.id ? { [me.id]: me.name } : {};
+          if (S.api.isLeader()) (await S.api.users().catch(() => [])).forEach((u) => { names[u.id] = u.name; });
+          return names;
+        };
+        async function load() { holder.replaceChildren(S.skeleton(5, 38)); [list, managers] = await Promise.all([S.api.deals(), loadManagers()]); draw(); } load();
         S.reloadDeals = load;
       },
 
