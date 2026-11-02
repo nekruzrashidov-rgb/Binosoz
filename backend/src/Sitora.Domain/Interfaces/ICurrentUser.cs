@@ -20,7 +20,7 @@ public interface ICurrentUser
     // Гость, покупатель (свои сделки проверяет DealAccess) и создатель платформы видят всё.
     bool IsRestricted => OrganizationId is not null;
 
-    bool IsLeader => IsInRole(RoleNames.PlatformOwner) || IsInRole(RoleNames.Owner) || IsInRole(RoleNames.ObjectAdmin);
+    bool IsLeader => IsInRole(RoleNames.SuperAdmin) || IsInRole(RoleNames.Owner) || IsInRole(RoleNames.ObjectAdmin);
 
     // Сотрудники, которым видны все сделки своих домов: менеджер, бухгалтер и руководители.
     bool IsDealStaff => IsLeader || IsInRole(RoleNames.Manager) || IsInRole(RoleNames.Accountant);

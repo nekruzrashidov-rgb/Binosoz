@@ -46,9 +46,9 @@ public class OrganizationStatusTests(SitoraApiFactory factory) : IClassFixture<S
     }
 
     [Fact]
-    public async Task Status_OnlyPlatformOwner_UnknownIs404()
+    public async Task Status_OnlySuperAdmin_UnknownIs404()
     {
-        var platform = await factory.CreatePlatformOwnerClientAsync();
+        var platform = await factory.CreateSuperAdminClientAsync();
         var admin = await factory.CreateAdminClientAsync();
 
         Assert.Equal(HttpStatusCode.NotFound, (await platform.PatchAsJsonAsync($"/api/v1/platform/organizations/{Guid.NewGuid()}/status", new OrganizationStatusRequest(false))).StatusCode);
@@ -57,7 +57,7 @@ public class OrganizationStatusTests(SitoraApiFactory factory) : IClassFixture<S
 
     private async Task<(HttpClient Platform, string Slug, string OwnerEmail)> NewOrganizationAsync()
     {
-        var platform = await factory.CreatePlatformOwnerClientAsync();
+        var platform = await factory.CreateSuperAdminClientAsync();
         var slug = "st-" + Guid.NewGuid().ToString("N")[..8];
         var ownerEmail = $"owner-{slug}@status.test";
         (await platform.PostAsJsonAsync("/api/v1/platform/organizations", new CreateOrganizationRequest("Статус " + slug, slug, ownerEmail, "Владелец Статуса"))).EnsureSuccessStatusCode();

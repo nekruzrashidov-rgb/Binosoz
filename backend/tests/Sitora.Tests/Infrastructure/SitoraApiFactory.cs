@@ -40,6 +40,7 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public string ManagerPassword { get; } = GeneratePassword();
     public string ContentPassword { get; } = GeneratePassword();
     public string AccountantPassword { get; } = GeneratePassword();
+    public string SeedSuperAdminPassword { get; } = GeneratePassword();
 
     public Task<HttpClient> CreateAdminClientAsync() => CreateClientForAsync(AdminEmail, AdminPassword);
     public Task<HttpClient> CreateManagerClientAsync() => CreateClientForAsync(ManagerEmail, ManagerPassword);
@@ -117,6 +118,7 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("SEED_MANAGER_PASSWORD", ManagerPassword);
         builder.UseSetting("SEED_CONTENT_PASSWORD", ContentPassword);
         builder.UseSetting("SEED_ACCOUNTANT_PASSWORD", AccountantPassword);
+        builder.UseSetting("SEED_SUPERADMIN_PASSWORD", SeedSuperAdminPassword);
         builder.UseSetting("Encryption:Key", _encryptionKey);
         builder.UseSetting("Storage:RootPath", _storagePath);
         builder.UseSetting("Cors:AllowedOrigins:0", AllowedOrigin);
@@ -137,8 +139,8 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Seed:RichTower", "false");
         // Код 123456 для любой почты (Development) выключен: тесты проверяют настоящие коды; режим проверяет DevFixedCodeTests.
         builder.UseSetting("Auth:DevFixedCodeForAnyEmail", "false");
-        builder.UseSetting("ADMIN_EMAIL", PlatformOwnerEmail);
-        builder.UseSetting("ADMIN_PASSWORD", PlatformOwnerPassword);
+        builder.UseSetting("ADMIN_EMAIL", SuperAdminEmail);
+        builder.UseSetting("ADMIN_PASSWORD", SuperAdminPassword);
         builder.ConfigureTestServices(services =>
         {
             services.AddSingleton<ISmsSender>(Sms);
@@ -150,8 +152,8 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     protected virtual bool SmsLoginEnabled => true;
 
-    public const string PlatformOwnerEmail = "owner@platform.test";
-    public string PlatformOwnerPassword { get; } = GeneratePassword();
+    public const string SuperAdminEmail = "owner@platform.test";
+    public string SuperAdminPassword { get; } = GeneratePassword();
 
     public FakeSmsSender Sms { get; } = new();
     public FakeRateProvider Rates { get; } = new();
@@ -206,7 +208,7 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     }
 
     // Создатель платформы входит по паролю, как и другие сотрудники (2FA у него в тестах не включена).
-    public Task<HttpClient> CreatePlatformOwnerClientAsync() => CreateClientForAsync(PlatformOwnerEmail, PlatformOwnerPassword);
+    public Task<HttpClient> CreateSuperAdminClientAsync() => CreateClientForAsync(SuperAdminEmail, SuperAdminPassword);
 
     private readonly string _storagePath = Path.Combine(Path.GetTempPath(), "sitora-tests", Guid.NewGuid().ToString("N"));
 

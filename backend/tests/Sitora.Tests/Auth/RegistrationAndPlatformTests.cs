@@ -75,9 +75,9 @@ public class RegistrationAndPlatformTests(SitoraApiFactory factory) : IClassFixt
     }
 
     [Fact]
-    public async Task PlatformOwner_AddsOwnerWithPassword_AndOthersCannot()
+    public async Task SuperAdmin_AddsOwnerWithPassword_AndOthersCannot()
     {
-        var platform = await factory.CreatePlatformOwnerClientAsync();
+        var platform = await factory.CreateSuperAdminClientAsync();
         var slug = $"o-{Guid.NewGuid():N}"[..16];
         var organization = await TestScenarios.ReadAsync<OrganizationResponse>(await platform.PostAsJsonAsync("/api/v1/platform/organizations",
             new CreateOrganizationRequest("Второй застройщик", slug, $"first-{slug}@org.test", "Первый владелец")));
@@ -102,13 +102,13 @@ public class RegistrationAndPlatformTests(SitoraApiFactory factory) : IClassFixt
     }
 
     [Fact]
-    public async Task PlatformOwner_ImpersonatesAUser_SeesTheirData_AndItIsAudited()
+    public async Task SuperAdmin_ImpersonatesAUser_SeesTheirData_AndItIsAudited()
     {
         var deal = await TestScenarios.CreateDealAsync(factory);
         var customerClient = await factory.CreateCustomerClientAsync(deal.Phone);
         var customerId = (await customerClient.GetFromJsonAsync<CurrentUserResponse>("/api/v1/auth/me", TestJson.Options))!.Id;
-        var platform = await factory.CreatePlatformOwnerClientAsync();
-        var platformId = await factory.WithDbAsync(db => db.Users.Where(u => u.Email == SitoraApiFactory.PlatformOwnerEmail).Select(u => u.Id).SingleAsync());
+        var platform = await factory.CreateSuperAdminClientAsync();
+        var platformId = await factory.WithDbAsync(db => db.Users.Where(u => u.Email == SitoraApiFactory.SuperAdminEmail).Select(u => u.Id).SingleAsync());
 
         var started = await TestScenarios.ReadAsync<AccessTokenResponse>(await platform.PostAsync($"/api/v1/platform/impersonate/{customerId}", null));
         Assert.Equal(("Customer", customerId), (started.User.Role, started.User.Id));
@@ -121,7 +121,7 @@ public class RegistrationAndPlatformTests(SitoraApiFactory factory) : IClassFixt
         Assert.NotNull((await asCustomer.GetFromJsonAsync<CurrentUserResponse>("/api/v1/auth/me", TestJson.Options))!.Impersonation);
 
         var stopped = await TestScenarios.ReadAsync<AccessTokenResponse>(await asCustomer.PostAsync("/api/v1/platform/impersonate/stop", null));
-        Assert.Equal("PlatformOwner", stopped.User.Role);
+        Assert.Equal("SuperAdmin", stopped.User.Role);
 
         await factory.WithDbAsync(async db =>
         {

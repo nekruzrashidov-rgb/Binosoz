@@ -8,20 +8,20 @@ using Sitora.Domain.Interfaces;
 
 namespace Sitora.WebApi.Controllers;
 
-// Раздел создателя платформы: организации (застройщики), вход «как владелец», второй фактор.
+// Раздел суперадмина: организации (застройщики) и вход «как владелец». 2FA — /auth/2fa/*.
 [ApiController]
 [Route("api/v1/platform")]
 [Produces("application/json")]
 public class PlatformController(IPlatformService platform) : ControllerBase
 {
     [HttpGet("organizations")]
-    [Authorize(Roles = Roles.PlatformOwner)]
+    [Authorize(Roles = Roles.SuperAdmin)]
     public Task<IReadOnlyList<OrganizationResponse>> Organizations(CancellationToken ct) =>
         platform.GetOrganizationsAsync(ct);
 
     /// <summary>Новая организация и её владелец (входит по коду из почты).</summary>
     [HttpPost("organizations")]
-    [Authorize(Roles = Roles.PlatformOwner)]
+    [Authorize(Roles = Roles.SuperAdmin)]
     [ProducesResponseType<OrganizationResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<OrganizationResponse>> CreateOrganization(CreateOrganizationRequest request, CancellationToken ct) =>
@@ -30,7 +30,7 @@ public class PlatformController(IPlatformService platform) : ControllerBase
     /// <summary>Короткое имя (поддомен) и свой домен организации; пустой домен — без своего домена.</summary>
     /// <summary>Приостановить или снова открыть организацию. При приостановке вход её сотрудникам закрыт, их сессии отзываются.</summary>
     [HttpPatch("organizations/{organizationId:guid}/status")]
-    [Authorize(Roles = Roles.PlatformOwner)]
+    [Authorize(Roles = Roles.SuperAdmin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> SetStatus(Guid organizationId, OrganizationStatusRequest request, CancellationToken ct)
@@ -40,7 +40,7 @@ public class PlatformController(IPlatformService platform) : ControllerBase
     }
 
     [HttpPut("organizations/{organizationId:guid}/domain")]
-    [Authorize(Roles = Roles.PlatformOwner)]
+    [Authorize(Roles = Roles.SuperAdmin)]
     [ProducesResponseType<BrandResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public Task<BrandResponse> SetDomain(Guid organizationId, UpdateOrganizationDomainRequest request, [FromServices] IBrandService brands,
@@ -49,7 +49,7 @@ public class PlatformController(IPlatformService platform) : ControllerBase
 
     /// <summary>Добавить владельца организации: почта, имя и пароль (необязательно — вход по коду из почты).</summary>
     [HttpPost("organizations/{organizationId:guid}/owners")]
-    [Authorize(Roles = Roles.PlatformOwner)]
+    [Authorize(Roles = Roles.SuperAdmin)]
     [ProducesResponseType<UserResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<UserResponse>> AddOwner(Guid organizationId, AddOwnerRequest request, CancellationToken ct) =>
@@ -57,14 +57,14 @@ public class PlatformController(IPlatformService platform) : ControllerBase
 
     /// <summary>Заявки застройщиков с публичной страницы; status — Pending, Approved или Rejected, без него — все.</summary>
     [HttpGet("applications")]
-    [Authorize(Roles = Roles.PlatformOwner)]
+    [Authorize(Roles = Roles.SuperAdmin)]
     public Task<PagedResult<OrgApplicationResponse>> Applications([FromServices] IOrgApplicationService applications,
         OrgApplicationStatus? status, int page = 1, int pageSize = PageRequest.DefaultPageSize, CancellationToken ct = default) =>
         applications.GetAsync(status, PageRequest.Normalize(page, pageSize), ct);
 
     /// <summary>Одобрить заявку: создаётся организация с этим коротким именем, владельцу уходит письмо со входом.</summary>
     [HttpPost("applications/{id:guid}/approve")]
-    [Authorize(Roles = Roles.PlatformOwner)]
+    [Authorize(Roles = Roles.SuperAdmin)]
     [ProducesResponseType<ApproveApplicationResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public Task<ApproveApplicationResponse> ApproveApplication(Guid id, ApproveApplicationRequest request,
@@ -73,7 +73,7 @@ public class PlatformController(IPlatformService platform) : ControllerBase
 
     /// <summary>Отклонить заявку с причиной; заявителю уходит письмо.</summary>
     [HttpPost("applications/{id:guid}/reject")]
-    [Authorize(Roles = Roles.PlatformOwner)]
+    [Authorize(Roles = Roles.SuperAdmin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> RejectApplication(Guid id, RejectApplicationRequest request,
@@ -88,7 +88,7 @@ public class PlatformController(IPlatformService platform) : ControllerBase
     /// access-токен без refresh с пометкой imp. Каждое действие в этом режиме пишется в аудит.
     /// </summary>
     [HttpPost("impersonate/{id:guid}")]
-    [Authorize(Roles = Roles.PlatformOwner)]
+    [Authorize(Roles = Roles.SuperAdmin)]
     [ProducesResponseType<AccessTokenResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public Task<AccessTokenResponse> Impersonate(Guid id, CancellationToken ct) =>
@@ -100,21 +100,6 @@ public class PlatformController(IPlatformService platform) : ControllerBase
     [ProducesResponseType<AccessTokenResponse>(StatusCodes.Status200OK)]
     public Task<AccessTokenResponse> StopImpersonation(CancellationToken ct) =>
         platform.StopImpersonationAsync(ct);
-
-    /// <summary>Ключ для приложения-аутентификатора (второй фактор вместо пароля).</summary>
-    [HttpGet("totp")]
-    [Authorize(Roles = Roles.PlatformOwner)]
-    public Task<TotpSetupResponse> TotpSetup(CancellationToken ct) =>
-        platform.GetTotpSetupAsync(ct);
-
-    [HttpPost("totp/enable")]
-    [Authorize(Roles = Roles.PlatformOwner)]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public async Task<IActionResult> EnableTotp(TotpEnableRequest request, CancellationToken ct)
-    {
-        await platform.EnableTotpAsync(request, ct);
-        return NoContent();
-    }
 }
 
 [ApiController]

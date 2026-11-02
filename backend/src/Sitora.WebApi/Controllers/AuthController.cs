@@ -95,6 +95,39 @@ public class AuthController(IAuthService auth, IOptions<AuthOptions> options) : 
     public Task<AuthResponse> VerifyTwoFactor(TwoFactorVerifyRequest request, CancellationToken ct) =>
         auth.VerifyTwoFactorAsync(request, ct);
 
+    /// <summary>
+    /// Ключ для приложения-аутентификатора (Google Authenticator и т. п.): qrCodeUri для QR-кода и manualKey для ручного ввода.
+    /// Только сотрудникам; если 2FA уже включена — 409 (сначала отключить).
+    /// </summary>
+    [HttpGet("2fa/setup")]
+    [Authorize(Roles = Roles.AllStaff)]
+    [ProducesResponseType<TwoFactorSetupResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public Task<TwoFactorSetupResponse> TwoFactorSetup(CancellationToken ct) =>
+        auth.GetTwoFactorSetupAsync(User.GetUserId(), ct);
+
+    /// <summary>Включить 2FA кодом из приложения: дальше вход по паролю спрашивает и код. Неверный код — 422.</summary>
+    [HttpPost("2fa/enable")]
+    [Authorize(Roles = Roles.AllStaff)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> EnableTwoFactor(TwoFactorCodeRequest request, CancellationToken ct)
+    {
+        await auth.EnableTwoFactorAsync(User.GetUserId(), request, ct);
+        return NoContent();
+    }
+
+    /// <summary>Отключить 2FA кодом из приложения; ключ сбрасывается. Неверный код или 2FA не включена — 422.</summary>
+    [HttpPost("2fa/disable")]
+    [Authorize(Roles = Roles.AllStaff)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> DisableTwoFactor(TwoFactorCodeRequest request, CancellationToken ct)
+    {
+        await auth.DisableTwoFactorAsync(User.GetUserId(), request, ct);
+        return NoContent();
+    }
+
     [HttpPost("refresh")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicies.Login)]

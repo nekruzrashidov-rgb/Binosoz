@@ -130,7 +130,7 @@ public class StatsTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFacto
         var deal = await TestScenarios.CreateDealAsync(factory);
         var customer = await factory.CreateCustomerClientAsync(deal.Phone);
         Assert.Equal(HttpStatusCode.Forbidden, (await customer.GetAsync("/api/v1/stats/dashboard")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await (await factory.CreatePlatformOwnerClientAsync()).GetAsync("/api/v1/stats/dashboard")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await (await factory.CreateSuperAdminClientAsync()).GetAsync("/api/v1/stats/dashboard")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await factory.CreateClient().GetAsync("/api/v1/stats/dashboard")).StatusCode);
     }
 

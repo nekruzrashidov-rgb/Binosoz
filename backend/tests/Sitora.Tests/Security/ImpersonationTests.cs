@@ -17,9 +17,9 @@ public class ImpersonationTests(SitoraApiFactory factory) : IClassFixture<Sitora
     [Fact]
     public async Task Impersonation_IsMarkedInTokenAndResponses_AndEveryActionIsAudited()
     {
-        var platform = await factory.CreatePlatformOwnerClientAsync();
+        var platform = await factory.CreateSuperAdminClientAsync();
         var platformUserId = await factory.WithDbAsync(db =>
-            db.Users.Where(u => u.Email == SitoraApiFactory.PlatformOwnerEmail).Select(u => u.Id).SingleAsync());
+            db.Users.Where(u => u.Email == SitoraApiFactory.SuperAdminEmail).Select(u => u.Id).SingleAsync());
 
         var organizations = await platform.GetFromJsonAsync<List<OrganizationResponse>>("/api/v1/platform/organizations", TestJson.Options);
         Assert.Contains(organizations!, o => o.Id == Organization.DefaultId);
@@ -54,7 +54,7 @@ public class ImpersonationTests(SitoraApiFactory factory) : IClassFixture<Sitora
 
         var stopped = await TestScenarios.ReadAsync<AccessTokenResponse>(await impersonated.PostAsync("/api/v1/platform/impersonate/stop", null));
         Assert.Null(stopped.User.Impersonation);
-        Assert.Equal("PlatformOwner", stopped.User.Role);
+        Assert.Equal("SuperAdmin", stopped.User.Role);
 
         await factory.WithDbAsync(async db =>
         {

@@ -73,11 +73,11 @@ public class OrgApplicationTests(SitoraApiFactory factory) : IClassFixture<Sitor
     }
 
     [Fact]
-    public async Task PlatformOwner_CanApprove_CreatesOrganizationWithOwner()
+    public async Task SuperAdmin_CanApprove_CreatesOrganizationWithOwner()
     {
         var email = NewEmail();
         var id = await SubmitIdAsync(email);
-        var platform = await factory.CreatePlatformOwnerClientAsync();
+        var platform = await factory.CreateSuperAdminClientAsync();
         var slug = "dev-" + Guid.NewGuid().ToString("N")[..8];
 
         var pending = await platform.GetFromJsonAsync<PagedResult<OrgApplicationResponse>>("/api/v1/platform/applications?status=Pending&pageSize=100", TestJson.Options);
@@ -117,7 +117,7 @@ public class OrgApplicationTests(SitoraApiFactory factory) : IClassFixture<Sitor
     {
         var email = NewEmail();
         var id = await SubmitIdAsync(email);
-        var platform = await factory.CreatePlatformOwnerClientAsync();
+        var platform = await factory.CreateSuperAdminClientAsync();
         factory.Email.Failing[email] = true;
 
         var approved = await TestScenarios.ReadAsync<ApproveApplicationResponse>(
@@ -129,9 +129,9 @@ public class OrgApplicationTests(SitoraApiFactory factory) : IClassFixture<Sitor
     }
 
     [Fact]
-    public async Task PlatformOwner_CanReject_SetsRejected_AndTakenSlugKeepsPending()
+    public async Task SuperAdmin_CanReject_SetsRejected_AndTakenSlugKeepsPending()
     {
-        var platform = await factory.CreatePlatformOwnerClientAsync();
+        var platform = await factory.CreateSuperAdminClientAsync();
         var id = await SubmitIdAsync(NewEmail());
 
         // Занятое короткое имя: организация не создаётся, заявка остаётся на рассмотрении.

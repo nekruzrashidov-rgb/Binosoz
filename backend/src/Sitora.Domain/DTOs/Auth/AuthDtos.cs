@@ -13,7 +13,7 @@ public record AuthResponse(
     DateTime RefreshTokenExpiresAt,
     CurrentUserResponse User);
 
-// Role — главная роль для выбора интерфейса (PlatformOwner > Owner > ObjectAdmin > Manager > Accountant > Content > Customer).
+// Role — главная роль для выбора интерфейса (SuperAdmin > Owner > ObjectAdmin > Manager > Accountant > Content > Customer).
 // BuildingIds пустой — доступны все дома организации. Impersonation — токен выдан в режиме «войти как владелец».
 public record CurrentUserResponse(
     Guid Id,
@@ -53,6 +53,8 @@ public record LoginResult(AuthResponse? Auth, TwoFactorRequiredResponse? TwoFact
 // Токен без refresh-токена: режим «войти как владелец» и выход из него.
 public record AccessTokenResponse(string AccessToken, DateTime AccessTokenExpiresAt, CurrentUserResponse User);
 
-public record TotpSetupResponse(string SharedKey, string AuthenticatorUri);
+// Настройка 2FA: qrCodeUri — для QR-кода (otpauth://totp/Binosoz:{email}?secret=…&issuer=Binosoz), manualKey — ввести руками.
+public record TwoFactorSetupResponse(string QrCodeUri, string ManualKey);
 
-public record TotpEnableRequest(string Code);
+// Код из приложения-аутентификатора: включить или отключить 2FA.
+public record TwoFactorCodeRequest(string Code);

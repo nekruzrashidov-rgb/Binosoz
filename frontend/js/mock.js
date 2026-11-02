@@ -14,7 +14,7 @@
   const PLATFORM_PASSWORD = 'Platform123!';
   const DEMO_CUSTOMER_EMAIL = 'customer@sitora.tj';
   const STAFF = [
-    { id: 'u0', email: 'nekrashidov@gmail.com', password: PLATFORM_PASSWORD, name: 'Создатель платформы', roles: ['PlatformOwner'], platform: true },
+    { id: 'u0', email: 'nekrashidov@gmail.com', password: PLATFORM_PASSWORD, name: 'Создатель платформы', roles: ['SuperAdmin'], platform: true },
     { id: 'u1', email: 'admin@sitora.tj', password: 'Admin123!', name: 'Фирдавс Назаров', roles: ['Owner'] },
     { id: 'u5', email: 'object@sitora.tj', password: 'Object123!', name: 'Рустам Каримов', roles: ['ObjectAdmin'], buildingIds: [1] },
     { id: 'u2', email: 'manager@sitora.tj', password: 'Manager123!', name: 'Мадина Исмоилова', roles: ['Manager'] },
@@ -179,7 +179,7 @@
     if (roles === 'any') return;
     // Leaders can do what the positions can; 'Owner-only' sections stay with the owner.
     const leader = ctx.user.roles.includes('Owner') || (ctx.user.roles.includes('ObjectAdmin') && !roles.includes('Owner-only'));
-    const ok = (leader && !roles.includes('Customer-only') && !roles.includes('PlatformOwner')) || ctx.user.roles.some((r) => roles.includes(r));
+    const ok = (leader && !roles.includes('Customer-only') && !roles.includes('SuperAdmin')) || ctx.user.roles.some((r) => roles.includes(r));
     if (!ok) err(403, 'Forbidden', 'Недостаточно прав для этого действия');
   }
 
@@ -244,7 +244,7 @@
 
   // platform owner (the demo has one developer with data; a new organization starts empty on the real API)
   const orgView = (o) => ({ id: o.id, name: o.name, slug: o.slug, isActive: o.isActive, buildingsCount: o.id === ORG.id ? 1 : 0, usersCount: db.users.filter((u) => !u.platform && !u.impersonation && !u.roles.includes('Customer') && (u.organizationId || ORG.id) === o.id).length, createdAt: o.createdAt });
-  route('GET', /^\/platform\/organizations$/, () => db.orgs.map(orgView), ['PlatformOwner']);
+  route('GET', /^\/platform\/organizations$/, () => db.orgs.map(orgView), ['SuperAdmin']);
   route('POST', /^\/platform\/organizations$/, (c) => {
     const b = c.body; const slug = String(b.slug || '').trim().toLowerCase(); const email = String(b.ownerEmail || '').trim().toLowerCase();
     if (!String(b.name || '').trim()) err(400, 'Validation', 'Укажите название', { Name: ['Укажите название'] });
@@ -255,7 +255,7 @@
     const o = { id: 'org' + db.seq++, name: b.name.trim(), slug, isActive: true, createdAt: iso(Date.now()) };
     db.orgs.push(o); db.users.push({ id: 'u' + db.seq++, email, name: b.ownerFullName || email, roles: ['Owner'], status: 'Active', organizationId: o.id, buildingIds: [] });
     audit(db, c.user.name, 'Created', 'Organization', o.id, null, { name: o.name, slug }); return orgView(o);
-  }, ['PlatformOwner']);
+  }, ['SuperAdmin']);
   route('POST', /^\/platform\/impersonate\/stop$/, (c) => {
     if (!c.user.impersonation) err(422, 'Business', 'Режим «войти как владелец» не включён');
     const p = db.users.find((x) => x.id === c.user.impersonation.impersonatedBy); audit(db, p.name, 'ImpersonationStopped', 'Organization', c.user.organizationId, null, null);
@@ -267,9 +267,9 @@
     if (!u) { u = { id, email: c.user.email, name: c.user.name, roles: ['Owner'], status: 'Active', organizationId: o.id, buildingIds: [], impersonation: { impersonatedBy: c.user.id, organizationId: o.id } }; db.users.push(u); }
     audit(db, c.user.name, 'ImpersonationStarted', 'Organization', o.id, null, { organization: o.name });
     return { accessToken: tokenFor(u), accessTokenExpiresAt: iso(Date.now() + 15 * 60000), user: userView(u) };
-  }, ['PlatformOwner']);
-  route('GET', /^\/platform\/totp$/, () => ({ sharedKey: 'DEMO DEMO DEMO DEMO', authenticatorUri: 'otpauth://totp/Sitora:nekrashidov@gmail.com?secret=DEMODEMODEMODEMO&issuer=Sitora&digits=6' }), ['PlatformOwner']);
-  route('POST', /^\/platform\/totp\/enable$/, (c) => { if (!/^\d{6}$/.test(String(c.body.code || ''))) err(422, 'Business', 'Неверный код из приложения'); db.totp = true; return {}; }, ['PlatformOwner']);
+  }, ['SuperAdmin']);
+  route('GET', /^\/auth\/2fa\/setup$/, () => (db.totp ? err(409, 'Conflict', '2FA уже включена') : { manualKey: 'DEMODEMODEMODEMO', qrCodeUri: 'otpauth://totp/Binosoz:nekrashidov%40gmail.com?secret=DEMODEMODEMODEMO&issuer=Binosoz' }), ['SuperAdmin']);
+  route('POST', /^\/auth\/2fa\/enable$/, (c) => { if (!/^\d{6}$/.test(String(c.body.code || ''))) err(422, 'Business', 'Неверный код из приложения'); db.totp = true; return {}; }, ['SuperAdmin']);
   route('GET', /^\/auth\/me$/, (c) => userView(c.user), 'any');
 
   // catalog

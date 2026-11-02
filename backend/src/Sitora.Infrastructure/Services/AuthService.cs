@@ -376,6 +376,76 @@ public class AuthService(
 
     private static string ChallengeKey(string token) => "2fa:" + JwtTokenService.HashToken(token);
 
+    // ---------- Настройка 2FA ----------
+
+    public const string AuthenticatorIssuer = "Binosoz";
+
+    // Ключ показывается, пока 2FA не включена: включённую сначала отключают кодом, тогда выдаётся новый ключ.
+    public async Task<TwoFactorSetupResponse> GetTwoFactorSetupAsync(Guid userId, CancellationToken ct = default)
+    {
+        var user = await RequireStaffSelfAsync(userId);
+        if (await userManager.GetTwoFactorEnabledAsync(user))
+            throw new ConflictException("2FA уже включена. Чтобы получить новый ключ, сначала отключите её");
+
+        var key = await userManager.GetAuthenticatorKeyAsync(user);
+        if (string.IsNullOrEmpty(key))
+        {
+            await userManager.ResetAuthenticatorKeyAsync(user);
+            key = await userManager.GetAuthenticatorKeyAsync(user);
+        }
+
+        var account = Uri.EscapeDataString(user.Email ?? user.Id.ToString());
+        return new TwoFactorSetupResponse($"otpauth://totp/{AuthenticatorIssuer}:{account}?secret={key}&issuer={AuthenticatorIssuer}", key!);
+    }
+
+    public async Task EnableTwoFactorAsync(Guid userId, TwoFactorCodeRequest request, CancellationToken ct = default)
+    {
+        var user = await RequireStaffSelfAsync(userId);
+        if (await userManager.GetTwoFactorEnabledAsync(user))
+            throw new ConflictException("2FA уже включена");
+        if (string.IsNullOrEmpty(await userManager.GetAuthenticatorKeyAsync(user)))
+            throw new BusinessRuleException("Сначала получите ключ: GET /auth/2fa/setup");
+        await EnsureTotpAsync(user, request.Code);
+
+        await userManager.SetTwoFactorEnabledAsync(user, true);
+        audit.Record(nameof(AppUser), user.Id, "TwoFactorEnabled", null, null, user.OrganizationId);
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("Пользователь {UserId} включил 2FA", user.Id);
+    }
+
+    // Отключение — тоже кодом из приложения; ключ сбрасывается, при новой настройке будет другой.
+    public async Task DisableTwoFactorAsync(Guid userId, TwoFactorCodeRequest request, CancellationToken ct = default)
+    {
+        var user = await RequireStaffSelfAsync(userId);
+        if (!await userManager.GetTwoFactorEnabledAsync(user))
+            throw new BusinessRuleException("2FA не включена");
+        await EnsureTotpAsync(user, request.Code);
+
+        await userManager.SetTwoFactorEnabledAsync(user, false);
+        await userManager.ResetAuthenticatorKeyAsync(user);
+        audit.Record(nameof(AppUser), user.Id, "TwoFactorDisabled", null, null, user.OrganizationId);
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("Пользователь {UserId} отключил 2FA", user.Id);
+    }
+
+    private async Task EnsureTotpAsync(AppUser user, string? code)
+    {
+        if (!await userManager.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultAuthenticatorProvider,
+                (code ?? "").Replace(" ", "", StringComparison.Ordinal)))
+            throw new BusinessRuleException("Неверный код из приложения");
+    }
+
+    // 2FA настраивает только сам сотрудник; в режиме «войти как …» — нельзя: это чужая учётная запись.
+    private async Task<AppUser> RequireStaffSelfAsync(Guid userId)
+    {
+        if (currentUser.ImpersonatorId is not null)
+            throw new ForbiddenException("В режиме «войти как владелец» 2FA не настраивается");
+        var user = await userManager.FindByIdAsync(userId.ToString()) ?? throw new UnauthorizedException("Требуется вход");
+        if (!await IsStaffAsync(user))
+            throw new ForbiddenException("2FA — для сотрудников: покупатели входят по коду из почты");
+        return user;
+    }
+
     // ---------- Приглашение сотрудника ----------
 
     // Недействительная ссылка — 404 с тем же текстом, что и при попытке её принять.

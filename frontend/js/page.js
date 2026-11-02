@@ -78,7 +78,7 @@
   function accountLink() {
     const u = S.api.isAuthed && S.api.user;
     if (!u) return h('a', { class: 'btn sm gold', href: '/login' }, t('nav.login'));
-    const home = u.role === 'PlatformOwner' ? 'platform' : u.role === 'Customer' ? 'cabinet' : 'crm';
+    const home = u.role === 'SuperAdmin' ? 'platform' : u.role === 'Customer' ? 'cabinet' : 'crm';
     return h('a', { class: 'btn sm gold', href: PAGES[home], title: u.name || '' }, t('nav.' + home));
   }
 

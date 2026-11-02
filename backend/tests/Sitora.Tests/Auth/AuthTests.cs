@@ -247,6 +247,63 @@ public class AuthTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFactor
         Assert.Equal(HttpStatusCode.Unauthorized, (await Verify2Fa(twoFactor.TempToken, Totp.Code(key))).StatusCode);
     }
 
+    [Fact]
+    public async Task SeededSuperAdmin_LogsInWithPassword_OutsideOrganizations()
+    {
+        var auth = await LoginOk(Sitora.Infrastructure.Data.Seed.DatabaseInitializer.SuperAdminEmail, factory.SeedSuperAdminPassword);
+
+        Assert.Equal("SuperAdmin", auth.User.Role);
+        Assert.Null(auth.User.OrganizationId);
+        Assert.Contains(new JsonWebToken(auth.AccessToken).Claims, c => c.Type == "role" && c.Value == "SuperAdmin");
+    }
+
+    [Fact]
+    public async Task TwoFactor_Setup_Enable_Login_Disable()
+    {
+        var (email, password) = await NewStaffAsync();
+        var staff = await factory.CreateClientForAsync(email, password);
+
+        var setup = (await staff.GetFromJsonAsync<TwoFactorSetupResponse>("/api/v1/auth/2fa/setup", TestJson.Options))!;
+        Assert.Equal($"otpauth://totp/Binosoz:{Uri.EscapeDataString(email)}?secret={setup.ManualKey}&issuer=Binosoz", setup.QrCodeUri);
+        var wrong = Totp.Code(setup.ManualKey) == "000000" ? "111111" : "000000";
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await staff.PostAsJsonAsync("/api/v1/auth/2fa/enable", new TwoFactorCodeRequest(wrong))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await staff.PostAsJsonAsync("/api/v1/auth/2fa/enable", new TwoFactorCodeRequest(Totp.Code(setup.ManualKey)))).StatusCode);
+        // Включённую 2FA ключ не показывает.
+        Assert.Equal(HttpStatusCode.Conflict, (await staff.GetAsync("/api/v1/auth/2fa/setup")).StatusCode);
+
+        // Теперь вход спрашивает код.
+        var twoFactor = (await (await Login(email, password)).Content.ReadFromJsonAsync<TwoFactorRequiredResponse>(TestJson.Options))!;
+        Assert.True(twoFactor.RequiresTwoFactor);
+        Assert.Equal(HttpStatusCode.OK, (await Verify2Fa(twoFactor.TempToken, Totp.Code(setup.ManualKey))).StatusCode);
+
+        // Отключить — тоже кодом; после этого вход снова сразу по паролю.
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await staff.PostAsJsonAsync("/api/v1/auth/2fa/disable", new TwoFactorCodeRequest(wrong))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await staff.PostAsJsonAsync("/api/v1/auth/2fa/disable", new TwoFactorCodeRequest(Totp.Code(setup.ManualKey)))).StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await staff.PostAsJsonAsync("/api/v1/auth/2fa/disable", new TwoFactorCodeRequest(Totp.Code(setup.ManualKey)))).StatusCode);
+        await LoginOk(email, password);
+
+        // Новый ключ после отключения — другой.
+        var again = (await staff.GetFromJsonAsync<TwoFactorSetupResponse>("/api/v1/auth/2fa/setup", TestJson.Options))!;
+        Assert.NotEqual(setup.ManualKey, again.ManualKey);
+
+        var userId = await factory.WithDbAsync(db => db.Users.Where(u => u.Email == email).Select(u => u.Id).SingleAsync());
+        var actions = await factory.WithDbAsync(db => db.AuditLogs.Where(l => l.EntityId == userId).Select(l => l.Action).ToListAsync());
+        Assert.Contains("TwoFactorEnabled", actions);
+        Assert.Contains("TwoFactorDisabled", actions);
+    }
+
+    [Fact]
+    public async Task TwoFactor_OnlyForStaff()
+    {
+        var deal = await TestScenarios.CreateDealAsync(factory);
+        var customer = await factory.CreateCustomerClientAsync(deal.Phone);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await customer.GetAsync("/api/v1/auth/2fa/setup")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await _client.GetAsync("/api/v1/auth/2fa/setup")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await _client.PostAsJsonAsync("/api/v1/auth/2fa/enable", new TwoFactorCodeRequest("123456"))).StatusCode);
+    }
+
     private Task<HttpResponseMessage> Login(string email, string password) =>
         _client.PostAsJsonAsync("/api/v1/auth/login", new LoginRequest(email, password));
 

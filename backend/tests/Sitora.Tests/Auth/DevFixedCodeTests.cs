@@ -73,7 +73,7 @@ public class AnyEmailFixedCodeFactory : SitoraApiFactory
 public class AnyEmailFixedCodeTests(AnyEmailFixedCodeFactory factory) : IClassFixture<AnyEmailFixedCodeFactory>
 {
     [Fact]
-    public async Task UnknownEmail_BecomesCustomer_StaffAndPlatformOwnerStillNeedPassword()
+    public async Task UnknownEmail_BecomesCustomer_StaffAndSuperAdminStillNeedPassword()
     {
         var client = factory.CreateClient();
         var email = $"New-{Guid.NewGuid():N}@Mail.Test";
@@ -89,7 +89,7 @@ public class AnyEmailFixedCodeTests(AnyEmailFixedCodeFactory factory) : IClassFi
         Assert.Equal(1, await factory.WithDbAsync(db => db.Customers.IgnoreQueryFilters().CountAsync(c => c.Email == email.ToLowerInvariant())));
 
         // Код разработки не открывает вход сотрудникам и создателю платформы и не делает из них покупателей.
-        foreach (var staff in new[] { SitoraApiFactory.ManagerEmail, SitoraApiFactory.PlatformOwnerEmail })
+        foreach (var staff in new[] { SitoraApiFactory.ManagerEmail, SitoraApiFactory.SuperAdminEmail })
             Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/v1/auth/email/verify", new EmailVerifyRequest(staff, "123456"))).StatusCode);
         Assert.False(await factory.WithDbAsync(db => db.Customers.IgnoreQueryFilters().AnyAsync(c => c.Email == SitoraApiFactory.ManagerEmail)));
 

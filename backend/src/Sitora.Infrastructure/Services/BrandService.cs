@@ -168,7 +168,7 @@ public class BrandService(
 
     public async Task<BrandResponse> SetDomainAsync(Guid organizationId, UpdateOrganizationDomainRequest request, CancellationToken ct = default)
     {
-        if (!currentUser.IsInRole(RoleNames.PlatformOwner))
+        if (!currentUser.IsInRole(RoleNames.SuperAdmin))
             throw new ForbiddenException("Доступно только создателю платформы");
         var organization = await db.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId, ct)
             ?? throw new NotFoundException("Организация не найдена");

@@ -7,7 +7,7 @@
 
   /* ---------- login ---------- */
   // Where each role works: the platform section, the management workspace or the buyer cabinet.
-  S.homeFor = (u) => (!u ? 'cabinet' : u.role === 'PlatformOwner' ? 'platform' : u.role === 'Customer' ? 'cabinet' : 'crm');
+  S.homeFor = (u) => (!u ? 'cabinet' : u.role === 'SuperAdmin' ? 'platform' : u.role === 'Customer' ? 'cabinet' : 'crm');
   const enter = (r) => { S.toast(t('login.welcome'), 'ok'); S.go(S.homeFor(r.user)); };
 
   // One form for everyone: e-mail, then the code from the letter. Only the platform owner gets a third step.

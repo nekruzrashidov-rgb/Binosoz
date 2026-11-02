@@ -12,13 +12,18 @@ namespace Sitora.Infrastructure.Data.Seed;
 
 public static class DatabaseInitializer
 {
-    private static readonly (string Email, string FullName, string Role, string PasswordVariable)[] DevelopmentUsers =
+    // Пароли — только из переменных окружения или user-secrets, в репозитории их нет.
+    // Суперадмин — вне организаций (OrganizationId = null).
+    private static readonly (string Email, string FullName, string Role, string PasswordVariable, bool InOrganization)[] DevelopmentUsers =
     [
-        ("admin@sitora.local", "Владелец", RoleNames.Owner, "SEED_ADMIN_PASSWORD"),
-        ("manager@sitora.local", "Менеджер по продажам", RoleNames.Manager, "SEED_MANAGER_PASSWORD"),
-        ("accountant@sitora.local", "Бухгалтер", RoleNames.Accountant, "SEED_ACCOUNTANT_PASSWORD"),
-        ("content@sitora.local", "Контент-менеджер", RoleNames.Content, "SEED_CONTENT_PASSWORD")
+        ("admin@sitora.local", "Владелец", RoleNames.Owner, "SEED_ADMIN_PASSWORD", true),
+        ("manager@sitora.local", "Менеджер по продажам", RoleNames.Manager, "SEED_MANAGER_PASSWORD", true),
+        ("accountant@sitora.local", "Бухгалтер", RoleNames.Accountant, "SEED_ACCOUNTANT_PASSWORD", true),
+        ("content@sitora.local", "Контент-менеджер", RoleNames.Content, "SEED_CONTENT_PASSWORD", true),
+        (SuperAdminEmail, "Суперадмин", RoleNames.SuperAdmin, "SEED_SUPERADMIN_PASSWORD", false)
     ];
+
+    public const string SuperAdminEmail = "superadmin@binosoz.tj";
 
     public const string MigrateCommand = "--migrate";
 
@@ -51,7 +56,7 @@ public static class DatabaseInitializer
         await SeedRolesAsync(provider.GetRequiredService<RoleManager<IdentityRole<Guid>>>());
         await BootstrapOwnerAsync(provider.GetRequiredService<UserManager<AppUser>>(),
             provider.GetRequiredService<IConfiguration>(), logger);
-        await EnsurePlatformOwnerAsync(provider.GetRequiredService<UserManager<AppUser>>(),
+        await EnsureSuperAdminAsync(provider.GetRequiredService<UserManager<AppUser>>(),
             provider.GetRequiredService<IConfiguration>(), logger);
 
         if (provider.GetRequiredService<IHostEnvironment>().IsDevelopment())
@@ -110,10 +115,10 @@ public static class DatabaseInitializer
         logger.LogInformation("Создан первый владелец {Email}", email);
     }
 
-    // Создатель платформы — только из .env (ADMIN_EMAIL). Вход: код из почты и обязательно второй фактор,
-    // поэтому без пароля (ADMIN_PASSWORD) учётная запись не создаётся: войти было бы нечем.
-    // TOTP можно включить потом в разделе платформы. Существующему пароль не меняется.
-    private static async Task EnsurePlatformOwnerAsync(UserManager<AppUser> userManager, IConfiguration configuration, ILogger logger)
+    // Суперадмин в любом окружении — из .env (ADMIN_EMAIL и ADMIN_PASSWORD). Вход по паролю,
+    // поэтому без ADMIN_PASSWORD учётная запись не создаётся: войти было бы нечем.
+    // 2FA (TOTP) включается потом в разделе платформы. Существующему пароль не меняется.
+    private static async Task EnsureSuperAdminAsync(UserManager<AppUser> userManager, IConfiguration configuration, ILogger logger)
     {
         var email = configuration["ADMIN_EMAIL"]?.Trim().ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(email))
@@ -124,15 +129,15 @@ public static class DatabaseInitializer
         {
             if (user.OrganizationId is not null)
                 throw new InvalidOperationException($"ADMIN_EMAIL {email} уже занят сотрудником организации");
-            if (!await userManager.IsInRoleAsync(user, RoleNames.PlatformOwner))
-                await userManager.AddToRoleAsync(user, RoleNames.PlatformOwner);
+            if (!await userManager.IsInRoleAsync(user, RoleNames.SuperAdmin))
+                await userManager.AddToRoleAsync(user, RoleNames.SuperAdmin);
             return;
         }
 
         var password = configuration["ADMIN_PASSWORD"];
         if (string.IsNullOrWhiteSpace(password))
         {
-            logger.LogWarning("Создатель платформы {Email} не создан: задайте ADMIN_PASSWORD (второй фактор входа)", email);
+            logger.LogWarning("Суперадмин {Email} не создан: задайте ADMIN_PASSWORD", email);
             return;
         }
 
@@ -141,13 +146,13 @@ public static class DatabaseInitializer
         if (!result.Succeeded)
             throw new InvalidOperationException("Не удалось создать создателя платформы: " +
                                                 string.Join("; ", result.Errors.Select(e => e.Description)));
-        await userManager.AddToRoleAsync(user, RoleNames.PlatformOwner);
+        await userManager.AddToRoleAsync(user, RoleNames.SuperAdmin);
         logger.LogInformation("Создан создатель платформы {Email}", email);
     }
 
     private static async Task SeedDevelopmentUsersAsync(UserManager<AppUser> userManager, IConfiguration configuration, ILogger logger)
     {
-        foreach (var (email, fullName, role, passwordVariable) in DevelopmentUsers)
+        foreach (var (email, fullName, role, passwordVariable, inOrganization) in DevelopmentUsers)
         {
             if (await userManager.FindByEmailAsync(email) is not null)
                 continue;
@@ -165,7 +170,7 @@ public static class DatabaseInitializer
                 Email = email,
                 EmailConfirmed = true,
                 FullName = fullName,
-                OrganizationId = Organization.DefaultId
+                OrganizationId = inOrganization ? Organization.DefaultId : null
             };
             var result = await userManager.CreateAsync(user, password);
             if (!result.Succeeded)

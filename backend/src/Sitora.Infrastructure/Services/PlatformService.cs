@@ -14,7 +14,7 @@ using Sitora.Infrastructure.Security;
 
 namespace Sitora.Infrastructure.Services;
 
-// Действия создателя платформы: организации, вход «как владелец» и второй фактор.
+// Действия суперадмина: организации и вход «как владелец».
 public class PlatformService(
     AppDbContext db,
     UserManager<AppUser> userManager,
@@ -25,8 +25,6 @@ public class PlatformService(
     StaffAccounts accounts,
     ILogger<PlatformService> logger) : IPlatformService
 {
-    private const string AuthenticatorIssuer = "Sitora";
-
     // Организации с логотипом, почтами владельцев и названиями домов — для раскрывающейся строки в разделе платформы.
     public async Task<IReadOnlyList<OrganizationResponse>> GetOrganizationsAsync(CancellationToken ct = default)
     {
@@ -52,7 +50,7 @@ public class PlatformService(
     // Приостановка закрывает вход сотрудникам организации и её сайт; выданные сессии отзываются сразу.
     public async Task SetOrganizationActiveAsync(Guid organizationId, bool isActive, CancellationToken ct = default)
     {
-        await RequirePlatformOwnerAsync();
+        await RequireSuperAdminAsync();
         var organization = await db.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId, ct)
             ?? throw new NotFoundException("Организация не найдена");
         if (organization.IsActive == isActive)
@@ -104,7 +102,7 @@ public class PlatformService(
     // Ещё один владелец организации. Без пароля он генерируется и уходит владельцу письмом.
     public async Task<UserResponse> AddOwnerAsync(Guid organizationId, AddOwnerRequest request, CancellationToken ct = default)
     {
-        await RequirePlatformOwnerAsync();
+        await RequireSuperAdminAsync();
         var organization = await db.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId, ct)
             ?? throw new NotFoundException("Организация не найдена");
         var email = EmailAddress.Normalize(request.Email) ?? throw new BusinessRuleException("Неверный адрес почты владельца");
@@ -128,7 +126,7 @@ public class PlatformService(
     // id — организация или пользователь. Пометка imp видна в аудите и в каждом ответе (X-Impersonated-By).
     public async Task<AccessTokenResponse> ImpersonateAsync(Guid id, CancellationToken ct = default)
     {
-        var user = await RequirePlatformOwnerAsync();
+        var user = await RequireSuperAdminAsync();
         var organization = await db.Organizations.FirstOrDefaultAsync(o => o.Id == id, ct);
         return organization is not null
             ? await ImpersonateOrganizationAsync(user, organization, ct)
@@ -142,7 +140,7 @@ public class PlatformService(
         var target = await userManager.FindByIdAsync(userId.ToString())
             ?? throw new NotFoundException("Организация или пользователь не найдены");
         var roles = await userManager.GetRolesAsync(target);
-        if (roles.Contains(RoleNames.PlatformOwner))
+        if (roles.Contains(RoleNames.SuperAdmin))
             throw new BusinessRuleException("Нельзя войти под создателем платформы");
         if (!target.IsActive)
             throw new BusinessRuleException("Пользователь заблокирован");
@@ -195,38 +193,10 @@ public class PlatformService(
         return new AccessTokenResponse(token, expiresAt, await auth.BuildUserResponseAsync(user, roles, scope, ct));
     }
 
-    // Ключ для приложения-аутентификатора (Google Authenticator и т. п.). Включается кодом из приложения.
-    public async Task<TotpSetupResponse> GetTotpSetupAsync(CancellationToken ct = default)
+    private async Task<AppUser> RequireSuperAdminAsync()
     {
-        var user = await RequirePlatformOwnerAsync();
-        var key = await userManager.GetAuthenticatorKeyAsync(user);
-        if (string.IsNullOrEmpty(key))
-        {
-            await userManager.ResetAuthenticatorKeyAsync(user);
-            key = await userManager.GetAuthenticatorKeyAsync(user);
-        }
-
-        var account = Uri.EscapeDataString(user.Email ?? user.Id.ToString());
-        var uri = $"otpauth://totp/{AuthenticatorIssuer}:{account}?secret={key}&issuer={AuthenticatorIssuer}&digits=6";
-        return new TotpSetupResponse(key!, uri);
-    }
-
-    public async Task EnableTotpAsync(TotpEnableRequest request, CancellationToken ct = default)
-    {
-        var user = await RequirePlatformOwnerAsync();
-        var code = request.Code.Replace(" ", "", StringComparison.Ordinal);
-        if (!await userManager.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultAuthenticatorProvider, code))
-            throw new BusinessRuleException("Неверный код из приложения");
-
-        await userManager.SetTwoFactorEnabledAsync(user, true);
-        audit.Record(nameof(AppUser), user.Id, "TotpEnabled", null, null);
-        await db.SaveChangesAsync(ct);
-    }
-
-    private async Task<AppUser> RequirePlatformOwnerAsync()
-    {
-        // В режиме «войти как владелец» роли PlatformOwner в токене нет — эти действия недоступны.
-        if (!currentUser.IsInRole(RoleNames.PlatformOwner) || currentUser.UserId is not { } userId)
+        // В режиме «войти как владелец» роли SuperAdmin в токене нет — эти действия недоступны.
+        if (!currentUser.IsInRole(RoleNames.SuperAdmin) || currentUser.UserId is not { } userId)
             throw new ForbiddenException("Доступно только создателю платформы");
         return await userManager.FindByIdAsync(userId.ToString())
             ?? throw new UnauthorizedException("Требуется вход");

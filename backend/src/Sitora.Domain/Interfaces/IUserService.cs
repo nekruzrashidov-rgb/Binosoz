@@ -30,6 +30,4 @@ public interface IPlatformService
     // id — организация (войти «как её владелец») или пользователь (войти под ним самим).
     Task<AccessTokenResponse> ImpersonateAsync(Guid id, CancellationToken ct = default);
     Task<AccessTokenResponse> StopImpersonationAsync(CancellationToken ct = default);
-    Task<TotpSetupResponse> GetTotpSetupAsync(CancellationToken ct = default);
-    Task EnableTotpAsync(TotpEnableRequest request, CancellationToken ct = default);
 }

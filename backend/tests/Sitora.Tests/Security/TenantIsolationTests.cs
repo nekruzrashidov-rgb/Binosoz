@@ -288,7 +288,7 @@ public class TenantIsolationTests(SitoraApiFactory factory) : IClassFixture<Sito
     // Второй застройщик: создатель платформы заводит организацию, её владелец входит по почте и строит дом.
     private async Task<(HttpClient Owner, Guid BuildingId, string Slug)> CreateOrganizationBAsync()
     {
-        var platform = await factory.CreatePlatformOwnerClientAsync();
+        var platform = await factory.CreateSuperAdminClientAsync();
         var slug = $"b-{Guid.NewGuid():N}"[..20];
         var ownerEmail = $"owner-{slug}@b.test";
         await TestScenarios.ReadAsync<OrganizationResponse>(await platform.PostAsJsonAsync("/api/v1/platform/organizations",

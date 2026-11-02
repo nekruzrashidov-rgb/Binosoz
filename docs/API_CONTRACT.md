@@ -14,19 +14,19 @@
 ## Роли и организации
 
 - **Организация** — застройщик. Ей принадлежат дома, сотрудники, клиенты, заявки, ручной курс и аудит. Данные из базы фильтруются по организации и домам из токена. Чужое отвечает 404, как несуществующее.
-- **PlatformOwner** — создатель платформы, скрытая роль. Создаётся только из `ADMIN_EMAIL` и `ADMIN_PASSWORD`. Ведёт организации и может войти «как владелец» любой из них. На странице входа его нет: он входит той же формой по почте, а потом вводит второй фактор.
+- **SuperAdmin** (раньше PlatformOwner) — создатель платформы, выше всех ролей. Создаётся из `ADMIN_EMAIL` и `ADMIN_PASSWORD`, в Development ещё сидер `superadmin@binosoz.tj` (пароль — `SEED_SUPERADMIN_PASSWORD`). Ведёт организации и может войти «как владелец» любой из них. Входит, как сотрудники, по почте и паролю; если включена 2FA — ещё кодом из приложения.
 - **Owner** — владелец организации (бывшая роль `Admin`). Ведёт все свои дома, создаёт дома, назначает админов объектов и сотрудников, видит аудит и отчёты.
 - **ObjectAdmin** — админ одного дома. Ведёт свой дом, его сделки и сотрудников этого дома.
 - **Manager, Accountant, Content** — должности внутри организации. Без домов в `buildingIds` должность действует во всей организации, с домами — только в них.
 - **Customer** — покупатель, видит только свои сделки.
 
-В таблицах ниже «руководители» — это Owner и ObjectAdmin, а также PlatformOwner в режиме «как владелец».
+В таблицах ниже «руководители» — это Owner и ObjectAdmin, а также SuperAdmin в режиме «как владелец».
 
 Сотрудников не регистрируют сами: их заводит руководитель (`/invitations` или `/users`), а логин и пароль приходят письмом «Вы приглашены в Binosoz».
 
 ## Вход и сессия
 
-Два способа входа: **сотрудники** (Owner, ObjectAdmin, Manager, Accountant, Content, PlatformOwner) — по почте и паролю, **покупатели** — по коду из почты. Раздел интерфейса выбирается по `user.role`.
+Два способа входа: **сотрудники** (Owner, ObjectAdmin, Manager, Accountant, Content, SuperAdmin) — по почте и паролю, **покупатели** — по коду из почты. Раздел интерфейса выбирается по `user.role`.
 
 | Метод | Путь | Тело | Ответ |
 | --- | --- | --- | --- |
@@ -40,6 +40,9 @@
 | GET | `/auth/me` | — | `CurrentUser` |
 | POST | `/auth/login` | `{ email, password }` | сотрудник: 200 `AuthResponse`, с включённой 2FA — 200 `TwoFactorRequired`. Покупатель — 400 «Используйте вход по коду». Неверный пароль или незнакомая почта — 401 «Неверная почта или пароль»; после 5 ошибок подряд — блокировка на 15 минут (401 «Слишком много неудачных попыток…», даже с верным паролем) |
 | POST | `/auth/2fa/verify` | `{ tempToken, code }` | `AuthResponse`. `tempToken` живёт 5 минут, 5 попыток; неверный код — 401 |
+| GET | `/auth/2fa/setup` | — | сотрудник: `{ qrCodeUri, manualKey }`, `qrCodeUri = otpauth://totp/Binosoz:{email}?secret={key}&issuer=Binosoz`. 2FA уже включена — 409; покупатель — 403 |
+| POST | `/auth/2fa/enable` | `{ code }` | 204; дальше вход по паролю спрашивает код. Неверный код — 422. Аудит `TwoFactorEnabled` |
+| POST | `/auth/2fa/disable` | `{ code }` | 204, ключ сбрасывается. Неверный код или 2FA не включена — 422. Аудит `TwoFactorDisabled` |
 | POST | `/auth/sms/send`, `/auth/sms/verify` | — | выключены (404), включаются `Auth__SmsLoginEnabled=true` |
 
 Код из почты:
@@ -58,8 +61,8 @@ AuthResponse = { accessToken, accessTokenExpiresAt, refreshToken, refreshTokenEx
 CurrentUser = {
   id, email, phone, fullName,
   roles: ["Owner"],                 // все роли
-  role: "Owner",                    // главная: PlatformOwner > Owner > ObjectAdmin > Manager > Accountant > Content > Customer
-  organizationId: "…" | null,       // null у PlatformOwner вне режима и у покупателя
+  role: "Owner",                    // главная: SuperAdmin > Owner > ObjectAdmin > Manager > Accountant > Content > Customer
+  organizationId: "…" | null,       // null у SuperAdmin вне режима и у покупателя
   organizationName: "…" | null,
   buildingIds: [],                  // пусто — все дома организации; у ObjectAdmin ровно один
   impersonation: null | { impersonatedBy, organizationId }
@@ -80,7 +83,7 @@ TwoFactorRequired = { requiresTwoFactor: true, tempToken, expiresAt }
 | POST | `/deals/{dealId}/documents/verify` | multipart `file` (JPG, PNG, GIF, WebP до 5 МБ или PDF до 10 МБ), `expectedFullName?` | Manager, руководители. То же для нового файла; файл не сохраняется, аудит `Deal` / `AiDocumentVerified` |
 | POST | `/deals/{dealId}/payments/read-receipt` | multipart `file` | Manager, Accountant, руководители. `{ receipt: { isReadable, amount, currency, paymentDate, description, bankName, rawResponse }, suggestedScheduleItemId, suggestedDueDate, suggestedAmount, suggestedCurrency }`. Подходящий пункт графика — неоплаченный, остаток отличается от суммы чека меньше чем на 1 %, срок в пределах 30 дней от даты оплаты, та же валюта. Платёж не создаётся: его вносит бухгалтер обычным `POST /deals/{id}/payments` |
 
-## Платформа (только PlatformOwner)
+## Платформа (только SuperAdmin)
 
 | Метод | Путь | Тело / ответ |
 | --- | --- | --- |
@@ -90,8 +93,6 @@ TwoFactorRequired = { requiresTwoFactor: true, tempToken, expiresAt }
 | POST | `/platform/organizations/{id}/owners` | `{ email, fullName, password? }` → 201 `UserResponse`: ещё один владелец организации. Без пароля он генерируется и уходит письмом |
 | POST | `/platform/impersonate/{id}` | `id` — организация: вход «как владелец» (`user.role = "Owner"`). `id` — пользователь: вход под ним самим, с его ролью и домами. Ответ — `AccessTokenResponse = { accessToken, accessTokenExpiresAt, user }` без refresh-токена, `user.impersonation` заполнено. Под создателем платформы войти нельзя (422) |
 | POST | `/platform/impersonate/stop` | `AccessTokenResponse` — обычный токен создателя платформы |
-| GET | `/platform/totp` | `{ sharedKey, authenticatorUri }` для приложения-аутентификатора |
-| POST | `/platform/totp/enable` | `{ code }` → 204; после этого вторым фактором подходит и код из приложения |
 | GET | `/platform/applications?status=&page=&pageSize=` | `PagedResult` заявок застройщиков: `{ id, companyName, contactEmail, contactPhone, ownerFullName, comment, status, reviewNote, createdAt, reviewedAt, organizationId }`. `status`: `Pending`, `Approved`, `Rejected`; без него — все |
 | POST | `/platform/applications/{id}/approve` | `{ organizationSlug }` → `{ organizationId, message }`: создаётся организация с владельцем (как `POST /platform/organizations`), владельцу уходит письмо со входом. Уже рассмотренная заявка или занятое короткое имя — 409 |
 | POST | `/platform/applications/{id}/reject` | `{ reason }` → 204, заявителю уходит письмо с причиной. Уже рассмотренная — 409 |
@@ -159,7 +160,7 @@ TwoFactorRequired = { requiresTwoFactor: true, tempToken, expiresAt }
 | --- | --- | --- | --- |
 | GET | `/buildings/{id}/floorplan` | Manager, Accountant, Content, руководители | Номера этажей, для которых есть план: `[1, 5]` |
 | GET | `/buildings/{id}/floorplan/{floor}` | то же | `image/svg+xml`: у `<rect id="apt-{apartmentId}">` — `fill` по статусу (Free `#22c55e`, Booked `#f59e0b`, Sold `#ef4444`, OnRequest `#6b7280`), `<title>` «Кв. N, площадь м², цена валюта», `class="fp-apt"`, `data-apartment-id`, `data-number`, `data-status` (`free`/`booked`/`sold`/`onrequest`), `data-deal-id` (действующая сделка, у брони и продажи). Квартира другого дома в шаблоне — серая, без данных. Нет плана или этажа — 404 |
-| PUT | `/buildings/{id}/floorplan/{floor}` | Owner, ObjectAdmin, PlatformOwner | `{ svgTemplate }` (до 200 тыс. символов) → 204. Разрешены `svg, g, rect, text, tspan, title, desc, line, path, polygon, polyline, circle, ellipse`; `<script>`, `<foreignObject>` и прочее — 422; атрибуты `on*`, `href` и `url()` в `style` удаляются. Этаж должен существовать (иначе 404). Аудит `FloorPlan` / `Updated` |
+| PUT | `/buildings/{id}/floorplan/{floor}` | Owner, ObjectAdmin, SuperAdmin | `{ svgTemplate }` (до 200 тыс. символов) → 204. Разрешены `svg, g, rect, text, tspan, title, desc, line, path, polygon, polyline, circle, ellipse`; `<script>`, `<foreignObject>` и прочее — 422; атрибуты `on*`, `href` и `url()` в `style` удаляются. Этаж должен существовать (иначе 404). Аудит `FloorPlan` / `Updated` |
 
 ## CRM
 
@@ -203,7 +204,7 @@ TwoFactorRequired = { requiresTwoFactor: true, tempToken, expiresAt }
 | GET | `/buildings/{id}/reports/weekly` | Accountant, руководители | Еженедельные отчёты дома, новые сверху: `[{ id, buildingId, periodStart, periodEnd, generatedAt, isManual }]`. Чужой или несуществующий дом — 404 |
 | GET | `/buildings/{id}/reports/weekly/{reportId}/excel` | Accountant, руководители | `.xlsx`: «Сводка» (касса за неделю в TJS: поступления, расходы, прибыль; новые сделки; просрочек на понедельник после недели; готовность стройки — среднее по этапам), «Платежи» (оплаты и сторно за неделю), «Касса», «Просрочки». Отчёт другого дома — 404 |
 | GET | `/buildings/{id}/reports/weekly/{reportId}/pdf` | Accountant, руководители | PDF A4: «Binosoz» золотом (#c9a227), сводка карточками, топ-5 должников (по давности, затем по сумме) |
-| POST | `/buildings/{id}/reports/weekly/generate` | Owner, PlatformOwner | 201 → отчёт за последнюю завершённую неделю пн–вс по Душанбе. Готовый за ту же неделю перезаписывается (один отчёт на дом и неделю). Аудит `WeeklyReport` / `Generate` |
+| POST | `/buildings/{id}/reports/weekly/generate` | Owner, SuperAdmin | 201 → отчёт за последнюю завершённую неделю пн–вс по Душанбе. Готовый за ту же неделю перезаписывается (один отчёт на дом и неделю). Аудит `WeeklyReport` / `Generate` |
 
 Подробности:
 - Пункт графика: `kind` (`DownPayment` или `Monthly`), `status` (`Pending`, `PartiallyPaid` или `Paid`) и признак `isOverdue`. Интерфейс показывает «Просрочен» по `isOverdue`.
@@ -284,7 +285,7 @@ Telegram (в дополнение к колокольчику, только те
 2. **Второй шаг.** Если verify ответил **202**, показать поле «Пароль или код из приложения» и отправить `POST /auth/second-factor` с `challengeToken`. Это бывает только у создателя платформы; отдельного входа для него нет.
 3. **Таймер и ошибки кода.** Повторная отправка — не раньше чем через 60 секунд. На 429 показать `detail`. На 401 показать «Неверный или устаревший код» и предложить запросить новый.
 4. **Выбор раздела** — по `user.role`:
-   - `PlatformOwner` → раздел платформы;
+   - `SuperAdmin` → раздел платформы;
    - `Owner` / `ObjectAdmin` → админка;
    - `Manager` / `Accountant` / `Content` → CRM с пунктами по должности;
    - `Customer` → кабинет.
@@ -292,7 +293,7 @@ Telegram (в дополнение к колокольчику, только те
    Роль `Admin` больше не приходит, вместо неё `Owner`.
 5. **Шапка.** Показывать `organizationName`. У ObjectAdmin — название его дома (`buildingIds[0]` → `/buildings/{id}`).
 6. **Плашка режима «как владелец».** Если `user.impersonation` не `null` или в ответе есть заголовок `X-Impersonated-By`, показать заметную полосу «Вы вошли как владелец организации …» с кнопкой «Выйти». Кнопка вызывает `POST /platform/impersonate/stop` и подменяет токен. Refresh-токена в этом режиме нет: на 401 вернуть человека в раздел платформы.
-7. **Раздел платформы** (новый): список организаций, «Создать организацию» (`name, slug, ownerEmail, ownerFullName`), кнопка «Войти как владелец», настройка TOTP (`/platform/totp`).
+7. **Раздел платформы** (новый): список организаций, «Создать организацию» (`name, slug, ownerEmail, ownerFullName`), кнопка «Войти как владелец», настройка 2FA (`/auth/2fa/*`).
 8. **Сотрудники.**
    - Вместо поля «Пароль» — «Пригласить по почте» (`POST /invitations`), выбор должности и домов.
    - Для ObjectAdmin — ровно один дом.

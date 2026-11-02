@@ -46,8 +46,8 @@
   function normStatus(s) { if (typeof s === 'number') return STATUS[s] || 'free'; s = String(s || 'free').toLowerCase().replace(/[^a-z]/g, ''); return STATUS.includes(s) ? s : s === 'available' ? 'free' : s === 'reserved' ? 'booked' : 'free'; }
   const STAGE_NAMES = ['Lead', 'Showing', 'Booking', 'Contract', 'Payment', 'Completed', 'Cancelled'];
   function normStage(s) { if (typeof s === 'number') return STAGE_NAMES[s] || 'Lead'; const f = STAGE_NAMES.find((x) => x.toLowerCase() === String(s || '').toLowerCase()); return f || String(s || 'Lead'); }
-  // Main role picks the interface: PlatformOwner > Owner > ObjectAdmin > Manager > Accountant > Content > Customer.
-  const ROLE_ORDER = ['PlatformOwner', 'Owner', 'ObjectAdmin', 'Manager', 'Accountant', 'Content', 'Customer'];
+  // Main role picks the interface: SuperAdmin > Owner > ObjectAdmin > Manager > Accountant > Content > Customer.
+  const ROLE_ORDER = ['SuperAdmin', 'Owner', 'ObjectAdmin', 'Manager', 'Accountant', 'Content', 'Customer'];
   function primaryRole(role, roles) { if (typeof role === 'string' && ROLE_ORDER.includes(role)) return role; return ROLE_ORDER.find((r) => roles.includes(r)) || roles[0] || ''; }
   function roleList(u) {
     const r = pick(u, ['roles', 'role', 'userRoles'], []);
@@ -274,7 +274,7 @@
     isStaff() { return !!(auth && auth.user && auth.user.roles.some((r) => STAFF_ROLES.includes(r))); },
     isCustomer() { return role() === 'Customer'; },
     // The platform owner's own section (not while working "as owner" of an organization).
-    isPlatform() { return role() === 'PlatformOwner'; },
+    isPlatform() { return role() === 'SuperAdmin'; },
     isLeader() { return LEADERS.includes(role()); },
     isOwner() { return role() === 'Owner'; },
     get impersonating() { return !!(auth && (auth.platform || (auth.user && auth.user.impersonation))); },
@@ -316,8 +316,10 @@
       try { token = (await request('POST', '/platform/impersonate/stop')).accessToken; } catch (e) { /* expired: the saved session is enough */ }
       endImpersonation(token); return auth && auth.user;
     },
-    totpSetup() { return request('GET', '/platform/totp'); },
-    totpEnable(code) { return request('POST', '/platform/totp/enable', { body: { code } }); },
+    // 2FA of the signed-in staff member: { qrCodeUri, manualKey } (sharedKey/authenticatorUri kept for older callers).
+    async totpSetup() { const r = await request('GET', '/auth/2fa/setup'); return Object.assign({ sharedKey: r.manualKey, authenticatorUri: r.qrCodeUri }, r); },
+    totpEnable(code) { return request('POST', '/auth/2fa/enable', { body: { code } }); },
+    totpDisable(code) { return request('POST', '/auth/2fa/disable', { body: { code } }); },
     clearAuth,
     async restore() { if (!auth || !auth.accessToken) return null; try { return await api.loadMe(); } catch (e) { if (auth && e.status !== 0) clearAuth(); return null; } },
 
