@@ -203,15 +203,18 @@ public class AuthService(
         return await IssueTokensAsync(user, ct);
     }
 
-    // Покупатель сам регистрируется на сайте застройщика: появляется карточка клиента с этой почтой,
-    // и на почту уходит код — как при обычном входе. Учётная запись создаётся при вводе кода.
+    // Покупатель сам регистрируется на сайте застройщика: появляются карточка клиента и учётная запись покупателя
+    // (без пароля), приходит приветственное письмо, и сразу — код для входа, как при обычном входе.
     public async Task<EmailSendResponse> RegisterCustomerAsync(RegisterCustomerRequest request, string? requestIp, CancellationToken ct = default)
     {
         var address = EmailAddress.Normalize(request.Email) ?? throw new BusinessRuleException("Неверный адрес почты");
         var phone = PhoneNumber.Normalize(request.Phone) ?? throw new BusinessRuleException("Неверный номер телефона");
-        var fullName = request.FullName?.Trim();
-        if (string.IsNullOrEmpty(fullName) || fullName.Length > 200)
-            throw new BusinessRuleException("Укажите имя (до 200 символов)");
+        var fullName = $"{request.FirstName?.Trim()} {request.LastName?.Trim()}".Trim();
+        if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName) || fullName.Length > 200)
+            throw new BusinessRuleException("Укажите имя и фамилию (вместе до 200 символов)");
+        // Почта сотрудника не становится покупателем: он входит по паролю.
+        if (await userManager.FindByEmailAsync(address) is { } existingUser && await IsStaffAsync(existingUser))
+            throw new ConflictException("Эта почта принадлежит сотруднику. Войдите на вкладке «Сотрудник»");
 
         // Лимиты кодов проверяются до того, как появится карточка: иначе регистрацией можно было бы заваливать базу.
         var limits = authOptions.Value;
@@ -236,6 +239,11 @@ public class AuthService(
             {
                 throw new ConflictException(PhoneTaken);
             }
+
+            var user = await GetOrCreateCustomerUserByEmailAsync(address, ct);
+            audit.Record(nameof(AppUser), user.Id, "Registered", null, new { user.Email, user.FullName }, organizationId);
+            await db.SaveChangesAsync(ct);
+            await SendWelcomeAsync(address, fullName, ct);
         }
         // Телефон из чужой карточки не привязывается к новой почте: иначе по одному номеру можно было бы
         // получить доступ к чужим сделкам.
@@ -243,6 +251,23 @@ public class AuthService(
             throw new ConflictException(PhoneTaken);
 
         return await SendEmailCodeAsync(new EmailSendRequest(address), requestIp, ct);
+    }
+
+    // Приветствие от имени застройщика; сбой почты регистрацию не отменяет (код для входа уйдёт отдельным письмом).
+    private async Task SendWelcomeAsync(string address, string fullName, CancellationToken ct)
+    {
+        var brand = await brands.NameForEmailAsync(address, ct);
+        try
+        {
+            await email.SendAsync(new EmailMessage(address, $"Добро пожаловать в {brand}",
+                $"Здравствуйте, {fullName}!\n\nВы зарегистрировались в личном кабинете {brand}. " +
+                "Входите по почте: на неё придёт код, пароль не нужен. В кабинете — ваши сделки, график платежей, документы и чат с менеджером.\n\n" +
+                "Следующим письмом придёт код для первого входа."), ct);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            logger.LogError(e, "Приветственное письмо покупателю не отправлено");
+        }
     }
 
     private const string PhoneTaken =
@@ -365,6 +390,9 @@ public class AuthService(
         var invitation = await FindPendingInvitationAsync(request.Token, ct) ?? throw new UnauthorizedException(InvalidInvitation);
         if (await userManager.FindByEmailAsync(invitation.Email) is not null)
             throw new ConflictException("Пользователь с такой почтой уже есть");
+        // Сотрудники входят только по паролю: без него учётная запись была бы без входа.
+        if (string.IsNullOrEmpty(request.Password))
+            throw new BusinessRuleException("Задайте пароль: сотрудники входят по почте и паролю");
 
         var user = new AppUser
         {
@@ -374,9 +402,7 @@ public class AuthService(
             FullName = invitation.FullName,
             OrganizationId = invitation.OrganizationId
         };
-        var result = string.IsNullOrEmpty(request.Password)
-            ? await userManager.CreateAsync(user)
-            : await userManager.CreateAsync(user, request.Password);
+        var result = await userManager.CreateAsync(user, request.Password);
         if (!result.Succeeded)
             throw new BusinessRuleException(string.Join("; ", result.Errors.Select(e => e.Description)));
         await userManager.AddToRoleAsync(user, invitation.Role);

@@ -100,7 +100,7 @@ public class TenantIsolationTests(SitoraApiFactory factory) : IClassFixture<Sito
             (HttpMethod.Post, $"/api/v1/buildings/{a.BuildingId}/stages", stage),
             (HttpMethod.Put, $"/api/v1/stages/{a.StageId}", stage),
             (HttpMethod.Post, "/api/v1/deals", new CreateDealRequest(a.ApartmentId, a.Deal.CustomerId, DealStage.Contract, Currency.TJS, null, null)),
-            (HttpMethod.Post, "/api/v1/invitations", new CreateInvitationRequest($"x-{Guid.NewGuid():N}@b.test", "Чужой", "ObjectAdmin", [a.BuildingId])),
+            (HttpMethod.Post, "/api/v1/invitations", new CreateInvitationRequest($"x-{Guid.NewGuid():N}@b.test", "Чужой", "Админ", "ObjectAdmin", a.BuildingId)),
             (HttpMethod.Post, "/api/v1/users", new CreateUserRequest($"y-{Guid.NewGuid():N}@b.test", "Чужой", "Manager", null, null, [a.BuildingId]))
         ];
         foreach (var (method, url, body) in writes)
@@ -168,7 +168,7 @@ public class TenantIsolationTests(SitoraApiFactory factory) : IClassFixture<Sito
         var neighbourDeal = await TestScenarios.ReadAsync<DealResponse>(await owner.PostAsJsonAsync("/api/v1/deals",
             new CreateDealRequest(apartment.Id, neighbourCustomer.Id, DealStage.Contract, Currency.TJS, null, null), TestJson.Options));
 
-        // Админ объекта на первый дом: заводится владельцем, входит по коду из почты.
+        // Админ объекта на первый дом: заводится владельцем, входит по паролю.
         var email = $"object-{Guid.NewGuid():N}@sitora.local";
         var created = await TestScenarios.ReadAsync<UserResponse>(await owner.PostAsJsonAsync("/api/v1/users",
             new CreateUserRequest(email, "Админ объекта", "ObjectAdmin", null, null, [myBuilding])));
@@ -205,17 +205,17 @@ public class TenantIsolationTests(SitoraApiFactory factory) : IClassFixture<Sito
             new SaveBuildingRequest("Новый", "Нав", "ул.", 3, null, null))).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await objectAdmin.GetAsync("/api/v1/audit")).StatusCode);
         AssertHidden(await objectAdmin.PostAsJsonAsync("/api/v1/invitations",
-            new CreateInvitationRequest($"m-{Guid.NewGuid():N}@sitora.local", "Менеджер", "Manager", [neighbour.Id])), "приглашение в чужой дом");
+            new CreateInvitationRequest($"m-{Guid.NewGuid():N}@sitora.local", "Менеджер", "Чужой", "Manager", neighbour.Id)), "приглашение в чужой дом");
         var adminId = await factory.WithDbAsync(db => db.Users.Where(u => u.Email == SitoraApiFactory.AdminEmail).Select(u => u.Id).SingleAsync());
         AssertHidden(await objectAdmin.PatchAsJsonAsync($"/api/v1/users/{adminId}/status", new SetUserStatusRequest(false)), "блокировка владельца");
         var ownInvite = await objectAdmin.PostAsJsonAsync("/api/v1/invitations",
-            new CreateInvitationRequest($"m-{Guid.NewGuid():N}@sitora.local", "Менеджер", "Manager", null));
+            new CreateInvitationRequest($"m-{Guid.NewGuid():N}@sitora.local", "Менеджер", "Свой", "Manager"));
         Assert.Equal(HttpStatusCode.Created, ownInvite.StatusCode);
         Assert.Equal([myBuilding], (await ownInvite.Content.ReadFromJsonAsync<InvitationResponse>(TestJson.Options))!.BuildingIds);
     }
 
     [Fact]
-    public async Task Invitation_CreatesStaffInBuilding_OnceOnly()
+    public async Task Invitation_CreatesStaffInBuilding_WithEmailedPassword_OnceOnly()
     {
         var owner = await factory.CreateAdminClientAsync();
         var building = (await owner.GetFromJsonAsync<PagedResult<BuildingResponse>>("/api/v1/buildings", TestJson.Options))!.Items[0].Id;
@@ -224,29 +224,34 @@ public class TenantIsolationTests(SitoraApiFactory factory) : IClassFixture<Sito
 
         // Админу объекта нужен ровно один дом.
         Assert.Equal(HttpStatusCode.UnprocessableEntity, (await owner.PostAsJsonAsync("/api/v1/invitations",
-            new CreateInvitationRequest(email, "Без дома", "ObjectAdmin", null))).StatusCode);
+            new CreateInvitationRequest(email, "Без", "Дома", "ObjectAdmin"))).StatusCode);
         // Владельцев заводит только создатель платформы.
         Assert.Equal(HttpStatusCode.UnprocessableEntity, (await owner.PostAsJsonAsync("/api/v1/invitations",
-            new CreateInvitationRequest(email, "Второй владелец", "Owner", null))).StatusCode);
+            new CreateInvitationRequest(email, "Второй", "Владелец", "Owner"))).StatusCode);
+        // Имя и фамилия обязательны.
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await owner.PostAsJsonAsync("/api/v1/invitations",
+            new CreateInvitationRequest(email, "Только", " ", "ObjectAdmin", building))).StatusCode);
 
         var invitation = await TestScenarios.ReadAsync<InvitationResponse>(await owner.PostAsJsonAsync("/api/v1/invitations",
-            new CreateInvitationRequest(email, "Приглашённый админ", "ObjectAdmin", [building])));
-        Assert.Equal(normalized, invitation.Email);
-        var token = factory.Email.LastInviteToken(normalized);
-        Assert.NotNull(token);
+            new CreateInvitationRequest(email, "Приглашённый", "Админ", "ObjectAdmin", building)));
+        Assert.Equal((normalized, "Приглашённый Админ"), (invitation.Email, invitation.FullName));
+        Assert.NotNull(invitation.AcceptedAt);
 
-        var guest = factory.CreateClient();
-        Assert.Equal(HttpStatusCode.Unauthorized, (await guest.PostAsJsonAsync("/api/v1/auth/invitations/accept",
-            new AcceptInvitationRequest(new string('A', 64)))).StatusCode);
-        var auth = await TestScenarios.ReadAsync<AuthResponse>(await guest.PostAsJsonAsync("/api/v1/auth/invitations/accept", new AcceptInvitationRequest(token)));
-        Assert.Equal(("ObjectAdmin", Organization.DefaultId), (auth.User.Role, auth.User.OrganizationId));
-        Assert.Equal([building], auth.User.BuildingIds);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await guest.PostAsJsonAsync("/api/v1/auth/invitations/accept",
-            new AcceptInvitationRequest(token))).StatusCode);
+        // Письмо «Вы приглашены в Binosoz» с логином и паролем из 8 букв и цифр.
+        var letter = factory.Email.LastMessage(normalized)!;
+        Assert.Equal("Вы приглашены в Binosoz", letter.Subject);
+        Assert.Contains($"Логин: {normalized}", letter.Text);
+        var password = factory.Email.LastPassword(normalized)!;
+        Assert.Matches("^[A-Za-z0-9]{8}$", password);
 
-        // Дальше — обычный вход сотрудника по паролю.
-        var again = await factory.CreateStaffClientAsync(normalized);
-        Assert.Equal("ObjectAdmin", (await again.GetFromJsonAsync<CurrentUserResponse>("/api/v1/auth/me", TestJson.Options))!.Role);
+        var staff = await factory.CreateClientForAsync(normalized, password);
+        var me = await staff.GetFromJsonAsync<CurrentUserResponse>("/api/v1/auth/me", TestJson.Options);
+        Assert.Equal(("ObjectAdmin", Organization.DefaultId), (me!.Role, me.OrganizationId));
+        Assert.Equal([building], me.BuildingIds);
+
+        // Вторая учётная запись на ту же почту не создаётся; в «ожидающих» приглашение не висит.
+        Assert.Equal(HttpStatusCode.Conflict, (await owner.PostAsJsonAsync("/api/v1/invitations",
+            new CreateInvitationRequest(email, "Повтор", "Админ", "ObjectAdmin", building))).StatusCode);
         Assert.DoesNotContain((await owner.GetFromJsonAsync<List<InvitationResponse>>("/api/v1/invitations", TestJson.Options))!,
             i => i.Id == invitation.Id);
     }

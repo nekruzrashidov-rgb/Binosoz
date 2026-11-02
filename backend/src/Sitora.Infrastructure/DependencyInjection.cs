@@ -57,6 +57,7 @@ public static class DependencyInjection
             .BindConfiguration(BrandOptions.SectionName);
         services.AddOptions<EmailOptions>()
             .BindConfiguration(EmailOptions.SectionName)
+            .PostConfigure<IConfiguration>(EmailOptions.ApplySmtpSection)
             .ValidateDataAnnotations();
 
         // Redis, если задан Redis__ConnectionString, иначе кэш в памяти. Как и строку подключения к базе,
@@ -72,6 +73,7 @@ public static class DependencyInjection
         services.AddScoped<AuthService>();
         services.AddScoped<IAuthService>(sp => sp.GetRequiredService<AuthService>());
         services.AddScoped<StaffPolicy>();
+        services.AddScoped<StaffAccounts>();
         services.AddScoped<IInvitationService, InvitationService>();
         services.AddScoped<IPlatformService, PlatformService>();
         services.AddScoped<IOrgApplicationService, OrgApplicationService>();
@@ -148,18 +150,23 @@ public static class DependencyInjection
     }
 
     // Почтовый сервис выбирается настройкой Email__Provider: Smtp, Resend или Dev (письма в лог, только для разработки).
+    // Заданный Smtp__Host (короткие переменные) включает SMTP сам.
     private static void AddEmailSender(IServiceCollection services)
     {
         services.AddHttpClient<ResendEmailSender>();
         services.AddSingleton<DevEmailSender>();
         services.AddSingleton<SmtpEmailSender>();
         services.AddScoped<IEmailSender>(sp =>
-            sp.GetRequiredService<IConfiguration>()[$"{EmailOptions.SectionName}:Provider"]?.Trim().ToLowerInvariant() switch
+        {
+            var configuration = sp.GetRequiredService<IConfiguration>();
+            var provider = EmailOptions.HasSmtpSection(configuration) ? "smtp" : configuration[$"{EmailOptions.SectionName}:Provider"];
+            return provider?.Trim().ToLowerInvariant() switch
             {
                 "smtp" => sp.GetRequiredService<SmtpEmailSender>(),
                 "resend" => sp.GetRequiredService<ResendEmailSender>(),
-                _ => sp.GetRequiredService<DevEmailSender>()
-            });
+                _ => (IEmailSender)sp.GetRequiredService<DevEmailSender>()
+            };
+        });
     }
 
     private static string GetConnectionString(IServiceProvider sp)

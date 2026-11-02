@@ -37,8 +37,9 @@ public record EmailSendResponse(string Message, int ExpiresInSeconds);
 
 public record EmailVerifyRequest(string Email, string Code);
 
-// Регистрация покупателя на сайте застройщика: Organization — его короткое имя (slug); без него — единственный застройщик платформы.
-public record RegisterCustomerRequest(string Email, string FullName, string Phone, string? Organization = null);
+// Регистрация покупателя на сайте застройщика (без пароля: дальше вход по коду из почты).
+// Organization — короткое имя застройщика (slug); без него — единственный застройщик платформы.
+public record RegisterCustomerRequest(string Email, string FirstName, string LastName, string Phone, string? Organization = null);
 
 // Пароль принят, но у учётной записи включена 2FA: токены выдаст /auth/2fa/verify с кодом из приложения.
 public record TwoFactorRequiredResponse(bool RequiresTwoFactor, string TempToken, DateTime ExpiresAt);

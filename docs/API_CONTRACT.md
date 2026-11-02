@@ -22,7 +22,7 @@
 
 В таблицах ниже «руководители» — это Owner и ObjectAdmin, а также PlatformOwner в режиме «как владелец».
 
-Сотрудников не регистрируют сами: их приглашают по почте (`/invitations`) или заводят сразу (`/users`).
+Сотрудников не регистрируют сами: их заводит руководитель (`/invitations` или `/users`), а логин и пароль приходят письмом «Вы приглашены в Binosoz».
 
 ## Вход и сессия
 
@@ -32,9 +32,9 @@
 | --- | --- | --- | --- |
 | POST | `/auth/email/send` | `{ email }` | 200 `{ message, expiresInSeconds }` — всегда одинаковый, даже если почты нет. Код уходит только покупателю, сотруднику — нет (ответ тот же) |
 | POST | `/auth/email/verify` | `{ email, code }` | 200 `AuthResponse` — только покупатель. Почта сотрудника — 401 «Сотрудники входят по паролю» |
-| POST | `/auth/register` | `{ email, fullName, phone, organization? }` | 200, как `/auth/email/send`: создаётся карточка клиента у застройщика `organization` (slug; без него — единственный застройщик платформы) и уходит код. Дальше — `/auth/email/verify`. Телефон из карточки с другой почтой — 409, неизвестный застройщик — 404 |
+| POST | `/auth/register` | `{ email, firstName, lastName, phone, organization? }` | 200, как `/auth/email/send`. Пароля нет. Создаются карточка клиента у застройщика `organization` (slug; без него — единственный застройщик платформы) и учётная запись покупателя; уходят приветственное письмо и код для входа. Дальше — `/auth/email/verify`. Телефон обязателен. Без имени или фамилии и с неверным телефоном — 422; телефон из карточки с другой почтой — 409; почта сотрудника — 409; неизвестный застройщик — 404 |
 | GET | `/auth/invitations/{token}` | — | `{ organizationName, fullName, email, role, expiresAt }` — что показать на странице приглашения; 404 — недействительно, использовано или просрочено |
-| POST | `/auth/invitations/accept` | `{ token, password? }` | `AuthResponse`; 401 — приглашение недействительно или использовано. Пароль необязателен (от 8 символов, цифра, строчная и заглавная буквы; иначе 422): с ним сотрудник входит и через `/auth/login` |
+| POST | `/auth/invitations/accept` | `{ token, password }` | только ссылки из старых писем: `AuthResponse`; 401 — приглашение недействительно или использовано. Пароль обязателен (от 8 символов, цифра, строчная и заглавная буквы; иначе 422) |
 | POST | `/auth/refresh` | `{ refreshToken }` | `AuthResponse` |
 | POST | `/auth/logout` | `{ refreshToken }` | 204 |
 | GET | `/auth/me` | — | `CurrentUser` |
@@ -86,8 +86,8 @@ TwoFactorRequired = { requiresTwoFactor: true, tempToken, expiresAt }
 | --- | --- | --- |
 | GET | `/platform/organizations` | `[{ id, name, slug, isActive, buildingsCount, usersCount, createdAt, customDomain, logoUrl, ownerEmails, buildingNames }]` |
 | PATCH | `/platform/organizations/{id}/status` | `{ isActive }` → 204. Приостановка (`false`): вход сотрудникам и сайт застройщика закрыты, refresh-токены сотрудников отзываются; `true` — снова работает. В аудите `Suspended` / `Activated` |
-| POST | `/platform/organizations` | `{ name, slug, ownerEmail, ownerFullName }` → 201. Владельцу уходит письмо, он входит по коду из почты. `slug`: латиница, цифры, дефис |
-| POST | `/platform/organizations/{id}/owners` | `{ email, fullName, password? }` → 201 `UserResponse`: ещё один владелец организации. Без пароля он входит по коду из почты |
+| POST | `/platform/organizations` | `{ name, slug, ownerEmail, ownerFullName }` → 201. Владельцу уходит письмо с логином и сгенерированным паролем. `slug`: латиница, цифры, дефис |
+| POST | `/platform/organizations/{id}/owners` | `{ email, fullName, password? }` → 201 `UserResponse`: ещё один владелец организации. Без пароля он генерируется и уходит письмом |
 | POST | `/platform/impersonate/{id}` | `id` — организация: вход «как владелец» (`user.role = "Owner"`). `id` — пользователь: вход под ним самим, с его ролью и домами. Ответ — `AccessTokenResponse = { accessToken, accessTokenExpiresAt, user }` без refresh-токена, `user.impersonation` заполнено. Под создателем платформы войти нельзя (422) |
 | POST | `/platform/impersonate/stop` | `AccessTokenResponse` — обычный токен создателя платформы |
 | GET | `/platform/totp` | `{ sharedKey, authenticatorUri }` для приложения-аутентификатора |
@@ -258,11 +258,11 @@ Telegram (в дополнение к колокольчику, только те
 | Метод | Путь | Роли | Примечание |
 | --- | --- | --- | --- |
 | GET | `/users` | руководители | страница `{ id, email, phone, fullName, roles[], isActive, createdAt, organizationId, buildingIds[] }`. ObjectAdmin видит только сотрудников своего дома |
-| POST | `/users` | руководители | `{ email, fullName, role, password?, phone?, buildingIds? }`. Пароль необязателен: вход по коду из почты |
+| POST | `/users` | руководители | `{ email, fullName, role, password?, phone?, buildingIds? }`. Без пароля он генерируется (8 букв и цифр) и уходит сотруднику письмом |
 | PATCH | `/users/{id}/status` | руководители | `{ isActive }`. ObjectAdmin не может блокировать руководителей |
 | PUT | `/users/{id}/buildings` | Owner | `{ buildingIds }`: пусто — все дома, у ObjectAdmin ровно один. Сессии сотрудника отзываются |
-| POST | `/invitations` | руководители | `{ email, fullName, role, buildingIds? }` → 201 `{ id, email, fullName, role, buildingIds, expiresAt, acceptedAt, createdAt }`. Письмо со ссылкой `EMAIL_INVITE_URL + token` живёт 7 дней |
-| GET | `/invitations` | руководители | непринятые приглашения |
+| POST | `/invitations` | руководители (ObjectAdmin — только в свой дом) | `{ email, firstName, lastName, role, buildingId?, buildingIds? }` → 201 `{ id, email, fullName, role, buildingIds, expiresAt, acceptedAt, createdAt }`. Учётная запись создаётся сразу; пароль из 8 букв и цифр приходит письмом «Вы приглашены в Binosoz» с логином и ссылкой на вход. Почта занята — 409, без имени или фамилии — 422 |
+| GET | `/invitations` | руководители | непринятые приглашения по ссылкам из старых писем (новые принимаются сразу) |
 | DELETE | `/invitations/{id}` | руководители | 204 |
 | POST | `/buildings` | Owner | новый дом организации: те же поля, что в `PUT`. Этажи сам не создаёт — фронтенд создаёт их сразу после дома (`POST /floors` для 1…N) |
 

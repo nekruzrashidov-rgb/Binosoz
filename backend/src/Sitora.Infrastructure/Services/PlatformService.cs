@@ -22,8 +22,7 @@ public class PlatformService(
     JwtTokenService tokens,
     ICurrentUser currentUser,
     IAuditService audit,
-    IEmailSender email,
-    IOptions<EmailOptions> emailOptions,
+    StaffAccounts accounts,
     ILogger<PlatformService> logger) : IPlatformService
 {
     private const string AuthenticatorIssuer = "Sitora";
@@ -71,7 +70,7 @@ public class PlatformService(
         logger.LogInformation("Организация {OrganizationId} {State}", organizationId, isActive ? "снова работает" : "приостановлена");
     }
 
-    // Новая организация сразу получает владельца; он входит по коду из почты.
+    // Новая организация сразу получает владельца; логин и пароль приходят ему письмом.
     public async Task<OrganizationResponse> CreateOrganizationAsync(CreateOrganizationRequest request, CancellationToken ct = default)
     {
         var slug = BrandRules.NormalizeSlug(request.Slug) ?? throw new BusinessRuleException(BrandRules.SlugMessage);
@@ -88,41 +87,21 @@ public class PlatformService(
         db.Organizations.Add(organization);
         await db.SaveChangesAsync(ct);
 
-        var owner = new AppUser
-        {
-            UserName = ownerEmail,
-            Email = ownerEmail,
-            EmailConfirmed = true,
-            FullName = request.OwnerFullName.Trim(),
-            OrganizationId = organization.Id
-        };
-        var result = await userManager.CreateAsync(owner);
-        if (!result.Succeeded)
-            throw new BusinessRuleException(string.Join("; ", result.Errors.Select(e => e.Description)));
-        await userManager.AddToRoleAsync(owner, RoleNames.Owner);
+        var (owner, password, _) = await accounts.CreateAsync(ownerEmail, request.OwnerFullName.Trim(), RoleNames.Owner, organization.Id, null, null);
 
         audit.Record(nameof(Organization), organization.Id, "Created", null,
             new { organization.Name, organization.Slug, OwnerEmail = ownerEmail }, organization.Id);
         await db.SaveChangesAsync(ct);
 
-        // Организация уже сохранена, а владелец входит по коду и без этого письма: сбой почты не отменяет создание.
-        try
-        {
-            await email.SendAsync(new EmailMessage(ownerEmail, $"Sitora: вы владелец «{organization.Name}»",
-                $"Здравствуйте, {owner.FullName}!\n\nДля вас создана организация «{organization.Name}» на платформе Sitora. " +
-                $"Входите по коду, который придёт на эту почту: {emailOptions.Value.LoginUrl}"), ct);
-        }
-        catch (Exception e)
-        {
-            logger.LogError(e, "Не удалось отправить письмо владельцу {Email}", ownerEmail);
-        }
+        // Логин и пароль — письмом; сбой почты не отменяет создание (владелец задаст пароль через «Забыли пароль?»).
+        await accounts.SendCredentialsAsync(owner, password, organization.Name, ct);
 
         logger.LogInformation("Создана организация {OrganizationId} ({Slug})", organization.Id, slug);
         return new OrganizationResponse(organization.Id, organization.Name, organization.Slug, organization.IsActive, 0, 1,
             organization.CreatedAt);
     }
 
-    // Ещё один владелец организации. Пароль необязателен: владелец входит по коду из почты.
+    // Ещё один владелец организации. Без пароля он генерируется и уходит владельцу письмом.
     public async Task<UserResponse> AddOwnerAsync(Guid organizationId, AddOwnerRequest request, CancellationToken ct = default)
     {
         await RequirePlatformOwnerAsync();
@@ -135,16 +114,12 @@ public class PlatformService(
         if (await userManager.FindByEmailAsync(email) is not null)
             throw new ConflictException("Пользователь с такой почтой уже есть");
 
-        var owner = new AppUser { UserName = email, Email = email, EmailConfirmed = true, FullName = fullName, OrganizationId = organization.Id };
-        var result = string.IsNullOrEmpty(request.Password)
-            ? await userManager.CreateAsync(owner)
-            : await userManager.CreateAsync(owner, request.Password);
-        if (!result.Succeeded)
-            throw new BusinessRuleException(string.Join("; ", result.Errors.Select(e => e.Description)));
-        await userManager.AddToRoleAsync(owner, RoleNames.Owner);
+        var (owner, password, generated) = await accounts.CreateAsync(email, fullName, RoleNames.Owner, organization.Id, null, request.Password);
 
         audit.Record(nameof(AppUser), owner.Id, "OwnerAdded", null, new { owner.Email, owner.FullName, OrganizationId = organization.Id }, organization.Id);
         await db.SaveChangesAsync(ct);
+        if (generated)
+            await accounts.SendCredentialsAsync(owner, password, organization.Name, ct);
         logger.LogInformation("В организацию {OrganizationId} добавлен владелец {UserId}", organization.Id, owner.Id);
         return new UserResponse(owner.Id, owner.Email, owner.PhoneNumber, owner.FullName, [RoleNames.Owner], owner.IsActive, owner.CreatedAt,
             organization.Id, []);

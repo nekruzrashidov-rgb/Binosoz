@@ -1,69 +1,72 @@
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using Sitora.Domain.Common;
 using Sitora.Domain.DTOs.Auth;
 using Sitora.Domain.Entities;
 using Sitora.Domain.Exceptions;
 using Sitora.Domain.Interfaces;
 using Sitora.Infrastructure.Data;
-using Sitora.Infrastructure.Integrations;
 using Sitora.Infrastructure.Security;
 
 namespace Sitora.Infrastructure.Services;
 
-// Приглашение сотрудника по почте. Свободной регистрации сотрудников нет: учётная запись появляется,
-// только когда человек откроет ссылку из письма. Токен хранится в базе только в виде хеша.
+// Приглашение сотрудника. Свободной регистрации сотрудников нет: учётную запись сразу заводит руководитель,
+// а логин и сгенерированный пароль уходят сотруднику письмом. Запись приглашения остаётся для истории (уже принятой).
 public class InvitationService(
     AppDbContext db,
     UserManager<AppUser> userManager,
     ICurrentUser currentUser,
     StaffPolicy policy,
-    IEmailSender email,
+    StaffAccounts accounts,
     IAuditService audit,
-    IOptions<EmailOptions> emailOptions,
     TimeProvider timeProvider) : IInvitationService
 {
     public async Task<InvitationResponse> CreateAsync(CreateInvitationRequest request, CancellationToken ct = default)
     {
-        var buildings = await policy.ValidateAsync(request.Role, request.BuildingIds, ct);
+        var requested = request.BuildingIds?.ToList() ?? [];
+        if (request.BuildingId is { } single && !requested.Contains(single))
+            requested.Add(single);
+        var buildings = await policy.ValidateAsync(request.Role, requested, ct);
         var organizationId = policy.RequireOrganization();
         var address = EmailAddress.Normalize(request.Email) ?? throw new BusinessRuleException("Неверный адрес почты");
+        var fullName = $"{request.FirstName?.Trim()} {request.LastName?.Trim()}".Trim();
+        if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName) || fullName.Length > 200)
+            throw new BusinessRuleException("Укажите имя и фамилию (вместе до 200 символов)");
         if (await userManager.FindByEmailAsync(address) is not null)
             throw new ConflictException("Пользователь с такой почтой уже есть");
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
-        // Новое приглашение на ту же почту заменяет прежнее.
+        // Ссылки из прежних приглашений на ту же почту больше не действуют.
         var previous = await db.Invitations
             .Where(i => i.Email == address && i.AcceptedAt == null && i.RevokedAt == null)
             .ToListAsync(ct);
         previous.ForEach(i => i.RevokedAt = now);
 
-        var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-        var organizationName = await db.Organizations.Where(o => o.Id == organizationId).Select(o => o.Name).SingleAsync(ct);
+        var (user, password, _) = await accounts.CreateAsync(address, fullName, request.Role, organizationId, null, null);
+        foreach (var buildingId in buildings)
+            db.UserBuildings.Add(new UserBuilding { UserId = user.Id, BuildingId = buildingId });
+
         var invitation = new Invitation
         {
             OrganizationId = organizationId,
             Email = address,
-            FullName = request.FullName.Trim(),
+            FullName = fullName,
             Role = request.Role,
             BuildingIds = buildings,
-            TokenHash = JwtTokenService.HashToken(token),
-            ExpiresAt = now.Add(Invitation.Lifetime),
+            // Ссылки нет: учётная запись уже создана. Хеш случайный, чтобы по нему ничего нельзя было принять.
+            TokenHash = JwtTokenService.HashToken(Convert.ToHexString(RandomNumberGenerator.GetBytes(32))),
+            ExpiresAt = now,
+            AcceptedAt = now,
             InvitedById = currentUser.UserId ?? throw new UnauthorizedException("Требуется вход")
         };
         db.Invitations.Add(invitation);
         audit.Record(nameof(Invitation), invitation.Id, "Created", null,
-            new { invitation.Email, invitation.Role, invitation.BuildingIds });
+            new { invitation.Email, invitation.Role, invitation.BuildingIds, UserId = user.Id });
         await db.SaveChangesAsync(ct);
 
-        await email.SendAsync(new EmailMessage(address, $"Приглашение в Sitora: {organizationName}",
-            $"Здравствуйте, {invitation.FullName}!\n\nВас пригласили в «{organizationName}» на платформе Sitora. " +
-            $"Чтобы принять приглашение, откройте ссылку:\n{emailOptions.Value.InviteUrl}{token}\n\n" +
-            $"Ссылка действует {Invitation.Lifetime.TotalDays:0} дней. На странице задайте пароль — дальше входите по нему " +
-            "или по коду, который придёт на эту почту."), ct);
-
+        var organizationName = await db.Organizations.Where(o => o.Id == organizationId).Select(o => o.Name).SingleAsync(ct);
+        await accounts.SendCredentialsAsync(user, password, organizationName, ct);
         return ToResponse(invitation);
     }
 

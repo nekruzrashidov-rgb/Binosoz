@@ -16,6 +16,7 @@ public class UserService(
     UserManager<AppUser> userManager,
     ICurrentUser currentUser,
     StaffPolicy policy,
+    StaffAccounts accounts,
     IAuditService audit,
     TimeProvider timeProvider) : IUserService
 {
@@ -69,27 +70,17 @@ public class UserService(
         if (!string.IsNullOrWhiteSpace(request.Phone))
             phone = PhoneNumber.Normalize(request.Phone) ?? throw new BusinessRuleException("Неверный номер телефона");
 
-        var user = new AppUser
-        {
-            UserName = email,
-            Email = email,
-            EmailConfirmed = true,
-            FullName = request.FullName.Trim(),
-            PhoneNumber = phone,
-            OrganizationId = organizationId
-        };
-        // Пароль необязателен: сотрудник может входить по коду из почты.
-        var result = string.IsNullOrEmpty(request.Password)
-            ? await userManager.CreateAsync(user)
-            : await userManager.CreateAsync(user, request.Password);
-        if (!result.Succeeded)
-            throw new BusinessRuleException(string.Join("; ", result.Errors.Select(e => e.Description)));
-
-        await userManager.AddToRoleAsync(user, request.Role);
+        // Сотрудник входит только по паролю: если руководитель его не задал, пароль уходит сотруднику письмом.
+        var (user, password, generated) = await accounts.CreateAsync(email, request.FullName.Trim(), request.Role, organizationId, phone, request.Password);
         foreach (var buildingId in buildings)
             db.UserBuildings.Add(new UserBuilding { UserId = user.Id, BuildingId = buildingId });
         audit.Record(nameof(AppUser), user.Id, "Created", null, new { user.Email, user.FullName, request.Role, BuildingIds = buildings });
         await db.SaveChangesAsync(ct);
+        if (generated)
+        {
+            var organizationName = await db.Organizations.Where(o => o.Id == organizationId).Select(o => o.Name).SingleAsync(ct);
+            await accounts.SendCredentialsAsync(user, password, organizationName, ct);
+        }
 
         return new UserResponse(user.Id, user.Email, user.PhoneNumber, user.FullName, [request.Role], user.IsActive, user.CreatedAt,
             organizationId, buildings);

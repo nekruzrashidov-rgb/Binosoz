@@ -1,13 +1,16 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using Microsoft.EntityFrameworkCore;
 using Sitora.Domain.DTOs.Auth;
-using Sitora.Domain.DTOs.Common;
-using Sitora.Domain.DTOs.Catalog;
+using Sitora.Domain.Entities;
+using Sitora.Infrastructure.Security;
 using Sitora.Tests.Infrastructure;
 
 namespace Sitora.Tests.Auth;
 
-// Страница /accept-invite: сведения о приглашении до принятия и принятие с паролем.
+// Страница /accept-invite для ссылок из старых писем: сведения о приглашении и принятие — только с паролем.
+// Новые приглашения ссылок не содержат (учётная запись создаётся сразу), поэтому приглашение кладём в базу сами.
 public class InvitationPageTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFactory>
 {
     private readonly HttpClient _guest = factory.CreateClient();
@@ -15,13 +18,13 @@ public class InvitationPageTests(SitoraApiFactory factory) : IClassFixture<Sitor
     [Fact]
     public async Task Info_ShowsOrganizationAndRole_UntilAccepted()
     {
-        var (email, token) = await InviteAsync("Manager");
+        var (email, token) = await LegacyInvitationAsync("Manager", "Приглашённый менеджер");
 
         var info = await TestScenarios.ReadAsync<InvitationInfoResponse>(await _guest.GetAsync($"/api/v1/auth/invitations/{token}"));
         Assert.Equal((email, "Приглашённый менеджер", "Manager"), (info.Email, info.FullName, info.Role));
         Assert.False(string.IsNullOrWhiteSpace(info.OrganizationName));
 
-        (await _guest.PostAsJsonAsync("/api/v1/auth/invitations/accept", new AcceptInvitationRequest(token))).EnsureSuccessStatusCode();
+        (await _guest.PostAsJsonAsync("/api/v1/auth/invitations/accept", new AcceptInvitationRequest(token, "Menedzher2026"))).EnsureSuccessStatusCode();
         var used = await _guest.GetAsync($"/api/v1/auth/invitations/{token}");
         Assert.Equal(HttpStatusCode.NotFound, used.StatusCode);
         Assert.Contains("Приглашение недействительно", await used.Content.ReadAsStringAsync());
@@ -35,10 +38,11 @@ public class InvitationPageTests(SitoraApiFactory factory) : IClassFixture<Sitor
     }
 
     [Fact]
-    public async Task Accept_WithPassword_AllowsPasswordLogin_AndWeakPasswordKeepsInvitation()
+    public async Task Accept_NeedsPassword_WeakOrMissingKeepsInvitation_ThenPasswordLoginWorks()
     {
-        var (email, token) = await InviteAsync("Accountant");
+        var (email, token) = await LegacyInvitationAsync("Accountant", "Приглашённый сотрудник");
 
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await _guest.PostAsJsonAsync("/api/v1/auth/invitations/accept", new AcceptInvitationRequest(token))).StatusCode);
         var weak = await _guest.PostAsJsonAsync("/api/v1/auth/invitations/accept", new AcceptInvitationRequest(token, "short"));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, weak.StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await _guest.GetAsync($"/api/v1/auth/invitations/{token}")).StatusCode);
@@ -51,15 +55,26 @@ public class InvitationPageTests(SitoraApiFactory factory) : IClassFixture<Sitor
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
     }
 
-    private async Task<(string Email, string Token)> InviteAsync(string role)
+    private async Task<(string Email, string Token)> LegacyInvitationAsync(string role, string fullName)
     {
-        var owner = await factory.CreateAdminClientAsync();
         var email = $"invited-{Guid.NewGuid():N}@sitora.local";
-        List<Guid>? buildings = null;
-        if (role == "ObjectAdmin")
-            buildings = [(await owner.GetFromJsonAsync<PagedResult<BuildingResponse>>("/api/v1/buildings", TestJson.Options))!.Items[0].Id];
-        (await owner.PostAsJsonAsync("/api/v1/invitations",
-            new CreateInvitationRequest(email, role == "Manager" ? "Приглашённый менеджер" : "Приглашённый сотрудник", role, buildings))).EnsureSuccessStatusCode();
-        return (email, factory.Email.LastInviteToken(email)!);
+        var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        await factory.WithDbAsync(async db =>
+        {
+            var adminId = await db.Users.Where(u => u.Email == SitoraApiFactory.AdminEmail).Select(u => u.Id).SingleAsync();
+            db.Invitations.Add(new Invitation
+            {
+                OrganizationId = Organization.DefaultId,
+                Email = email,
+                FullName = fullName,
+                Role = role,
+                BuildingIds = [],
+                TokenHash = JwtTokenService.HashToken(token),
+                ExpiresAt = DateTime.UtcNow.Add(Invitation.Lifetime),
+                InvitedById = adminId
+            });
+            await db.SaveChangesAsync();
+        });
+        return (email, token);
     }
 }

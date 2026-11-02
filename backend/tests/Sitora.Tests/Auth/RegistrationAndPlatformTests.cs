@@ -27,10 +27,20 @@ public class RegistrationAndPlatformTests(SitoraApiFactory factory) : IClassFixt
         var response = await Register(email, "Новый Покупатель", phone);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        // Два письма: приветствие и код для входа (последним).
+        Assert.Equal(2, factory.Email.SentCount(normalized));
         var code = factory.Email.LastCode(normalized);
         Assert.NotNull(code);
         var customer = await factory.WithDbAsync(db => db.Customers.IgnoreQueryFilters().SingleAsync(c => c.Email == normalized));
         Assert.Equal((Organization.DefaultId, "Новый Покупатель", phone), (customer.OrganizationId, customer.FullName, customer.Phone));
+        // Учётная запись покупателя — сразу, без пароля, и регистрация в аудите.
+        Assert.NotNull(customer.UserId);
+        await factory.WithDbAsync(async db =>
+        {
+            var user = await db.Users.SingleAsync(u => u.Id == customer.UserId);
+            Assert.Null(user.PasswordHash);
+            Assert.True(await db.AuditLogs.IgnoreQueryFilters().AnyAsync(l => l.EntityId == user.Id && l.Action == "Registered"));
+        });
 
         var auth = await TestScenarios.ReadAsync<AuthResponse>(await _client.PostAsJsonAsync("/api/v1/auth/email/verify",
             new EmailVerifyRequest(normalized, code!)));
@@ -53,12 +63,15 @@ public class RegistrationAndPlatformTests(SitoraApiFactory factory) : IClassFixt
     {
         // Чужой телефон к новой почте не привязывается: иначе по номеру можно было бы получить чужие сделки.
         var deal = await TestScenarios.CreateDealAsync(factory);
-        var taken = await Register($"thief-{Guid.NewGuid():N}@mail.test", "Чужой", deal.Phone);
+        var taken = await Register($"thief-{Guid.NewGuid():N}@mail.test", "Чужой Человек", deal.Phone);
         Assert.Equal(HttpStatusCode.Conflict, taken.StatusCode);
         Assert.Contains("другой почтой", await taken.Content.ReadAsStringAsync());
 
-        Assert.Equal(HttpStatusCode.NotFound, (await Register($"x-{Guid.NewGuid():N}@mail.test", "Имя", SitoraApiFactory.RandomPhone(), "no-such-developer")).StatusCode);
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await Register($"y-{Guid.NewGuid():N}@mail.test", "Имя", "12345")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await Register($"x-{Guid.NewGuid():N}@mail.test", "Имя Фамилия", SitoraApiFactory.RandomPhone(), "no-such-developer")).StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await Register($"y-{Guid.NewGuid():N}@mail.test", "Имя Фамилия", "12345")).StatusCode);
+        // Без фамилии — 422; почта сотрудника покупателем не становится — 409.
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await Register($"z-{Guid.NewGuid():N}@mail.test", "Имя", SitoraApiFactory.RandomPhone())).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await Register(SitoraApiFactory.ManagerEmail, "Менеджер Покупатель", SitoraApiFactory.RandomPhone())).StatusCode);
     }
 
     [Fact]
@@ -122,8 +135,13 @@ public class RegistrationAndPlatformTests(SitoraApiFactory factory) : IClassFixt
         Assert.Equal(HttpStatusCode.NotFound, (await platform.PostAsync($"/api/v1/platform/impersonate/{Guid.NewGuid()}", null)).StatusCode);
     }
 
-    private Task<HttpResponseMessage> Register(string email, string fullName, string phone, string? organization = null) =>
-        _client.PostAsJsonAsync("/api/v1/auth/register", new RegisterCustomerRequest(email, fullName, phone, organization ?? Organization.DefaultSlug));
+    // fullName — «Имя Фамилия»: в запросе это два поля.
+    private Task<HttpResponseMessage> Register(string email, string fullName, string phone, string? organization = null)
+    {
+        var parts = fullName.Split(' ', 2);
+        return _client.PostAsJsonAsync("/api/v1/auth/register",
+            new RegisterCustomerRequest(email, parts[0], parts.Length > 1 ? parts[1] : "", phone, organization ?? Organization.DefaultSlug));
+    }
 
     private async Task Send(string email) =>
         (await _client.PostAsJsonAsync("/api/v1/auth/email/send", new EmailSendRequest(email))).EnsureSuccessStatusCode();

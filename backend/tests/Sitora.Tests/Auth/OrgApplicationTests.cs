@@ -100,8 +100,11 @@ public class OrgApplicationTests(SitoraApiFactory factory) : IClassFixture<Sitor
         Assert.Equal(organization.Id, owner!.OrganizationId);
         Assert.True(await users.IsInRoleAsync(owner, "Owner"));
         Assert.Equal(2, factory.Email.SentCount(email));
-        // Письмо владельцу ведёт на страницу входа, а не на страницу приглашения без токена.
-        Assert.EndsWith("/login", factory.Email.LastMessage(email)!.Text.TrimEnd());
+        // Письмо владельцу — логин и пароль со ссылкой на страницу входа; по этому паролю он и входит.
+        var letter = factory.Email.LastMessage(email)!;
+        Assert.Contains("/login", letter.Text);
+        Assert.Contains($"Логин: {email}", letter.Text);
+        await factory.CreateClientForAsync(email, factory.Email.LastPassword(email)!);
         Assert.True(await factory.WithDbAsync(db => db.AuditLogs.AnyAsync(l => l.Entity == nameof(OrgApplication) && l.EntityId == id && l.Action == "Approved")));
 
         // Рассмотренную заявку повторно не одобрить.

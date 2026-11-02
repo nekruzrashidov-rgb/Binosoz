@@ -39,6 +39,9 @@ public partial class FakeEmailSender : IEmailSender
 
     public string? LastInviteToken(string email) => Last(email, InvitePattern(), group: 1);
 
+    // Пароль из письма «Вы приглашены в Binosoz».
+    public string? LastPassword(string email) => Last(email, PasswordPattern(), group: 1);
+
     private string? Last(string email, Regex pattern, int group = 0)
     {
         if (!_messages.TryGetValue(email, out var list))
@@ -61,4 +64,7 @@ public partial class FakeEmailSender : IEmailSender
 
     [GeneratedRegex(@"#(?:invite|token)=([0-9A-F]{64})")]
     private static partial Regex InvitePattern();
+
+    [GeneratedRegex(@"Пароль: (\S+)")]
+    private static partial Regex PasswordPattern();
 }

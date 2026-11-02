@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Net;
 using System.Net.Http.Json;
 using System.Net.Mail;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -20,7 +21,31 @@ public class EmailOptions
     [EmailAddress]
     public string From { get; set; } = "no-reply@sitora.local";
 
-    public string FromName { get; set; } = "Sitora";
+    public string FromName { get; set; } = "Binosoz";
+
+    // Короткие переменные Smtp__Host, Smtp__Port, Smtp__Username, Smtp__Password, Smtp__FromEmail, Smtp__FromName
+    // (user-secrets или .env) перекрывают Email__Smtp__* и включают отправку через SMTP.
+    public const string SmtpSectionName = "Smtp";
+
+    public static bool HasSmtpSection(IConfiguration configuration) =>
+        !string.IsNullOrWhiteSpace(configuration[$"{SmtpSectionName}:Host"]);
+
+    public static void ApplySmtpSection(EmailOptions options, IConfiguration configuration)
+    {
+        if (!HasSmtpSection(configuration))
+            return;
+        var smtp = configuration.GetSection(SmtpSectionName);
+        options.Provider = "Smtp";
+        options.Smtp.Host = smtp["Host"];
+        if (int.TryParse(smtp["Port"], out var port))
+            options.Smtp.Port = port;
+        options.Smtp.Username = smtp["Username"] ?? options.Smtp.Username;
+        options.Smtp.Password = smtp["Password"] ?? options.Smtp.Password;
+        if (!string.IsNullOrWhiteSpace(smtp["FromEmail"]))
+            options.From = smtp["FromEmail"]!;
+        if (!string.IsNullOrWhiteSpace(smtp["FromName"]))
+            options.FromName = smtp["FromName"]!;
+    }
 
     // Адрес страницы принятия приглашения; токен дописывается в конец.
     public string InviteUrl { get; set; } = "http://localhost:5500/accept-invite#token=";
