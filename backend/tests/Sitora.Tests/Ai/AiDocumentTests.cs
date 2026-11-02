@@ -101,7 +101,7 @@ public class AiDocumentTests(AiDocumentFactory factory) : IClassFixture<AiDocume
     }
 
     [Fact]
-    public async Task ChatWithDeal_PutsDealIntoStaffPrompt_ButNotForBuyer()
+    public async Task ChatWithDeal_PutsDealIntoStaffPrompt_BuyerGetsOwnDealsOnly()
     {
         var deal = await TestScenarios.CreateDealAsync(factory);
         await TestScenarios.CreatePlanAsync(factory, deal.DealId);
@@ -111,15 +111,17 @@ public class AiDocumentTests(AiDocumentFactory factory) : IClassFixture<AiDocume
             new AiChatRequest("Напомни клиенту о платеже", null)));
 
         var system = factory.Model.LastSystem!;
-        Assert.StartsWith("Текущая сделка: Покупатель Кабинета, квартира ", system);
-        Assert.Contains("статус договор", system);
-        Assert.Contains("Платежей: 0/", system);
+        Assert.StartsWith("Текущая сделка: покупатель Покупатель Кабинета, квартира ", system);
+        Assert.Contains("этап сделки: договор", system);
+        Assert.Contains("закрыто платежей по графику: 0 из ", system);
         Assert.EndsWith(AiAssistant.StaffPrompt, system);
 
         var customer = await factory.CreateCustomerClientAsync(deal.Phone);
         await TestScenarios.ReadAsync<AiChatResponse>(await customer.PostAsJsonAsync($"/api/v1/ai/chat?dealId={deal.DealId}",
             new AiChatRequest("Когда платить?", null)));
-        Assert.Equal(AiAssistant.CustomerPrompt, factory.Model.LastSystem);
+        // Покупателю dealId не нужен: в промпт попадают его собственные сделки.
+        Assert.StartsWith("Сделки покупателя:\n- покупатель Покупатель Кабинета", factory.Model.LastSystem);
+        Assert.EndsWith(AiAssistant.CustomerPrompt, factory.Model.LastSystem);
 
         Assert.Equal(HttpStatusCode.NotFound, (await manager.PostAsJsonAsync($"/api/v1/ai/chat?dealId={Guid.NewGuid()}",
             new AiChatRequest("Кто это?", null))).StatusCode);
