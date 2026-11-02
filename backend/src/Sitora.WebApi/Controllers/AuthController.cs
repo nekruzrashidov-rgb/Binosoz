@@ -14,7 +14,7 @@ namespace Sitora.WebApi.Controllers;
 [Produces("application/json")]
 public class AuthController(IAuthService auth, IOptions<AuthOptions> options) : ControllerBase
 {
-    /// <summary>Код для входа на почту — для всех ролей. Ответ одинаковый, есть ли такая учётная запись.</summary>
+    /// <summary>Код для входа на почту — только покупателям (сотрудники входят по паролю). Ответ одинаковый, есть ли такая учётная запись.</summary>
     /// <remarks>Не чаще одного кода в минуту и пяти в час на почту и на IP. Код живёт 10 минут, 5 попыток ввода.</remarks>
     [HttpPost("email/send")]
     [AllowAnonymous]
@@ -24,18 +24,14 @@ public class AuthController(IAuthService auth, IOptions<AuthOptions> options) : 
     public async Task<ActionResult<EmailSendResponse>> SendEmailCode(EmailSendRequest request, CancellationToken ct) =>
         Ok(await auth.SendEmailCodeAsync(request, HttpContext.Connection.RemoteIpAddress?.ToString(), ct));
 
-    /// <summary>Проверка кода из почты: токены (200) или запрос второго фактора для создателя платформы (202).</summary>
+    /// <summary>Проверка кода из почты — вход покупателя. Почта сотрудника — 401 «Сотрудники входят по паролю».</summary>
     [HttpPost("email/verify")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicies.Login)]
     [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK)]
-    [ProducesResponseType<SecondFactorChallenge>(StatusCodes.Status202Accepted)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> VerifyEmailCode(EmailVerifyRequest request, CancellationToken ct)
-    {
-        var result = await auth.VerifyEmailCodeAsync(request, ct);
-        return result.Challenge is { } challenge ? Accepted(challenge) : Ok(result.Auth);
-    }
+    public Task<AuthResponse> VerifyEmailCode(EmailVerifyRequest request, CancellationToken ct) =>
+        auth.VerifyEmailCodeAsync(request, ct);
 
     /// <summary>
     /// Регистрация покупателя на сайте застройщика (organization — его короткое имя). Создаёт карточку клиента
@@ -49,32 +45,6 @@ public class AuthController(IAuthService auth, IOptions<AuthOptions> options) : 
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult<EmailSendResponse>> Register(RegisterCustomerRequest request, CancellationToken ct) =>
         Ok(await auth.RegisterCustomerAsync(request, HttpContext.Connection.RemoteIpAddress?.ToString(), ct));
-
-    /// <summary>
-    /// Вход создателя платформы: почта и код из письма (код запрашивается обычным /auth/email/send).
-    /// Только для этой роли; ответ — запрос второго фактора (202), токен выдаёт /auth/second-factor.
-    /// В разработке с кодом 123456 второй шаг пропускается и сразу приходят токены (200).
-    /// </summary>
-    [HttpPost("platform/login")]
-    [AllowAnonymous]
-    [EnableRateLimiting(RateLimitPolicies.Login)]
-    [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK)]
-    [ProducesResponseType<SecondFactorChallenge>(StatusCodes.Status202Accepted)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> PlatformLogin(EmailVerifyRequest request, CancellationToken ct)
-    {
-        var result = await auth.VerifyPlatformCodeAsync(request, ct);
-        return result.Challenge is { } challenge ? Accepted(challenge) : Ok(result.Auth);
-    }
-
-    /// <summary>Второй фактор создателя платформы: пароль или код из приложения-аутентификатора.</summary>
-    [HttpPost("second-factor")]
-    [AllowAnonymous]
-    [EnableRateLimiting(RateLimitPolicies.Login)]
-    [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
-    public Task<AuthResponse> SecondFactor(SecondFactorRequest request, CancellationToken ct) =>
-        auth.CompleteSecondFactorAsync(request, ct);
 
     /// <summary>Сведения о приглашении по токену из письма: организация, роль, имя и почта. Недействительное — 404.</summary>
     [HttpGet("invitations/{token}")]
@@ -97,14 +67,33 @@ public class AuthController(IAuthService auth, IOptions<AuthOptions> options) : 
     public Task<AuthResponse> AcceptInvitation(AcceptInvitationRequest request, CancellationToken ct) =>
         auth.AcceptInvitationAsync(request, ct);
 
-    /// <summary>Вход сотрудника по паролю (если включён Auth:PasswordLoginEnabled). Создателю платформы закрыт.</summary>
+    /// <summary>
+    /// Вход сотрудника (Owner, ObjectAdmin, Manager, Accountant, Content, SuperAdmin) по почте и паролю.
+    /// Покупателю — 400 «Используйте вход по коду». 5 неудачных попыток — блокировка на 15 минут.
+    /// С включённой 2FA ответ — { requiresTwoFactor: true, tempToken, expiresAt }, токены выдаёт /auth/2fa/verify.
+    /// </summary>
     [HttpPost("login")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicies.Login)]
     [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<TwoFactorRequiredResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> Login(LoginRequest request, CancellationToken ct) =>
-        options.Value.PasswordLoginEnabled ? Ok(await auth.LoginAsync(request, ct)) : NotFound();
+    public async Task<IActionResult> Login(LoginRequest request, CancellationToken ct)
+    {
+        var result = await auth.LoginAsync(request, ct);
+        return result.TwoFactor is { } twoFactor ? Ok(twoFactor) : Ok(result.Auth);
+    }
+
+    /// <summary>Второй шаг входа с 2FA: временный токен из /auth/login и 6 цифр из приложения-аутентификатора.</summary>
+    /// <remarks>Токен живёт 5 минут, 5 попыток ввода.</remarks>
+    [HttpPost("2fa/verify")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Login)]
+    [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    public Task<AuthResponse> VerifyTwoFactor(TwoFactorVerifyRequest request, CancellationToken ct) =>
+        auth.VerifyTwoFactorAsync(request, ct);
 
     [HttpPost("refresh")]
     [AllowAnonymous]

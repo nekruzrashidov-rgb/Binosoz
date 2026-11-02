@@ -14,7 +14,7 @@ public class OrganizationStatusTests(SitoraApiFactory factory) : IClassFixture<S
     public async Task Organizations_ListOwnersAndBuildings()
     {
         var (platform, slug, ownerEmail) = await NewOrganizationAsync();
-        var owner = await factory.CreateEmailClientAsync(ownerEmail);
+        var owner = await factory.CreateStaffClientAsync(ownerEmail);
         (await owner.PostAsJsonAsync("/api/v1/buildings", new SaveBuildingRequest("Дом статуса", "Хона", "ул. Тест, 1", 3, null, null))).EnsureSuccessStatusCode();
 
         var list = await platform.GetFromJsonAsync<List<OrganizationResponse>>("/api/v1/platform/organizations", TestJson.Options);
@@ -28,10 +28,10 @@ public class OrganizationStatusTests(SitoraApiFactory factory) : IClassFixture<S
     public async Task Suspend_ClosesSignInAndSessions_Activate_OpensAgain()
     {
         var (platform, slug, ownerEmail) = await NewOrganizationAsync();
+        await factory.CreateStaffClientAsync(ownerEmail);
         var signIn = factory.CreateClient();
-        (await signIn.PostAsJsonAsync("/api/v1/auth/email/send", new EmailSendRequest(ownerEmail))).EnsureSuccessStatusCode();
-        var auth = await TestScenarios.ReadAsync<AuthResponse>(await signIn.PostAsJsonAsync("/api/v1/auth/email/verify",
-            new EmailVerifyRequest(ownerEmail, factory.Email.LastCode(ownerEmail)!)));
+        var auth = await TestScenarios.ReadAsync<AuthResponse>(await signIn.PostAsJsonAsync("/api/v1/auth/login",
+            new LoginRequest(ownerEmail, SitoraApiFactory.StaffTestPassword)));
         var id = (await platform.GetFromJsonAsync<List<OrganizationResponse>>("/api/v1/platform/organizations", TestJson.Options))!.Single(o => o.Slug == slug).Id;
 
         Assert.Equal(HttpStatusCode.NoContent, (await platform.PatchAsJsonAsync($"/api/v1/platform/organizations/{id}/status", new OrganizationStatusRequest(false))).StatusCode);
@@ -41,7 +41,7 @@ public class OrganizationStatusTests(SitoraApiFactory factory) : IClassFixture<S
         Assert.True(await factory.WithDbAsync(db => db.AuditLogs.IgnoreQueryFilters().AnyAsync(l => l.EntityId == id && l.Action == "Suspended")));
 
         Assert.Equal(HttpStatusCode.NoContent, (await platform.PatchAsJsonAsync($"/api/v1/platform/organizations/{id}/status", new OrganizationStatusRequest(true))).StatusCode);
-        var again = await factory.CreateEmailClientAsync(ownerEmail);
+        var again = await factory.CreateStaffClientAsync(ownerEmail);
         Assert.Equal(HttpStatusCode.OK, (await again.GetAsync("/api/v1/auth/me")).StatusCode);
     }
 

@@ -40,14 +40,14 @@ public record EmailVerifyRequest(string Email, string Code);
 // Регистрация покупателя на сайте застройщика: Organization — его короткое имя (slug); без него — единственный застройщик платформы.
 public record RegisterCustomerRequest(string Email, string FullName, string Phone, string? Organization = null);
 
-// Код из почты принят, но учётной записи нужен второй фактор (создатель платформы).
-public record SecondFactorChallenge(string ChallengeToken, DateTime ExpiresAt, IReadOnlyList<string> Methods, string Message);
+// Пароль принят, но у учётной записи включена 2FA: токены выдаст /auth/2fa/verify с кодом из приложения.
+public record TwoFactorRequiredResponse(bool RequiresTwoFactor, string TempToken, DateTime ExpiresAt);
 
-// Пароль или код из приложения-аутентификатора (TOTP) — что-то одно.
-public record SecondFactorRequest(string ChallengeToken, string? Password, string? TotpCode);
+// Второй шаг входа: временный токен из /auth/login и 6 цифр из приложения-аутентификатора.
+public record TwoFactorVerifyRequest(string TempToken, string Code);
 
-// Результат проверки кода: либо токены, либо запрос второго фактора.
-public record EmailLoginResult(AuthResponse? Auth, SecondFactorChallenge? Challenge);
+// Результат входа по паролю: либо токены, либо запрос кода 2FA.
+public record LoginResult(AuthResponse? Auth, TwoFactorRequiredResponse? TwoFactor);
 
 // Токен без refresh-токена: режим «войти как владелец» и выход из него.
 public record AccessTokenResponse(string AccessToken, DateTime AccessTokenExpiresAt, CurrentUserResponse User);

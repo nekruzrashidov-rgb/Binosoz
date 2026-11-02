@@ -10,6 +10,9 @@ public class ForbiddenException(string message = "Недостаточно пр�
 
 public class BusinessRuleException(string message) : DomainException(message);
 
+// Запрос не к тому адресу (например, покупатель пришёл во вход по паролю) — 400.
+public class BadRequestException(string message) : DomainException(message);
+
 public class UnauthorizedException(string message) : DomainException(message);
 
 public class TooManyRequestsException(string message) : DomainException(message);

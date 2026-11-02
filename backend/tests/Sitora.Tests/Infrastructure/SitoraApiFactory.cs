@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Sitora.Domain.Interfaces;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Sitora.Domain.DTOs.Auth;
+using Sitora.Domain.Entities;
 using Sitora.Domain.Enums;
 using Sitora.Infrastructure.Data;
 using Testcontainers.PostgreSql;
@@ -173,7 +175,7 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         return await CreateEmailClientAsync(email);
     }
 
-    // Вход по коду из почты; для создателя платформы возвращает ответ второго шага.
+    // Вход покупателя по коду из почты.
     public async Task<HttpClient> CreateEmailClientAsync(string email)
     {
         var client = CreateClient();
@@ -186,21 +188,25 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         return client;
     }
 
-    // Создатель платформы: код из почты и пароль вторым фактором.
-    public async Task<HttpClient> CreatePlatformOwnerClientAsync()
+    // Сотрудник, которого тест создал без известного пароля: задаём пароль напрямую и входим по нему, как на странице входа.
+    public const string StaffTestPassword = "Staff-Test-1";
+
+    public async Task<HttpClient> CreateStaffClientAsync(string email)
     {
-        var client = CreateClient();
-        (await client.PostAsJsonAsync("/api/v1/auth/email/send", new EmailSendRequest(PlatformOwnerEmail))).EnsureSuccessStatusCode();
-        var verified = await client.PostAsJsonAsync("/api/v1/auth/email/verify",
-            new EmailVerifyRequest(PlatformOwnerEmail, Email.LastCode(PlatformOwnerEmail)!));
-        var challenge = await verified.Content.ReadFromJsonAsync<SecondFactorChallenge>();
-        var response = await client.PostAsJsonAsync("/api/v1/auth/second-factor",
-            new SecondFactorRequest(challenge!.ChallengeToken, PlatformOwnerPassword, null));
-        response.EnsureSuccessStatusCode();
-        var auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
-        return client;
+        const string password = StaffTestPassword;
+        await WithServiceAsync<UserManager<AppUser>>(async users =>
+        {
+            var user = await users.FindByEmailAsync(email) ?? throw new InvalidOperationException($"Нет сотрудника {email}");
+            if (await users.HasPasswordAsync(user))
+                await users.RemovePasswordAsync(user);
+            if (!(await users.AddPasswordAsync(user, password)).Succeeded)
+                throw new InvalidOperationException("Пароль сотрудника не задан");
+        });
+        return await CreateClientForAsync(email, password);
     }
+
+    // Создатель платформы входит по паролю, как и другие сотрудники (2FA у него в тестах не включена).
+    public Task<HttpClient> CreatePlatformOwnerClientAsync() => CreateClientForAsync(PlatformOwnerEmail, PlatformOwnerPassword);
 
     private readonly string _storagePath = Path.Combine(Path.GetTempPath(), "sitora-tests", Guid.NewGuid().ToString("N"));
 

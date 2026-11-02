@@ -15,20 +15,26 @@ public class EmailAuthTests(SitoraApiFactory factory) : IClassFixture<SitoraApiF
     private readonly HttpClient _client = factory.CreateClient();
 
     [Fact]
-    public async Task Send_AnswersTheSame_ForKnownAndUnknownEmail_AndMailsOnlyKnown()
+    public async Task Send_AnswersTheSame_ForCustomerStaffAndUnknownEmail_AndMailsOnlyCustomer()
     {
         var unknown = $"nobody-{Guid.NewGuid():N}@nowhere.test";
+        var customer = await NewCustomerEmailAsync();
+        var staffBefore = factory.Email.SentCount(SitoraApiFactory.AccountantEmail);
 
-        var known = await _client.PostAsJsonAsync("/api/v1/auth/email/send", new EmailSendRequest(SitoraApiFactory.ManagerEmail));
+        var known = await _client.PostAsJsonAsync("/api/v1/auth/email/send", new EmailSendRequest(customer));
+        var staff = await _client.PostAsJsonAsync("/api/v1/auth/email/send", new EmailSendRequest(SitoraApiFactory.AccountantEmail));
         var missing = await _client.PostAsJsonAsync("/api/v1/auth/email/send", new EmailSendRequest(unknown));
 
-        Assert.Equal((HttpStatusCode.OK, HttpStatusCode.OK), (known.StatusCode, missing.StatusCode));
+        Assert.Equal((HttpStatusCode.OK, HttpStatusCode.OK, HttpStatusCode.OK), (known.StatusCode, staff.StatusCode, missing.StatusCode));
         Assert.Equal(await known.Content.ReadAsStringAsync(), await missing.Content.ReadAsStringAsync());
+        Assert.Equal(await known.Content.ReadAsStringAsync(), await staff.Content.ReadAsStringAsync());
         Assert.Equal(0, factory.Email.SentCount(unknown));
-        Assert.NotNull(factory.Email.LastCode(SitoraApiFactory.ManagerEmail));
+        // Сотрудник входит по паролю: код ему не отправляется.
+        Assert.Equal(staffBefore, factory.Email.SentCount(SitoraApiFactory.AccountantEmail));
+        Assert.NotNull(factory.Email.LastCode(customer));
 
         // Код хранится только хешем.
-        var code = factory.Email.LastCode(SitoraApiFactory.ManagerEmail)!;
+        var code = factory.Email.LastCode(customer)!;
         await factory.WithDbAsync(async db => Assert.False(await db.EmailCodes.AnyAsync(c => c.CodeHash.Contains(code))));
 
         // По коду для незнакомой почты войти нельзя.
@@ -49,19 +55,27 @@ public class EmailAuthTests(SitoraApiFactory factory) : IClassFixture<SitoraApiF
     }
 
     [Fact]
-    public async Task Verify_StaffGetsTokensWithRoleAndOrganization()
+    public async Task Verify_StaffEmail_IsRejected_StaffUsePassword()
     {
-        await Send(SitoraApiFactory.ManagerEmail);
+        // Почта нормализуется: регистр и пробелы не важны — сотрудник узнаётся и так.
+        var response = await Verify("  MANAGER@Sitora.Local ", "123456");
 
-        // Почта нормализуется: регистр и пробелы не важны.
-        var response = await Verify("  MANAGER@Sitora.Local ", factory.Email.LastCode(SitoraApiFactory.ManagerEmail)!);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("Сотрудники входят по паролю", (await response.Content.ReadFromJsonAsync<ProblemDetails>())?.Detail);
+    }
 
-        var auth = await TestScenarios.ReadAsync<AuthResponse>(response);
-        Assert.Equal("Manager", auth.User.Role);
-        Assert.Equal(Sitora.Domain.Entities.Organization.DefaultId, auth.User.OrganizationId);
-        Assert.Empty(auth.User.BuildingIds!);
+    [Fact]
+    public async Task Verify_CustomerGetsTokens_AndLoginIsAudited()
+    {
+        var email = await NewCustomerEmailAsync();
+        await Send(email);
+
+        var auth = await TestScenarios.ReadAsync<AuthResponse>(await Verify(email.ToUpperInvariant(), factory.Email.LastCode(email)!));
+
+        Assert.Equal("Customer", auth.User.Role);
         Assert.Null(auth.User.Impersonation);
         Assert.False(string.IsNullOrEmpty(auth.RefreshToken));
+        Assert.True(await factory.WithDbAsync(db => db.AuditLogs.AnyAsync(l => l.EntityId == auth.User.Id && l.Action == "Login")));
     }
 
     [Fact]
@@ -127,39 +141,6 @@ public class EmailAuthTests(SitoraApiFactory factory) : IClassFixture<SitoraApiF
         Assert.Equal([deal.Id], deals!.Select(d => d.Id));
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/v1/deals/{foreign.DealId}/schedule")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/v1/deals")).StatusCode);
-    }
-
-    [Fact]
-    public async Task PlatformOwner_NeedsSecondFactor_AndCannotUsePasswordLogin()
-    {
-        await Send(SitoraApiFactory.PlatformOwnerEmail);
-        var verified = await Verify(SitoraApiFactory.PlatformOwnerEmail, factory.Email.LastCode(SitoraApiFactory.PlatformOwnerEmail)!);
-
-        Assert.Equal(HttpStatusCode.Accepted, verified.StatusCode);
-        var body = await verified.Content.ReadAsStringAsync();
-        Assert.DoesNotContain("accessToken", body);
-        var challenge = (await verified.Content.ReadFromJsonAsync<SecondFactorChallenge>(TestJson.Options))!;
-        Assert.Contains("password", challenge.Methods, StringComparer.OrdinalIgnoreCase);
-
-        Assert.Equal(HttpStatusCode.Unauthorized, (await _client.PostAsJsonAsync("/api/v1/auth/second-factor",
-            new SecondFactorRequest(challenge.ChallengeToken, "Wrong-password-1", null))).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await _client.PostAsJsonAsync("/api/v1/auth/second-factor",
-            new SecondFactorRequest("not-a-challenge", factory.PlatformOwnerPassword, null))).StatusCode);
-
-        var auth = await TestScenarios.ReadAsync<AuthResponse>(await _client.PostAsJsonAsync("/api/v1/auth/second-factor",
-            new SecondFactorRequest(challenge.ChallengeToken, factory.PlatformOwnerPassword, null)));
-        Assert.Equal("PlatformOwner", auth.User.Role);
-        Assert.Null(auth.User.OrganizationId);
-
-        // Вызов использован — повторно не сработает.
-        Assert.Equal(HttpStatusCode.Unauthorized, (await _client.PostAsJsonAsync("/api/v1/auth/second-factor",
-            new SecondFactorRequest(challenge.ChallengeToken, factory.PlatformOwnerPassword, null))).StatusCode);
-
-        // Вход по паролю без кода из почты закрыт, ответ как на неверный пароль.
-        var password = await _client.PostAsJsonAsync("/api/v1/auth/login",
-            new LoginRequest(SitoraApiFactory.PlatformOwnerEmail, factory.PlatformOwnerPassword));
-        Assert.Equal(HttpStatusCode.Unauthorized, password.StatusCode);
-        Assert.Equal("Неверная почта или пароль", (await password.Content.ReadFromJsonAsync<ProblemDetails>())?.Detail);
     }
 
     private Task Send(string email) =>

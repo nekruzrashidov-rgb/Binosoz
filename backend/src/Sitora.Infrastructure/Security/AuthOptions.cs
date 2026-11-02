@@ -10,9 +10,6 @@ public class AuthOptions
     // Старый вход покупателей по SMS: выключен, пока не подключён SMS-провайдер.
     public bool SmsLoginEnabled { get; set; }
 
-    // Вход сотрудников по паролю (для создателя платформы закрыт всегда: только почта и второй фактор).
-    public bool PasswordLoginEnabled { get; set; } = true;
-
     // Не чаще одной отправки кода в минуту и пяти в час — на почту и на IP.
     [Range(1, 100)]
     public int EmailCodesPerMinute { get; set; } = 1;

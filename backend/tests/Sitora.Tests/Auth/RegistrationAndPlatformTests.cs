@@ -62,24 +62,6 @@ public class RegistrationAndPlatformTests(SitoraApiFactory factory) : IClassFixt
     }
 
     [Fact]
-    public async Task PlatformLogin_OnlyForPlatformOwner_AndStillAsksSecondFactor()
-    {
-        await Send(SitoraApiFactory.PlatformOwnerEmail);
-        var platform = await _client.PostAsJsonAsync("/api/v1/auth/platform/login",
-            new EmailVerifyRequest(SitoraApiFactory.PlatformOwnerEmail, factory.Email.LastCode(SitoraApiFactory.PlatformOwnerEmail)!));
-        Assert.Equal(HttpStatusCode.Accepted, platform.StatusCode);
-        Assert.False(string.IsNullOrEmpty((await platform.Content.ReadFromJsonAsync<SecondFactorChallenge>(TestJson.Options))!.ChallengeToken));
-
-        // Сотрудник через этот вход не попадёт, и его код при этом не тратится.
-        await Send(SitoraApiFactory.ContentEmail);
-        var code = factory.Email.LastCode(SitoraApiFactory.ContentEmail)!;
-        Assert.Equal(HttpStatusCode.Unauthorized, (await _client.PostAsJsonAsync("/api/v1/auth/platform/login",
-            new EmailVerifyRequest(SitoraApiFactory.ContentEmail, code))).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await _client.PostAsJsonAsync("/api/v1/auth/email/verify",
-            new EmailVerifyRequest(SitoraApiFactory.ContentEmail, code))).StatusCode);
-    }
-
-    [Fact]
     public async Task PlatformOwner_AddsOwnerWithPassword_AndOthersCannot()
     {
         var platform = await factory.CreatePlatformOwnerClientAsync();

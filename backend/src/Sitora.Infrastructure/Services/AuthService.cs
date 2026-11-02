@@ -39,7 +39,9 @@ public class AuthService(
     private const string InvalidRefreshToken = "Сессия истекла, войдите заново";
     private const string InvalidSmsCode = "Неверный или устаревший код";
     private const string InvalidEmailCode = "Неверный или устаревший код";
-    private const string InvalidChallenge = "Время на подтверждение входа истекло, запросите код заново";
+    private const string InvalidChallenge = "Время на подтверждение входа истекло, войдите заново";
+    private const string CustomerUseCode = "Используйте вход по коду";
+    private const string StaffUsePassword = "Сотрудники входят по паролю";
     private const string InvalidInvitation = "Приглашение недействительно или уже использовано";
     public const int MaxSmsCodesPerHour = 5;
 
@@ -92,7 +94,7 @@ public class AuthService(
             }
         }
         else
-            logger.LogInformation("Код не отправлен: почта не найдена среди пользователей и покупателей");
+            logger.LogInformation("Код не отправлен: почта не найдена среди покупателей");
 
         return new EmailSendResponse("Если почта зарегистрирована, мы отправили на неё код для входа",
             (int)EmailCode.Lifetime.TotalSeconds);
@@ -140,18 +142,27 @@ public class AuthService(
         logger.LogInformation("Разработка: для {Email} создан покупатель", address);
     }
 
+    // Код уходит только покупателю: сотрудники входят по паролю.
     private async Task<bool> IsKnownEmailAsync(string address, CancellationToken ct)
     {
         var user = await userManager.FindByEmailAsync(address);
         if (user is not null)
-            return user.IsActive;
+            return user.IsActive && !await IsStaffAsync(user);
         return await db.Customers.IgnoreQueryFilters().AnyAsync(c => c.Email == address, ct);
     }
 
-    public async Task<EmailLoginResult> VerifyEmailCodeAsync(EmailVerifyRequest request, CancellationToken ct = default)
+    // Сотрудник — любая роль, кроме покупателя.
+    private async Task<bool> IsStaffAsync(AppUser user) =>
+        (await userManager.GetRolesAsync(user)).Any(r => r != RoleNames.Customer);
+
+    public async Task<AuthResponse> VerifyEmailCodeAsync(EmailVerifyRequest request, CancellationToken ct = default)
     {
         var address = EmailAddress.Normalize(request.Email) ?? throw new UnauthorizedException(InvalidEmailCode);
         var now = Now;
+
+        // Сотрудник по коду не входит, даже с кодом разработки: у него пароль.
+        if (await userManager.FindByEmailAsync(address) is { } existing && await IsStaffAsync(existing))
+            throw new UnauthorizedException(StaffUsePassword);
 
         // Действует только последний код: запрос нового делает прежние бесполезными.
         var stored = await db.EmailCodes
@@ -187,12 +198,9 @@ public class AuthService(
         var user = await userManager.FindByEmailAsync(address) ?? await GetOrCreateCustomerUserByEmailAsync(address, ct);
         await EnsureCanSignInAsync(user, ct);
 
-        // Второй шаг создателя платформы пропускается только в разработке с кодом 123456.
-        if (await userManager.IsInRoleAsync(user, RoleNames.PlatformOwner) && !devFixedCode)
-            return new EmailLoginResult(null, await CreateChallengeAsync(user));
-
+        audit.Record(nameof(AppUser), user.Id, "Login", null, new { Method = "EmailCode" }, user.OrganizationId);
         logger.LogInformation("Пользователь {UserId} вошёл по коду из почты", user.Id);
-        return new EmailLoginResult(await IssueTokensAsync(user, ct), null);
+        return await IssueTokensAsync(user, ct);
     }
 
     // Покупатель сам регистрируется на сайте застройщика: появляется карточка клиента с этой почтой,
@@ -254,19 +262,6 @@ public class AuthService(
         return ids is [var single] ? single : throw new BusinessRuleException("Укажите застройщика (organization)");
     }
 
-    // Отдельный вход создателя платформы: только для этой роли, дальше — второй фактор, как и в обычном входе.
-    // Для чужой почты ответ такой же, как на неверный код, и код при этом не тратится.
-    public async Task<EmailLoginResult> VerifyPlatformCodeAsync(EmailVerifyRequest request, CancellationToken ct = default)
-    {
-        var address = EmailAddress.Normalize(request.Email) ?? throw new UnauthorizedException(InvalidEmailCode);
-        var user = await userManager.FindByEmailAsync(address);
-        if (user is null || !await userManager.IsInRoleAsync(user, RoleNames.PlatformOwner))
-            throw new UnauthorizedException(InvalidEmailCode);
-
-        // Обычно — запрос второго фактора; в разработке с кодом 123456 — сразу токены.
-        return await VerifyEmailCodeAsync(request, ct);
-    }
-
     // Покупатель входит по почте из своих сделок: учётная запись создаётся при первом входе
     // и привязывается ко всем записям клиента с этой почтой (у разных застройщиков).
     private async Task<AppUser> GetOrCreateCustomerUserByEmailAsync(string address, CancellationToken ct)
@@ -306,54 +301,33 @@ public class AuthService(
         return user;
     }
 
-    // ---------- Второй фактор (создатель платформы) ----------
+    // ---------- Двухфакторный вход (TOTP) ----------
 
-    private async Task<SecondFactorChallenge> CreateChallengeAsync(AppUser user)
+    // Пароль уже проверен: временный токен живёт 5 минут и годится на 5 попыток ввода кода.
+    private async Task<TwoFactorRequiredResponse> CreateChallengeAsync(AppUser user)
     {
-        var methods = new List<string>();
-        if (await userManager.HasPasswordAsync(user))
-            methods.Add("password");
-        if (await userManager.GetTwoFactorEnabledAsync(user))
-            methods.Add("totp");
-        if (methods.Count == 0)
-            throw new UnauthorizedException("Для этой учётной записи не настроен второй фактор. Задайте пароль в ADMIN_PASSWORD");
-
         var token = Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
         var expiresAt = Now.Add(ChallengeLifetime);
         await SaveCachedAsync(ChallengeKey(token), new Challenge(user.Id, 0, expiresAt));
-        return new SecondFactorChallenge(token, expiresAt, methods,
-            "Код принят. Подтвердите вход паролем или кодом из приложения-аутентификатора");
+        return new TwoFactorRequiredResponse(true, token, expiresAt);
     }
 
-    public async Task<AuthResponse> CompleteSecondFactorAsync(SecondFactorRequest request, CancellationToken ct = default)
+    public async Task<AuthResponse> VerifyTwoFactorAsync(TwoFactorVerifyRequest request, CancellationToken ct = default)
     {
-        var key = ChallengeKey(request.ChallengeToken);
+        var key = ChallengeKey(request.TempToken);
         var challenge = await ReadCachedAsync<Challenge>(key, ct);
         if (challenge is null || challenge.ExpiresAt <= Now)
             throw new UnauthorizedException(InvalidChallenge);
 
         var user = await userManager.FindByIdAsync(challenge.UserId.ToString());
-        if (user is null || !user.IsActive || !await userManager.IsInRoleAsync(user, RoleNames.PlatformOwner))
+        if (user is null || !user.IsActive || !await userManager.GetTwoFactorEnabledAsync(user))
         {
             await cache.RemoveAsync(key, ct);
             throw new UnauthorizedException(InvalidChallenge);
         }
 
-        bool ok;
-        if (!string.IsNullOrWhiteSpace(request.TotpCode) && await userManager.GetTwoFactorEnabledAsync(user))
-            ok = await userManager.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultAuthenticatorProvider,
-                request.TotpCode.Replace(" ", "", StringComparison.Ordinal));
-        else if (!string.IsNullOrEmpty(request.Password))
-        {
-            if (await userManager.IsLockedOutAsync(user))
-                throw new UnauthorizedException(LockedOut);
-            ok = await userManager.CheckPasswordAsync(user, request.Password);
-            if (!ok)
-                await userManager.AccessFailedAsync(user);
-        }
-        else
-            throw new BusinessRuleException("Введите пароль или код из приложения-аутентификатора");
-
+        var ok = await userManager.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultAuthenticatorProvider,
+            (request.Code ?? "").Replace(" ", "", StringComparison.Ordinal));
         if (!ok)
         {
             // Число попыток хранится вместе с запросом и живёт до того же срока, что и он.
@@ -362,13 +336,16 @@ public class AuthService(
                 await cache.RemoveAsync(key, ct);
             else
                 await SaveCachedAsync(key, challenge with { Attempts = attempts });
-            logger.LogWarning("Неверный второй фактор создателя платформы {UserId}", user.Id);
-            throw new UnauthorizedException("Неверный пароль или код");
+            audit.Record(nameof(AppUser), user.Id, "LoginFailed", null, new { Method = "Totp" }, user.OrganizationId);
+            await db.SaveChangesAsync(ct);
+            logger.LogWarning("Неверный код 2FA пользователя {UserId}", user.Id);
+            throw new UnauthorizedException("Неверный код из приложения");
         }
 
         await cache.RemoveAsync(key, ct);
-        await userManager.ResetAccessFailedCountAsync(user);
-        logger.LogInformation("Создатель платформы {UserId} вошёл с двумя факторами", user.Id);
+        await EnsureCanSignInAsync(user, ct);
+        audit.Record(nameof(AppUser), user.Id, "Login", null, new { Method = "Password+Totp" }, user.OrganizationId);
+        logger.LogInformation("Пользователь {UserId} вошёл с паролем и кодом 2FA", user.Id);
         return await IssueTokensAsync(user, ct);
     }
 
@@ -515,28 +492,39 @@ public class AuthService(
 
     // ---------- Вход по паролю, обновление и выход ----------
 
-    public async Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken ct = default)
+    // Вход сотрудника: пароль, 5 ошибок подряд — блокировка на 15 минут (настройки Identity в DependencyInjection).
+    // С включённой 2FA вместо токенов — временный токен для /auth/2fa/verify.
+    public async Task<LoginResult> LoginAsync(LoginRequest request, CancellationToken ct = default)
     {
-        var address = request.Email.Trim();
+        var address = (request.Email ?? "").Trim();
         var user = await userManager.FindByEmailAsync(address);
-        // Создатель платформы по паролю не входит: только код из почты и второй фактор.
-        if (user is null || !user.IsActive || await userManager.IsInRoleAsync(user, RoleNames.PlatformOwner))
-            throw await UnknownAccountFailureAsync(address, request.Password, ct);
+        if (user is null || !user.IsActive)
+            throw await UnknownAccountFailureAsync(address, request.Password ?? "", ct);
+
+        if (!await IsStaffAsync(user))
+            throw new BadRequestException(CustomerUseCode);
 
         if (await userManager.IsLockedOutAsync(user))
             throw new UnauthorizedException(LockedOut);
 
-        if (!await userManager.CheckPasswordAsync(user, request.Password))
+        if (!await userManager.CheckPasswordAsync(user, request.Password ?? ""))
         {
             await userManager.AccessFailedAsync(user);
+            audit.Record(nameof(AppUser), user.Id, "LoginFailed", null, new { Method = "Password" }, user.OrganizationId);
+            await db.SaveChangesAsync(ct);
             logger.LogWarning("Неудачный вход для пользователя {UserId}", user.Id);
             throw new UnauthorizedException(InvalidCredentials);
         }
 
         await EnsureCanSignInAsync(user, ct);
         await userManager.ResetAccessFailedCountAsync(user);
+
+        if (await userManager.GetTwoFactorEnabledAsync(user))
+            return new LoginResult(null, await CreateChallengeAsync(user));
+
+        audit.Record(nameof(AppUser), user.Id, "Login", null, new { Method = "Password" }, user.OrganizationId);
         logger.LogInformation("Пользователь {UserId} вошёл в систему", user.Id);
-        return await IssueTokensAsync(user, ct);
+        return new LoginResult(await IssueTokensAsync(user, ct), null);
     }
 
     // Для несуществующей или отключённой почты ведём такой же счётчик ошибок, как Identity для настоящей,

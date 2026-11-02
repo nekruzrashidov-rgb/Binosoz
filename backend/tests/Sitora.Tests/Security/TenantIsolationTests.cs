@@ -173,7 +173,7 @@ public class TenantIsolationTests(SitoraApiFactory factory) : IClassFixture<Sito
         var created = await TestScenarios.ReadAsync<UserResponse>(await owner.PostAsJsonAsync("/api/v1/users",
             new CreateUserRequest(email, "Админ объекта", "ObjectAdmin", null, null, [myBuilding])));
         Assert.Equal([myBuilding], created.BuildingIds);
-        var objectAdmin = await factory.CreateEmailClientAsync(email);
+        var objectAdmin = await factory.CreateStaffClientAsync(email);
 
         var me = await objectAdmin.GetFromJsonAsync<CurrentUserResponse>("/api/v1/auth/me", TestJson.Options);
         Assert.Equal(("ObjectAdmin", Organization.DefaultId), (me!.Role, me.OrganizationId));
@@ -244,8 +244,8 @@ public class TenantIsolationTests(SitoraApiFactory factory) : IClassFixture<Sito
         Assert.Equal(HttpStatusCode.Unauthorized, (await guest.PostAsJsonAsync("/api/v1/auth/invitations/accept",
             new AcceptInvitationRequest(token))).StatusCode);
 
-        // Дальше — обычный вход по коду из почты.
-        var again = await factory.CreateEmailClientAsync(normalized);
+        // Дальше — обычный вход сотрудника по паролю.
+        var again = await factory.CreateStaffClientAsync(normalized);
         Assert.Equal("ObjectAdmin", (await again.GetFromJsonAsync<CurrentUserResponse>("/api/v1/auth/me", TestJson.Options))!.Role);
         Assert.DoesNotContain((await owner.GetFromJsonAsync<List<InvitationResponse>>("/api/v1/invitations", TestJson.Options))!,
             i => i.Id == invitation.Id);
@@ -288,7 +288,7 @@ public class TenantIsolationTests(SitoraApiFactory factory) : IClassFixture<Sito
         var ownerEmail = $"owner-{slug}@b.test";
         await TestScenarios.ReadAsync<OrganizationResponse>(await platform.PostAsJsonAsync("/api/v1/platform/organizations",
             new CreateOrganizationRequest("Застройщик B", slug, ownerEmail, "Владелец B")));
-        var owner = await factory.CreateEmailClientAsync(ownerEmail);
+        var owner = await factory.CreateStaffClientAsync(ownerEmail);
         var building = await TestScenarios.ReadAsync<BuildingResponse>(await owner.PostAsJsonAsync("/api/v1/buildings",
             new SaveBuildingRequest("Дом B", "Хонаи B", "ул. Второго, 1", 5, null, null)));
         return (owner, building.Id, slug);

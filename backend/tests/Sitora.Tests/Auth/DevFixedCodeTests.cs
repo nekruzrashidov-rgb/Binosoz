@@ -73,7 +73,7 @@ public class AnyEmailFixedCodeFactory : SitoraApiFactory
 public class AnyEmailFixedCodeTests(AnyEmailFixedCodeFactory factory) : IClassFixture<AnyEmailFixedCodeFactory>
 {
     [Fact]
-    public async Task UnknownEmail_BecomesCustomer_StaffKeepsRole_PlatformOwnerSkipsSecondStep()
+    public async Task UnknownEmail_BecomesCustomer_StaffAndPlatformOwnerStillNeedPassword()
     {
         var client = factory.CreateClient();
         var email = $"New-{Guid.NewGuid():N}@Mail.Test";
@@ -88,14 +88,10 @@ public class AnyEmailFixedCodeTests(AnyEmailFixedCodeFactory factory) : IClassFi
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/v1/auth/email/verify", new EmailVerifyRequest(email, "123456"))).StatusCode);
         Assert.Equal(1, await factory.WithDbAsync(db => db.Customers.IgnoreQueryFilters().CountAsync(c => c.Email == email.ToLowerInvariant())));
 
-        var manager = await client.PostAsJsonAsync("/api/v1/auth/email/verify", new EmailVerifyRequest(SitoraApiFactory.ManagerEmail, "123456"));
-        Assert.Equal("Manager", (await manager.Content.ReadFromJsonAsync<AuthResponse>(TestJson.Options))!.User.Role);
-
-        // Создатель платформы с 123456 входит без второго шага — только в разработке.
-        var platform = await client.PostAsJsonAsync("/api/v1/auth/email/verify", new EmailVerifyRequest(SitoraApiFactory.PlatformOwnerEmail, "123456"));
-        Assert.Equal("PlatformOwner", (await platform.Content.ReadFromJsonAsync<AuthResponse>(TestJson.Options))!.User.Role);
-        var platformLogin = await client.PostAsJsonAsync("/api/v1/auth/platform/login", new EmailVerifyRequest(SitoraApiFactory.PlatformOwnerEmail, "123456"));
-        Assert.Equal(HttpStatusCode.OK, platformLogin.StatusCode);
+        // Код разработки не открывает вход сотрудникам и создателю платформы и не делает из них покупателей.
+        foreach (var staff in new[] { SitoraApiFactory.ManagerEmail, SitoraApiFactory.PlatformOwnerEmail })
+            Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/v1/auth/email/verify", new EmailVerifyRequest(staff, "123456"))).StatusCode);
+        Assert.False(await factory.WithDbAsync(db => db.Customers.IgnoreQueryFilters().AnyAsync(c => c.Email == SitoraApiFactory.ManagerEmail)));
 
         // Неверный код по-прежнему не подходит.
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/v1/auth/email/verify",

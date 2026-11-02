@@ -26,21 +26,20 @@
 
 ## Вход и сессия
 
-Вход для всех — по коду из почты. Отдельных кнопок по ролям нет: интерфейс выбирает раздел по `user.role`.
+Два способа входа: **сотрудники** (Owner, ObjectAdmin, Manager, Accountant, Content, PlatformOwner) — по почте и паролю, **покупатели** — по коду из почты. Раздел интерфейса выбирается по `user.role`.
 
 | Метод | Путь | Тело | Ответ |
 | --- | --- | --- | --- |
-| POST | `/auth/email/send` | `{ email }` | 200 `{ message, expiresInSeconds }` — всегда одинаковый, даже если почты нет |
-| POST | `/auth/email/verify` | `{ email, code }` | 200 `AuthResponse` или 202 `SecondFactorChallenge` (только PlatformOwner) |
+| POST | `/auth/email/send` | `{ email }` | 200 `{ message, expiresInSeconds }` — всегда одинаковый, даже если почты нет. Код уходит только покупателю, сотруднику — нет (ответ тот же) |
+| POST | `/auth/email/verify` | `{ email, code }` | 200 `AuthResponse` — только покупатель. Почта сотрудника — 401 «Сотрудники входят по паролю» |
 | POST | `/auth/register` | `{ email, fullName, phone, organization? }` | 200, как `/auth/email/send`: создаётся карточка клиента у застройщика `organization` (slug; без него — единственный застройщик платформы) и уходит код. Дальше — `/auth/email/verify`. Телефон из карточки с другой почтой — 409, неизвестный застройщик — 404 |
-| POST | `/auth/platform/login` | `{ email, code }` | только PlatformOwner: 202 `SecondFactorChallenge`, токен — после `/auth/second-factor`. Для других почт — 401, как на неверный код |
-| POST | `/auth/second-factor` | `{ challengeToken, password? , totpCode? }` | `AuthResponse` |
 | GET | `/auth/invitations/{token}` | — | `{ organizationName, fullName, email, role, expiresAt }` — что показать на странице приглашения; 404 — недействительно, использовано или просрочено |
 | POST | `/auth/invitations/accept` | `{ token, password? }` | `AuthResponse`; 401 — приглашение недействительно или использовано. Пароль необязателен (от 8 символов, цифра, строчная и заглавная буквы; иначе 422): с ним сотрудник входит и через `/auth/login` |
 | POST | `/auth/refresh` | `{ refreshToken }` | `AuthResponse` |
 | POST | `/auth/logout` | `{ refreshToken }` | 204 |
 | GET | `/auth/me` | — | `CurrentUser` |
-| POST | `/auth/login` | `{ email, password }` | `AuthResponse`; выключается `Auth__PasswordLoginEnabled=false` (тогда 404). PlatformOwner так не входит |
+| POST | `/auth/login` | `{ email, password }` | сотрудник: 200 `AuthResponse`, с включённой 2FA — 200 `TwoFactorRequired`. Покупатель — 400 «Используйте вход по коду». Неверный пароль или незнакомая почта — 401 «Неверная почта или пароль»; после 5 ошибок подряд — блокировка на 15 минут (401 «Слишком много неудачных попыток…», даже с верным паролем) |
+| POST | `/auth/2fa/verify` | `{ tempToken, code }` | `AuthResponse`. `tempToken` живёт 5 минут, 5 попыток; неверный код — 401 |
 | POST | `/auth/sms/send`, `/auth/sms/verify` | — | выключены (404), включаются `Auth__SmsLoginEnabled=true` |
 
 Код из почты:
@@ -66,7 +65,7 @@ CurrentUser = {
   impersonation: null | { impersonatedBy, organizationId }
 }
 
-SecondFactorChallenge = { challengeToken, expiresAt, methods: ["password", "totp"?], message }
+TwoFactorRequired = { requiresTwoFactor: true, tempToken, expiresAt }
 ```
 
 В access-токене те же данные — в claims `role`, `org`, `bld` (по одному на дом) и `imp`. Если владелец меняет сотруднику дома, все сессии сотрудника отзываются: новые права действуют со следующего входа.
