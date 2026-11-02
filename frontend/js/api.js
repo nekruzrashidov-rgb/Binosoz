@@ -237,9 +237,9 @@
     auth = { accessToken: accessToken || p.accessToken, refreshToken: p.refreshToken, user: p.user };
     saveAuth(); S.bus.emit('auth', auth.user);
   }
-  // Login result: tokens, or a second-factor request (only the platform owner gets one).
+  // Login result: tokens, or a request for the authenticator code (staff with 2FA turned on).
   async function signedIn(d) {
-    if (d && d.challengeToken) return { challenge: { token: d.challengeToken, methods: arr(d.methods), message: d.message || '' } };
+    if (d && d.requiresTwoFactor) return { challenge: { token: d.tempToken, expiresAt: d.expiresAt || null } };
     setAuth(d);
     if (!auth.user || !auth.user.roles.length) await api.loadMe();
     return { user: auth.user };
@@ -279,13 +279,16 @@
     isOwner() { return role() === 'Owner'; },
     get impersonating() { return !!(auth && (auth.platform || (auth.user && auth.user.impersonation))); },
     has(...roles) { return !!(auth && auth.user && (api.isLeader() || auth.user.roles.some((r) => roles.includes(r)))); },
-    // Everyone signs in with a code from e-mail; the platform owner then confirms with a password or an authenticator code.
+    // Buyers sign in with a code from e-mail; staff (and the super admin) with a password, then a 2FA code if it is on.
     emailSend(email) { return request('POST', '/auth/email/send', { auth: false, body: { email } }); },
-    // A buyer registers on the developer's site (ORG_SLUG); the code then comes by e-mail as usual.
-    register(b) { return request('POST', '/auth/register', { auth: false, body: { email: b.email, fullName: b.fullName, phone: b.phone, organization: cfgSlug() || null } }); },
+    // A buyer registers on the developer's site (ORG_SLUG) without a password; the code then comes by e-mail.
+    register(b) { return request('POST', '/auth/register', { auth: false, body: { email: b.email, firstName: b.firstName, lastName: b.lastName, phone: b.phone, organization: cfgSlug() || null } }); },
     async passwordLogin(email, password) { return signedIn(await request('POST', '/auth/login', { auth: false, body: { email, password } })); },
     async emailVerify(email, code) { return signedIn(await request('POST', '/auth/email/verify', { auth: false, body: { email, code } })); },
-    async secondFactor(token, password, totpCode) { return signedIn(await request('POST', '/auth/second-factor', { auth: false, body: { challengeToken: token, password: password || null, totpCode: totpCode || null } })); },
+    async twoFactorVerify(tempToken, code) { return signedIn(await request('POST', '/auth/2fa/verify', { auth: false, body: { tempToken, code } })); },
+    // "Forgot password?": a link by e-mail (24 hours), then the new password with the token from that link.
+    passwordResetRequest(email) { return request('POST', '/auth/password/reset-request', { auth: false, body: { email } }); },
+    passwordReset(token, newPassword) { return request('POST', '/auth/password/reset', { auth: false, body: { token, newPassword } }); },
     // What the invitation is (organization, role, name) before accepting it; an optional password also allows /auth/login.
     invitationInfo(token) { return request('GET', '/auth/invitations/' + encodeURIComponent(token), { auth: false }); },
     async acceptInvitation(token, password) { return signedIn(await request('POST', '/auth/invitations/accept', { auth: false, body: { token, password: password || null } })); },
@@ -488,7 +491,8 @@
     async users() { return (await all('/users')).map(M.user).filter((u) => !u.roles.length || u.roles.some((r) => STAFF_ROLES.includes(r))); },
     // Staff are invited by e-mail and sign in with a code; no passwords are set here.
     async invitations() { return arr(await request('GET', '/invitations')).map(M.invitation); },
-    invite(b) { return withFields(request('POST', '/invitations', { body: { email: b.email, fullName: b.fullName, role: b.role, buildingIds: b.buildingIds && b.buildingIds.length ? b.buildingIds : null } })).then(M.invitation); },
+    // The account is created at once; the password (8 letters and digits) reaches the person by e-mail.
+    invite(b) { return withFields(request('POST', '/invitations', { body: { email: b.email, firstName: b.firstName, lastName: b.lastName, role: b.role, buildingIds: b.buildingIds && b.buildingIds.length ? b.buildingIds : null } })).then(M.invitation); },
     revokeInvitation(id) { return request('DELETE', '/invitations/' + id); },
     setUserBuildings(id, buildingIds) { return request('PUT', '/users/' + id + '/buildings', { body: { buildingIds } }).then(M.user); },
     setUserBlocked(id, blocked) { return request('PATCH', '/users/' + id + '/status', { body: { isActive: !blocked, blocked } }); },

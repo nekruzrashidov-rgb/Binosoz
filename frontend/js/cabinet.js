@@ -10,18 +10,43 @@
   S.homeFor = (u) => (!u ? 'cabinet' : u.role === 'SuperAdmin' ? 'platform' : u.role === 'Customer' ? 'cabinet' : 'crm');
   const enter = (r) => { S.toast(t('login.welcome'), 'ok'); S.go(S.homeFor(r.user)); };
 
-  // One form for everyone: e-mail, then the code from the letter. Only the platform owner gets a third step.
   // The login pages have no site header: the logo above the card leads back to the site.
   const loginBrand = () => h('a', { class: 'login-brand', href: '/', 'aria-label': 'Binosoz' }, S.logo(), h('span', null, 'BINOSOZ'));
 
+  // A password with a show/hide button (👁); the label still points at the input itself.
+  function passwordField(label, name, autocomplete, hint) {
+    const input = S.input(name, { type: 'password', autocomplete });
+    const eye = h('button', { type: 'button', class: 'pass-eye', 'aria-label': t('login.showPass'), title: t('login.showPass'), 'aria-pressed': 'false' }, '👁');
+    eye.addEventListener('click', () => {
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      const label2 = t(show ? 'login.hidePass' : 'login.showPass');
+      eye.setAttribute('aria-pressed', String(show)); eye.setAttribute('aria-label', label2); eye.title = label2;
+      input.focus();
+    });
+    const field = S.field(label, h('div', { class: 'pass-wrap' }, input, eye), hint);
+    S.$('label', field).htmlFor = input.id;
+    field.dataset.name = name;
+    return { field, input };
+  }
+
+  // Two tabs: staff sign in with e-mail and password (then a 2FA code if it is on), buyers with a code from e-mail.
+  // /login#reset=<token> from the "forgot password" letter opens the new-password form.
   S.views.login = function (root) {
     const card = h('div', { class: 'card login-card login' });
     root.appendChild(h('div', { class: 'wrap page-in' }, loginBrand(), card));
-    let step = 'email', emailVal = '', timer = 0, tick = null, challenge = null;
-    // Buyer or staff: the same code flow, different hints; staff who set a password when joining may use it instead.
-    let who = S.store.get('sitora.loginAs') === 'staff' ? 'staff' : 'buyer';
-    const whoToggle = (email) => h('div', { class: 'seg login-who', role: 'group', 'aria-label': t('login.as') }, [['buyer', 'login.asBuyer'], ['staff', 'login.asStaff']].map(([k, key]) =>
-      h('button', { type: 'button', class: who === k ? 'on' : '', 'aria-pressed': String(who === k), onclick: () => { if (who === k) return; who = k; S.store.set('sitora.loginAs', k); emailVal = email.value.trim(); draw(); } }, t(key))));
+    const tokenInHash = () => (location.hash.match(/reset=([A-Za-z0-9_-]+)/) || [])[1] || '';
+    let resetToken = tokenInHash();
+    let who = resetToken || S.store.get('sitora.loginAs') !== 'buyer' ? 'staff' : 'buyer';
+    let step = resetToken ? 'reset' : who, emailVal = '', timer = 0, tick = null, challenge = null, notice = '';
+    const isEmail = (v) => /^\S+@\S+\.\S+$/.test(v);
+    const badEmail = (form) => S.showErrors(form, { message: t('val.email'), errors: { email: [t('val.email')] } });
+    const tabs = () => h('div', { class: 'login-tabs', role: 'tablist', 'aria-label': t('login.as') }, [['staff', 'login.staff'], ['buyer', 'login.buyer']].map(([k, key]) =>
+      h('button', { type: 'button', role: 'tab', class: who === k ? 'on' : '', 'aria-selected': String(who === k), onclick: () => {
+        if (who === k && step === k) return;
+        who = k; S.store.set('sitora.loginAs', k); step = k; notice = ''; clearInterval(tick); draw();
+      } }, t(key))));
+    const link = (label, onclick) => h('button', { class: 'btn ghost sm', type: 'button', onclick }, label);
 
     const startTick = () => {
       clearInterval(tick); timer = 60;
@@ -35,78 +60,110 @@
     };
     const send = async () => { await S.api.emailSend(emailVal); startTick(); };
 
+    const codeInput = (name) => S.input(name, { inputmode: 'numeric', maxlength: 6, placeholder: '••••••', autocomplete: 'one-time-code', style: { letterSpacing: '.4em', fontSize: '20px', textAlign: 'center', fontWeight: 800 } });
+
     function draw() {
       const form = h('form', { class: 'stack', novalidate: true });
-      const btn = h('button', { class: 'btn lg block', type: 'submit' }, step === 'email' ? t('login.getCode') : t('login.enter'));
-      let submit;
-      if (step === 'email') {
-        const email = S.input('email', { type: 'email', value: emailVal, placeholder: 'name@mail.tj', autocomplete: 'email', inputmode: 'email' });
-        // The server answers the same for known and unknown addresses, so registration is offered as a link, not detected.
-        form.append(h('h2', null, t('login.title')), h('p', { class: 'muted' }, t(who === 'staff' ? 'login.hintStaff' : 'login.hintBuyer')), S.field(t('login.email'), email), btn,
-          who === 'staff'
-            ? h('p', { class: 'muted', style: { textAlign: 'center' } }, h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { emailVal = email.value.trim(); step = 'password'; draw(); } }, t('login.byPassword')))
-            : h('p', { class: 'muted', style: { textAlign: 'center' } }, t('reg.ask'), ' ', h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { emailVal = email.value.trim(); step = 'register'; draw(); } }, t('reg.link'))),
-          whoToggle(email));
-        submit = async () => {
-          emailVal = email.value.trim();
-          if (!/^\S+@\S+\.\S+$/.test(emailVal)) { S.showErrors(form, { message: t('val.email'), errors: { email: [t('val.email')] } }); return; }
-          await send(); step = 'code'; draw();
-        };
-        setTimeout(() => email.focus(), 30);
-      } else if (step === 'password') {
-        // Staff who set a password when accepting the invitation (POST /auth/login); the platform owner cannot sign in this way.
+      const btn = h('button', { class: 'btn lg block', type: 'submit' }, t('login.enter'));
+      const info = notice ? h('div', { class: 'form-ok', role: 'status' }, notice) : null;
+      let submit, focus;
+      if (step === 'staff') {
         const email = S.input('email', { type: 'email', value: emailVal, placeholder: 'name@mail.tj', autocomplete: 'username', inputmode: 'email' });
-        const pass = S.input('password', { type: 'password', autocomplete: 'current-password' });
-        btn.textContent = t('login.enter');
-        form.append(h('h2', null, t('login.passTitle')), h('p', { class: 'muted' }, t('login.passSub')), S.field(t('login.email'), email), S.field(t('login.password'), pass), btn,
-          h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { emailVal = email.value.trim(); step = 'email'; draw(); } }, t('login.byCode')));
+        const pass = passwordField(t('login.password'), 'password', 'current-password');
+        form.append(h('h2', null, t('login.staffTitle')), h('p', { class: 'muted' }, t('login.staffHint')), info, S.field(t('login.email'), email), pass.field, btn,
+          h('p', { style: { textAlign: 'center', margin: 0 } }, link(t('login.forgot'), () => { emailVal = email.value.trim(); notice = ''; step = 'forgot'; draw(); })));
         submit = async () => {
           emailVal = email.value.trim();
-          if (!/^\S+@\S+\.\S+$/.test(emailVal)) { S.showErrors(form, { message: t('val.email'), errors: { email: [t('val.email')] } }); return; }
-          enter(await S.api.passwordLogin(emailVal, pass.value));
+          if (!isEmail(emailVal)) { badEmail(form); return; }
+          try {
+            const r = await S.api.passwordLogin(emailVal, pass.input.value);
+            if (r.challenge) { challenge = r.challenge; notice = ''; step = '2fa'; draw(); return; }
+            enter(r);
+          } catch (er) {
+            // A buyer's address: they sign in with a code — open that tab with the address already filled in.
+            if (er.status === 400 && who === 'staff') { who = 'buyer'; S.store.set('sitora.loginAs', 'buyer'); step = 'buyer'; notice = t('login.useCode'); draw(); return; }
+            throw er;
+          }
         };
-        setTimeout(() => (emailVal ? pass : email).focus(), 30);
-      } else if (step === 'register') {
+        focus = emailVal ? pass.input : email;
+      } else if (step === '2fa') {
+        const code = codeInput('code');
+        form.append(h('h2', null, t('login.twoFaTitle')), h('p', { class: 'muted' }, t('login.twoFaSub')), S.field(t('login.twoFaLabel'), code), btn,
+          link(t('login.again'), () => { challenge = null; step = 'staff'; draw(); }));
+        submit = async () => enter(await S.api.twoFactorVerify(challenge.token, code.value.replace(/\s/g, '')));
+        focus = code;
+      } else if (step === 'forgot') {
         const email = S.input('email', { type: 'email', value: emailVal, placeholder: 'name@mail.tj', autocomplete: 'email', inputmode: 'email' });
-        const name = S.input('fullName', { autocomplete: 'name' });
-        const phone = S.input('phone', { type: 'tel', value: '+992', autocomplete: 'tel' });
-        btn.textContent = t('reg.submit');
-        form.append(h('h2', null, t('reg.title')), h('p', { class: 'muted' }, t('reg.sub')), S.field(t('login.email'), email), S.field(t('f.fullName'), name), S.field(t('f.phone'), phone, t('f.phoneHint')), btn,
-          h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { step = 'email'; draw(); } }, t('reg.haveAccount')));
+        btn.textContent = t('login.forgotSend');
+        form.append(h('h2', null, t('login.forgotTitle')), h('p', { class: 'muted' }, t('login.forgotSub')), info, S.field(t('login.email'), email), btn,
+          link(t('login.forgotBack'), () => { notice = ''; step = 'staff'; draw(); }));
         submit = async () => {
           emailVal = email.value.trim();
-          if (!/^\S+@\S+\.\S+$/.test(emailVal)) { S.showErrors(form, { message: t('val.email'), errors: { email: [t('val.email')] } }); return; }
-          await S.api.register({ email: emailVal, fullName: name.value.trim(), phone: phone.value.replace(/[\s()-]/g, '') });
+          if (!isEmail(emailVal)) { badEmail(form); return; }
+          const r = await S.api.passwordResetRequest(emailVal);
+          notice = (r && r.message) || t('login.forgotSent'); draw();
+        };
+        focus = email;
+      } else if (step === 'reset') {
+        const pass = passwordField(t('login.newPassword'), 'newPassword', 'new-password', t('login.passRules'));
+        const again = passwordField(t('login.repeatPassword'), 'repeat', 'new-password');
+        btn.textContent = t('login.resetSave');
+        form.append(h('h2', null, t('login.resetTitle')), pass.field, again.field, btn,
+          link(t('login.forgotBack'), () => { history.replaceState(null, '', location.pathname); step = 'staff'; draw(); }));
+        submit = async () => {
+          if (pass.input.value !== again.input.value) { S.showErrors(form, { message: t('login.mismatch'), errors: { repeat: [t('login.mismatch')] } }); return; }
+          await S.api.passwordReset(resetToken, pass.input.value);
+          history.replaceState(null, '', location.pathname);
+          notice = t('login.resetDone'); step = 'staff'; draw();
+        };
+        focus = pass.input;
+      } else if (step === 'buyer') {
+        const email = S.input('email', { type: 'email', value: emailVal, placeholder: 'name@mail.tj', autocomplete: 'email', inputmode: 'email' });
+        btn.textContent = t('login.sendCode');
+        // The server answers the same for known and unknown addresses, so registration is offered as a link, not detected.
+        form.append(h('h2', null, t('login.buyerTitle')), h('p', { class: 'muted' }, t('login.hintBuyer')), info, S.field(t('login.email'), email), btn,
+          h('p', { class: 'muted', style: { textAlign: 'center', margin: 0 } }, t('reg.ask'), ' ', link(t('reg.link'), () => { emailVal = email.value.trim(); notice = ''; step = 'register'; draw(); })));
+        submit = async () => {
+          emailVal = email.value.trim();
+          if (!isEmail(emailVal)) { badEmail(form); return; }
+          await send(); notice = ''; step = 'code'; draw();
+        };
+        focus = email;
+      } else if (step === 'register') {
+        const first = S.input('firstName', { autocomplete: 'given-name' });
+        const last = S.input('lastName', { autocomplete: 'family-name' });
+        const email = S.input('email', { type: 'email', value: emailVal, placeholder: 'name@mail.tj', autocomplete: 'email', inputmode: 'email' });
+        const phone = S.input('phone', { type: 'tel', value: '+992', autocomplete: 'tel' });
+        btn.textContent = t('login.sendCode');
+        form.append(h('h2', null, t('reg.title')), h('p', { class: 'muted' }, t('reg.sub')), S.field(t('reg.firstName'), first), S.field(t('reg.lastName'), last),
+          S.field(t('login.email'), email), S.field(t('f.phone'), phone, t('f.phoneHint')), btn,
+          link(t('reg.haveAccount'), () => { step = 'buyer'; draw(); }));
+        submit = async () => {
+          emailVal = email.value.trim();
+          if (!first.value.trim() || !last.value.trim()) { S.showErrors(form, { message: t('reg.nameRequired'), errors: Object.assign({}, first.value.trim() ? {} : { firstName: [t('reg.nameRequired')] }, last.value.trim() ? {} : { lastName: [t('reg.nameRequired')] }) }); return; }
+          if (!isEmail(emailVal)) { badEmail(form); return; }
+          await S.api.register({ email: emailVal, firstName: first.value.trim(), lastName: last.value.trim(), phone: phone.value.replace(/[\s()-]/g, '') });
           startTick(); step = 'code'; draw();
         };
-        setTimeout(() => (emailVal ? name : email).focus(), 30);
-      } else if (step === 'code') {
-        const code = S.input('code', { inputmode: 'numeric', maxlength: 6, placeholder: '••••••', autocomplete: 'one-time-code', style: { letterSpacing: '.4em', fontSize: '20px', textAlign: 'center', fontWeight: 800 } });
+        focus = first;
+      } else {
+        const code = codeInput('code');
         const resend = h('button', { class: 'btn ghost sm', type: 'button', 'data-resend': '', disabled: timer > 0, onclick: async () => { try { await send(); S.toast(t('login.sent'), 'ok'); } catch (er) { S.err(er); } } }, timer > 0 ? t('login.resendIn', { s: timer }) : t('login.resend'));
         form.append(h('h2', null, t('login.codeTitle')), h('p', { class: 'muted' }, t('login.codeSub', { p: emailVal })), S.field(t('login.code'), code, t('login.codeHint')), btn,
-          h('div', { class: 'row between' }, h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { step = 'email'; clearInterval(tick); draw(); } }, t('login.changeEmail')), resend));
-        submit = async () => {
-          const r = await S.api.emailVerify(emailVal, code.value.replace(/\s/g, ''));
-          if (r.challenge) { challenge = r.challenge; step = 'second'; clearInterval(tick); draw(); return; }
-          enter(r);
-        };
-        setTimeout(() => code.focus(), 30);
-      } else {
-        const pass = S.input('password', { type: 'password', autocomplete: 'current-password' });
-        form.append(h('h2', null, t('login.secondTitle')), h('p', { class: 'muted' }, t('login.secondSub')), S.field(t('login.secondLabel'), pass, t('login.secondHint')), btn,
-          h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { step = 'email'; challenge = null; draw(); } }, t('login.again')));
-        submit = async () => {
-          // Six digits are a code from the authenticator app, anything else is the password.
-          const v = pass.value.trim(); const totp = /^\d{6}$/.test(v);
-          enter(await S.api.secondFactor(challenge.token, totp ? null : pass.value, totp ? v : null));
-        };
-        setTimeout(() => pass.focus(), 30);
+          h('div', { class: 'row between' }, link(t('login.changeEmail'), () => { step = 'buyer'; clearInterval(tick); draw(); }), resend));
+        submit = async () => enter(await S.api.emailVerify(emailVal, code.value.replace(/\s/g, '')));
+        focus = code;
       }
       form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await submit(); } catch (er) { S.showErrors(form, er); } }); });
-      card.replaceChildren(form);
+      // Tabs only on the first screens; the code, 2FA and password-reset steps keep their own "back" link.
+      card.replaceChildren(step === 'staff' || step === 'buyer' || step === 'register' ? tabs() : null, form);
+      setTimeout(() => focus && focus.focus(), 30);
     }
     draw();
-    return () => clearInterval(tick);
+    // The reset link opened while this page is already on screen changes only the hash.
+    const onHash = () => { const token = tokenInHash(); if (token) { resetToken = token; who = 'staff'; notice = ''; step = 'reset'; draw(); } };
+    window.addEventListener('hashchange', onHash);
+    return () => { clearInterval(tick); window.removeEventListener('hashchange', onHash); };
   };
 
   /* ---------- staff invitation: #invite=<token> ---------- */

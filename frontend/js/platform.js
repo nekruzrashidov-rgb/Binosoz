@@ -103,21 +103,38 @@
         load(); countPending();
       },
 
+      // 2FA: a QR code (qrcode.min.js from cdnjs) and the key for manual entry; turned on and off with a code from the app.
+      // The API answers 409 to "setup" while 2FA is on — then only the "turn off" form is shown.
       security(body) {
         const holder = h('div', { class: 'card stack', style: { maxWidth: '520px' } }, S.skeleton(3, 30));
         body.replaceChildren(holder);
-        (async () => {
+        const codeForm = (label, action, done) => {
+          const code = S.input('code', { inputmode: 'numeric', maxlength: 6, autocomplete: 'one-time-code' });
+          const btn = h('button', { class: 'btn', type: 'submit' }, label);
+          const form = h('form', { class: 'stack', novalidate: true }, S.field(t('plat.totpCode'), code), btn);
+          form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await action(code.value.replace(/\s/g, '')); S.toast(done, 'ok'); draw(); } catch (er) { S.showErrors(form, er); } }); });
+          return form;
+        };
+        const qr = (uri) => {
+          const box = h('div', { class: 'qr-box', role: 'img', 'aria-label': t('plat.totpQr') });
+          if (window.QRCode) new QRCode(box, { text: uri, width: 180, height: 180, correctLevel: QRCode.CorrectLevel.M });
+          else box.replaceChildren(h('a', { href: uri, class: 'hint' }, t('plat.totpLink')));
+          return box;
+        };
+        async function draw() {
+          holder.replaceChildren(S.skeleton(3, 30));
           try {
             const k = await S.api.totpSetup();
-            const code = S.input('code', { inputmode: 'numeric', maxlength: 6, autocomplete: 'one-time-code' });
-            const btn = h('button', { class: 'btn', type: 'submit' }, t('plat.totpOn'));
-            const form = h('form', { class: 'stack', novalidate: true }, S.field(t('plat.totpCode'), code), btn);
-            form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await S.api.totpEnable(code.value.trim()); S.toast(t('plat.totpDone'), 'ok'); code.value = ''; } catch (er) { S.showErrors(form, er); } }); });
-            holder.replaceChildren(h('h3', null, t('plat.totp')), h('p', { class: 'muted' }, t('plat.totpText')),
-              S.field(t('plat.totpKey'), h('code', { class: 'paper', style: { display: 'block', wordBreak: 'break-all', userSelect: 'all' } }, k.sharedKey)),
-              h('a', { href: k.authenticatorUri, class: 'hint' }, t('plat.totpLink')), form);
-          } catch (e) { holder.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
-        })();
+            holder.replaceChildren(h('h3', null, t('plat.totp')), h('p', { class: 'muted' }, t('plat.totpText')), qr(k.qrCodeUri),
+              S.field(t('plat.totpKey'), h('code', { class: 'paper', style: { display: 'block', wordBreak: 'break-all', userSelect: 'all' } }, k.manualKey)),
+              h('a', { href: k.qrCodeUri, class: 'hint' }, t('plat.totpLink')), codeForm(t('plat.totpOn'), S.api.totpEnable, t('plat.totpDone')));
+          } catch (e) {
+            if (e.status !== 409) { holder.replaceChildren(h('div', { class: 'form-err' }, e.message)); return; }
+            holder.replaceChildren(h('h3', null, t('plat.totp')), h('div', { class: 'form-ok' }, t('plat.totpIsOn')), h('p', { class: 'muted' }, t('plat.totpOffText')),
+              codeForm(t('plat.totpOff'), S.api.totpDisable, t('plat.totpOffDone')));
+          }
+        }
+        draw();
       },
     };
 

@@ -9,7 +9,7 @@
   function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
 
   const STAGES = ['Lead', 'Showing', 'Booking', 'Contract', 'Payment', 'Completed', 'Cancelled'];
-  // Everyone signs in with a code from e-mail (always 123456 here); the platform owner also gives a password.
+  // Buyers sign in with a code from e-mail (always 123456 here); staff and the super admin — with their password.
   const ORG = { id: 'org1', name: 'Ситора Девелопмент', slug: 'sitora' };
   const PLATFORM_PASSWORD = 'Platform123!';
   const DEMO_CUSTOMER_EMAIL = 'customer@sitora.tj';
@@ -206,17 +206,20 @@
   route('POST', /^\/auth\/register$/, (c) => {
     const b = c.body; const email = String(b.email || '').trim().toLowerCase(); const phone = normPhone(b.phone);
     if (!/^\S+@\S+\.\S+$/.test(email)) err(400, 'Validation', 'Неверный формат почты', { Email: ['Неверный формат почты'] });
-    if (!String(b.fullName || '').trim()) err(422, 'Business', 'Укажите имя (до 200 символов)');
+    const fullName = (String(b.firstName || '').trim() + ' ' + String(b.lastName || '').trim()).trim();
+    if (!String(b.firstName || '').trim() || !String(b.lastName || '').trim()) err(422, 'Business', 'Укажите имя и фамилию (вместе до 200 символов)');
+    if (db.users.some((x) => !x.customerId && x.email && x.email.toLowerCase() === email)) err(409, 'Conflict', 'Эта почта принадлежит сотруднику. Войдите на вкладке «Сотрудник»');
     if (!validPhone(phone)) err(422, 'Business', 'Неверный номер телефона');
     const byPhone = db.customers.find((x) => x.phone === phone);
     if (byPhone && (byPhone.email || '').toLowerCase() !== email) err(409, 'Conflict', 'Этот телефон уже указан в договоре с другой почтой. Войдите по почте из договора или обратитесь к менеджеру');
-    if (!byPhone && !db.customers.some((x) => (x.email || '').toLowerCase() === email)) db.customers.push({ id: db.customers.length + 1, fullName: b.fullName.trim(), phone, email, passport: '', createdAt: iso(Date.now()) });
+    if (!byPhone && !db.customers.some((x) => (x.email || '').toLowerCase() === email)) db.customers.push({ id: db.customers.length + 1, fullName, phone, email, passport: '', createdAt: iso(Date.now()) });
     return { message: 'Если почта зарегистрирована, мы отправили на неё код для входа', expiresInSeconds: 600 };
   });
   route('POST', /^\/auth\/email\/verify$/, (c) => {
     const email = String(c.body.email || '').trim().toLowerCase();
     if (String(c.body.code || '').trim() !== '123456') err(401, 'Unauthorized', 'Неверный или устаревший код');
     let u = db.users.find((x) => x.email && x.email.toLowerCase() === email);
+    if (u && !u.customerId) err(401, 'Unauthorized', 'Сотрудники входят по паролю');
     if (!u) {
       let cust = db.customers.find((x) => x.email && x.email.toLowerCase() === email);
       // Demo: an unknown address becomes a buyer, like the API in development.
@@ -225,16 +228,25 @@
       if (!u) { u = { id: 'c' + cust.id, email, phone: cust.phone, name: cust.fullName, roles: ['Customer'], status: 'Active', customerId: cust.id, buildingIds: [] }; db.users.push(u); }
     }
     if (u.status === 'Blocked') err(401, 'Unauthorized', 'Учётная запись заблокирована');
-    // Demo: the platform owner signs in with the code alone (the real API asks for a password outside development).
     return authResp(u);
   });
-  route('POST', /^\/auth\/second-factor$/, (c) => {
-    const m = /^demo-ch\.(.+)$/.exec(c.body.challengeToken || ''); const u = m && db.users.find((x) => x.id === m[1] && x.platform);
-    if (!u) err(401, 'Unauthorized', 'Время на подтверждение входа истекло, запросите код заново');
-    const ok = c.body.password ? c.body.password === u.password : db.totp && /^\d{6}$/.test(String(c.body.totpCode || ''));
-    if (!ok) err(401, 'Unauthorized', 'Неверный пароль или код');
+  // Staff: e-mail and password; a buyer is sent to the code login. Demo 2FA (any 6 digits) is only for the super admin.
+  route('POST', /^\/auth\/login$/, (c) => {
+    const email = String(c.body.email || '').trim().toLowerCase();
+    const u = db.users.find((x) => x.email && x.email.toLowerCase() === email);
+    if (u && u.customerId) err(400, 'Bad Request', 'Используйте вход по коду');
+    if (!u || u.password !== c.body.password || u.status === 'Blocked') err(401, 'Unauthorized', 'Неверная почта или пароль');
+    if (u.platform && db.totp) return { requiresTwoFactor: true, tempToken: 'demo-ch.' + u.id, expiresAt: iso(Date.now() + 5 * 60000) };
     return authResp(u);
   });
+  route('POST', /^\/auth\/2fa\/verify$/, (c) => {
+    const m = /^demo-ch\.(.+)$/.exec(c.body.tempToken || ''); const u = m && db.users.find((x) => x.id === m[1] && x.platform);
+    if (!u) err(401, 'Unauthorized', 'Время на подтверждение входа истекло, войдите заново');
+    if (!/^\d{6}$/.test(String(c.body.code || ''))) err(401, 'Unauthorized', 'Неверный код из приложения');
+    return authResp(u);
+  });
+  route('POST', /^\/auth\/password\/reset-request$/, () => ({ message: 'Если почта принадлежит сотруднику, мы отправили на неё ссылку для смены пароля' }));
+  route('POST', /^\/auth\/password\/reset$/, () => err(422, 'Business', 'Ссылка для смены пароля недействительна или устарела. Запросите новую'));
   route('POST', /^\/auth\/invitations\/accept$/, () => err(401, 'Unauthorized', 'Приглашение недействительно или уже использовано'));
   route('POST', /^\/auth\/refresh$/, (c) => {
     const m = /^demo-r\.(.+)$/.exec(c.body.refreshToken || ''); const u = m && db.users.find((x) => x.id === m[1]);
@@ -520,7 +532,8 @@
   route('POST', /^\/invitations$/, (c) => {
     const b = c.body; const email = String(b.email || '').trim().toLowerCase();
     if (!/^\S+@\S+\.\S+$/.test(email)) err(400, 'Validation', 'Неверный адрес почты', { Email: ['Неверный адрес почты'] });
-    if (!String(b.fullName || '').trim()) err(400, 'Validation', 'Укажите имя', { FullName: ['Укажите имя'] });
+    const fullName = (String(b.firstName || '').trim() + ' ' + String(b.lastName || '').trim()).trim();
+    if (!String(b.firstName || '').trim() || !String(b.lastName || '').trim()) err(422, 'Business', 'Укажите имя и фамилию (вместе до 200 символов)');
     const allowed = c.user.roles.includes('Owner') ? ['ObjectAdmin', 'Manager', 'Accountant', 'Content'] : ['Manager', 'Accountant', 'Content'];
     if (!allowed.includes(b.role)) err(422, 'Business', 'Роль должна быть одной из: ' + allowed.join(', '));
     let ids = (b.buildingIds || []).map(Number);
@@ -528,7 +541,7 @@
     if (b.role === 'ObjectAdmin' && ids.length !== 1) err(422, 'Business', 'Админу объекта назначается ровно один дом');
     if (db.users.some((u) => u.email === email)) err(409, 'Conflict', 'Пользователь с такой почтой уже есть');
     db.invitations = db.invitations.filter((i) => i.email !== email);
-    const inv = { id: db.seq++, email, fullName: b.fullName.trim(), role: b.role, buildingIds: ids, expiresAt: iso(Date.now() + 7 * DAY), createdAt: iso(Date.now()) };
+    const inv = { id: db.seq++, email, fullName, role: b.role, buildingIds: ids, expiresAt: iso(Date.now() + 7 * DAY), createdAt: iso(Date.now()) };
     db.invitations.push(inv); audit(db, c.user.name, 'Created', 'Invitation', inv.id, null, { email, role: b.role }); return inv;
   }, ['Owner']);
   route('DELETE', /^\/invitations\/(\d+)$/, (c) => { const i = db.invitations.find((x) => x.id === +c.m[1]); if (!i) err(404, 'Not Found', 'Приглашение не найдено'); db.invitations = db.invitations.filter((x) => x !== i); audit(db, c.user.name, 'Revoked', 'Invitation', i.id, null, { email: i.email }); return {}; }, ['Owner']);

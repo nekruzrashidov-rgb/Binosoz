@@ -740,19 +740,21 @@
     function userForm(done, presetBuilding) {
       const u = S.api.user; const bs = S.crmBuildings || [];
       const roles = (S.api.isOwner() ? STAFF_POSITIONS : STAFF_POSITIONS.filter((r) => r !== 'ObjectAdmin'));
-      const name = S.input('fullName'), email = S.input('email', { type: 'email' }), role = S.select('role', roles.map((r) => [r, t('role.' + r)]), 'Manager');
+      const first = S.input('firstName', { autocomplete: 'off' }), last = S.input('lastName', { autocomplete: 'off' });
+      const email = S.input('email', { type: 'email' }), role = S.select('role', roles.map((r) => [r, t('role.' + r)]), 'Manager');
       const own = u.buildingIds.length ? bs.filter((b) => u.buildingIds.includes(b.id)) : bs;
       const boxes = h('div', { class: 'stack', style: { gap: '6px' } }, own.map((b) => h('label', { class: 'row', style: { gap: '8px', flexWrap: 'nowrap' } }, h('input', { type: 'checkbox', value: b.id, checked: own.length === 1 || String(b.id) === String(presetBuilding) }), b.name)));
       const hint = h('div', { class: 'hint' });
       const syncHint = () => { hint.textContent = role.value === 'ObjectAdmin' ? t('inv.oneBuilding') : t('inv.allHint'); };
       role.addEventListener('change', syncHint); syncHint();
-      const form = h('form', { class: 'stack', id: 'userform', novalidate: true }, S.field(t('f.fullName'), name), S.field(t('login.email'), email, t('inv.emailHint')), S.field(t('users.role'), role),
+      const form = h('form', { class: 'stack', id: 'userform', novalidate: true }, h('div', { class: 'grid g2' }, S.field(t('reg.firstName'), first), S.field(t('reg.lastName'), last)),
+        S.field(t('login.email'), email, t('inv.emailHint')), S.field(t('users.role'), role),
         h('div', { class: 'field', dataset: { name: 'buildingIds' } }, h('label', null, t('users.buildings')), boxes, hint, h('div', { class: 'ferr' })));
       const btn = h('button', { class: 'btn', type: 'submit', form: 'userform' }, t('inv.send'));
       const md = S.modal({ title: t('inv.new'), body: form, actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
       form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try {
         const buildingIds = S.$$('input[type=checkbox]:checked', boxes).map((c) => c.value);
-        await S.api.invite({ fullName: name.value.trim(), email: email.value.trim(), role: role.value, buildingIds });
+        await S.api.invite({ firstName: first.value.trim(), lastName: last.value.trim(), email: email.value.trim(), role: role.value, buildingIds });
         S.toast(t('inv.sent', { e: email.value.trim() }), 'ok'); md.close(); done && done(); } catch (er) { S.showErrors(form, er); } }); });
     }
 
@@ -984,18 +986,20 @@
 
     function inviteStep() {
       const card = (role) => {
-        const name = S.input('fullName', { placeholder: t('wiz.namePh') }), email = S.input('email', { type: 'email', placeholder: 'name@company.tj', inputmode: 'email' });
+        const first = S.input('firstName'), last = S.input('lastName'), email = S.input('email', { type: 'email', placeholder: 'name@company.tj', inputmode: 'email' });
         const btn = h('button', { class: 'btn', type: 'submit' }, t('wiz.invite'));
-        const f = h('form', { class: 'card flat stack wiz-inv', novalidate: true }, h('h3', null, t('role.' + role)), h('p', { class: 'hint' }, t('wiz.inv.' + role)), S.field(t('f.fullName'), name), S.field(t('login.email'), email), btn);
+        const f = h('form', { class: 'card flat stack wiz-inv', novalidate: true }, h('h3', null, t('role.' + role)), h('p', { class: 'hint' }, t('wiz.inv.' + role)),
+          S.field(t('reg.firstName'), first), S.field(t('reg.lastName'), last), S.field(t('login.email'), email), btn);
         f.addEventListener('submit', async (e) => {
           e.preventDefault(); S.showErrors(f, null);
           const errors = {};
-          if (!name.value.trim()) errors.fullName = [t('wiz.errPerson')];
+          if (!first.value.trim()) errors.firstName = [t('wiz.errPerson')];
+          if (!last.value.trim()) errors.lastName = [t('wiz.errPerson')];
           if (!/^\S+@\S+\.\S+$/.test(email.value.trim())) errors.email = [t('val.email')];
           if (Object.keys(errors).length) { S.showErrors(f, { message: t('wiz.errForm'), errors }); return; }
           await S.busy(btn, async () => {
             try {
-              await S.api.invite({ fullName: name.value.trim(), email: email.value.trim(), role, buildingIds: [building.id] });
+              await S.api.invite({ firstName: first.value.trim(), lastName: last.value.trim(), email: email.value.trim(), role, buildingIds: [building.id] });
               f.replaceChildren(h('h3', null, t('role.' + role)), h('div', { class: 'wiz-sent', role: 'status' }, '✓ ' + t('wiz.sent', { e: email.value.trim() })));
             } catch (er) { S.showErrors(f, er); }
           });
