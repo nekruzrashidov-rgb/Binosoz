@@ -107,7 +107,8 @@ public static class DependencyInjection
 
         services.AddScoped<INotificationSender, TelegramNotificationSender>();
         services.AddOptions<TelegramOptions>().BindConfiguration(TelegramOptions.SectionName);
-        services.AddHttpClient(TelegramBotTransport.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(15));
+        // Токен бота — часть адреса запроса: без журнала HttpClient он не попадает в логи.
+        services.AddHttpClient(TelegramBotTransport.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(15)).RemoveAllLoggers();
         services.AddSingleton<ITelegramTransport, TelegramBotTransport>();
         services.AddSingleton<ITelegramNotifier, TelegramNotifier>();
         services.AddScoped<TelegramAlertService>();
