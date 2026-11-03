@@ -935,6 +935,17 @@ a.float-card.tg:hover { border-color: rgba(34, 158, 217, 0.75); background: rgba
 .pass-wrap .inp { padding-right: 46px; }
 .pass-eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; border: 0; border-radius: 8px; background: none; cursor: pointer; font-size: 17px; line-height: 1; opacity: 0.6; }
 .pass-eye:hover, .pass-eye[aria-pressed='true'] { opacity: 1; background: var(--surface-2); }
+/* super admin panel */
+.plat-chart { position: relative; height: 280px; }
+.stars { color: var(--gold); letter-spacing: 2px; white-space: nowrap; font-size: 15px; }
+.review-cell { max-width: 420px; white-space: normal; }
+.tariff-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+.tariff-card { display: flex; flex-direction: column; gap: 10px; border-top: 3px solid var(--gold); }
+.tariff-card.off { opacity: 0.6; border-top-color: var(--line); }
+.tariff-card h3 { margin: 0; font-family: var(--display); }
+.tariff-card ul { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 14px; }
+.tariff-price { font-family: var(--display); font-size: 26px; font-weight: 700; color: var(--gold); }
+.tariff-price small { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); }
 .qr-box { width: 196px; padding: 8px; border-radius: 10px; background: #fff; }
 .qr-box img, .qr-box canvas { display: block; width: 180px; height: 180px; }
 

@@ -55,6 +55,7 @@
     building: '<path d="M5 21V4h9v17M14 9h5v12M3 21h18M8 8h3M8 12h3M8 16h3"/>',
     hammer: '<path d="M14 6l4 4-8 8-4-4zM12 4l2 2M3 21l4-4"/>',
     chart: '<path d="M4 20V4M4 20h16M8 16v-5M12 16V8M16 16v-8"/>',
+    star: '<path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/>',
     shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
     out: '<path d="M10 4H5v16h5M15 8l4 4-4 4M19 12H9"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',

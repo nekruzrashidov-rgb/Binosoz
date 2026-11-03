@@ -110,7 +110,7 @@
       return { id: u.id, email: pick(u, ['email'], ''), phone: pick(u, ['phone', 'phoneNumber'], ''), name: pick(u, ['fullName', 'name', 'userName'], ''), roles, role: primaryRole(u.role, roles), organizationId: pick(u, ['organizationId'], null), organizationName: pick(u, ['organizationName'], ''), buildingIds: arr(pick(u, ['buildingIds'], [])), impersonation: u.impersonation || null, status, blocked: active === false || /block|lock/i.test(status) || !!u.isBlocked };
     },
     invitation(i) { return { id: i.id, email: pick(i, ['email'], ''), name: pick(i, ['fullName', 'name'], ''), role: pick(i, ['role'], ''), buildingIds: arr(pick(i, ['buildingIds'], [])), expiresAt: pick(i, ['expiresAt'], ''), createdAt: pick(i, ['createdAt'], '') }; },
-    organization(o) { return { id: o.id, name: pick(o, ['name'], ''), slug: pick(o, ['slug'], ''), active: pick(o, ['isActive'], true) !== false, buildings: num(pick(o, ['buildingsCount'], 0)), users: num(pick(o, ['usersCount'], 0)), createdAt: pick(o, ['createdAt'], ''), logoUrl: pick(o, ['logoUrl'], null), domain: pick(o, ['customDomain'], null), owners: arr(o.ownerEmails), buildingNames: arr(o.buildingNames) }; },
+    organization(o) { return { id: o.id, name: pick(o, ['name'], ''), slug: pick(o, ['slug'], ''), active: pick(o, ['isActive'], true) !== false, buildings: num(pick(o, ['buildingsCount'], 0)), users: num(pick(o, ['usersCount'], 0)), createdAt: pick(o, ['createdAt'], ''), logoUrl: pick(o, ['logoUrl'], null), domain: pick(o, ['customDomain'], null), owners: arr(o.ownerEmails), buildingNames: arr(o.buildingNames), deals: num(pick(o, ['dealsCount'], 0)), customers: num(pick(o, ['customersCount'], 0)), lastActivityAt: pick(o, ['lastActivityAt'], null), tariff: o.tariff || null, ownerInfos: arr(o.owners) }; },
     booking(b) { return { id: b.id, apartmentId: b.apartmentId, apartmentNumber: pick(b, ['apartmentNumber'], ''), name: pick(b, ['name', 'customerName', 'fullName'], ''), phone: pick(b, ['phone', 'customerPhone'], ''), status: String(pick(b, ['status'], 'Active')), createdAt: pick(b, ['createdAt'], ''), expiresAt: pick(b, ['expiresAt'], '') }; },
     audit(a) { return { id: a.id, at: pick(a, ['at', 'createdAt', 'timestamp'], ''), user: pick(a, ['userEmail', 'user', 'userName', 'actor'], '') || (S.t ? S.t('audit.system', null, 'система') : 'система'), action: pick(a, ['action'], ''), entity: pick(a, ['entity', 'entityType'], ''), entityId: pick(a, ['entityId'], ''), before: parseJson(pick(a, ['before', 'oldValues'], null)), after: parseJson(pick(a, ['after', 'newValues'], null)), viaPlatform: !!a.impersonatedById }; },
   });
@@ -306,7 +306,21 @@
     rejectApplication(id, reason) { return request('POST', '/platform/applications/' + id + '/reject', { body: { reason } }); },
     // platform owner
     async organizations() { return arr(await request('GET', '/platform/organizations')).map(M.organization); },
-    setOrganizationActive(id, isActive) { return request('PATCH', '/platform/organizations/' + id + '/status', { body: { isActive } }); },
+    setOrganizationActive(id, isActive) { return isActive ? request('POST', '/platform/organizations/' + id + '/activate') : request('DELETE', '/platform/organizations/' + id + '/suspend'); },
+    // Super admin's panel: platform dashboard, organization card, owners, users, reviews and tariffs.
+    platformDashboard() { return request('GET', '/platform/dashboard'); },
+    async organizationDetails(id) { const d = await request('GET', '/platform/organizations/' + id); return Object.assign({}, d, { organization: M.organization(d.organization) }); },
+    updateOrganization(id, b) { return withFields(request('PUT', '/platform/organizations/' + id, { body: { name: b.name, slug: b.slug || null } })); },
+    inviteOwner(id, b) { return withFields(request('POST', '/platform/organizations/' + id + '/invite-owner', { body: { email: b.email, firstName: b.firstName, lastName: b.lastName } })); },
+    platformUsers(q) { return request('GET', '/platform/users', { query: { role: q.role || undefined, organizationId: q.organizationId || undefined, search: q.search || undefined, page: q.page || 1, pageSize: q.pageSize || 20 } }); },
+    blockUser(id) { return request('POST', '/platform/users/' + id + '/block'); },
+    unblockUser(id) { return request('POST', '/platform/users/' + id + '/unblock'); },
+    resetUserPassword(id) { return request('POST', '/platform/users/' + id + '/reset-password'); },
+    platformReviews(page) { return request('GET', '/platform/reviews', { query: { page: page || 1, pageSize: 50 } }); },
+    deleteReview(id) { return request('DELETE', '/platform/reviews/' + id); },
+    tariffs() { return request('GET', '/platform/tariffs'); },
+    saveTariff(id, b) { return withFields(request(id ? 'PUT' : 'POST', '/platform/tariffs' + (id ? '/' + id : ''), { body: b })); },
+    assignTariff(organizationId, b) { return withFields(request('POST', '/platform/organizations/' + organizationId + '/tariff', { body: b })); },
     createOrganization(b) { return withFields(request('POST', '/platform/organizations', { body: { name: b.name, slug: b.slug, ownerEmail: b.ownerEmail, ownerFullName: b.ownerFullName } })).then(M.organization); },
     async impersonate(organizationId) {
       const d = await request('POST', '/platform/impersonate/' + organizationId);

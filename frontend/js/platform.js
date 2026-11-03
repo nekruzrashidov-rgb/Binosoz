@@ -1,4 +1,5 @@
-/* Platform owner's section: developers (organizations), working "as owner" of one, authenticator app. */
+/* Super admin's section: platform dashboard, developers (organizations), users, reviews, tariffs,
+   applications, working "as owner" of an organization, authenticator app. */
 (function () {
   const S = (window.S = window.S || {});
   const h = (...a) => S.h(...a);
@@ -9,20 +10,62 @@
     if (!S.api.isAuthed) return S.views.login(root);
     if (!S.api.isPlatform()) { root.appendChild(h('div', { class: 'wrap page-in' }, h('div', { class: 'card login-card login' }, h('h2', null, t('plat.only')), h('div', { class: 'row', style: { marginTop: '14px' } }, h('button', { class: 'btn', onclick: () => S.go(S.homeFor(S.api.user)) }, t('cab.toCrm')))))); return () => {}; }
     const page = h('div', { class: 'page-in' }); root.appendChild(page);
-    const items = [{ key: 'orgs', label: t('plat.orgs'), icon: 'building' }, { key: 'apps', label: t('apps.title'), icon: 'inbox' }, { key: 'security', label: t('plat.security'), icon: 'shield' }];
+    const items = [
+      { key: 'dashboard', label: t('plat.dashboard'), icon: 'chart' }, { key: 'orgs', label: t('plat.orgs'), icon: 'building' },
+      { key: 'users', label: t('plat.usersTitle'), icon: 'users' }, { key: 'reviews', label: t('plat.reviews'), icon: 'star' },
+      { key: 'tariffs', label: t('plat.tariffs'), icon: 'wallet' }, { key: 'apps', label: t('apps.title'), icon: 'inbox' },
+      { key: 'security', label: t('plat.security'), icon: 'shield' }];
     // The number of applications waiting for a decision, on the section's label.
     let focusOrg = null;
-    const countPending = () => S.api.applications('Pending').then((l) => { items[1].badge = l.length || null; ws.redraw(); }).catch(() => {});
-    const ws = S.workspace(items, 'orgs', (k, main) => { S.clear(main); main.append(h('h1', null, items.find((i) => i.key === k).label), h('p', { class: 'sub' }, t('plat.sub.' + k))); const body = h('div', { class: 'stack' }); main.appendChild(body); views[k](body); });
+    const appsItem = items.find((i) => i.key === 'apps');
+    const countPending = () => S.api.applications('Pending').then((l) => { appsItem.badge = l.length || null; ws.redraw(); }).catch(() => {});
+    const ws = S.workspace(items, 'dashboard', (k, main) => { S.clear(main); main.append(h('h1', null, items.find((i) => i.key === k).label), h('p', { class: 'sub' }, t('plat.sub.' + k))); const body = h('div', { class: 'stack' }); main.appendChild(body); views[k](body); });
     page.appendChild(ws.el);
-    queueMicrotask(() => ws.go('orgs'));
+    queueMicrotask(() => ws.go('dashboard'));
     countPending();
 
+    const money = (v) => S.fmt.money(v, 'TJS');
+    // Long values (sums with the currency) get a smaller font so they stay on one line, as in the CRM.
+    const kpi = (label, value, color, sub) => h('div', { class: 'card kpi', style: { '--k': color } }, h('span', null, label),
+      h('b', { style: String(value).length > 8 ? { fontSize: '22px' } : null }, value), sub ? h('div', { class: 'muted' }, sub) : null, h('i'));
+    const fail = (holder, e) => holder.replaceChildren(h('div', { class: 'form-err' }, e.message));
+    const stars = (n) => h('span', { class: 'stars', title: n + '/5', 'aria-label': n + '/5' }, '★'.repeat(n) + '☆'.repeat(5 - n));
+    const tariffChip = (tr) => (tr ? S.chip(tr.isPaid ? 'good' : 'warn', tr.tariffName + (tr.isPaid ? '' : ' · ' + t('plat.unpaid'))) : h('span', { class: 'muted' }, t('plat.noTariff')));
+    let chart = null;
+
     const views = {
+      // Platform totals, deals by month (Chart.js from cdnjs) and the five organizations with the most deals.
+      dashboard(body) {
+        const holder = h('div', { class: 'stack' }, S.skeleton(3, 90));
+        body.replaceChildren(holder);
+        (async () => {
+          try {
+            const d = await S.api.platformDashboard();
+            const canvas = h('canvas', { height: 260, role: 'img', 'aria-label': t('plat.dealsByMonth') });
+            holder.replaceChildren(
+              h('div', { class: 'kpis' },
+                kpi(t('plat.kpiOrgs'), S.fmt.n(d.totalOrganizations), 'var(--accent)', t('plat.kpiOrgsSub', { a: S.fmt.n(d.activeOrganizations), n: S.fmt.n(d.newOrganizationsMonth) })),
+                kpi(t('plat.kpiBuildings'), S.fmt.n(d.totalBuildings), 'var(--info)'),
+                kpi(t('plat.kpiDeals'), S.fmt.n(d.totalDeals), 'var(--good)', t('plat.kpiNewMonth', { n: S.fmt.n(d.newDealsMonth) })),
+                kpi(t('plat.kpiRevenue'), money(d.platformRevenueMonth), 'var(--gold)')),
+              h('div', { class: 'kpis' },
+                kpi(t('plat.kpiPayments'), money(d.totalPaymentsSum), 'var(--good)'),
+                kpi(t('plat.kpiCustomers'), S.fmt.n(d.totalCustomers), 'var(--info)'),
+                kpi(t('plat.kpiStaff'), S.fmt.n(d.totalStaff), 'var(--accent)')),
+              h('div', { class: 'card' }, h('h3', null, t('plat.dealsByMonth')), h('div', { class: 'plat-chart' }, canvas)),
+              h('div', { class: 'card' }, h('h3', null, t('plat.topOrgs')), S.tbl([
+                { label: '#', render: (o) => d.topOrganizations.indexOf(o) + 1 },
+                { label: t('plat.name'), render: (o) => h('b', null, o.name) },
+                { label: t('plat.deals'), r: true, num: true, render: (o) => S.fmt.n(o.dealsCount) },
+                { label: t('plat.paymentsSum'), r: true, num: true, render: (o) => money(o.paymentsSum) }], d.topOrganizations, { empty: t('plat.none') })));
+            drawChart(canvas, d.dealsByMonth);
+          } catch (e) { fail(holder, e); }
+        })();
+      },
+
       orgs(body) {
         const holder = h('div');
         const search = S.input('search', { type: 'search', placeholder: t('plat.search'), 'aria-label': t('plat.search') });
-        const opened = new Set();
         let list = [], focus = null;
         // The logo is served by the API: a relative address needs the API's host when the site is elsewhere.
         const src = (u) => (u && u.charAt(0) === '/' ? S.apiBase().replace(/\/api\/v1\/?$/, '') + u : u);
@@ -31,38 +74,130 @@
           if (o.active && !(await S.confirm(t('plat.suspendText', { o: o.name }), t('plat.suspend'), true))) return;
           try { await S.api.setOrganizationActive(o.id, !o.active); S.toast(t(o.active ? 'plat.suspended' : 'plat.activated', { o: o.name }), 'ok'); load(); } catch (er) { S.err(er); }
         }));
-        const details = (o) => h('div', { class: 'org-details' },
-          h('div', null, h('small', { class: 'muted' }, t('plat.owners')), o.owners.length ? o.owners.map((e) => h('div', null, h('a', { href: 'mailto:' + e, onclick: (ev) => ev.stopPropagation() }, e))) : h('div', null, '—')),
-          h('div', null, h('small', { class: 'muted' }, t('plat.buildingList')), o.buildingNames.length ? h('ul', null, o.buildingNames.map((b) => h('li', null, b))) : h('div', null, t('plat.noBuildings'))),
-          o.domain ? h('div', null, h('small', { class: 'muted' }, t('plat.domain')), h('div', null, o.domain)) : null);
         const draw = () => {
           const q = search.value.trim().toLowerCase();
           const rows = list.filter((o) => !q || o.name.toLowerCase().includes(q) || o.slug.includes(q) || o.owners.some((e) => e.toLowerCase().includes(q)));
           holder.replaceChildren(S.tbl([
             { label: t('plat.logo'), render: (o) => (o.logoUrl ? h('img', { class: 'org-logo', src: src(o.logoUrl), alt: '' }) : h('span', { class: 'avatar org-logo' }, S.fmt.initials(o.name))) },
-            { label: t('plat.name'), render: (o) => h('div', null, h('b', null, o.name), h('div', { class: 'app-note-toggle', 'aria-expanded': String(opened.has(o.id)) }, t(opened.has(o.id) ? 'plat.less' : 'plat.more')), opened.has(o.id) ? details(o) : null) },
+            { label: t('plat.name'), render: (o) => h('div', null, h('b', null, o.name), h('div', { class: 'hint' }, o.ownerInfos.length ? o.ownerInfos[0].fullName + (o.ownerInfos[0].email ? ' · ' + o.ownerInfos[0].email : '') : t('plat.noOwner'))) },
             { label: t('plat.slug'), render: (o) => h('code', null, o.slug) },
-            { label: t('plat.buildings'), r: true, num: true, render: (o) => o.buildings },
-            { label: t('plat.users'), r: true, num: true, render: (o) => o.users },
             { label: t('deal.stage'), render: (o) => S.chip(o.active ? 'Active ok' : 'Blocked', t(o.active ? 'plat.active' : 'plat.off')) },
+            { label: t('plat.tariff'), render: (o) => tariffChip(o.tariff) },
+            { label: t('plat.buildings'), r: true, num: true, render: (o) => o.buildings },
+            { label: t('plat.deals'), r: true, num: true, render: (o) => o.deals },
+            { label: t('plat.customers'), r: true, num: true, render: (o) => o.customers },
             { label: t('plat.createdAt'), render: (o) => S.fmt.date(o.createdAt) },
             { label: '', r: true, render: (o) => h('div', { class: 'row', style: { gap: '6px', justifyContent: 'flex-end', flexWrap: 'nowrap' } },
               o.active ? h('button', { class: 'btn soft sm', onclick: own((e) => S.busy(e.currentTarget, async () => { try { await S.api.impersonate(o.id); S.toast(t('imp.started', { o: o.name }), 'ok'); S.go('crm'); } catch (er) { S.err(er); } })) }, t('plat.enter')) : null,
+              h('button', { class: 'btn ghost sm', onclick: own(() => inviteOwnerForm(o, load)) }, t('plat.inviteOwner')),
               h('button', { class: 'btn sm ' + (o.active ? 'ghost' : ''), onclick: toggle(o) }, t(o.active ? 'plat.suspend' : 'plat.activate'))) },
-          ], rows, { empty: t(q ? 'plat.noMatch' : 'plat.none'), rowClass: (o) => 'app-row has-note' + (o.id === focus ? ' row-focus' : ''), onRow: (o) => { if (opened.has(o.id)) opened.delete(o.id); else opened.add(o.id); draw(); } }));
+          ], rows, { empty: t(q ? 'plat.noMatch' : 'plat.none'), rowClass: (o) => 'app-row has-note' + (o.id === focus ? ' row-focus' : ''), onRow: (o) => orgCard(o.id, load) }));
         };
         const load = async () => {
           holder.replaceChildren(S.skeleton(4, 38));
           try {
             list = await S.api.organizations();
-            // Arrived from an approved application: its organization is highlighted, opened and scrolled into view.
-            if (focusOrg) { focus = focusOrg; opened.add(focusOrg); focusOrg = null; }
+            // Arrived from an approved application: its organization is highlighted and scrolled into view.
+            if (focusOrg) { focus = focusOrg; focusOrg = null; }
             draw();
             const row = S.$('.row-focus', holder); if (row) row.scrollIntoView({ block: 'center' });
-          } catch (e) { holder.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
+          } catch (e) { fail(holder, e); }
         };
         search.addEventListener('input', draw);
         body.replaceChildren(h('p', { class: 'hint' }, t('plat.enterHint')), h('div', { class: 'toolbar' }, h('div', { style: { minWidth: '240px', flex: '1', maxWidth: '380px' } }, search), h('span', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => orgForm(load) }, t('plat.new'))), holder);
+        load();
+      },
+
+      // Everyone on the platform: filter by role and organization, search; block, unblock, a new password by e-mail.
+      users(body) {
+        const holder = h('div');
+        const ROLES = ['SuperAdmin', 'Owner', 'ObjectAdmin', 'Manager', 'Accountant', 'Content', 'Customer'];
+        const role = S.select('role', [['', t('plat.allRoles')]].concat(ROLES.map((r) => [r, t('role.' + r, null, r)])), '');
+        const org = S.select('organizationId', [['', t('plat.allOrgs')]], '');
+        const search = S.input('search', { type: 'search', placeholder: t('plat.userSearch'), 'aria-label': t('plat.userSearch') });
+        let page = 1;
+        S.api.organizations().then((l) => l.forEach((o) => org.appendChild(h('option', { value: o.id }, o.name)))).catch(() => {});
+        const act = (fn, done) => (e) => { e.stopPropagation(); S.busy(e.currentTarget, async () => { try { await fn(); S.toast(done, 'ok'); load(); } catch (er) { S.err(er); } }); };
+        const load = async () => {
+          holder.replaceChildren(S.skeleton(5, 38));
+          try {
+            const r = await S.api.platformUsers({ role: role.value, organizationId: org.value, search: search.value.trim(), page });
+            const pages = Math.max(1, Math.ceil(r.totalCount / r.pageSize));
+            holder.replaceChildren(S.tbl([
+              { label: t('f.fullName'), render: (u) => h('div', null, h('b', null, u.fullName), h('div', { class: 'hint' }, u.email || u.phone || '—')) },
+              { label: t('users.role'), render: (u) => t('role.' + u.role, null, u.role || '—') },
+              { label: t('plat.org'), render: (u) => u.organizationName || '—' },
+              { label: t('plat.createdAt'), render: (u) => S.fmt.date(u.createdAt) },
+              { label: t('plat.lastLogin'), render: (u) => (u.lastLoginAt ? S.fmt.dt(u.lastLoginAt) : '—') },
+              { label: t('deal.stage'), render: (u) => S.chip(u.status === 'Active' ? 'Active ok' : 'Blocked', t(u.status === 'Active' ? 'plat.userActive' : 'plat.userBlocked')) },
+              { label: t('plat.deals'), r: true, num: true, render: (u) => (u.role === 'Customer' ? u.dealsCount : '—') },
+              { label: '', r: true, render: (u) => (u.role === 'SuperAdmin' ? '' : h('div', { class: 'row', style: { gap: '6px', justifyContent: 'flex-end', flexWrap: 'nowrap' } },
+                u.status === 'Active'
+                  ? h('button', { class: 'btn ghost sm', onclick: async (e) => {
+                    e.stopPropagation(); const btn = e.currentTarget;
+                    if (!(await S.confirm(t('plat.blockText', { u: u.fullName }), t('plat.block'), true))) return;
+                    await S.busy(btn, async () => { try { await S.api.blockUser(u.id); S.toast(t('plat.blocked'), 'ok'); load(); } catch (er) { S.err(er); } });
+                  } }, t('plat.block'))
+                  : h('button', { class: 'btn sm', onclick: act(() => S.api.unblockUser(u.id), t('plat.unblocked')) }, t('plat.unblock')),
+                u.role !== 'Customer' ? h('button', { class: 'btn ghost sm', onclick: act(() => S.api.resetUserPassword(u.id), t('plat.passwordSent', { e: u.email })) }, t('plat.resetPassword')) : null)) },
+            ], r.items, { empty: t('plat.noUsers') }),
+            pages > 1 ? h('div', { class: 'row', style: { justifyContent: 'center', gap: '10px', marginTop: '12px' } },
+              h('button', { class: 'btn ghost sm', disabled: page <= 1, onclick: () => { page--; load(); } }, '←'),
+              h('span', { class: 'muted' }, t('plat.page', { p: page, n: pages })),
+              h('button', { class: 'btn ghost sm', disabled: page >= pages, onclick: () => { page++; load(); } }, '→')) : null);
+          } catch (e) { fail(holder, e); }
+        };
+        const reload = () => { page = 1; load(); };
+        role.addEventListener('change', reload); org.addEventListener('change', reload); search.addEventListener('input', S.debounce(reload, 300));
+        body.replaceChildren(h('div', { class: 'toolbar' }, h('div', { style: { minWidth: '220px', flex: '1', maxWidth: '340px' } }, search), role, org), holder);
+        load();
+      },
+
+      // All reviews of the platform: stars, published or hidden, delete (the copy stays in the audit log).
+      reviews(body) {
+        const holder = h('div');
+        const load = async () => {
+          holder.replaceChildren(S.skeleton(5, 38));
+          try {
+            const r = await S.api.platformReviews(1);
+            holder.replaceChildren(S.tbl([
+              { label: t('plat.rating'), render: (v) => stars(v.rating) },
+              { label: t('plat.reviewText'), render: (v) => h('div', { class: 'review-cell' }, h('div', null, v.text), v.ownerReply ? h('div', { class: 'hint' }, '↳ ' + v.ownerReply) : null) },
+              { label: t('plat.building'), render: (v) => h('div', null, v.buildingName || '—', h('div', { class: 'hint' }, v.organizationName || '')) },
+              { label: t('plat.author'), render: (v) => v.customerFullName || v.authorName },
+              { label: t('deal.stage'), render: (v) => S.chip(v.isPublished ? 'good' : 'warn', t(v.isPublished ? 'plat.published' : 'plat.hidden')) },
+              { label: t('plat.createdAt'), render: (v) => S.fmt.date(v.createdAt) },
+              { label: '', r: true, render: (v) => h('button', { class: 'btn ghost sm', onclick: async (e) => {
+                const btn = e.currentTarget;
+                if (!(await S.confirm(t('plat.deleteReviewText'), t('plat.deleteReview'), true))) return;
+                await S.busy(btn, async () => { try { await S.api.deleteReview(v.id); S.toast(t('plat.reviewDeleted'), 'ok'); load(); } catch (er) { S.err(er); } });
+              } }, t('plat.deleteReview')) },
+            ], r.items, { empty: t('plat.noReviews') }));
+          } catch (e) { fail(holder, e); }
+        };
+        body.replaceChildren(holder);
+        load();
+      },
+
+      // Tariff cards; a new tariff, editing one and giving one to an organization.
+      tariffs(body) {
+        const holder = h('div', { class: 'stack' });
+        const limit = (n, key) => (n === null || n === undefined ? t(key + 'Unlimited') : t(key, { n }));
+        const load = async () => {
+          holder.replaceChildren(S.skeleton(3, 120));
+          try {
+            const list = await S.api.tariffs();
+            holder.replaceChildren(h('div', { class: 'tariff-grid' }, list.map((p) => h('div', { class: 'card tariff-card' + (p.isActive ? '' : ' off') },
+              h('div', { class: 'row between' }, h('h3', null, p.name), p.isActive ? null : S.chip('Blocked', t('plat.tariffOff'))),
+              h('div', { class: 'tariff-price' }, S.fmt.money(p.price, p.currency), h('small', null, ' ' + t('plat.perMonth'))),
+              h('ul', null, h('li', null, limit(p.maxBuildings, 'plat.maxBuildings')), h('li', null, limit(p.maxUsers, 'plat.maxUsers')), p.features.map((f) => h('li', null, f))),
+              h('div', { class: 'hint' }, t('plat.tariffOrgs', { n: p.organizationsCount })),
+              h('div', { class: 'row', style: { gap: '6px' } }, h('button', { class: 'btn ghost sm', onclick: () => tariffForm(p, load) }, t('common.edit')))))));
+          } catch (e) { fail(holder, e); }
+        };
+        body.replaceChildren(h('div', { class: 'toolbar' }, h('span', { class: 'spacer' }),
+          h('button', { class: 'btn ghost', onclick: () => assignForm(null, load) }, t('plat.assignTariff')),
+          h('button', { class: 'btn', onclick: () => tariffForm(null, load) }, t('plat.newTariff'))), holder);
         load();
       },
 
@@ -152,6 +287,116 @@
       const btn = h('button', { class: 'btn danger', type: 'submit', form: 'rejectform' }, t('apps.reject'));
       const md = S.modal({ title: t('apps.rejectTitle'), body: form, actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
       form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await S.api.rejectApplication(a.id, reason.value.trim()); S.toast(t('apps.rejectedToast'), 'ok'); md.close(); done(); } catch (er) { S.showErrors(form, er); } }); });
+    }
+
+    // Deals by month: bars — how many, line — for how much (TJS, right axis). Colours follow the theme.
+    function drawChart(canvas, rows) {
+      if (chart) { chart.destroy(); chart = null; }
+      if (!window.Chart) { canvas.replaceWith(h('p', { class: 'muted' }, t('plat.noChart'))); return; }
+      const css = getComputedStyle(document.documentElement);
+      const gold = css.getPropertyValue('--gold').trim() || '#c9a227', info = css.getPropertyValue('--info').trim() || '#8d9bff';
+      const ink = css.getPropertyValue('--muted').trim() || '#8894ba', line = css.getPropertyValue('--line').trim() || '#26325e';
+      const months = t('stats.months').split(',');
+      chart = new window.Chart(canvas, {
+        data: {
+          labels: rows.map((r) => months[+r.month.slice(5) - 1] + ' ' + r.month.slice(2, 4)),
+          datasets: [
+            { type: 'bar', label: t('plat.dealsCount'), data: rows.map((r) => r.count), backgroundColor: gold, borderRadius: 6, yAxisID: 'y' },
+            { type: 'line', label: t('plat.dealsSum'), data: rows.map((r) => r.sum), borderColor: info, backgroundColor: info, tension: 0.3, yAxisID: 'sum' }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: ink } }, tooltip: { callbacks: { label: (c) => c.dataset.yAxisID === 'sum' ? money(c.parsed.y) : c.dataset.label + ': ' + c.parsed.y } } },
+          scales: {
+            x: { ticks: { color: ink }, grid: { color: line } },
+            y: { beginAtZero: true, ticks: { color: ink, precision: 0 }, grid: { color: line } },
+            sum: { position: 'right', beginAtZero: true, ticks: { color: ink, callback: (v) => S.fmt.n(v) }, grid: { drawOnChartArea: false } } },
+        },
+      });
+    }
+
+    // Organization card: totals, buildings, owners, tariff history; rename, give a tariff, invite an owner.
+    async function orgCard(id, done) {
+      const body = h('div', { class: 'stack' }, S.skeleton(4, 30));
+      const md = S.modal({ title: t('plat.orgCard'), body, actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.close'))] });
+      try {
+        const d = await S.api.organizationDetails(id);
+        const o = d.organization;
+        const kv = (k, v) => [h('dt', null, k), h('dd', null, v === null || v === undefined || v === '' ? '—' : v)];
+        body.replaceChildren(
+          h('div', { class: 'row between' }, h('h3', null, o.name), S.chip(o.active ? 'Active ok' : 'Blocked', t(o.active ? 'plat.active' : 'plat.off'))),
+          h('dl', { class: 'kv' }, kv(t('plat.slug'), o.slug), kv(t('plat.tariff'), tariffChip(o.tariff)), kv(t('plat.createdAt'), S.fmt.date(o.createdAt)),
+            kv(t('plat.lastActivity'), o.lastActivityAt ? S.fmt.dt(o.lastActivityAt) : null), kv(t('plat.buildings'), o.buildings), kv(t('plat.deals'), o.deals),
+            kv(t('plat.customers'), o.customers), kv(t('plat.users'), o.users), kv(t('plat.apartments'), t('plat.apartmentsLine', { a: d.apartmentsCount, f: d.freeApartments, s: d.soldApartments })),
+            kv(t('plat.paymentsSum'), money(d.paymentsSumTjs))),
+          h('h4', null, t('plat.owners')), o.ownerInfos.length ? h('ul', null, o.ownerInfos.map((w) => h('li', null, h('b', null, w.fullName), ' · ', w.email ? h('a', { href: 'mailto:' + w.email }, w.email) : '—', w.phone ? ' · ' + w.phone : ''))) : h('p', { class: 'muted' }, t('plat.noOwner')),
+          h('h4', null, t('plat.buildingList')), d.buildings.length ? h('ul', null, d.buildings.map((b) => h('li', null, b.name + ' — ' + t('plat.apartmentsShort', { a: b.apartmentsCount, f: b.freeApartments })))) : h('p', { class: 'muted' }, t('plat.noBuildings')),
+          d.tariffHistory.length ? h('h4', null, t('plat.tariffHistory')) : null,
+          d.tariffHistory.length ? h('ul', null, d.tariffHistory.map((th) => h('li', null, th.tariffName + ' · ' + S.fmt.date(th.startsAt) + ' — ' + (th.endsAt ? S.fmt.date(th.endsAt) : t('plat.noEnd')) + (th.isPaid ? ' · ' + t('plat.paid') : '')))) : null,
+          h('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap' } },
+            h('button', { class: 'btn ghost sm', onclick: () => { md.close(); renameForm(o, done); } }, t('plat.rename')),
+            h('button', { class: 'btn ghost sm', onclick: () => { md.close(); assignForm(o, done); } }, t('plat.assignTariff')),
+            h('button', { class: 'btn ghost sm', onclick: () => { md.close(); inviteOwnerForm(o, done); } }, t('plat.inviteOwner'))));
+      } catch (e) { fail(body, e); }
+    }
+
+    function renameForm(o, done) {
+      const name = S.input('name', { value: o.name }), slug = S.input('slug', { value: o.slug });
+      const form = h('form', { class: 'stack', id: 'renameform', novalidate: true }, S.field(t('plat.name'), name), S.field(t('plat.slug'), slug, t('plat.slugHint')));
+      const btn = h('button', { class: 'btn', type: 'submit', form: 'renameform' }, t('common.save'));
+      const md = S.modal({ title: t('plat.rename'), body: form, actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
+      form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await S.api.updateOrganization(o.id, { name: name.value.trim(), slug: slug.value.trim() }); S.toast(t('common.saved'), 'ok'); md.close(); done(); } catch (er) { S.showErrors(form, er); } }); });
+    }
+
+    function inviteOwnerForm(o, done) {
+      const first = S.input('firstName'), last = S.input('lastName'), email = S.input('email', { type: 'email' });
+      const form = h('form', { class: 'stack', id: 'ownerform', novalidate: true }, h('p', { class: 'muted' }, t('plat.inviteOwnerText', { o: o.name })),
+        h('div', { class: 'grid g2' }, S.field(t('reg.firstName'), first), S.field(t('reg.lastName'), last)), S.field(t('login.email'), email));
+      const btn = h('button', { class: 'btn', type: 'submit', form: 'ownerform' }, t('plat.inviteOwner'));
+      const md = S.modal({ title: t('plat.inviteOwner'), body: form, actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
+      form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await S.api.inviteOwner(o.id, { email: email.value.trim(), firstName: first.value.trim(), lastName: last.value.trim() }); S.toast(t('plat.ownerInvited', { e: email.value.trim() }), 'ok'); md.close(); done(); } catch (er) { S.showErrors(form, er); } }); });
+    }
+
+    function tariffForm(p, done) {
+      const name = S.input('name', { value: p ? p.name : '' }), price = S.input('price', { type: 'number', min: 0, step: '0.01', value: p ? p.price : 0 });
+      const currency = S.select('currency', [['TJS', 'TJS'], ['USD', 'USD']], p ? p.currency : 'TJS');
+      const maxB = S.input('maxBuildings', { type: 'number', min: 1, value: p && p.maxBuildings !== null ? p.maxBuildings : '', placeholder: t('plat.unlimited') });
+      const maxU = S.input('maxUsers', { type: 'number', min: 1, value: p && p.maxUsers !== null ? p.maxUsers : '', placeholder: t('plat.unlimited') });
+      const features = h('textarea', { class: 'inp', name: 'features', rows: 4 }, p ? p.features.join('\n') : '');
+      const active = h('input', { type: 'checkbox', checked: p ? p.isActive : true });
+      const form = h('form', { class: 'stack', id: 'tariffform', novalidate: true }, S.field(t('plat.name'), name),
+        h('div', { class: 'grid g2' }, S.field(t('plat.price'), price), S.field(t('plat.currency'), currency)),
+        h('div', { class: 'grid g2' }, S.field(t('plat.maxBuildingsLabel'), maxB, t('plat.emptyUnlimited')), S.field(t('plat.maxUsersLabel'), maxU)),
+        S.field(t('plat.features'), features, t('plat.featuresHint')), h('label', { class: 'check' }, active, ' ', t('plat.tariffActive')));
+      const btn = h('button', { class: 'btn', type: 'submit', form: 'tariffform' }, t('common.save'));
+      const md = S.modal({ title: p ? p.name : t('plat.newTariff'), body: form, actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
+      const intOrNull = (el) => (el.value.trim() === '' ? null : Number(el.value));
+      form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => {
+        try {
+          await S.api.saveTariff(p && p.id, { name: name.value.trim(), price: Number(price.value || 0), currency: currency.value, maxBuildings: intOrNull(maxB), maxUsers: intOrNull(maxU),
+            features: features.value.split('\n').map((f) => f.trim()).filter(Boolean), isActive: active.checked });
+          S.toast(t('common.saved'), 'ok'); md.close(); done();
+        } catch (er) { S.showErrors(form, er); }
+      }); });
+    }
+
+    // Give a tariff to an organization from today; the previous one ends now.
+    async function assignForm(o, done) {
+      const [orgs, plans] = await Promise.all([o ? Promise.resolve([o]) : S.api.organizations(), S.api.tariffs()]);
+      const org = S.select('organizationId', orgs.map((x) => [x.id, x.name]), o ? o.id : undefined);
+      const plan = S.select('tariffPlanId', plans.filter((p) => p.isActive).map((p) => [p.id, p.name + ' · ' + S.fmt.money(p.price, p.currency)]));
+      const ends = S.input('endsAt', { type: 'date' });
+      const paid = h('input', { type: 'checkbox' });
+      const form = h('form', { class: 'stack', id: 'assignform', novalidate: true }, S.field(t('plat.org'), org), S.field(t('plat.tariff'), plan),
+        S.field(t('plat.endsAt'), ends, t('plat.endsAtHint')), h('label', { class: 'check' }, paid, ' ', t('plat.paid')));
+      const btn = h('button', { class: 'btn', type: 'submit', form: 'assignform' }, t('plat.assignTariff'));
+      const md = S.modal({ title: t('plat.assignTariff'), body: form, actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
+      form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => {
+        try {
+          await S.api.assignTariff(org.value, { tariffPlanId: plan.value, endsAt: ends.value ? new Date(ends.value + 'T23:59:59+05:00').toISOString() : null, isPaid: paid.checked });
+          S.toast(t('plat.tariffAssigned'), 'ok'); md.close(); done();
+        } catch (er) { S.showErrors(form, er); }
+      }); });
     }
 
     function orgForm(done) {

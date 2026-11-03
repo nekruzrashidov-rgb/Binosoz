@@ -11,9 +11,10 @@ public static class TariffSeeder
 {
     public static readonly (string Name, decimal Price, int? MaxBuildings, int? MaxUsers, string[] Features)[] Plans =
     [
-        ("Free", 0m, 1, 5, ["1 дом", "До 5 сотрудников", "CRM и кабинет покупателя"]),
-        ("Basic", 500m, 3, 20, ["До 3 домов", "До 20 сотрудников", "Отчёты и Telegram-уведомления"]),
-        ("Pro", 1500m, null, null, ["Без ограничения домов", "Без ограничения сотрудников", "AI-помощник и свой домен"])
+        // Лимиты домов и сотрудников видны отдельно; здесь — только возможности.
+        ("Free", 0m, 1, 5, ["CRM, каталог и кабинет покупателя"]),
+        ("Basic", 500m, 3, 20, ["Всё из Free", "Отчёты владельцу", "Telegram-уведомления"]),
+        ("Pro", 1500m, null, null, ["Всё из Basic", "AI-помощник", "Свой домен"])
     ];
 
     public static async Task SeedAsync(AppDbContext db)
