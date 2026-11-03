@@ -28,6 +28,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider t
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<TariffPlan> TariffPlans => Set<TariffPlan>();
     public DbSet<OrganizationTariff> OrganizationTariffs => Set<OrganizationTariff>();
+    public DbSet<Review> Reviews => Set<Review>();
     public DbSet<Building> Buildings => Set<Building>();
     public DbSet<Floor> Floors => Set<Floor>();
     public DbSet<Apartment> Apartments => Set<Apartment>();
@@ -82,6 +83,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider t
         ByBuilding<CashTransaction>(builder, x => x.Building.OrganizationId, x => x.BuildingId);
         ByBuilding<WeeklyReport>(builder, x => x.Building.OrganizationId, x => x.BuildingId);
         ByBuilding<FloorPlan>(builder, x => x.Building.OrganizationId, x => x.BuildingId);
+        ByBuilding<Review>(builder, x => x.Building.OrganizationId, x => x.BuildingId);
         ByBuilding<Document>(builder, x => x.Deal.Apartment.Floor.Building.OrganizationId, x => x.Deal.Apartment.Floor.BuildingId);
         ByBuilding<ChatMessage>(builder, x => x.Deal.Apartment.Floor.Building.OrganizationId, x => x.Deal.Apartment.Floor.BuildingId);
         ByBuilding<ConstructionStage>(builder, x => x.Building.OrganizationId, x => x.BuildingId);

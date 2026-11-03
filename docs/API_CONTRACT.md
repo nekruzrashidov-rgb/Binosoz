@@ -114,6 +114,21 @@ TwoFactorRequired = { requiresTwoFactor: true, tempToken, expiresAt }
 | PUT | `/platform/tariffs/{id}` | то же тело → 200. Отключённый тариф нельзя назначить, у кого он есть — остаётся |
 | POST | `/platform/organizations/{id}/tariff` | `{ tariffPlanId, endsAt?, isPaid? }` → `{ id, organizationId, tariffPlanId, tariffName, price, currency, startsAt, endsAt, isPaid }`. Тариф действует с текущего момента, прежний закрывается. Отключённый тариф — 422. Аудит `TariffAssigned` |
 
+| GET | `/platform/reviews?page=&pageSize=` | `PagedResult` всех отзывов платформы (`ReviewResponse` с `buildingName`, `organizationName`) |
+| DELETE | `/platform/reviews/{id}` | 204: удалить навсегда; копия — в журнале (`Review` / `Deleted`) |
+
+## Отзывы о доме
+
+| Метод | Путь | Кто | Тело / ответ |
+| --- | --- | --- | --- |
+| GET | `/buildings/{id}/reviews` | все, без входа | опубликованные: `[{ id, buildingId, rating, text, authorName, ownerReply, createdAt, repliedAt }]`; автор — только имя |
+| POST | `/buildings/{id}/reviews` | Customer | `{ rating: 1–5, text: до 1000 }` → 201. Нужна сделка в этом доме (не отменённая), иначе 403; второй отзыв на дом — 409; неизвестный дом — 404 |
+| PUT | `/buildings/{id}/reviews/{rid}` | Customer (свой) | то же тело; после публикации — 422, чужой — 404 |
+| GET | `/buildings/{id}/reviews/all` | Manager, руководители дома | все отзывы с `isPublished`, `aiReply`, `customerId`, `customerFullName` |
+| POST | `/buildings/{id}/reviews/{rid}/reply` | Manager, руководители | `{ text }` (до 2000) → отзыв с `ownerReply`, `repliedAt` |
+| POST | `/buildings/{id}/reviews/{rid}/ai-reply` | Manager, руководители | черновик ответа от Claude (`claude-haiku-5-5`) в `aiReply`, не публикуется; нет ключа Claude — 503 |
+| POST | `/buildings/{id}/reviews/{rid}/publish`, `…/hide` | Manager, руководители | показать или скрыть на сайте. Аудит `Published` / `Hidden` |
+
 **Лимиты тарифа.** Создание дома (`POST /buildings`) и сотрудника (`POST /invitations`, `POST /users`, `POST /platform/organizations/{id}/owners`) сверяются с действующим тарифом организации: дома — все дома организации, сотрудники — активные учётные записи организации. Лимит исчерпан — **402** «Тариф «…» позволяет не больше N … Перейдите на тариф выше». У организации без назначенного тарифа ограничений нет.
 
 Заявка застройщика без входа (страница `/register`):

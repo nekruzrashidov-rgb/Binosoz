@@ -77,6 +77,7 @@ public static class DependencyInjection
         services.AddScoped<ITariffService, TariffService>();
         services.AddScoped<IPlatformUserService, PlatformUserService>();
         services.AddScoped<IPlatformDashboardService, PlatformDashboardService>();
+        services.AddScoped<IReviewService, ReviewService>();
         services.AddScoped<IInvitationService, InvitationService>();
         services.AddScoped<IPlatformService, PlatformService>();
         services.AddScoped<IOrgApplicationService, OrgApplicationService>();
