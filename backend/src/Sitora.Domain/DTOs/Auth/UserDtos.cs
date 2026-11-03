@@ -71,7 +71,13 @@ public record OrganizationResponse(
     string? CustomDomain = null,
     string? LogoUrl = null,
     IReadOnlyList<string>? OwnerEmails = null,
-    IReadOnlyList<string>? BuildingNames = null);
+    IReadOnlyList<string>? BuildingNames = null,
+    // Для раздела суперадмина: сделки и покупатели, последнее действие по журналу, действующий тариф, владельцы.
+    int DealsCount = 0,
+    int CustomersCount = 0,
+    DateTime? LastActivityAt = null,
+    Sitora.Domain.DTOs.Platform.OrganizationTariffResponse? Tariff = null,
+    IReadOnlyList<Sitora.Domain.DTOs.Platform.OrganizationOwnerInfo>? Owners = null);
 
 // Приостановить (false) или снова открыть (true) организацию: при приостановке её сотрудники выходят из системы.
 public record OrganizationStatusRequest(bool IsActive);

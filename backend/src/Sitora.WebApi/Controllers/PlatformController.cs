@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Sitora.Domain.DTOs.Auth;
 using Sitora.Domain.DTOs.Brand;
 using Sitora.Domain.DTOs.Common;
+using Sitora.Domain.DTOs.Platform;
 using Sitora.Domain.Enums;
 using Sitora.Domain.Interfaces;
 
@@ -14,12 +15,62 @@ namespace Sitora.WebApi.Controllers;
 [Produces("application/json")]
 public class PlatformController(IPlatformService platform) : ControllerBase
 {
+    /// <summary>
+    /// Все организации: название, slug, статус, дома, сотрудники, сделки, покупатели, дата регистрации,
+    /// последняя активность (по журналу), действующий тариф и владельцы (имя, почта, телефон).
+    /// </summary>
     [HttpGet("organizations")]
     [Authorize(Roles = Roles.SuperAdmin)]
     public Task<IReadOnlyList<OrganizationResponse>> Organizations(CancellationToken ct) =>
         platform.GetOrganizationsAsync(ct);
 
-    /// <summary>Новая организация и её владелец (входит по коду из почты).</summary>
+    /// <summary>Карточка организации: данные списка, дома с числом квартир, сумма платежей (TJS), история тарифов.</summary>
+    [HttpGet("organizations/{organizationId:guid}")]
+    [Authorize(Roles = Roles.SuperAdmin)]
+    [ProducesResponseType<OrganizationDetailsResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public Task<OrganizationDetailsResponse> Organization(Guid organizationId, CancellationToken ct) =>
+        platform.GetOrganizationAsync(organizationId, ct);
+
+    /// <summary>Изменить название и (необязательно) короткое имя организации. Занятое короткое имя — 409. Аудит Organization / Updated.</summary>
+    [HttpPut("organizations/{organizationId:guid}")]
+    [Authorize(Roles = Roles.SuperAdmin)]
+    [ProducesResponseType<OrganizationDetailsResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public Task<OrganizationDetailsResponse> UpdateOrganization(Guid organizationId, UpdateOrganizationRequest request, CancellationToken ct) =>
+        platform.UpdateOrganizationAsync(organizationId, request, ct);
+
+    /// <summary>Приостановить организацию (данные не удаляются): вход сотрудникам и сайт закрыты, сессии отозваны. Аудит Suspended.</summary>
+    [HttpDelete("organizations/{organizationId:guid}/suspend")]
+    [Authorize(Roles = Roles.SuperAdmin)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Suspend(Guid organizationId, CancellationToken ct)
+    {
+        await platform.SetOrganizationActiveAsync(organizationId, false, ct);
+        return NoContent();
+    }
+
+    /// <summary>Снова открыть приостановленную организацию. Аудит Activated.</summary>
+    [HttpPost("organizations/{organizationId:guid}/activate")]
+    [Authorize(Roles = Roles.SuperAdmin)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Activate(Guid organizationId, CancellationToken ct)
+    {
+        await platform.SetOrganizationActiveAsync(organizationId, true, ct);
+        return NoContent();
+    }
+
+    /// <summary>Пригласить владельца: учётная запись Owner создаётся сразу, пароль приходит письмом. Лимит тарифа — 402.</summary>
+    [HttpPost("organizations/{organizationId:guid}/invite-owner")]
+    [Authorize(Roles = Roles.SuperAdmin)]
+    [ProducesResponseType<UserResponse>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<UserResponse>> InviteOwner(Guid organizationId, InviteOwnerRequest request, CancellationToken ct) =>
+        StatusCode(StatusCodes.Status201Created, await platform.InviteOwnerAsync(organizationId, request, ct));
+
+    /// <summary>Новая организация и её владелец (логин и пароль — письмом).</summary>
     [HttpPost("organizations")]
     [Authorize(Roles = Roles.SuperAdmin)]
     [ProducesResponseType<OrganizationResponse>(StatusCodes.Status201Created)]

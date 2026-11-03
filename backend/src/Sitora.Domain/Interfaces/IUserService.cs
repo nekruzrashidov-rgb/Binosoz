@@ -1,5 +1,6 @@
 using Sitora.Domain.DTOs.Auth;
 using Sitora.Domain.DTOs.Common;
+using Sitora.Domain.DTOs.Platform;
 
 namespace Sitora.Domain.Interfaces;
 
@@ -23,6 +24,9 @@ public interface IInvitationService
 public interface IPlatformService
 {
     Task<IReadOnlyList<OrganizationResponse>> GetOrganizationsAsync(CancellationToken ct = default);
+    Task<OrganizationDetailsResponse> GetOrganizationAsync(Guid organizationId, CancellationToken ct = default);
+    Task<OrganizationDetailsResponse> UpdateOrganizationAsync(Guid organizationId, UpdateOrganizationRequest request, CancellationToken ct = default);
+    Task<UserResponse> InviteOwnerAsync(Guid organizationId, InviteOwnerRequest request, CancellationToken ct = default);
     Task<OrganizationResponse> CreateOrganizationAsync(CreateOrganizationRequest request, CancellationToken ct = default);
     Task<UserResponse> AddOwnerAsync(Guid organizationId, AddOwnerRequest request, CancellationToken ct = default);
     Task SetOrganizationActiveAsync(Guid organizationId, bool isActive, CancellationToken ct = default);

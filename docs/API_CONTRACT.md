@@ -89,7 +89,12 @@ TwoFactorRequired = { requiresTwoFactor: true, tempToken, expiresAt }
 
 | Метод | Путь | Тело / ответ |
 | --- | --- | --- |
-| GET | `/platform/organizations` | `[{ id, name, slug, isActive, buildingsCount, usersCount, createdAt, customDomain, logoUrl, ownerEmails, buildingNames }]` |
+| GET | `/platform/organizations` | `[{ id, name, slug, isActive, buildingsCount, usersCount, createdAt, customDomain, logoUrl, ownerEmails, buildingNames, dealsCount, customersCount, lastActivityAt, tariff, owners: [{ id, fullName, email, phone }] }]`. `lastActivityAt` — последняя запись журнала организации; `tariff` — действующий тариф или null |
+| GET | `/platform/organizations/{id}` | `{ organization, paymentsSumTjs, apartmentsCount, freeApartments, soldApartments, buildings: [{ id, name, apartmentsCount, freeApartments }], tariffHistory[] }`; неизвестная — 404 |
+| PUT | `/platform/organizations/{id}` | `{ name, slug? }` → карточка. Короткое имя занято — 409, пустое название — 422. Аудит `Updated` |
+| DELETE | `/platform/organizations/{id}/suspend` | 204: приостановить (данные не удаляются) — как `PATCH …/status { isActive: false }`, аудит `Suspended` |
+| POST | `/platform/organizations/{id}/activate` | 204: снова открыть, аудит `Activated` |
+| POST | `/platform/organizations/{id}/invite-owner` | `{ email, firstName, lastName }` → 201 `UserResponse`: учётная запись Owner, пароль приходит письмом. Почта занята — 409, без имени или фамилии — 422, лимит тарифа — 402 |
 | PATCH | `/platform/organizations/{id}/status` | `{ isActive }` → 204. Приостановка (`false`): вход сотрудникам и сайт застройщика закрыты, refresh-токены сотрудников отзываются; `true` — снова работает. В аудите `Suspended` / `Activated` |
 | POST | `/platform/organizations` | `{ name, slug, ownerEmail, ownerFullName }` → 201. Владельцу уходит письмо с логином и сгенерированным паролем. `slug`: латиница, цифры, дефис |
 | POST | `/platform/organizations/{id}/owners` | `{ email, fullName, password? }` → 201 `UserResponse`: ещё один владелец организации. Без пароля он генерируется и уходит письмом |

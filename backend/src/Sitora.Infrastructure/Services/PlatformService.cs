@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sitora.Domain.Common;
 using Sitora.Domain.DTOs.Auth;
+using Sitora.Domain.DTOs.Platform;
 using Sitora.Domain.Entities;
 using Sitora.Domain.Enums;
 using Sitora.Domain.Exceptions;
@@ -26,26 +27,99 @@ public class PlatformService(
     ITariffService tariffs,
     ILogger<PlatformService> logger) : IPlatformService
 {
-    // Организации с логотипом, почтами владельцев и названиями домов — для раскрывающейся строки в разделе платформы.
-    public async Task<IReadOnlyList<OrganizationResponse>> GetOrganizationsAsync(CancellationToken ct = default)
+    // Организации с логотипом, владельцами, домами, счётчиками сделок и покупателей, последней активностью и тарифом.
+    public async Task<IReadOnlyList<OrganizationResponse>> GetOrganizationsAsync(CancellationToken ct = default) =>
+        await OrganizationsAsync(null, ct);
+
+    private async Task<List<OrganizationResponse>> OrganizationsAsync(Guid? onlyId, CancellationToken ct)
     {
         var rows = await db.Organizations.AsNoTracking()
+            .Where(o => onlyId == null || o.Id == onlyId)
             .OrderBy(o => o.Name)
             .Select(o => new
             {
                 o.Id, o.Name, o.Slug, o.IsActive, o.CreatedAt, o.CustomDomain, o.LogoUrl,
                 Buildings = o.Buildings.OrderBy(b => b.NameRu).Select(b => b.NameRu).ToList(),
-                Users = db.Users.Count(u => u.OrganizationId == o.Id)
+                Users = db.Users.Count(u => u.OrganizationId == o.Id),
+                Deals = db.Deals.Count(d => d.Apartment.Floor.Building.OrganizationId == o.Id),
+                Customers = db.Customers.Count(c => c.OrganizationId == o.Id),
+                LastActivity = db.AuditLogs.Where(a => a.OrganizationId == o.Id).Max(a => (DateTime?)a.At)
             })
             .ToListAsync(ct);
+        var ids = rows.Select(o => o.Id).ToList();
         var ownerRoleId = await db.Roles.Where(r => r.Name == RoleNames.Owner).Select(r => r.Id).SingleAsync(ct);
         var owners = (await db.Users.AsNoTracking()
-                .Where(u => u.OrganizationId != null && db.UserRoles.Any(ur => ur.UserId == u.Id && ur.RoleId == ownerRoleId))
-                .Select(u => new { u.OrganizationId, u.Email })
+                .Where(u => u.OrganizationId != null && ids.Contains(u.OrganizationId.Value)
+                            && db.UserRoles.Any(ur => ur.UserId == u.Id && ur.RoleId == ownerRoleId))
+                .Select(u => new { u.Id, u.OrganizationId, u.FullName, u.Email, u.PhoneNumber })
                 .ToListAsync(ct))
-            .ToLookup(u => u.OrganizationId!.Value, u => u.Email ?? string.Empty);
-        return rows.Select(o => new OrganizationResponse(o.Id, o.Name, o.Slug, o.IsActive, o.Buildings.Count, o.Users, o.CreatedAt,
-            o.CustomDomain, o.LogoUrl, owners[o.Id].OrderBy(e => e).ToList(), o.Buildings)).ToList();
+            .ToLookup(u => u.OrganizationId!.Value);
+        var tariffsNow = await tariffs.CurrentAsync(ids, ct);
+        return rows.Select(o =>
+        {
+            var orgOwners = owners[o.Id].OrderBy(u => u.Email).ToList();
+            return new OrganizationResponse(o.Id, o.Name, o.Slug, o.IsActive, o.Buildings.Count, o.Users, o.CreatedAt,
+                o.CustomDomain, o.LogoUrl, orgOwners.Select(u => u.Email ?? string.Empty).ToList(), o.Buildings,
+                o.Deals, o.Customers, o.LastActivity, tariffsNow.GetValueOrDefault(o.Id),
+                orgOwners.Select(u => new OrganizationOwnerInfo(u.Id, u.FullName, u.Email, u.PhoneNumber)).ToList());
+        }).ToList();
+    }
+
+    // Карточка организации: данные списка и статистика по домам, квартирам и платежам, история тарифов.
+    public async Task<OrganizationDetailsResponse> GetOrganizationAsync(Guid organizationId, CancellationToken ct = default)
+    {
+        var organization = (await OrganizationsAsync(organizationId, ct)).SingleOrDefault()
+            ?? throw new NotFoundException("Организация не найдена");
+        var buildings = await db.Buildings.AsNoTracking().Where(b => b.OrganizationId == organizationId)
+            .OrderBy(b => b.NameRu)
+            .Select(b => new OrganizationBuildingBrief(b.Id, b.NameRu,
+                db.Apartments.Count(a => a.Floor.BuildingId == b.Id),
+                db.Apartments.Count(a => a.Floor.BuildingId == b.Id && a.Status == ApartmentStatus.Free)))
+            .ToListAsync(ct);
+        var sold = await db.Apartments.CountAsync(a => a.Floor.Building.OrganizationId == organizationId && a.Status == ApartmentStatus.Sold, ct);
+        var paid = await db.Payments.Where(p => p.Deal.Apartment.Floor.Building.OrganizationId == organizationId).SumAsync(p => (decimal?)p.AmountTjs, ct) ?? 0;
+        var history = await db.OrganizationTariffs.AsNoTracking().Where(t => t.OrganizationId == organizationId)
+            .OrderByDescending(t => t.StartsAt)
+            .Select(t => new OrganizationTariffResponse(t.Id, t.OrganizationId, t.TariffPlanId, t.TariffPlan.Name, t.TariffPlan.Price,
+                t.TariffPlan.Currency, t.StartsAt, t.EndsAt, t.IsPaid))
+            .ToListAsync(ct);
+        return new OrganizationDetailsResponse(organization, paid, buildings.Sum(b => b.ApartmentsCount), buildings.Sum(b => b.FreeApartments),
+            sold, buildings, history);
+    }
+
+    // Название и короткое имя; короткое имя — по тем же правилам, что при создании, и не занято другой организацией.
+    public async Task<OrganizationDetailsResponse> UpdateOrganizationAsync(Guid organizationId, UpdateOrganizationRequest request, CancellationToken ct = default)
+    {
+        await RequireSuperAdminAsync();
+        var organization = await db.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId, ct)
+            ?? throw new NotFoundException("Организация не найдена");
+        var name = request.Name?.Trim();
+        if (string.IsNullOrEmpty(name) || name.Length > 200)
+            throw new BusinessRuleException("Название организации — от 1 до 200 символов");
+        var slug = organization.Slug;
+        if (!string.IsNullOrWhiteSpace(request.Slug))
+        {
+            slug = BrandRules.NormalizeSlug(request.Slug) ?? throw new BusinessRuleException(BrandRules.SlugMessage);
+            if (slug != organization.Slug && BrandRules.IsReserved(slug))
+                throw new BusinessRuleException($"Короткое имя «{slug}» зарезервировано платформой, выберите другое");
+            if (await db.Organizations.IgnoreQueryFilters().AnyAsync(o => o.Slug == slug && o.Id != organizationId, ct))
+                throw new ConflictException("Организация с таким коротким именем уже есть");
+        }
+
+        var before = new { organization.Name, organization.Slug };
+        organization.Name = name;
+        organization.Slug = slug;
+        audit.Record(nameof(Organization), organization.Id, "Updated", before, new { organization.Name, organization.Slug }, organization.Id);
+        await db.SaveChangesAsync(ct);
+        return await GetOrganizationAsync(organizationId, ct);
+    }
+
+    // Новый владелец организации по имени и фамилии; пароль генерируется и приходит письмом.
+    public Task<UserResponse> InviteOwnerAsync(Guid organizationId, InviteOwnerRequest request, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName))
+            throw new BusinessRuleException("Укажите имя и фамилию владельца");
+        return AddOwnerAsync(organizationId, new AddOwnerRequest(request.Email, $"{request.FirstName.Trim()} {request.LastName.Trim()}", null), ct);
     }
 
     // Приостановка закрывает вход сотрудникам организации и её сайт; выданные сессии отзываются сразу.
