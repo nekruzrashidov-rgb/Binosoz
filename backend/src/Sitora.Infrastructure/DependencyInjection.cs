@@ -78,6 +78,9 @@ public static class DependencyInjection
         services.AddScoped<IPlatformUserService, PlatformUserService>();
         services.AddScoped<IPlatformDashboardService, PlatformDashboardService>();
         services.AddScoped<IReviewService, ReviewService>();
+        // Платёжный шлюз: сейчас имитация банка; позже — AlifPaymentGateway или DcPaymentGateway вместо этой строки.
+        services.AddSingleton<IPaymentGateway, MockPaymentGateway>();
+        services.AddScoped<IOnlinePaymentService, OnlinePaymentService>();
         services.AddScoped<IInvitationService, InvitationService>();
         services.AddScoped<IPlatformService, PlatformService>();
         services.AddScoped<IOrgApplicationService, OrgApplicationService>();

@@ -208,7 +208,40 @@
       page.replaceChildren(ws.el);
       show('overview', ws.main);
       refreshChat();
+      // Back from the bank's card page (/cabinet?success=1, ?payment=failed or ?payment=cancelled).
+      const back = new URLSearchParams(location.search);
+      if (back.has('success') || back.has('payment')) payReturn(back);
     })();
+
+    // The payment reaches the schedule when its status is asked: the server then sees that the bank confirmed it.
+    async function payReturn(q) {
+      history.replaceState(null, '', location.pathname);
+      let p = null; try { p = JSON.parse(S.store.get('sitora.pay') || 'null'); } catch (e) { p = null; }
+      S.store.del('sitora.pay');
+      if (q.get('payment') === 'cancelled') { S.toast(t('cab.payCancelled')); return; }
+      if (!p) { if (q.has('success')) S.toast(t('cab.payDone'), 'ok'); return; }
+      try {
+        const r = await S.api.paymentStatus(p.dealId, p.id);
+        if (r.status === 'Paid') S.toast(t('cab.payDone'), 'ok'); else if (r.status === 'Pending') S.toast(t('cab.payPending'), 'warn'); else S.toast(t('cab.payFailed'), 'bad');
+      } catch (e) { S.err(e); return; }
+      deal = deals.find((d) => String(d.id) === String(p.dealId)) || deal; sched = null;
+      ws.go('schedule');
+    }
+
+    // "Pay by card" for the next unpaid line of the schedule: the bank's page takes the card and brings the buyer back here.
+    function payCta(s) {
+      const next = s.items.find((i) => i.status !== 'Paid');
+      if (!next || !(s.remaining > 0) || deal.stage === 'Cancelled') return null;
+      const due = Math.min(next.amountDue - next.amountPaid, s.remaining);
+      const pay = (e) => S.busy(e.currentTarget, async () => {
+        try {
+          const r = await S.api.initiatePayment(deal.id, { returnUrl: '/cabinet?success=1' });
+          S.store.set('sitora.pay', JSON.stringify({ dealId: deal.id, id: r.gatewayPaymentId }));
+          location.href = r.paymentUrl;
+        } catch (er) { S.err(er); }
+      });
+      return h('div', { class: 'card pay-cta' }, h('span', null, t('cab.payNext', { sum: S.fmt.money(due, s.currency) })), h('button', { class: 'btn gold', onclick: pay }, t('cab.payCard')));
+    }
 
     async function ensureSchedule() { if (sched && sched.dealId === deal.id) return sched; try { sched = await S.api.schedule(deal.id); sched.dealId = deal.id; } catch (e) { sched = { dealId: deal.id, none: true, error: e }; } return sched; }
 
@@ -226,7 +259,7 @@
       const body = h('div', { class: 'stack' }, S.skeleton(3, 80)); main.appendChild(body);
       try {
         if (k === 'overview') body.replaceChildren(...(await overview()));
-        else if (k === 'schedule') { const s = await ensureSchedule(); body.replaceChildren(s.none ? S.empty(t('cab.noSchedule'), 'wallet') : h('div', null, S.panels.schedule(s), h('div', { class: 'row', style: { marginTop: '14px' } }, pdfBtn()))); }
+        else if (k === 'schedule') { const s = await ensureSchedule(); body.replaceChildren(s.none ? S.empty(t('cab.noSchedule'), 'wallet') : h('div', null, payCta(s), S.panels.schedule(s), h('div', { class: 'row', style: { marginTop: '14px' } }, pdfBtn()))); }
         else if (k === 'docs') body.replaceChildren(S.panels.documents(deal.id, false));
         else if (k === 'chat') {
           // Who answers and whether they are here now (any action in the CRM during the last 5 minutes).

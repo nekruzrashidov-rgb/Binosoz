@@ -22,6 +22,9 @@ public static class TelegramMessages
     public static string Overdue(string customer, int apartment, decimal amount, Currency currency, int days) =>
         $"🔴 *Просрочка*\n{Escape(customer)}, кв. {apartment}, {Money(amount, currency)}, просрочено {days} дн.";
 
+    public static string OnlinePayment(int apartment, decimal amount, Currency currency) =>
+        $"✅ *Оплата получена*\nКв. {apartment}: {Money(amount, currency)} картой. Спасибо!";
+
     public static string Reminder(decimal amount, Currency currency, DateOnly due) =>
         $"🟡 *Напоминание*\nПлатёж {Money(amount, currency)} через 3 дня, {due:dd.MM.yyyy}";
 

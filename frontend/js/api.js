@@ -491,6 +491,12 @@
     // conversations of the staff (fresh first, unread from the buyer) and what is unread for the reader of one deal
     chats(search) { return request('GET', '/chats', { query: search ? { search } : undefined }).then(arr); },
     chatUnread(id) { return request('GET', '/deals/' + id + '/messages/unread'); },
+    // Online card payment: the bank's page (paymentUrl) takes the card; the payment appears in the schedule
+    // when paymentStatus sees that the bank confirmed it.
+    initiatePayment(id, b) { return request('POST', '/deals/' + id + '/payment/initiate', { body: b || {} }); },
+    paymentStatus(id, gatewayId) { return request('GET', '/deals/' + id + '/payment/' + encodeURIComponent(gatewayId) + '/status'); },
+    // Only the test bank (Development): the bank page reports "paid" or "declined" — without the buyer's token, like a real bank.
+    simulatePayment(gatewayId, success) { return request('POST', '/payment/mock/simulate', { auth: false, body: { gatewayPaymentId: gatewayId, success: !!success } }); },
     async messages(id) { return arr(await request('GET', '/deals/' + id + '/messages', { query: real() ? { page: 1, pageSize: 100 } : undefined })).map(M.message); },
     sendMessage(id, text) { return request('POST', '/deals/' + id + '/messages', { body: { text } }); },
     async stages(buildingId) { const r = await request('GET', '/buildings/' + buildingId + '/stages'); return arr(Array.isArray(r) ? r : r.stages).map(M.stage).sort((a, b) => a.order - b.order); },

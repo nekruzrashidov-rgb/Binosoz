@@ -223,6 +223,10 @@ TwoFactorRequired = { requiresTwoFactor: true, tempToken, expiresAt }
 | GET | `/deals/{id}/schedule.pdf`, `/statement.pdf?date=` | владелец, сотрудник сделки | PDF |
 | POST | `/deals/{id}/payments` | Accountant, руководители | `{ amount, currency, paidAt, method: Cash\|BankTransfer\|Card\|Other, comment }` |
 | POST | `/payments/{id}/reverse` | Accountant, руководители | `{ reason }` → обратная запись: суммы со знаком минус, `reversalOfId` указывает на исходный платёж, у исходного `isReversed = true` |
+| POST | `/deals/{id}/payment/initiate` | владелец сделки, сотрудник сделки | Онлайн-оплата картой. `{ amount?, returnUrl? }` → `{ paymentUrl, gatewayPaymentId, amount, currency, provider }`. Без `amount` — ближайший неоплаченный платёж графика; больше остатка, отменённая сделка, нет остатка — 422; нет графика или чужая сделка — 404. `returnUrl` — путь на этом сайте (иначе `/cabinet?success=1`). Аудит `OnlinePayment` / `Initiated` |
+| GET | `/deals/{id}/payment/{gatewayPaymentId}/status` | владелец сделки, сотрудник сделки | `{ gatewayPaymentId, status: Pending|Paid|Failed|Refunded, amount, currency, paidAt, paymentId }`. Когда банк подтвердил оплату, один раз создаётся платёж графика `Method = Card` (`paymentId`), аудит `OnlinePayment` / `Paid`, Telegram покупателю |
+| POST | `/payment/mock/simulate` | без входа, только Development | `{ gatewayPaymentId, success }` → статус: тестовый банк принял или отклонил платёж. Уже обработанный — 422, неизвестный — 404, вне Development — 404 |
+| POST | `/payment/webhook/{provider}` | без входа | Заготовка для уведомлений Alif / Корти Миллӣ: 501 |
 | PUT | `/rates` | Accountant, руководители | `{ date, currency: "USD", rateToTjs }` |
 | GET | `/reports/payments?from=&to=` | Accountant, руководители | `{ rows[], totalsByCurrency[], totalTjs }`, Excel — `.xlsx` |
 | GET | `/reports/debts?asOf=` | Accountant, руководители | `rows[{ dealId, customerName, phone, apartmentNumber, currency, overdue, oldestOverdueDate, daysOverdue, remaining }]`, Excel — `.xlsx` |
@@ -243,6 +247,7 @@ TwoFactorRequired = { requiresTwoFactor: true, tempToken, expiresAt }
 Подробности:
 - Пункт графика: `kind` (`DownPayment` или `Monthly`), `status` (`Pending`, `PartiallyPaid` или `Paid`) и признак `isOverdue`. Интерфейс показывает «Просрочен» по `isOverdue`.
 - Отдельного списка платежей сделки нет: история берётся из `schedule.payments`.
+- Страница тестового банка — `/payment/mock-card?id=&amount=&currency=&returnUrl=&description=` (`frontend/payment.html`). Ожидающие онлайн-оплаты в `schedule.payments` не попадают.
 - PDF и Excel скачиваются с токеном. PDF открывается в новой вкладке, Excel сохраняется под именем из `Content-Disposition`.
 
 ## Уведомления (колокольчик)

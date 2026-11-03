@@ -32,6 +32,8 @@ public static class FrontendSetup
         app.MapGet("/", () => Results.File("index.html", Html)).ExcludeFromDescription();
         foreach (var page in Pages)
             app.MapGet("/" + page, () => Results.File(page + ".html", Html)).ExcludeFromDescription();
+        // Страница тестового банка (MockPaymentGateway): /payment/mock-card?id=…&amount=…&currency=…&returnUrl=…
+        app.MapGet("/payment/mock-card", () => Results.File("payment.html", Html)).ExcludeFromDescription();
 
         // Неизвестный адрес сайта — страница «не найдено» с кодом 404. Неизвестные адреса API отвечают как раньше (Problem Details).
         app.MapFallback(context =>
