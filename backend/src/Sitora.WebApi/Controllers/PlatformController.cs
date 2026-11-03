@@ -16,6 +16,17 @@ namespace Sitora.WebApi.Controllers;
 public class PlatformController(IPlatformService platform) : ControllerBase
 {
     /// <summary>
+    /// Дашборд платформы: организации (всего, активных, новых за месяц), дома, сделки (без отменённых), сумма платежей,
+    /// покупатели, сотрудники, доход платформы за месяц (оплаченные тарифы), топ-5 организаций по сделкам и сделки
+    /// по месяцам за последние 12 месяцев. Суммы — в сомони.
+    /// </summary>
+    [HttpGet("dashboard")]
+    [Authorize(Roles = Roles.SuperAdmin)]
+    [ProducesResponseType<PlatformDashboardResponse>(StatusCodes.Status200OK)]
+    public Task<PlatformDashboardResponse> Dashboard([FromServices] IPlatformDashboardService dashboard, CancellationToken ct) =>
+        dashboard.GetAsync(ct);
+
+    /// <summary>
     /// Все организации: название, slug, статус, дома, сотрудники, сделки, покупатели, дата регистрации,
     /// последняя активность (по журналу), действующий тариф и владельцы (имя, почта, телефон).
     /// </summary>

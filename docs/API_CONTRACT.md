@@ -89,6 +89,7 @@ TwoFactorRequired = { requiresTwoFactor: true, tempToken, expiresAt }
 
 | Метод | Путь | Тело / ответ |
 | --- | --- | --- |
+| GET | `/platform/dashboard` | `{ totalOrganizations, activeOrganizations, totalBuildings, totalDeals, totalPaymentsSum, totalCustomers, totalStaff, platformRevenueMonth, newOrganizationsMonth, newDealsMonth, topOrganizations: [{ id, name, dealsCount, paymentsSum }], dealsByMonth: [{ month: "2026-11", count, sum }] }`. Суммы в сомони (USD — по последнему курсу НБТ); сделки без отменённых; «месяц» — с 1-го числа по Душанбе; доход платформы — оплаченные тарифы, действующие в этом месяце; `dealsByMonth` — 12 месяцев по текущий, пустые с нулями; топ-5 — по числу сделок |
 | GET | `/platform/organizations` | `[{ id, name, slug, isActive, buildingsCount, usersCount, createdAt, customDomain, logoUrl, ownerEmails, buildingNames, dealsCount, customersCount, lastActivityAt, tariff, owners: [{ id, fullName, email, phone }] }]`. `lastActivityAt` — последняя запись журнала организации; `tariff` — действующий тариф или null |
 | GET | `/platform/organizations/{id}` | `{ organization, paymentsSumTjs, apartmentsCount, freeApartments, soldApartments, buildings: [{ id, name, apartmentsCount, freeApartments }], tariffHistory[] }`; неизвестная — 404 |
 | PUT | `/platform/organizations/{id}` | `{ name, slug? }` → карточка. Короткое имя занято — 409, пустое название — 422. Аудит `Updated` |
