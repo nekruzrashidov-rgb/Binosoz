@@ -10,6 +10,9 @@ public class ForbiddenException(string message = "Недостаточно пр�
 
 public class BusinessRuleException(string message) : DomainException(message);
 
+// Лимит тарифа исчерпан (домов, сотрудников) — 402: нужен тариф выше.
+public class PaymentRequiredException(string message) : DomainException(message);
+
 // Запрос не к тому адресу (например, покупатель пришёл во вход по паролю) — 400.
 public class BadRequestException(string message) : DomainException(message);
 

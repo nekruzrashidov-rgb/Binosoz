@@ -19,6 +19,7 @@ public class InvitationService(
     ICurrentUser currentUser,
     StaffPolicy policy,
     StaffAccounts accounts,
+    ITariffService tariffs,
     IAuditService audit,
     TimeProvider timeProvider) : IInvitationService
 {
@@ -35,6 +36,7 @@ public class InvitationService(
             throw new BusinessRuleException("Укажите имя и фамилию (вместе до 200 символов)");
         if (await userManager.FindByEmailAsync(address) is not null)
             throw new ConflictException("Пользователь с такой почтой уже есть");
+        await tariffs.EnsureCanAddUserAsync(organizationId, ct);
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
         // Ссылки из прежних приглашений на ту же почту больше не действуют.

@@ -23,6 +23,7 @@ public class PlatformService(
     ICurrentUser currentUser,
     IAuditService audit,
     StaffAccounts accounts,
+    ITariffService tariffs,
     ILogger<PlatformService> logger) : IPlatformService
 {
     // Организации с логотипом, почтами владельцев и названиями домов — для раскрывающейся строки в разделе платформы.
@@ -111,6 +112,7 @@ public class PlatformService(
             throw new BusinessRuleException("Укажите имя владельца");
         if (await userManager.FindByEmailAsync(email) is not null)
             throw new ConflictException("Пользователь с такой почтой уже есть");
+        await tariffs.EnsureCanAddUserAsync(organization.Id, ct);
 
         var (owner, password, generated) = await accounts.CreateAsync(email, fullName, RoleNames.Owner, organization.Id, null, request.Password);
 

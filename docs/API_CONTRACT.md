@@ -98,6 +98,12 @@ TwoFactorRequired = { requiresTwoFactor: true, tempToken, expiresAt }
 | GET | `/platform/applications?status=&page=&pageSize=` | `PagedResult` заявок застройщиков: `{ id, companyName, contactEmail, contactPhone, ownerFullName, comment, status, reviewNote, createdAt, reviewedAt, organizationId }`. `status`: `Pending`, `Approved`, `Rejected`; без него — все |
 | POST | `/platform/applications/{id}/approve` | `{ organizationSlug }` → `{ organizationId, message }`: создаётся организация с владельцем (как `POST /platform/organizations`), владельцу уходит письмо со входом. Уже рассмотренная заявка или занятое короткое имя — 409 |
 | POST | `/platform/applications/{id}/reject` | `{ reason }` → 204, заявителю уходит письмо с причиной. Уже рассмотренная — 409 |
+| GET | `/platform/tariffs` | `[{ id, name, price, currency, maxBuildings, maxUsers, features[], isActive, organizationsCount }]`; `maxBuildings`/`maxUsers` = null — без ограничения. Базовые: Free (0 TJS, 1 дом, 5 сотрудников), Basic (500 TJS, 3 / 20), Pro (1500 TJS, без ограничений) |
+| POST | `/platform/tariffs` | `{ name, price, currency?, maxBuildings?, maxUsers?, features?, isActive? }` → 201. Название занято — 409; цена < 0, лимит < 1 — 422 |
+| PUT | `/platform/tariffs/{id}` | то же тело → 200. Отключённый тариф нельзя назначить, у кого он есть — остаётся |
+| POST | `/platform/organizations/{id}/tariff` | `{ tariffPlanId, endsAt?, isPaid? }` → `{ id, organizationId, tariffPlanId, tariffName, price, currency, startsAt, endsAt, isPaid }`. Тариф действует с текущего момента, прежний закрывается. Отключённый тариф — 422. Аудит `TariffAssigned` |
+
+**Лимиты тарифа.** Создание дома (`POST /buildings`) и сотрудника (`POST /invitations`, `POST /users`, `POST /platform/organizations/{id}/owners`) сверяются с действующим тарифом организации: дома — все дома организации, сотрудники — активные учётные записи организации. Лимит исчерпан — **402** «Тариф «…» позволяет не больше N … Перейдите на тариф выше». У организации без назначенного тарифа ограничений нет.
 
 Заявка застройщика без входа (страница `/register`):
 

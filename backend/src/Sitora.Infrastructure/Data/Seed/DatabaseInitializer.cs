@@ -54,6 +54,7 @@ public static class DatabaseInitializer
         var db = provider.GetRequiredService<AppDbContext>();
         await db.Database.MigrateAsync();
         await SeedRolesAsync(provider.GetRequiredService<RoleManager<IdentityRole<Guid>>>());
+        await TariffSeeder.SeedAsync(db);
         await BootstrapOwnerAsync(provider.GetRequiredService<UserManager<AppUser>>(),
             provider.GetRequiredService<IConfiguration>(), logger);
         await EnsureSuperAdminAsync(provider.GetRequiredService<UserManager<AppUser>>(),

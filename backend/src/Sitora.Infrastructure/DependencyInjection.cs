@@ -74,6 +74,7 @@ public static class DependencyInjection
         services.AddScoped<IAuthService>(sp => sp.GetRequiredService<AuthService>());
         services.AddScoped<StaffPolicy>();
         services.AddScoped<StaffAccounts>();
+        services.AddScoped<ITariffService, TariffService>();
         services.AddScoped<IInvitationService, InvitationService>();
         services.AddScoped<IPlatformService, PlatformService>();
         services.AddScoped<IOrgApplicationService, OrgApplicationService>();

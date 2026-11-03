@@ -26,6 +26,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider t
     public DbSet<OrgApplication> OrgApplications => Set<OrgApplication>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<TariffPlan> TariffPlans => Set<TariffPlan>();
+    public DbSet<OrganizationTariff> OrganizationTariffs => Set<OrganizationTariff>();
     public DbSet<Building> Buildings => Set<Building>();
     public DbSet<Floor> Floors => Set<Floor>();
     public DbSet<Apartment> Apartments => Set<Apartment>();
@@ -98,6 +100,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider t
         builder.Entity<AuditLog>().HasQueryFilter(x => ScopeAll || x.OrganizationId == ScopeOrganizationId);
         builder.Entity<Invitation>().HasQueryFilter(x => ScopeAll || x.OrganizationId == ScopeOrganizationId);
         builder.Entity<Organization>().HasQueryFilter(x => ScopeAll || x.Id == ScopeOrganizationId);
+        builder.Entity<OrganizationTariff>().HasQueryFilter(x => ScopeAll || x.OrganizationId == ScopeOrganizationId);
     }
 
     private void ByBuilding<T>(ModelBuilder builder, Expression<Func<T, Guid>> organizationId, Expression<Func<T, Guid>> buildingId)

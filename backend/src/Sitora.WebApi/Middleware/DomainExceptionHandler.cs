@@ -36,6 +36,7 @@ public class DomainExceptionHandler(IProblemDetailsService problemDetails, ILogg
         ForbiddenException => (StatusCodes.Status403Forbidden, "Доступ запрещён"),
         BusinessRuleException => (StatusCodes.Status422UnprocessableEntity, "Нарушено бизнес-правило"),
         BadRequestException => (StatusCodes.Status400BadRequest, "Неверный запрос"),
+        PaymentRequiredException => (StatusCodes.Status402PaymentRequired, "Нужен тариф выше"),
         UnauthorizedException => (StatusCodes.Status401Unauthorized, "Требуется вход"),
         TooManyRequestsException => (StatusCodes.Status429TooManyRequests, "Слишком много запросов"),
         ServiceUnavailableException => (StatusCodes.Status503ServiceUnavailable, "Сервис недоступен"),

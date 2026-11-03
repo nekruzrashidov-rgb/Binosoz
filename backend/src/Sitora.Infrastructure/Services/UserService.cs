@@ -17,6 +17,7 @@ public class UserService(
     ICurrentUser currentUser,
     StaffPolicy policy,
     StaffAccounts accounts,
+    ITariffService tariffs,
     IAuditService audit,
     TimeProvider timeProvider) : IUserService
 {
@@ -70,6 +71,7 @@ public class UserService(
         if (!string.IsNullOrWhiteSpace(request.Phone))
             phone = PhoneNumber.Normalize(request.Phone) ?? throw new BusinessRuleException("Неверный номер телефона");
 
+        await tariffs.EnsureCanAddUserAsync(organizationId, ct);
         // Сотрудник входит только по паролю: если руководитель его не задал, пароль уходит сотруднику письмом.
         var (user, password, generated) = await accounts.CreateAsync(email, request.FullName.Trim(), request.Role, organizationId, phone, request.Password);
         foreach (var buildingId in buildings)

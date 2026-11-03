@@ -17,7 +17,8 @@ public class CatalogService(
     CatalogCache cache,
     IAuditService audit,
     ICurrentUser currentUser,
-    ApartmentImporter importer) : ICatalogService
+    ApartmentImporter importer,
+    ITariffService tariffs) : ICatalogService
 {
     private const string BuildingNotFound = "Дом не найден";
     private const string FloorNotFound = "Этаж не найден";
@@ -122,6 +123,7 @@ public class CatalogService(
             OrganizationId = currentUser.OrganizationId
                 ?? throw new BusinessRuleException("Выберите организацию: войдите как её владелец")
         };
+        await tariffs.EnsureCanAddBuildingAsync(building.OrganizationId, ct);
         Apply(building, request);
         db.Buildings.Add(building);
         audit.Record(nameof(Building), building.Id, "Created", null, Snapshot(building));
