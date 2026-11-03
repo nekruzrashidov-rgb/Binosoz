@@ -182,36 +182,168 @@
   };
 
   /* ---------- buyer cabinet ---------- */
+  // GET /cabinet/overview: no deals → a welcome card with the developer's contacts; otherwise the deal picker and six tabs.
+  // Each tab loads its own data from the shared deal addresses (schedule, documents, stages, messages, reviews).
+  const CAB_TABS = [['apt', '🏠', 'cab.t.apt'], ['pay', '💰', 'cab.t.pay'], ['docs', '📄', 'cab.t.docs'], ['build', '🏗️', 'cab.t.build'], ['chat', '💬', 'cab.t.chat'], ['review', '⭐', 'cab.t.review']];
+  // Deal stages as the buyer sees them: booking → contract → ownership.
+  const CAB_STEPS = [['booking', ['Lead', 'Showing', 'Booking']], ['deal', ['Contract', 'Payment']], ['own', ['Completed']]];
+  const NEW_DAYS = 3;
+
   S.views.cabinet = function (root) {
     if (!S.api.isAuthed) return S.views.login(root);
     if (!S.api.isCustomer()) {
       const w = h('div', { class: 'wrap page-in' }, h('div', { class: 'card login-card login' }, h('h2', null, t('cab.staffTitle')), h('p', { class: 'muted', style: { margin: '8px 0 16px' } }, t('cab.staffText')), h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => S.go(S.homeFor(S.api.user)) }, t('cab.toCrm')), h('button', { class: 'btn ghost', onclick: async () => { await S.api.logout(); S.go('cabinet'); } }, t('nav.logout')))));
       root.appendChild(w); return () => {};
     }
-    const page = h('div', { class: 'page-in' }); root.appendChild(page);
-    let deals = [], deal = null, sched = null, stopSel = false;
-    // Unread messages from the manager and whether they are online — without marking anything as read.
-    let chat = { unread: 0 };
-    const refreshChat = () => S.api.chatUnread(deal.id).then((u) => { chat = u; if (ws) ws.setItems(items()); return u; }).catch(() => chat);
-    const items = () => [
-      { key: 'overview', label: t('cab.overview'), icon: 'home' }, { key: 'schedule', label: t('cab.schedule'), icon: 'wallet' }, { key: 'docs', label: t('cab.docs'), icon: 'file' },
-      { key: 'chat', label: t('cab.chat'), icon: 'send', badge: chat.unread || null }, { key: 'build', label: t('cab.build'), icon: 'hammer' },
-    ];
-    let ws = null;
+    const page = h('div', { class: 'wrap cab page-in' }); root.appendChild(page);
+    let ov = null, deal = null, sched = null, stopped = false, chat = { unread: 0 };
+    let tab = CAB_TABS.some((x) => x[0] === S.store.get('sitora.cab.tab')) ? S.store.get('sitora.cab.tab') : 'apt';
+    const tabsBar = h('div', { class: 'cab-tabs', role: 'tablist', 'aria-label': t('cab.tabs') });
+    const panel = h('section', { class: 'cab-panel', role: 'tabpanel' });
+    const fab = h('button', { class: 'cab-fab', type: 'button', 'aria-label': t('cab.t.chat'), onclick: () => go('chat') }, '💬', h('span', { class: 'cab-fab-badge', hidden: true }));
+
     (async () => {
-      page.appendChild(h('div', { class: 'wrap', style: { paddingTop: '40px' } }, S.skeleton(4, 60)));
-      try { deals = await S.api.myDeals(); } catch (e) { page.replaceChildren(S.errorCard(e)); return; }
-      if (stopSel) return;
-      if (!deals.length) { page.replaceChildren(h('div', { class: 'wrap' }, h('div', { class: 'card login-card login cab-empty', style: { textAlign: 'center' } }, h('h2', null, t('cab.hello', { name: (S.api.user && S.api.user.name) || '' }) + '!'), S.empty(t('cab.noActive'), 'building'), h('p', { class: 'muted' }, t('cab.noDeals')), h('a', { class: 'btn', href: '/apartments' }, t('cab.seeApts'))))); return; }
-      deal = deals[0];
-      ws = S.workspace(items(), 'overview', (k, main) => show(k, main));
-      page.replaceChildren(ws.el);
-      show('overview', ws.main);
-      refreshChat();
-      // Back from the bank's card page (/cabinet?success=1, ?payment=failed or ?payment=cancelled).
+      page.appendChild(S.skeleton(4, 60));
+      try { ov = await S.api.cabinetOverview(); } catch (e) { page.replaceChildren(S.errorCard(e)); return; }
+      if (stopped) return;
+      if (!ov.hasDeals) { page.replaceChildren(onboarding()); return; }
+      // The remembered apartment, else the newest deal that is not cancelled.
+      const saved = S.store.get('sitora.cab.deal');
+      deal = ov.deals.find((d) => d.dealId === saved) || ov.deals.find((d) => d.stage !== 'Cancelled') || ov.deals[0];
+      drawShell();
       const back = new URLSearchParams(location.search);
       if (back.has('success') || back.has('payment')) payReturn(back);
     })();
+
+    function onboarding() {
+      const c = ov.contacts || {}, cfg = window.SITORA_CONFIG || {}, cc = cfg.CONTACT || {};
+      const phone = c.phone || cc.phone, email = c.email || cc.email;
+      return h('div', { class: 'card cab-onboard' },
+        h('div', { class: 'cab-wave', 'aria-hidden': 'true' }, '👋'),
+        h('h1', null, t('cab.welcome', { name: firstName(ov.customerName) })),
+        h('p', { class: 'muted' }, t('cab.noBooking')),
+        h('div', { class: 'cab-contacts' }, h('b', null, '📞 ' + t('cab.contactUs')),
+          phone ? h('a', { href: 'tel:' + phone.replace(/[^\d+]/g, '') }, phone) : null,
+          email ? h('a', { href: 'mailto:' + email }, email) : null),
+        h('a', { class: 'btn gold lg', href: '/apartments' }, t('cab.seeObjects')));
+    }
+
+    function drawShell() {
+      page.replaceChildren(
+        h('div', { class: 'cab-head' }, h('div', null, h('h1', null, t('cab.hi', { name: firstName(ov.customerName) })), h('p', { class: 'muted' }, aptTitle(deal))), picker()),
+        tabsBar, panel);
+      // On the body: the page's entrance animation leaves a transform, and position: fixed would follow the page.
+      if (!fab.isConnected) document.body.appendChild(fab);
+      drawTabs(); show();
+      refreshChat();
+    }
+
+    // Several apartments: the choice is remembered in this browser.
+    function picker() {
+      if (ov.deals.length < 2) return null;
+      const sel = S.select('deal', ov.deals.map((d) => [d.dealId, '🏠 ' + aptTitle(d) + (d.stage === 'Cancelled' ? ' · ' + t('stage.Cancelled') : '')]), deal.dealId, { 'aria-label': t('cab.deal'), class: 'inp cab-picker' });
+      sel.addEventListener('change', () => { deal = ov.deals.find((d) => d.dealId === sel.value); S.store.set('sitora.cab.deal', deal.dealId); sched = null; chat = { unread: 0 }; drawShell(); });
+      return sel;
+    }
+
+    function drawTabs() {
+      tabsBar.replaceChildren(...CAB_TABS.map(([k, icon, key]) => h('button', { type: 'button', role: 'tab', id: 'cab-tab-' + k, class: 'cab-tab' + (tab === k ? ' on' : ''), 'aria-selected': String(tab === k), onclick: () => go(k) },
+        h('span', { class: 'cab-tab-i', 'aria-hidden': 'true' }, icon), h('span', null, t(key)), k === 'chat' && chat.unread ? h('span', { class: 'cab-badge' }, chat.unread) : null)));
+      panel.setAttribute('aria-labelledby', 'cab-tab-' + tab);
+      const badge = S.$('.cab-fab-badge', fab); badge.hidden = !chat.unread; badge.textContent = chat.unread || '';
+      fab.hidden = tab === 'chat';
+      const on = S.$('.cab-tab.on', tabsBar);
+      if (on && tabsBar.scrollWidth > tabsBar.clientWidth) tabsBar.scrollLeft = on.offsetLeft - (tabsBar.clientWidth - on.offsetWidth) / 2;
+    }
+
+    function go(k) { tab = k; S.store.set('sitora.cab.tab', k); drawTabs(); show(); }
+
+    async function show() {
+      const k = tab;
+      panel.classList.remove('cab-fade'); void panel.offsetWidth; panel.classList.add('cab-fade');
+      panel.replaceChildren(S.skeleton(3, 70));
+      try {
+        const body = k === 'apt' ? aptTab() : k === 'pay' ? await payTab() : k === 'docs' ? await docsTab() : k === 'build' ? await buildTab() : k === 'chat' ? chatTab() : reviewTab();
+        if (tab === k && !stopped) panel.replaceChildren(body);
+      } catch (e) { if (tab === k) panel.replaceChildren(S.errorCard(e)); }
+    }
+
+    const refreshChat = () => S.api.chatUnread(deal.dealId).then((u) => { chat = u; if (!stopped) drawTabs(); return u; }).catch(() => chat);
+    async function ensureSchedule() { if (sched && sched.dealId === deal.dealId) return sched; try { sched = await S.api.schedule(deal.dealId); sched.dealId = deal.dealId; } catch (e) { if (e.status !== 404) throw e; sched = { dealId: deal.dealId, none: true }; } return sched; }
+
+    /* ---- 🏠 apartment ---- */
+    function aptTab() {
+      const d = deal;
+      const step = CAB_STEPS.findIndex(([, st]) => st.includes(d.stage));
+      const steps = d.stage === 'Cancelled'
+        ? h('div', null, S.stageChip('Cancelled'))
+        : h('ol', { class: 'cab-steps' }, CAB_STEPS.map(([k], i) => h('li', { class: i < step ? 'done' : i === step ? 'now' : '' }, h('i', { 'aria-hidden': 'true' }), t('cab.step.' + k))));
+      const contract = h('button', { class: 'btn', type: 'button', onclick: (e) => S.busy(e.currentTarget, async () => {
+        try {
+          const docs = await S.api.documents(d.dealId);
+          const c = docs.filter((x) => x.type === 'Contract').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+          if (!c) { S.toast(t('cab.noContract'), 'warn'); return; }
+          await S.api.openSigned(c.id, c.name);
+        } catch (er) { S.err(er); }
+      }) }, '📋 ' + t('cab.contractPdf'));
+      return h('div', { class: 'card cab-apt' },
+        h('div', { class: 'row between' }, h('h2', null, '🏠 ' + d.buildingName + ', ' + t('cab.aptNo', { n: d.apartmentNumber })), S.stageChip(d.stage)),
+        h('div', { class: 'cab-meta' }, h('span', null, t('cab.area') + ': ' + S.fmt.area(d.area)), h('span', null, S.fmt.rooms(d.rooms)), h('span', null, t('cab.floor') + ': ' + d.floor)),
+        h('dl', { class: 'cab-money' },
+          h('div', null, h('dt', null, t('cab.price')), h('dd', null, S.fmt.money(d.finalPrice, d.currency))),
+          h('div', null, h('dt', null, t('cab.paidSum')), h('dd', { class: 'good' }, S.fmt.money(d.paid, d.currency) + ' (' + d.paidPercent + '%)')),
+          h('div', null, h('dt', null, t('cab.left')), h('dd', null, S.fmt.money(d.remaining, d.currency)))),
+        progress(d.paidPercent),
+        h('div', { class: 'cab-status' }, h('span', { class: 'muted' }, t('cab.status') + ':'), steps),
+        d.managerName ? h('p', { class: 'muted' }, t('deal.manager') + ': ' + d.managerName) : null,
+        h('div', { class: 'row' }, contract, h('a', { class: 'btn ghost', href: '/apartments' }, '🗺️ ' + t('cab.plan'))));
+    }
+
+    /* ---- 💰 payments ---- */
+    async function payTab() {
+      const s = await ensureSchedule();
+      if (s.none) return h('div', { class: 'card' }, S.empty(t('cab.noSchedule'), 'wallet'));
+      const pct = s.total ? Math.min(100, Math.floor((s.paid * 100) / s.total)) : 0;
+      const open = s.items.filter((i) => i.status !== 'Paid');
+      const next = deal.stage === 'Cancelled' ? null : open[0];
+      const paidItems = s.items.filter((i) => i.status === 'Paid');
+      const head = h('div', { class: 'card' }, h('div', { class: 'row between' }, h('b', null, t('cab.paidTotal')), h('b', { class: 'num' }, pct + '%')), progress(pct),
+        h('div', { class: 'row between muted cab-small' }, h('span', null, t('cab.paidSum') + ': ' + S.fmt.money(s.paid, s.currency)), h('span', null, t('cab.left') + ': ' + S.fmt.money(s.remaining, s.currency))));
+      const due = next ? Math.min(next.amountDue - next.amountPaid, s.remaining) : 0;
+      const nextCard = next && s.remaining > 0 ? h('div', { class: 'card cab-next' + (next.status === 'Overdue' ? ' overdue' : '') },
+        h('div', null, h('div', { class: 'cab-next-t' }, '🔔 ' + t('cab.nextDue', { d: longDate(next.dueDate) })), h('div', { class: 'cab-next-sum' }, t('cab.amount') + ': ', h('b', null, S.fmt.money(due, s.currency))),
+          next.status === 'Overdue' ? S.chip('Overdue', t('pay.Overdue')) : null),
+        h('button', { class: 'btn gold', type: 'button', onclick: (e) => startPayment(e.currentTarget) }, t('cab.payCard'))) : null;
+      const history = s.payments.filter((p) => !p.reversal && !p.isReversed);
+      const paidList = history.length ? h('div', { class: 'cab-paid' }, history.slice().reverse().map((p) => h('div', { class: 'cab-paid-i' }, h('span', { 'aria-hidden': 'true' }, '✅'),
+        h('div', null, h('b', null, S.fmt.money(p.amountDeal || p.amount, s.currency)), h('small', { class: 'muted' }, S.fmt.date(p.date) + (p.method ? ' · ' + t('cab.m.' + p.method, null, '') : ''))),
+        h('span', { class: 'cab-paid-ok' }, t('cab.paidOk'))))) : h('p', { class: 'muted' }, t('cab.noPayments'));
+      const upcoming = open.slice(next ? 1 : 0);
+      return h('div', { class: 'stack' }, head, nextCard,
+        h('div', { class: 'card' }, h('h3', null, t('cab.paidList', { x: paidItems.length, y: s.items.length })), paidList),
+        upcoming.length ? h('div', { class: 'card' }, h('h3', null, t('cab.upcoming')), S.tbl([
+          { label: t('cab.dueDate'), render: (i) => S.fmt.date(i.dueDate) },
+          { label: t('cab.amount'), r: true, render: (i) => S.fmt.money(i.amountDue - i.amountPaid, s.currency) },
+          { label: '', r: true, render: (i) => (i.status === 'Overdue' ? S.chip('Overdue', t('pay.Overdue')) : i.status === 'Partial' ? S.chip('warn', t('pay.Partial')) : null) },
+        ], upcoming)) : null,
+        pdfRow());
+    }
+
+    function startPayment(btn) {
+      return S.busy(btn, async () => {
+        try {
+          const r = await S.api.initiatePayment(deal.dealId, { returnUrl: '/cabinet?success=1' });
+          S.store.set('sitora.pay', JSON.stringify({ dealId: deal.dealId, id: r.gatewayPaymentId }));
+          location.href = r.paymentUrl;
+        } catch (er) { S.err(er); }
+      });
+    }
+
+    function pdfRow() {
+      const date = S.input('date', { type: 'date', value: S.today(), 'aria-label': t('cab.actDate') }); date.style.maxWidth = '170px';
+      return h('div', { class: 'row' }, h('button', { class: 'btn ghost', onclick: (e) => S.busy(e.currentTarget, () => S.api.openDoc('/deals/' + deal.dealId + '/schedule.pdf', null, t('cab.pdfSchedule')).catch(S.err)) }, t('cab.pdfSchedule')),
+        h('button', { class: 'btn ghost', onclick: (e) => S.busy(e.currentTarget, () => S.api.openDoc('/deals/' + deal.dealId + '/statement.pdf', { date: date.value }, t('cab.pdfAct')).catch(S.err)) }, t('cab.pdfAct')), date);
+    }
 
     // The payment reaches the schedule when its status is asked: the server then sees that the bank confirmed it.
     async function payReturn(q) {
@@ -224,116 +356,109 @@
         const r = await S.api.paymentStatus(p.dealId, p.id);
         if (r.status === 'Paid') S.toast(t('cab.payDone'), 'ok'); else if (r.status === 'Pending') S.toast(t('cab.payPending'), 'warn'); else S.toast(t('cab.payFailed'), 'bad');
       } catch (e) { S.err(e); return; }
-      deal = deals.find((d) => String(d.id) === String(p.dealId)) || deal; sched = null;
-      ws.go('schedule');
+      // The paid amount changed: take fresh numbers and open the payments.
+      try { ov = await S.api.cabinetOverview(); } catch (e) { /* keep the old numbers */ }
+      deal = ov.deals.find((d) => d.dealId === p.dealId) || deal; sched = null; tab = 'pay'; drawShell();
     }
 
-    // "Pay by card" for the next unpaid line of the schedule: the bank's page takes the card and brings the buyer back here.
-    function payCta(s) {
-      const next = s.items.find((i) => i.status !== 'Paid');
-      if (!next || !(s.remaining > 0) || deal.stage === 'Cancelled') return null;
-      const due = Math.min(next.amountDue - next.amountPaid, s.remaining);
-      const pay = (e) => S.busy(e.currentTarget, async () => {
-        try {
-          const r = await S.api.initiatePayment(deal.id, { returnUrl: '/cabinet?success=1' });
-          S.store.set('sitora.pay', JSON.stringify({ dealId: deal.id, id: r.gatewayPaymentId }));
-          location.href = r.paymentUrl;
-        } catch (er) { S.err(er); }
-      });
-      return h('div', { class: 'card pay-cta' }, h('span', null, t('cab.payNext', { sum: S.fmt.money(due, s.currency) })), h('button', { class: 'btn gold', onclick: pay }, t('cab.payCard')));
+    /* ---- 📄 documents ---- */
+    async function docsTab() {
+      const docs = (await S.api.documents(deal.dealId)).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      if (!docs.length) return h('div', { class: 'card' }, S.empty(t('cab.noDocs'), 'file'));
+      const fresh = Date.now() - NEW_DAYS * 86400000;
+      return h('div', { class: 'card cab-docs' }, docs.map((d) => h('div', { class: 'cab-doc' },
+        h('span', { class: 'cab-doc-i', 'aria-hidden': 'true' }, '📄'),
+        h('div', { class: 'cab-doc-txt' }, h('b', null, d.name, new Date(d.createdAt).getTime() > fresh ? h('span', { class: 'cab-new' }, t('cab.new')) : null),
+          h('small', { class: 'muted' }, [t('cab.dt.' + d.type, null, ''), S.fmt.date(d.createdAt), S.fmt.size(d.size)].filter(Boolean).join(' · '))),
+        h('button', { class: 'btn soft sm', type: 'button', onclick: (e) => S.busy(e.currentTarget, async () => { try { await S.api.openSigned(d.id, d.name); } catch (er) { S.err(er); } }) }, '⬇ ' + t('cab.download')))));
     }
 
-    async function ensureSchedule() { if (sched && sched.dealId === deal.id) return sched; try { sched = await S.api.schedule(deal.id); sched.dealId = deal.id; } catch (e) { sched = { dealId: deal.id, none: true, error: e }; } return sched; }
-
-    function dealPicker() {
-      if (deals.length < 2) return null;
-      // Real ids are long GUIDs (UUIDv7, the tail tells them apart): show 8 characters.
-      const short = (id) => (typeof id === 'string' && id.length > 12 ? id.replace(/-/g, '').slice(-8).toUpperCase() : id);
-      const sel = S.select('deal', deals.map((d) => [d.id, t('cab.dealOpt', { n: d.apartmentNumber, id: short(d.id) })]), deal.id); sel.addEventListener('change', () => { deal = deals.find((d) => String(d.id) === sel.value); sched = null; ws.go(ws.current); });
-      return h('div', { style: { maxWidth: '320px', marginBottom: '14px' } }, S.field(t('cab.deal'), sel));
+    /* ---- 🏗️ construction ---- */
+    async function buildTab() {
+      const st = await S.api.stages(deal.buildingId);
+      if (!st.length) return h('div', { class: 'card' }, S.empty(t('con.none'), 'hammer'));
+      const total = Math.round(st.reduce((s, x) => s + x.percent, 0) / st.length);
+      const last = st.map((x) => x.date).filter(Boolean).sort().pop();
+      // The first stage not finished yet is the one being built now (the next ones wait).
+      const nowIdx = st.findIndex((x) => x.percent < 100);
+      const photos = st.slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).flatMap((x) => x.photos.map((p) => Object.assign({ stage: x.title }, p))).slice(0, 6);
+      return h('div', { class: 'stack' },
+        h('div', { class: 'card' }, h('div', { class: 'row between' }, h('b', null, t('con.total')), h('b', { class: 'num cab-big' }, total + '%')), progress(total),
+          last ? h('p', { class: 'muted cab-small' }, t('cab.lastUpdate', { d: longDate(last) })) : null),
+        h('div', { class: 'card' }, h('ul', { class: 'cab-stages' }, st.map((x, i) => {
+          const state = x.percent >= 100 ? 'done' : i === nowIdx ? 'now' : 'wait';
+          return h('li', { class: state }, h('span', { 'aria-hidden': 'true' }, state === 'done' ? '✅' : state === 'now' ? '🔄' : '⏳'),
+            h('div', null, h('b', null, x.title), h('small', { class: 'muted' }, t('cab.stage.' + state) + (state === 'now' ? ' · ' + x.percent + '%' : ''))));
+        }))),
+        photos.length ? h('div', { class: 'card' }, h('h3', null, t('cab.photos')), h('div', { class: 'cab-photos' }, photos.map((p) => h('a', { href: S.fileSrc(p.url), target: '_blank', rel: 'noopener' }, h('img', { src: S.fileSrc(p.url), alt: p.caption || p.stage, loading: 'lazy' }))))) : null);
     }
 
-    async function show(k, main) {
-      // The overview greets in its own card; the other sections keep the short line under the title.
-      main.replaceChildren(h('h1', null, items().find((i) => i.key === k).label), k === 'overview' ? null : h('p', { class: 'sub' }, t('cab.hello', { name: (S.api.user && S.api.user.name) || '' }) + ' · ' + t('cab.aptLine', { n: deal.apartmentNumber, f: deal.floor })), dealPicker());
-      const body = h('div', { class: 'stack' }, S.skeleton(3, 80)); main.appendChild(body);
-      try {
-        if (k === 'overview') body.replaceChildren(...(await overview()));
-        else if (k === 'schedule') { const s = await ensureSchedule(); body.replaceChildren(s.none ? S.empty(t('cab.noSchedule'), 'wallet') : h('div', null, payCta(s), S.panels.schedule(s), h('div', { class: 'row', style: { marginTop: '14px' } }, pdfBtn()))); }
-        else if (k === 'docs') body.replaceChildren(S.panels.documents(deal.id, false));
-        else if (k === 'chat') {
-          // Who answers and whether they are here now (any action in the CRM during the last 5 minutes).
-          const head = h('div', { class: 'chat-head' });
-          const drawHead = (u) => head.replaceChildren(h('span', { class: 'avatar' }, S.fmt.initials(u.managerName || deal.managerName)),
-            h('span', null, h('b', null, u.managerName || deal.managerName || t('deal.manager')), h('small', { class: 'chat-presence' + (u.managerOnline ? ' on' : '') }, h('i', { 'aria-hidden': 'true' }),
-              u.managerOnline ? t('chat.online') : u.managerLastSeenAt ? t('chat.seen', { d: S.fmt.dt(u.managerLastSeenAt) }) : t('chat.offline'))));
-          drawHead(chat);
-          body.replaceChildren(h('div', { class: 'card' }, head, S.panels.chat(deal.id, 'customer')));
-          // Opening the chat reads the messages: refresh the presence now and clear the badge once the history has loaded.
-          refreshChat().then(drawHead); setTimeout(refreshChat, 1500);
+    /* ---- 💬 chat ---- */
+    function chatTab() {
+      const head = h('div', { class: 'chat-head' });
+      const drawHead = (u) => head.replaceChildren(h('span', { class: 'avatar' }, S.fmt.initials(u.managerName || deal.managerName)),
+        h('span', null, h('b', null, u.managerName || deal.managerName || t('deal.manager')), h('small', { class: 'chat-presence' + (u.managerOnline ? ' on' : '') }, h('i', { 'aria-hidden': 'true' }),
+          u.managerOnline ? t('chat.online') : u.managerLastSeenAt ? t('chat.seen', { d: S.fmt.dt(u.managerLastSeenAt) }) : t('chat.offline'))));
+      drawHead(chat);
+      // Opening the chat reads the messages: refresh the presence now and clear the badge once the history has loaded.
+      refreshChat().then(drawHead); setTimeout(refreshChat, 1500);
+      return h('div', { class: 'card cab-chat' }, head, S.panels.chat(deal.dealId, 'customer'));
+    }
+
+    /* ---- ⭐ review ---- */
+    function reviewTab() {
+      const box = h('div', { class: 'card cab-review' });
+      const r = deal.myReview;
+      const draw = (editing) => {
+        if (r && !editing) {
+          box.replaceChildren(h('h2', null, t('cab.yourReview')),
+            h('p', null, t('cab.youRated') + ' ', stars(r.rating), ' (' + r.rating + '/5)'),
+            h('blockquote', { class: 'cab-quote' }, r.text),
+            r.ownerReply ? h('div', { class: 'cab-reply' }, h('b', null, t('cab.managerReply') + ':'), h('p', null, r.ownerReply)) : null,
+            h('p', { class: 'muted cab-small' }, r.isPublished ? t('cab.revPublished') : t('cab.revModeration')),
+            r.isPublished ? null : h('button', { class: 'btn ghost', type: 'button', onclick: () => draw(true) }, '✏️ ' + t('cab.edit')));
+          return;
         }
-        else if (k === 'build') body.replaceChildren(S.panels.stages(deal.buildingId || 1));
-      } catch (e) { body.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
+        if (deal.stage === 'Cancelled') { box.replaceChildren(S.empty(t('cab.revCancelled'), 'star')); return; }
+        let rating = r ? r.rating : 0;
+        const starBtns = [1, 2, 3, 4, 5].map((n) => h('button', { type: 'button', class: 'cab-star', role: 'radio', 'aria-label': t('rev.stars', { n }), onclick: () => { rating = n; paint(); } }, '★'));
+        const paint = () => starBtns.forEach((b, i) => { b.classList.toggle('on', i < rating); b.setAttribute('aria-checked', String(i + 1 === rating)); });
+        const text = h('textarea', { class: 'inp', name: 'text', id: 'cab-rev-text', rows: 5, maxlength: 1000, placeholder: t('cab.revPh') }); text.value = r ? r.text : '';
+        const btn = h('button', { class: 'btn gold', type: 'submit' }, t(r ? 'common.save' : 'cab.send'));
+        const form = h('form', { class: 'stack', novalidate: true }, h('h2', null, t(r ? 'cab.editReview' : 'cab.leaveReview')), h('p', { class: 'muted' }, t('cab.revHint', { b: deal.buildingName })),
+          h('div', { class: 'cab-stars', role: 'radiogroup', 'aria-label': t('cab.rating') }, starBtns), S.field(t('cab.revText'), text), h('div', { class: 'row' }, btn, r ? h('button', { class: 'btn ghost', type: 'button', onclick: () => draw(false) }, t('common.cancel')) : null));
+        form.addEventListener('submit', (e) => {
+          e.preventDefault(); S.showErrors(form, null);
+          if (!rating) { S.showErrors(form, { message: t('cab.revNeedRating') }); return; }
+          if (!text.value.trim()) { S.showErrors(form, { message: t('cab.revNeedText'), errors: { text: [t('cab.revNeedText')] } }); return; }
+          S.busy(btn, async () => {
+            try {
+              const saved = await S.api.saveReview(deal.buildingId, r && r.id, { rating, text: text.value.trim() });
+              ov.deals.filter((d) => d.buildingId === deal.buildingId).forEach((d) => { d.myReview = saved; });
+              S.toast(t('cab.revSaved'), 'ok'); show();
+            } catch (er) { S.showErrors(form, er); }
+          });
+        });
+        paint(); box.replaceChildren(form);
+      };
+      draw(false);
+      return box;
     }
 
-    function pdfBtn() {
-      const date = S.input('date', { type: 'date', value: S.today(), 'aria-label': t('cab.actDate') }); date.style.maxWidth = '170px';
-      return h('div', { class: 'row' }, h('button', { class: 'btn', onclick: (e) => S.busy(e.currentTarget, () => S.api.openDoc('/deals/' + deal.id + '/schedule.pdf', null, t('cab.pdfSchedule')).catch(S.err)) }, t('cab.pdfSchedule')), h('button', { class: 'btn ghost', onclick: (e) => S.busy(e.currentTarget, () => S.api.openDoc('/deals/' + deal.id + '/statement.pdf', { date: date.value }, t('cab.pdfAct')).catch(S.err)) }, t('cab.pdfAct')), h('span', { class: 'hint' }, t('cab.actDate')), date);
+    /* ---- helpers ---- */
+    function progress(pct) {
+      const v = Math.max(0, Math.min(100, pct || 0));
+      return h('div', { class: 'cab-progress', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(v) }, S.bar(v, 'gold'));
     }
-
-    async function overview() {
-      const s = await ensureSchedule();
-      const price = deal.price - deal.discount;
-      const paid = s.none ? deal.paid : s.paid; const pct = price ? Math.min(100, Math.round((paid / price) * 100)) : 0;
-      const next = s.none || deal.stage === 'Cancelled' ? null : s.items.find((i) => i.status !== 'Paid');
-      const c = 2 * Math.PI * 46;
-      const ring = h('div', { class: 'pay-ring' }); ring.innerHTML = '<svg viewBox="0 0 108 108"><defs><linearGradient id="gold-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f2c46a"/><stop offset="1" stop-color="#cf9a33"/></linearGradient></defs><circle class="bg" cx="54" cy="54" r="46"/><circle class="fg" cx="54" cy="54" r="46" stroke-dasharray="' + c + '" stroke-dashoffset="' + c + '"/></svg><b>' + pct + '%</b>';
-      requestAnimationFrame(() => requestAnimationFrame(() => { const fg = S.$('.fg', ring); if (fg) fg.style.strokeDashoffset = c * (1 - pct / 100); }));
-      const left = deal.remaining !== undefined && !s.none ? s.remaining : price - paid;
-      // The deal itself carries only the manager's id; the name comes with the chat's presence info.
-      const manager = h('span', null, deal.managerName || chat.managerName || '—');
-      if (!deal.managerName && !chat.managerName) refreshChat().then((u) => { if (u && u.managerName) manager.textContent = u.managerName; });
-      const info = h('div', { class: 'card' }, h('div', { class: 'row between' }, h('h3', null, t('apt.title', { n: deal.apartmentNumber })), S.stageChip(deal.stage)),
-        h('dl', { class: 'kv' }, kv(t('floor.nLabel'), deal.floor), kv(t('f.rooms'), S.fmt.rooms(deal.rooms)), kv(t('f.area'), S.fmt.area(deal.area)), kv(t('deal.price'), S.fmt.money(deal.price, deal.currency)), deal.discount ? kv(t('deal.discount'), '− ' + S.fmt.money(deal.discount, deal.currency)) : null, kv(t('deal.manager'), manager), kv(t('deal.since'), S.fmt.date(deal.createdAt))));
-      const pay = h('div', { class: 'card' }, h('h3', null, t('cab.payments')), h('div', { class: 'paybig' }, ring, h('div', { class: 'stack', style: { gap: '4px' } }, h('div', { class: 'muted' }, t('sch.paid')), h('div', { class: 'big', style: { fontSize: '24px' } }, S.fmt.money(paid, deal.currency)), h('div', { class: 'muted' }, t('sch.left') + ': ' + S.fmt.money(left, deal.currency)), s.eq ? h('div', { class: 'hint' }, '≈ ' + S.fmt.money(s.eq.paid, s.eq.currency) + ' · ' + t('price.estimate')) : null)),
-        countBox(s),
-        next ? h('div', { class: 'next' + (next.status === 'Overdue' ? ' overdue' : ''), style: { marginTop: '14px' } }, h('div', null, h('div', { class: 'muted', style: { fontSize: '12px', fontWeight: 800, textTransform: 'uppercase' } }, t('cab.next')), h('b', null, S.fmt.date(next.dueDate)), next.status === 'Overdue' ? h('span', { style: { marginLeft: '8px' } }, S.chip('Overdue', t('pay.Overdue'))) : null), h('b', { class: 'big', style: { fontSize: '20px' } }, S.fmt.money(next.amountDue - next.amountPaid, deal.currency))) : null);
-      // The whole name: in the CRM it is often written surname first, so the first word is not a safe "first name".
-      const firstName = (S.api.user && S.api.user.name) || '';
-      const welcome = h('div', { class: 'card cab-welcome' }, h('div', null, h('h2', null, t('cab.hi', { name: firstName })),
-        h('p', null, t('cab.yourApt', { b: deal.buildingName || t('cab.building'), n: deal.apartmentNumber, f: deal.floor }))),
-        h('a', { class: 'btn ghost sm', href: '/apartments' }, t('cab.seeApts')));
-      return [welcome, h('div', { class: 'deal-head' }, info, pay), buildCard(), s.none ? null : h('div', { class: 'row' }, pdfBtn()), s.none ? h('div', { class: 'card flat' }, t('cab.noSchedule')) : null];
+    const stars = (n) => h('span', { class: 'cab-stars-ro', 'aria-label': t('rev.stars', { n }) }, '★'.repeat(n), h('span', null, '★'.repeat(5 - n)));
+    // "15 декабря 2026" / "15 декабри 2026" — in the chosen language.
+    function longDate(d) {
+      const x = new Date(d); if (Number.isNaN(x.getTime())) return d || '';
+      return x.getDate() + ' ' + t('cab.month.' + x.getMonth()) + ' ' + x.getFullYear();
     }
-
-    // "Paid 4 of 12 payments" — by the schedule lines, next to the money ring.
-    function countBox(s) {
-      if (s.none || !s.items || !s.items.length) return null;
-      const done = s.items.filter((i) => i.status === 'Paid').length, all = s.items.length;
-      const pct = Math.round((done * 100) / all);
-      return h('div', { class: 'pay-count' }, h('div', { class: 'row between' }, h('span', null, t('cab.paidOf', { x: done, y: all })), h('b', { class: 'num' }, pct + '%')), S.bar(pct, 'gold'));
-    }
-
-    // The building's progress: the stage being built now, and the whole history on request.
-    function buildCard() {
-      const card = h('div', { class: 'card stack cab-build' }, S.skeleton(2, 24));
-      if (!deal.buildingId) return null;
-      S.api.stages(deal.buildingId).then((st) => {
-        if (!st.length) { card.remove(); return; }
-        const current = st.slice().reverse().find((x) => x.percent > 0 && x.percent < 100) || st.slice().reverse().find((x) => x.percent > 0) || st[0];
-        const all = h('div', { hidden: true });
-        const more = h('button', { class: 'btn ghost sm', type: 'button', 'aria-expanded': 'false', onclick: () => {
-          const open = all.hidden; all.hidden = !open; more.setAttribute('aria-expanded', String(open)); more.textContent = t(open ? 'cab.buildHide' : 'cab.buildHistory');
-          if (open && !all.firstChild) all.appendChild(S.panels.stages(deal.buildingId));
-        } }, t('cab.buildHistory'));
-        // The big number and the bar are the whole building (as on the "Construction" page); the line below is the stage now.
-        const total = Math.round(st.reduce((s, x) => s + x.percent, 0) / st.length);
-        card.replaceChildren(h('div', { class: 'row between' }, h('h3', null, t('cab.build')), h('b', { class: 'num' }, total + '%')),
-          h('div', { class: 'muted' }, t('cab.stageNow', { s: current.title, p: current.percent })), S.bar(total, 'gold'), h('div', null, more), all);
-      }).catch(() => card.remove());
-      return card;
-    }
-    const kv = (k, v) => [h('dt', null, k), h('dd', null, v === undefined || v === null || v === '' ? '—' : v)];
-    return () => { stopSel = true; };
+    function aptTitle(d) { return d.buildingName + ' — ' + t('cab.aptNo', { n: d.apartmentNumber }) + ', ' + S.fmt.rooms(d.rooms); }
+    // In the CRM the name is often written surname first, so the whole name is safer than a guessed "first name".
+    function firstName(n) { return n || (S.api.user && S.api.user.name) || ''; }
+    return () => { stopped = true; fab.remove(); };
   };
 })();

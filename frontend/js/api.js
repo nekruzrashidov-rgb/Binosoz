@@ -491,6 +491,10 @@
     // conversations of the staff (fresh first, unread from the buyer) and what is unread for the reader of one deal
     chats(search) { return request('GET', '/chats', { query: search ? { search } : undefined }).then(arr); },
     chatUnread(id) { return request('GET', '/deals/' + id + '/messages/unread'); },
+    // Buyer cabinet: whether there are deals, the developer's contacts and a summary of each apartment (with one's own review).
+    cabinetOverview() { return request('GET', '/cabinet/overview'); },
+    // One's own review of a building: a new one, or a change while it is not published yet.
+    saveReview(buildingId, reviewId, b) { return request(reviewId ? 'PUT' : 'POST', '/buildings/' + buildingId + '/reviews' + (reviewId ? '/' + reviewId : ''), { body: { rating: b.rating, text: b.text } }); },
     // Online card payment: the bank's page (paymentUrl) takes the card; the payment appears in the schedule
     // when paymentStatus sees that the bank confirmed it.
     initiatePayment(id, b) { return request('POST', '/deals/' + id + '/payment/initiate', { body: b || {} }); },

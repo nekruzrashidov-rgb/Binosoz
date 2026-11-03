@@ -15,6 +15,7 @@ namespace Sitora.WebApi.Hubs;
 public class ChatHub(IChatService chat, HubCaller caller) : Hub
 {
     public const string MessageReceived = "messageReceived";
+    public const string Typing = "typing";
 
     public static string GroupName(Guid dealId) => $"deal:{dealId:N}";
 
@@ -24,6 +25,16 @@ public class ChatHub(IChatService chat, HubCaller caller) : Hub
         if (!await chat.CanAccessAsync(dealId, Context.ConnectionAborted))
             throw new HubException("Сделка не найдена");
         await Groups.AddToGroupAsync(Context.ConnectionId, GroupName(dealId), Context.ConnectionAborted);
+    }
+
+    // «Печатает...»: остальным участникам чата сделки — кто печатает (покупатель или сотрудник). Клиент шлёт не чаще раза в 3 секунды.
+    public async Task SendTyping(Guid dealId)
+    {
+        caller.Principal = Context.User;
+        if (!await chat.CanAccessAsync(dealId, Context.ConnectionAborted))
+            throw new HubException("Сделка не найдена");
+        var fromCustomer = Context.User?.IsInRole(Roles.Customer) == true;
+        await Clients.OthersInGroup(GroupName(dealId)).SendAsync(Typing, new { dealId, fromCustomer }, Context.ConnectionAborted);
     }
 
     public Task LeaveDeal(Guid dealId) =>

@@ -275,6 +275,7 @@ Telegram (в дополнение к колокольчику, только те
 
 | Метод | Путь | Роли | Примечание |
 | --- | --- | --- | --- |
+| GET | `/cabinet/overview` | Customer | Первый экран кабинета: `{ hasDeals, customerName, contacts { organizationName, phone, email, telegram, address }, deals[] }`. `hasDeals = false` — сделок нет (приветствие и контакты). `deals[]` — свои сделки, новые сверху: `{ dealId, buildingId, buildingName (по Accept-Language), apartmentNumber, floor, rooms, area, stage, finalPrice, currency, paid (за вычетом сторно), remaining, paidPercent, managerName, createdAt, myReview }`; `myReview` — свой отзыв о доме (`ReviewResponse`) или `null`. Сотрудник — 403 |
 | GET | `/deals/{id}/documents` | владелец, сотрудник сделки | `{ id, type, fileName, contentType, sizeBytes, signedAt, createdAt }` |
 | POST | `/deals/{id}/documents` | Manager, Accountant, руководители | form-data: `file`, `type` (Contract, Annex, Act, Invoice, Receipt, Other), `signedAt?`; PDF, PNG, JPG, DOCX до 20 МБ |
 | GET | `/documents/{id}/download` | владелец, сотрудник сделки | `{ url, expiresAt }` — подписанная ссылка на 15 минут. `url` относительный (`/api/v1/files?token=…`), фронтенд добавляет адрес сервера |
@@ -289,7 +290,8 @@ Telegram (в дополнение к колокольчику, только те
 
 **Хаб чата** `/hubs/chat` (SignalR):
 - токен передаётся в `accessTokenFactory`;
-- методы `JoinDeal(dealId)`, `LeaveDeal(dealId)` и `SendMessage(dealId, text)`, `dealId` — строка GUID;
+- методы `JoinDeal(dealId)`, `LeaveDeal(dealId)`, `SendMessage(dealId, text)` и `SendTyping(dealId)`, `dealId` — строка GUID;
+- `SendTyping` — «печатает...»: остальные участники чата сделки получают событие `typing` `{ dealId, fromCustomer }` (отправителю не приходит; клиент шлёт не чаще раза в 3 секунды, подсказка гаснет через 4 секунды). Чужая сделка — ошибка хаба «Сделка не найдена»;
 - событие `messageReceived` с сообщением приходит и на сообщения, отправленные через REST;
 - если хаб недоступен, чат опрашивает REST раз в 9 секунд.
 

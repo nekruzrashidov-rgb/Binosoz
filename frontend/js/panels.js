@@ -102,17 +102,39 @@
     const input = h('input', { class: 'inp', id: 'chat-in-' + dealId, placeholder: t('chat.ph'), maxlength: 1000, autocomplete: 'off' });
     const btn = h('button', { class: 'btn', type: 'submit', 'aria-label': t('chat.send') }, S.icon('send'));
     const form = h('form', { class: 'row', style: { flexWrap: 'nowrap', marginTop: '10px' } }, input, btn);
-    const box = h('div', null, log, form);
+    // «… печатает»: the other side's typing, through the hub; it fades out 4 seconds after the last signal.
+    const typing = h('div', { class: 'chat-typing', 'aria-live': 'polite', hidden: true }, h('span', { class: 'dots', 'aria-hidden': 'true' }, h('i'), h('i'), h('i')), h('span', null, t(side === 'customer' ? 'chat.typingManager' : 'chat.typingCustomer')));
+    let typingTimer = 0, sentTyping = 0;
+    const box = h('div', null, log, typing, form);
     let last = '';
     const mine = (m) => (m.mine !== undefined && m.mine !== null ? m.mine : m.sender === side || (side === 'staff' && m.sender !== 'customer' && m.sender !== 'client'));
+    // Messages grouped by day; each with the sender's initials, the time and, on one's own, ✓ sent / ✓✓ read.
+    const dayKey = (d) => { const x = new Date(d); return Number.isNaN(x.getTime()) ? '' : x.getFullYear() + '-' + x.getMonth() + '-' + x.getDate(); };
+    const dayLabel = (d) => {
+      const x = new Date(d), today = new Date(), y = new Date(Date.now() - 86400000);
+      if (dayKey(x) === dayKey(today)) return t('chat.today');
+      if (dayKey(x) === dayKey(y)) return t('chat.yesterday');
+      return S.fmt.date(d);
+    };
+    const time = (d) => { const x = new Date(d); return Number.isNaN(x.getTime()) ? '' : String(x.getHours()).padStart(2, '0') + ':' + String(x.getMinutes()).padStart(2, '0'); };
     const draw = (msgs) => {
-      const sig = msgs.map((m) => m.id).join(',');
+      const sig = msgs.map((m) => m.id + (m.read ? 'r' : '')).join(',');
       if (sig === last) return; last = sig;
-      const nodes = msgs.length ? msgs.map((m) => h('div', { class: 'msg' + (mine(m) ? ' me' : '') }, m.text, h('small', null, (m.senderName || '') + ' · ' + S.fmt.dt(m.createdAt)))) : [h('div', { class: 'muted', style: { textAlign: 'center', padding: '24px' } }, t('chat.empty'))];
-      log.replaceChildren(...nodes);
+      const nodes = [];
+      let prevDay = '';
+      msgs.forEach((m) => {
+        const k = dayKey(m.createdAt);
+        if (k !== prevDay) { nodes.push(h('div', { class: 'chat-day', role: 'separator' }, h('span', null, dayLabel(m.createdAt)))); prevDay = k; }
+        const me = mine(m);
+        nodes.push(h('div', { class: 'msg-row' + (me ? ' me' : '') }, h('span', { class: 'avatar sm', 'aria-hidden': 'true' }, S.fmt.initials(m.senderName)),
+          h('div', { class: 'msg' + (me ? ' me' : '') }, m.text, h('small', null, me ? '' : (m.senderName || '') + ' · ', time(m.createdAt),
+            me ? h('span', { class: 'msg-tick' + (m.read ? ' read' : ''), title: t(m.read ? 'chat.read' : 'chat.sent'), 'aria-label': t(m.read ? 'chat.read' : 'chat.sent') }, m.read ? '✓✓' : '✓') : null))));
+      });
+      log.replaceChildren(...(nodes.length ? nodes : [h('div', { class: 'muted', style: { textAlign: 'center', padding: '24px' } }, t('chat.empty'))]));
       log.scrollTop = log.scrollHeight;
     };
     const load = async () => { try { const m = await S.api.messages(dealId); draw(m.slice().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))); } catch (e) { /* keep last */ } };
+    input.addEventListener('input', () => { if (!conn || !input.value.trim() || Date.now() - sentTyping < 3000) return; sentTyping = Date.now(); conn.invoke('SendTyping', dealId).catch(() => {}); });
     form.addEventListener('submit', async (e) => { e.preventDefault(); const text = input.value.trim(); if (!text) return; await S.busy(btn, async () => { try { await S.api.sendMessage(dealId, text); input.value = ''; await load(); } catch (er) { S.err(er); } }); });
     load();
     const timer = setInterval(() => { if (!box.isConnected) { clearInterval(timer); stopLive(); return; } if (!document.hidden) load(); }, S.isDemo() ? 4000 : 9000);
@@ -122,7 +144,8 @@
     if (!S.isDemo() && window.signalR) {
       try {
         conn = new window.signalR.HubConnectionBuilder().withUrl(S.hubUrl(), { accessTokenFactory: () => S.accessToken() }).withAutomaticReconnect().configureLogging(window.signalR.LogLevel.None).build();
-        conn.on('messageReceived', () => load());
+        conn.on('messageReceived', () => { typing.hidden = true; load(); });
+        conn.on('typing', (e) => { if (!e || String(e.dealId) !== String(dealId)) return; typing.hidden = false; clearTimeout(typingTimer); typingTimer = setTimeout(() => { typing.hidden = true; }, 4000); });
         // Deal ids are GUIDs: pass the id as is (Number() would turn it into NaN).
         conn.onreconnected(() => conn.invoke('JoinDeal', dealId).catch(() => {}));
         conn.start().then(() => conn.invoke('JoinDeal', dealId)).catch(() => { /* polling covers it */ });
