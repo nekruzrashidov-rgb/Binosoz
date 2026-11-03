@@ -103,6 +103,11 @@ TwoFactorRequired = { requiresTwoFactor: true, tempToken, expiresAt }
 | GET | `/platform/applications?status=&page=&pageSize=` | `PagedResult` заявок застройщиков: `{ id, companyName, contactEmail, contactPhone, ownerFullName, comment, status, reviewNote, createdAt, reviewedAt, organizationId }`. `status`: `Pending`, `Approved`, `Rejected`; без него — все |
 | POST | `/platform/applications/{id}/approve` | `{ organizationSlug }` → `{ organizationId, message }`: создаётся организация с владельцем (как `POST /platform/organizations`), владельцу уходит письмо со входом. Уже рассмотренная заявка или занятое короткое имя — 409 |
 | POST | `/platform/applications/{id}/reject` | `{ reason }` → 204, заявителю уходит письмо с причиной. Уже рассмотренная — 409 |
+| GET | `/platform/users?role=&organizationId=&search=&page=&pageSize=` | `PagedResult` пользователей всей платформы: `{ id, fullName, email, phone, role, roles[], organizationId, organizationName, createdAt, lastLoginAt, status: "Active" \| "Blocked", dealsCount }`. `lastLoginAt` — последний вход по журналу; `dealsCount` — сделки покупателя. Поиск по имени, почте, телефону; неизвестная роль — 422 |
+| GET | `/platform/users/{id}` | тот же объект; неизвестный — 404 |
+| POST | `/platform/users/{id}/block` | заблокировать: учётная запись выключена, блокировка входа на 100 лет, сессии отозваны. Себя и суперадмина — 422. Аудит `Blocked` |
+| POST | `/platform/users/{id}/unblock` | разблокировать, счётчик неудачных попыток сброшен. Аудит `Unblocked` |
+| POST | `/platform/users/{id}/reset-password` | 204: новый пароль (8 букв и цифр) приходит письмом «Binosoz: новый пароль», прежний не действует, сессии закрыты. Покупателю — 422 (он входит по коду). Аудит `PasswordResetBySuperAdmin` |
 | GET | `/platform/tariffs` | `[{ id, name, price, currency, maxBuildings, maxUsers, features[], isActive, organizationsCount }]`; `maxBuildings`/`maxUsers` = null — без ограничения. Базовые: Free (0 TJS, 1 дом, 5 сотрудников), Basic (500 TJS, 3 / 20), Pro (1500 TJS, без ограничений) |
 | POST | `/platform/tariffs` | `{ name, price, currency?, maxBuildings?, maxUsers?, features?, isActive? }` → 201. Название занято — 409; цена < 0, лимит < 1 — 422 |
 | PUT | `/platform/tariffs/{id}` | то же тело → 200. Отключённый тариф нельзя назначить, у кого он есть — остаётся |

@@ -75,6 +75,7 @@ public static class DependencyInjection
         services.AddScoped<StaffPolicy>();
         services.AddScoped<StaffAccounts>();
         services.AddScoped<ITariffService, TariffService>();
+        services.AddScoped<IPlatformUserService, PlatformUserService>();
         services.AddScoped<IInvitationService, InvitationService>();
         services.AddScoped<IPlatformService, PlatformService>();
         services.AddScoped<IOrgApplicationService, OrgApplicationService>();

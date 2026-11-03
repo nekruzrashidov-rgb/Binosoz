@@ -61,6 +61,23 @@ public class StaffAccounts(
         return (user, actual, generated);
     }
 
+    // Новый пароль, выданный суперадмином: письмо с логином и паролем. Сбой почты не откатывает смену —
+    // сотрудник всегда может задать пароль сам через «Забыли пароль?».
+    public async Task SendNewPasswordAsync(AppUser user, string password, CancellationToken ct)
+    {
+        try
+        {
+            await email.SendAsync(new EmailMessage(user.Email!, "Binosoz: новый пароль",
+                $"Здравствуйте, {user.FullName}!\n\nАдминистратор платформы задал вам новый пароль.\n\n" +
+                $"Страница входа: {emailOptions.Value.LoginUrl}\nЛогин: {user.Email}\nПароль: {password}\n\n" +
+                "Прежний пароль больше не действует, все сессии завершены. Сменить пароль можно через «Забыли пароль?»."), ct);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            logger.LogError(e, "Письмо с новым паролем пользователю {UserId} не отправлено", user.Id);
+        }
+    }
+
     // Письмо «Вы приглашены в Binosoz» с логином и паролем. Сбой почты не отменяет создание:
     // сотрудник задаст новый пароль через «Забыли пароль?».
     public async Task SendCredentialsAsync(AppUser user, string password, string? organizationName, CancellationToken ct)
