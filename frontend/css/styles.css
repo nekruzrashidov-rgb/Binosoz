@@ -28,9 +28,9 @@
   --shadow: 0 1px 2px rgba(12, 23, 48, 0.06), 0 8px 28px rgba(12, 23, 48, 0.08);
   --shadow-lg: 0 24px 70px rgba(12, 23, 48, 0.25);
   --glow: 0 0 0 4px rgba(29, 74, 208, 0.18), 0 8px 26px rgba(29, 74, 208, 0.35);
-  --font: 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
-  --display: 'Unbounded', 'Manrope', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
-  --r: 14px;
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --display: 'Unbounded', 'Inter', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+  --r: 18px;
   --r-sm: 9px;
   --hero-ink: #f3f6ff;
 }
@@ -208,7 +208,7 @@ textarea.inp { resize: vertical; min-height: 78px; }
 .empty svg { width: 54px; height: 54px; stroke: var(--line); fill: none; stroke-width: 1.4; margin-bottom: 8px; }
 
 /* ---------- hero with 3D ---------- */
-.hero { position: relative; height: clamp(560px, 86vh, 820px); background: #0a1228; overflow: hidden; color: var(--hero-ink); isolation: isolate; }
+.hero { position: relative; height: clamp(560px, 86vh, 820px); background: #060d1f; overflow: hidden; color: var(--hero-ink); isolation: isolate; }
 .hero .house3d { position: absolute; inset: 0; z-index: 0; }
 .house3d-canvas { display: block; width: 100%; height: 100%; outline: none; }
 .hero-shade { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(1200px 500px at 0% 0%, rgba(6, 12, 32, 0.62), transparent 60%), linear-gradient(180deg, rgba(6, 12, 32, 0) 70%, rgba(6, 12, 32, 0.5)); }
@@ -501,7 +501,7 @@ body:has(.lux) { background: #060d1f; }
 }
 .lux-hero-in { width: 100%; display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.8fr); gap: 40px; align-items: center; }
 .stars { position: absolute; inset: 0; z-index: -1; pointer-events: none; transform: translate3d(0, calc(var(--py, 0px) * 0.1), 0); }
-.stars i { position: absolute; border-radius: 50%; background: #fff; opacity: 0.18; animation: twinkle 3s ease-in-out infinite alternate; }
+.stars i { position: absolute; border-radius: 50%; background: #c9a227; opacity: 0.18; animation: twinkle 3s ease-in-out infinite alternate; }
 @keyframes twinkle { to { opacity: 0.95; transform: scale(1.35); } }
 .mountains { position: absolute; left: 0; right: 0; bottom: 0; height: 40%; z-index: -1; pointer-events: none; color: #8ea0d8; opacity: 0.3; transform: translate3d(0, calc(var(--py, 0px) * 0.22), 0); }
 .mountains svg { width: 100%; height: 100%; display: block; }
@@ -1083,7 +1083,7 @@ a.float-card.tg:hover { border-color: rgba(34, 158, 217, 0.75); background: rgba
 .pay-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
 .pay-form .wide { grid-column: 1 / -1; }
 .pay-field { min-width: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #9aa6c8; }
-.pay-field input { width: 100%; min-width: 0; box-sizing: border-box; font: 600 17px/1.2 'Manrope', system-ui, sans-serif; letter-spacing: 0.04em; color: #fff; background: #0b1430; border: 1px solid #2a3870; border-radius: 12px; padding: 13px 14px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+.pay-field input { width: 100%; min-width: 0; box-sizing: border-box; font: 600 17px/1.2 'Inter', system-ui, sans-serif; letter-spacing: 0.04em; color: #fff; background: #0b1430; border: 1px solid #2a3870; border-radius: 12px; padding: 13px 14px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
 .pay-field input:focus { border-color: #c9a227; box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.25); }
 .pay-field input.bad { border-color: #ef6b6b; }
 .pay-err { min-height: 16px; font-size: 12px; color: #ff8d8d; }
@@ -1106,7 +1106,7 @@ a.float-card.tg:hover { border-color: rgba(34, 158, 217, 0.75); background: rgba
 .pc-back { transform: rotateY(180deg); padding: 22px 0; justify-content: flex-start; gap: 18px; }
 .pc-chip { width: 46px; height: 34px; border-radius: 7px; background: linear-gradient(135deg, #f2d48a, #b98a2e); }
 .pc-brand { font: 700 18px var(--display); letter-spacing: 0.04em; color: #f2c46a; }
-.pc-number { font: 600 min(24px, 6.4cqw)/1 'Manrope', monospace; letter-spacing: 0.12em; white-space: nowrap; }
+.pc-number { font: 600 min(24px, 6.4cqw)/1 'Inter', monospace; letter-spacing: 0.12em; white-space: nowrap; }
 .pc-bottom small { display: block; font-size: 9px; letter-spacing: 0.14em; color: #9aa6c8; margin-bottom: 4px; }
 .pc-holder { font-weight: 700; letter-spacing: 0.08em; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pc-exp { font-weight: 700; letter-spacing: 0.08em; }
@@ -1241,3 +1241,27 @@ a.float-card.tg:hover { border-color: rgba(34, 158, 217, 0.75); background: rgba
   .cab-fab-badge[hidden] { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .cab-fade, .cab-wave, .chat-typing .dots i { animation: none; } }
+
+/* Design tokens, block 1: selected cards, button motion, status badges, active nav underline, thin gold scrollbar */
+.card.active, .card--selected { border-left: 3px solid var(--gold); }
+.btn { transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease, color 0.2s ease; }
+.btn:hover:not(:disabled) { transform: translateY(-1px); }
+.btn.soft { border-color: var(--line); }
+.badge--free { background: rgba(53, 214, 161, 0.15); color: #35d6a1; border: 1px solid rgba(53, 214, 161, 0.3); }
+.badge--booked { background: rgba(255, 176, 48, 0.12); color: #ffb030; border: 1px solid rgba(255, 176, 48, 0.25); }
+.badge--sold { background: rgba(255, 122, 107, 0.1); color: #ff7a6b; border: 1px solid rgba(255, 122, 107, 0.2); }
+/* The apartment status chips take the same look in the dark theme (the public site is always dark). */
+:root[data-theme='dark'] .chip.free { background: rgba(53, 214, 161, 0.15); color: #35d6a1; box-shadow: inset 0 0 0 1px rgba(53, 214, 161, 0.3); }
+:root[data-theme='dark'] .chip.booked { background: rgba(255, 176, 48, 0.12); color: #ffb030; box-shadow: inset 0 0 0 1px rgba(255, 176, 48, 0.25); }
+:root[data-theme='dark'] .chip.sold { background: rgba(255, 122, 107, 0.1); color: #ff7a6b; box-shadow: inset 0 0 0 1px rgba(255, 122, 107, 0.2); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .chip.free { background: rgba(53, 214, 161, 0.15); color: #35d6a1; box-shadow: inset 0 0 0 1px rgba(53, 214, 161, 0.3); }
+  :root:not([data-theme='light']) .chip.booked { background: rgba(255, 176, 48, 0.12); color: #ffb030; box-shadow: inset 0 0 0 1px rgba(255, 176, 48, 0.25); }
+  :root:not([data-theme='light']) .chip.sold { background: rgba(255, 122, 107, 0.1); color: #ff7a6b; box-shadow: inset 0 0 0 1px rgba(255, 122, 107, 0.2); }
+}
+/* Active link: a 2px gold underline under the text, without moving the menu. */
+.nav a.on, .nav-link.active { position: relative; }
+.nav a.on::after, .nav-link.active::after { content: ''; display: block; position: absolute; left: 12px; right: 12px; bottom: 3px; height: 2px; background: var(--gold); border-radius: 1px; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 3px; }

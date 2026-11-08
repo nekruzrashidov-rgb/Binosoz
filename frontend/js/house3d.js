@@ -136,7 +136,7 @@
     return canvasTex(1024, 192, (g, w, h) => {
       g.fillStyle = '#0d1426'; g.fillRect(0, 0, w, h);
       g.fillStyle = '#f2c46a';
-      g.font = '700 112px Unbounded, Manrope, Arial, sans-serif';
+      g.font = '700 112px Unbounded, Inter, Arial, sans-serif';
       g.textAlign = 'center'; g.textBaseline = 'middle';
       g.fillText(text, w / 2, h / 2 + 6);
       g.strokeStyle = 'rgba(242,196,106,.5)'; g.lineWidth = 4;

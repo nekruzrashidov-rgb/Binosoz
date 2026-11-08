@@ -10,7 +10,7 @@
 
   const STAGES = ['Lead', 'Showing', 'Booking', 'Contract', 'Payment', 'Completed', 'Cancelled'];
   // Buyers sign in with a code from e-mail (always 123456 here); staff and the super admin — with their password.
-  const ORG = { id: 'org1', name: 'Ситора Девелопмент', slug: 'sitora' };
+  const ORG = { id: 'org1', name: 'Ситора Девелопмент', slug: 'nekruz' };
   const PLATFORM_PASSWORD = 'Platform123!';
   const DEMO_CUSTOMER_EMAIL = 'customer@sitora.tj';
   const STAFF = [
@@ -33,7 +33,7 @@
       nameRu: 'ЖК «Ситора Резиденс»', nameTg: 'ЖК «Ситора Резиденс»',
       descriptionRu: 'Жилой комплекс комфорт-класса в центре Душанбе: 16 жилых этажей, подземный паркинг, закрытый двор и коммерческий этаж.',
       descriptionTg: '',
-      address: 'Душанбе, пр. Рудаки, 124', deliveryDate: '2028-06-30',
+      address: 'г. Душанбе, пр. Борбад, 15', deliveryDate: '2028-06-30',
     };
     db.floors = []; db.apts = [];
     let aid = 1;

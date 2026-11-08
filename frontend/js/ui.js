@@ -83,7 +83,7 @@
     dt(d) { if (!d) return '—'; const x = new Date(d); if (Number.isNaN(x.getTime())) return String(d); return x.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); },
     area: (v) => (v ? String(Math.round(v * 10) / 10).replace('.', ',') + ' ' + t('u.m2') : '—'),
     rooms: (r) => (r === 0 ? t('apt.studio') : r + t('apt.roomsShort')),
-    size(b) { if (!b) return ''; return b > 1048576 ? (b / 1048576).toFixed(1) + ' МБ' : Math.max(1, Math.round(b / 1024)) + ' КБ'; },
+    size(b) { if (!b) return ''; return b > 1048576 ? (b / 1048576).toFixed(1) + ' МБ' : Math.max(1, Math.round(b / 1024)) + ' КБ'; }, // TODO: i18n
     initials(n) { return String(n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]).join('').toUpperCase(); },
     left(iso) { const ms = new Date(iso).getTime() - Date.now(); if (ms <= 0) return t('book.expired'); const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000); return h + t('u.h') + ' ' + m + t('u.min'); },
   };

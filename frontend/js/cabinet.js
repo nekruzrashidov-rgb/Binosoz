@@ -34,14 +34,15 @@
   // /login#reset=<token> from the "forgot password" letter opens the new-password form.
   S.views.login = function (root) {
     const card = h('div', { class: 'card login-card login' });
-    root.appendChild(h('div', { class: 'wrap page-in' }, loginBrand(), card));
+    // /login gets the split page (the building and the form); the cabinet's own fallback keeps the plain card.
+    root.appendChild(document.body.dataset.page === 'login' ? loginShell(card) : h('div', { class: 'wrap page-in' }, loginBrand(), card));
     const tokenInHash = () => (location.hash.match(/reset=([A-Za-z0-9_-]+)/) || [])[1] || '';
     let resetToken = tokenInHash();
     let who = resetToken || S.store.get('sitora.loginAs') !== 'buyer' ? 'staff' : 'buyer';
     let step = resetToken ? 'reset' : who, emailVal = '', timer = 0, tick = null, challenge = null, notice = '';
     const isEmail = (v) => /^\S+@\S+\.\S+$/.test(v);
     const badEmail = (form) => S.showErrors(form, { message: t('val.email'), errors: { email: [t('val.email')] } });
-    const tabs = () => h('div', { class: 'login-tabs', role: 'tablist', 'aria-label': t('login.as') }, [['staff', 'login.staff'], ['buyer', 'login.buyer']].map(([k, key]) =>
+    const tabs = () => h('div', { class: 'login-tabs', role: 'tablist', 'aria-label': t('login.as') }, [['buyer', 'login.buyer'], ['staff', 'login.staff']].map(([k, key]) =>
       h('button', { type: 'button', role: 'tab', class: who === k ? 'on' : '', 'aria-selected': String(who === k), onclick: () => {
         if (who === k && step === k) return;
         who = k; S.store.set('sitora.loginAs', k); step = k; notice = ''; clearInterval(tick); draw();
@@ -159,6 +160,36 @@
       card.replaceChildren(step === 'staff' || step === 'buyer' || step === 'register' ? tabs() : null, form);
       setTimeout(() => focus && focus.focus(), 30);
     }
+    // The building on the left (55%), the form on the right; on a phone the building shrinks to a strip above the form.
+    function loginShell(c) {
+      const cc = (window.SITORA_CONFIG || {}).CONTACT || {};
+      const rnd = (a, b) => a + Math.random() * (b - a);
+      const sky = h('div', { class: 'lg-sky', 'aria-hidden': 'true' }, Array.from({ length: 46 }, () => {
+        const size = rnd(1.5, 4).toFixed(1) + 'px';
+        return h('i', { style: { left: rnd(0, 100).toFixed(1) + '%', top: rnd(0, 100).toFixed(1) + '%', width: size, height: size, animationDelay: rnd(0, 8).toFixed(1) + 's', animationDuration: rnd(7, 14).toFixed(1) + 's' } });
+      }));
+      const lang = h('div', { class: 'seg lg-lang', role: 'group', 'aria-label': 'Language' }, S.LANGS.map(([k, l]) => h('button', { type: 'button', class: S.lang === k ? 'on' : '', 'aria-pressed': String(S.lang === k), onclick: () => { if (S.lang !== k) S.setLang(k); } }, l)));
+      const facts = h('ul', { class: 'lg-facts' },
+        cc.address ? h('li', null, S.icon('pin'), cc.address) : null,
+        cc.phone ? h('li', null, S.icon('phone'), h('a', { href: 'tel:' + cc.phone.replace(/[^d+]/g, '') }, cc.phone)) : null);
+      const hero = h('aside', { class: 'lg-hero' }, sky,
+        h('div', { class: 'lg-hero-top' }, h('a', { class: 'lg-brand', href: '/', 'aria-label': t('login.toSite') }, S.logo(), h('span', null, 'BINOSOZ')), lang),
+        h('div', { class: 'lg-hero-text' }, h('p', { class: 'lg-eyebrow' }, t('login.heroEyebrow')), h('h1', { class: 'lg-name' }, t('login.heroName')), h('p', { class: 'lg-sub' }, t('login.heroSub')), facts));
+      return h('div', { class: 'lg-split' }, hero, h('main', { class: 'lg-side' }, h('div', { class: 'lg-frame' }, c), demoChips()));
+    }
+
+    // Development only (this computer): the seeded accounts as chips that fill the form. No passwords here:
+    // the buyer's code in development is 123456, the super admin's password is in user-secrets.
+    function demoChips() {
+      if (!/^(localhost|127.0.0.1|[::1])$|.localhost$/.test(location.hostname)) return null;
+      const chip = (tab, email, key) => h('button', { type: 'button', class: 'lg-chip', onclick: () => {
+        who = tab; S.store.set('sitora.loginAs', tab); step = tab; emailVal = email; notice = ''; clearInterval(tick); draw();
+      } }, h('b', null, t(key)), h('span', null, email));
+      return h('div', { class: 'lg-demo' }, h('p', null, t('login.demo')),
+        h('div', { class: 'lg-chips' }, chip('buyer', 'client1@example.com', 'login.demoBuyer'), chip('staff', 'superadmin@binosoz.tj', 'login.demoAdmin')),
+        h('small', null, t('login.demoHint')));
+    }
+
     draw();
     // The reset link opened while this page is already on screen changes only the hash.
     const onHash = () => { const token = tokenInHash(); if (token) { resetToken = token; who = 'staff'; notice = ''; step = 'reset'; draw(); } };

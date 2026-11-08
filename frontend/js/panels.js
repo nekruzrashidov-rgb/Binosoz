@@ -48,7 +48,7 @@
 
   /* Documents */
   const DOC_TYPES = ['Contract', 'Annex', 'Act', 'Invoice', 'Receipt', 'Other'];
-  const DOC_TYPE_RU = { Contract: 'Договор', Annex: 'Приложение', Act: 'Акт', Invoice: 'Счёт', Receipt: 'Квитанция', Other: 'Другое' };
+  const DOC_TYPE_RU = { Contract: 'Договор', Annex: 'Приложение', Act: 'Акт', Invoice: 'Счёт', Receipt: 'Квитанция', Other: 'Другое' }; // TODO: i18n
   // "Check with AI": the document is read by Claude on the server; the result is a hint next to the file, the deal does not change.
   function aiVerify(d) {
     const slot = h('span');

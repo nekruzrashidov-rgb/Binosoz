@@ -5,7 +5,7 @@ using Sitora.Domain.Entities;
 
 namespace Sitora.Infrastructure.Data.Seed;
 
-// Простой план 1-го этажа «Sitora Residence» для разработки: четыре квартиры в ряд, прямоугольники 120×80 с номерами.
+// Простой план 1-го этажа «Некруз Резиденс» для разработки: четыре квартиры в ряд, прямоугольники 120×80 с номерами.
 public static class FloorPlanSeeder
 {
     public const int Floor = 1;

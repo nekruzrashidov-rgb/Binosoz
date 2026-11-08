@@ -5,7 +5,7 @@ public class Organization : BaseEntity
 {
     // Организация, к которой при переходе на мультиарендность привязаны все прежние дома и сотрудники.
     public static readonly Guid DefaultId = new("01a20000-0000-7000-8000-000000000001");
-    public const string DefaultSlug = "sitora";
+    public const string DefaultSlug = "nekruz";
 
     public string Name { get; set; } = string.Empty;
 

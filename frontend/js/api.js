@@ -112,7 +112,7 @@
     invitation(i) { return { id: i.id, email: pick(i, ['email'], ''), name: pick(i, ['fullName', 'name'], ''), role: pick(i, ['role'], ''), buildingIds: arr(pick(i, ['buildingIds'], [])), expiresAt: pick(i, ['expiresAt'], ''), createdAt: pick(i, ['createdAt'], '') }; },
     organization(o) { return { id: o.id, name: pick(o, ['name'], ''), slug: pick(o, ['slug'], ''), active: pick(o, ['isActive'], true) !== false, buildings: num(pick(o, ['buildingsCount'], 0)), users: num(pick(o, ['usersCount'], 0)), createdAt: pick(o, ['createdAt'], ''), logoUrl: pick(o, ['logoUrl'], null), domain: pick(o, ['customDomain'], null), owners: arr(o.ownerEmails), buildingNames: arr(o.buildingNames), deals: num(pick(o, ['dealsCount'], 0)), customers: num(pick(o, ['customersCount'], 0)), lastActivityAt: pick(o, ['lastActivityAt'], null), tariff: o.tariff || null, ownerInfos: arr(o.owners) }; },
     booking(b) { return { id: b.id, apartmentId: b.apartmentId, apartmentNumber: pick(b, ['apartmentNumber'], ''), name: pick(b, ['name', 'customerName', 'fullName'], ''), phone: pick(b, ['phone', 'customerPhone'], ''), status: String(pick(b, ['status'], 'Active')), createdAt: pick(b, ['createdAt'], ''), expiresAt: pick(b, ['expiresAt'], '') }; },
-    audit(a) { return { id: a.id, at: pick(a, ['at', 'createdAt', 'timestamp'], ''), user: pick(a, ['userEmail', 'user', 'userName', 'actor'], '') || (S.t ? S.t('audit.system', null, 'система') : 'система'), action: pick(a, ['action'], ''), entity: pick(a, ['entity', 'entityType'], ''), entityId: pick(a, ['entityId'], ''), before: parseJson(pick(a, ['before', 'oldValues'], null)), after: parseJson(pick(a, ['after', 'newValues'], null)), viaPlatform: !!a.impersonatedById }; },
+    audit(a) { return { id: a.id, at: pick(a, ['at', 'createdAt', 'timestamp'], ''), user: pick(a, ['userEmail', 'user', 'userName', 'actor'], '') || (S.t ? S.t('audit.system', null, 'система') : 'система'), action: pick(a, ['action'], ''), entity: pick(a, ['entity', 'entityType'], ''), entityId: pick(a, ['entityId'], ''), before: parseJson(pick(a, ['before', 'oldValues'], null)), after: parseJson(pick(a, ['after', 'newValues'], null)), viaPlatform: !!a.impersonatedById }; }, // TODO: i18n
   });
 
   // ---------- transport ----------
@@ -134,7 +134,7 @@
     let body;
     if (o.form) body = o.form; else if (o.body !== undefined) { headers['Content-Type'] = 'application/json'; body = JSON.stringify(o.body); }
     const url = (o.absolute ? origin() : base) + path + qs(o.query);
-    try { return await fetch(url, { method, headers, body }); } catch (e) { throw new ApiError(0, S.t ? S.t('err.network') : 'Нет связи с сервером'); }
+    try { return await fetch(url, { method, headers, body }); } catch (e) { throw new ApiError(0, S.t ? S.t('err.network') : 'Нет связи с сервером'); } // TODO: i18n
   }
 
   // Form field names that differ between the views and the API (validation errors come back with API names).
@@ -150,15 +150,15 @@
     let errs = null, msg = (data && (data.detail || data.message)) || '';
     if (data && Array.isArray(data.errors)) {
       // 422 from the Excel import: [{ row, message }]
-      const lines = data.errors.map((x) => (x && x.row ? (S.t ? S.t('err.row', { n: x.row }, 'Строка ' + x.row) : 'Строка ' + x.row) + ': ' + x.message : x && x.message ? x.message : String(x)));
+      const lines = data.errors.map((x) => (x && x.row ? (S.t ? S.t('err.row', { n: x.row }, 'Строка ' + x.row) : 'Строка ' + x.row) + ': ' + x.message : x && x.message ? x.message : String(x))); // TODO: i18n
       msg = lines.join('\n') || msg;
     } else if (data && data.errors && typeof data.errors === 'object') {
       errs = renameErrors(data.errors);
       if (!msg) msg = Object.values(data.errors).flat().join(' ');
     }
-    if (res.status === 429) { const ra = res.headers.get('Retry-After'); msg = msg || (S.t ? S.t('err.429') : 'Слишком много запросов') + (ra ? ' (' + ra + ' c)' : ''); }
+    if (res.status === 429) { const ra = res.headers.get('Retry-After'); msg = msg || (S.t ? S.t('err.429') : 'Слишком много запросов') + (ra ? ' (' + ra + ' c)' : ''); } // TODO: i18n
     // Titles of generic ProblemDetails are English ("Unauthorized", "One or more validation errors occurred.") — not shown to people.
-    if (!msg) msg = S.t ? S.t('err.' + (res.status >= 500 ? '500' : res.status), {}, S.t('err.unknown')) : 'Ошибка ' + res.status;
+    if (!msg) msg = S.t ? S.t('err.' + (res.status >= 500 ? '500' : res.status), {}, S.t('err.unknown')) : 'Ошибка ' + res.status; // TODO: i18n
     return new ApiError(res.status, msg, errs, data && data.title);
   }
 
@@ -371,7 +371,7 @@
       const f = new FormData(); f.append('file', file);
       const r = await request('POST', '/apartments/import', { query: { buildingId }, form: f, file });
       if (r && r.message) return r;
-      return Object.assign({}, r, { message: S.t ? S.t('cat.importedN', { c: num(r && r.created), u: num(r && r.updated) }, 'Создано: ' + num(r && r.created) + ', обновлено: ' + num(r && r.updated)) : '' });
+      return Object.assign({}, r, { message: S.t ? S.t('cat.importedN', { c: num(r && r.created), u: num(r && r.updated) }, 'Создано: ' + num(r && r.created) + ', обновлено: ' + num(r && r.updated)) : '' }); // TODO: i18n
     },
 
     // leads & bookings
@@ -531,7 +531,7 @@
 
     /* Opens a PDF in a tab or downloads Excel: real API -> file from the server; demo -> in-page preview */
     async openDoc(path, query, title) {
-      if (S.isDemo()) { const r = await request('GET', path, { query }); S.bus.emit('demoDoc', r.demoDoc || { title: title || 'Документ', lines: [] }); return; }
+      if (S.isDemo()) { const r = await request('GET', path, { query }); S.bus.emit('demoDoc', r.demoDoc || { title: title || 'Документ', lines: [] }); return; } // TODO: i18n
       // The tab is opened right away: a window.open after an await is blocked as a pop-up.
       const isPdf = /\.pdf$/i.test(path); const tab = isPdf ? window.open('', '_blank') : null;
       try {
@@ -547,7 +547,7 @@
       } catch (e) { if (tab) tab.close(); throw e; }
     },
     async openSigned(id, title) {
-      if (S.isDemo()) { const r = await api.docLink(id); S.bus.emit('demoDoc', r.demoDoc || { title: title || 'Документ', lines: [] }); return; }
+      if (S.isDemo()) { const r = await api.docLink(id); S.bus.emit('demoDoc', r.demoDoc || { title: title || 'Документ', lines: [] }); return; } // TODO: i18n
       const tab = window.open('', '_blank');
       try { const r = await api.docLink(id); const href = fileHref(r.url || r.link || r.downloadUrl); if (tab) tab.location.href = href; else location.href = href; } catch (e) { if (tab) tab.close(); throw e; }
     },

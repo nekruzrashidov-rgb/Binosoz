@@ -7,7 +7,9 @@ namespace Sitora.Infrastructure.Data.Seed;
 
 public static class CatalogSeeder
 {
-    public const string BuildingName = "Sitora Residence";
+    public const string BuildingName = "Некруз Резиденс";
+    // Прежнее название дома из сидера: базы разработки, созданные до переименования, получают новое.
+    public const string LegacyBuildingName = "Sitora Residence";
     public const int ResidentialFloors = 16;
 
     // Типы квартир по порядку номеров на этаже: комнат (0 — студия) и площадь.
@@ -27,7 +29,11 @@ public static class CatalogSeeder
     public static async Task SeedAsync(AppDbContext db, ILogger logger)
     {
         if (await db.Buildings.AnyAsync())
+        {
+            await db.Buildings.Where(b => b.NameRu == LegacyBuildingName)
+                .ExecuteUpdateAsync(u => u.SetProperty(b => b.NameRu, BuildingName).SetProperty(b => b.NameTg, b => b.NameTg == LegacyBuildingName ? BuildingName : b.NameTg));
             return;
+        }
 
         var random = new Random(RandomSeed);
         var building = new Building

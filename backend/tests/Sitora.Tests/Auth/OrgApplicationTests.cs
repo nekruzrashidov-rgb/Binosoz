@@ -135,7 +135,7 @@ public class OrgApplicationTests(SitoraApiFactory factory) : IClassFixture<Sitor
         var id = await SubmitIdAsync(NewEmail());
 
         // Занятое короткое имя: организация не создаётся, заявка остаётся на рассмотрении.
-        var taken = await platform.PostAsJsonAsync($"/api/v1/platform/applications/{id}/approve", new ApproveApplicationRequest("sitora"));
+        var taken = await platform.PostAsJsonAsync($"/api/v1/platform/applications/{id}/approve", new ApproveApplicationRequest(Organization.DefaultSlug));
         Assert.Equal(HttpStatusCode.Conflict, taken.StatusCode);
         Assert.Equal(OrgApplicationStatus.Pending, await factory.WithDbAsync(db => db.OrgApplications.Where(a => a.Id == id).Select(a => a.Status).SingleAsync()));
 

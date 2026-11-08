@@ -1,14 +1,66 @@
 <!doctype html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Вход — Binosoz</title>
+<title>Вход — Некруз Резиденс</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Unbounded:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Unbounded:wght@500;600;700&display=swap">
 <link rel="stylesheet" href="/css/styles.css">
+<style>
+  /* Login only: the building on the left (55%), the form on the right; the page is always dark. */
+  body[data-page='login'] { background: #060d1f; }
+  .lg-split { display: grid; grid-template-columns: 55fr 45fr; min-height: 100vh; min-height: 100dvh; }
+  .lg-hero { position: relative; overflow: hidden; isolation: isolate; display: flex; flex-direction: column; justify-content: space-between; gap: 32px; padding: clamp(24px, 4vw, 56px);
+    background: radial-gradient(900px 520px at 20% 110%, rgba(201, 162, 39, 0.16), transparent 60%), radial-gradient(700px 400px at 90% -10%, rgba(64, 92, 190, 0.28), transparent 60%), #060d1f; color: #eef2ff; }
+  .lg-sky { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+  .lg-sky i { position: absolute; border-radius: 50%; background: #c9a227; opacity: 0; box-shadow: 0 0 8px rgba(201, 162, 39, 0.7); animation: lg-float 10s ease-in-out infinite; }
+  @keyframes lg-float { 0% { opacity: 0; transform: translateY(18px); } 25% { opacity: 0.85; } 75% { opacity: 0.55; } 100% { opacity: 0; transform: translateY(-46px); } }
+  .lg-hero-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .lg-brand { display: inline-flex; align-items: center; gap: 10px; color: #fff; font-family: var(--display); font-weight: 600; letter-spacing: 0.08em; text-decoration: none; }
+  .lg-brand:hover { text-decoration: none; }
+  .lg-brand svg { width: 30px; height: 30px; }
+  .lg-lang { background: rgba(255, 255, 255, 0.06); border-color: rgba(201, 162, 39, 0.25); }
+  .lg-hero-text { max-width: 560px; animation: rise 0.8s cubic-bezier(.2, .8, .2, 1) both; }
+  .lg-eyebrow { display: inline-flex; padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(201, 162, 39, 0.4); color: #f2c46a; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+  .lg-name { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 5.4vw, 72px); line-height: 1.02; letter-spacing: -0.01em; text-transform: uppercase; margin: 18px 0 16px;
+    background: linear-gradient(120deg, #fff 30%, #f2d48a 60%, #c9a227); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lg-sub { color: rgba(238, 242, 255, 0.76); font-size: 16px; max-width: 460px; }
+  .lg-facts { list-style: none; margin: 26px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; color: rgba(238, 242, 255, 0.86); font-weight: 600; }
+  .lg-facts li { display: flex; align-items: center; gap: 10px; }
+  .lg-facts svg { color: #c9a227; }
+  .lg-facts a { color: inherit; }
+  .lg-side { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 18px; padding: clamp(20px, 4vw, 48px); background: #0a1228; }
+  /* The form card with a slowly running gold border. */
+  .lg-frame { position: relative; width: 100%; max-width: 440px; padding: 1.5px; border-radius: 22px;
+    background: linear-gradient(120deg, rgba(201, 162, 39, 0.12), #c9a227, rgba(201, 162, 39, 0.12), #f2d48a, rgba(201, 162, 39, 0.12)); background-size: 300% 300%; animation: lg-border 4s linear infinite; }
+  @keyframes lg-border { 0% { background-position: 0% 50%; } 100% { background-position: 300% 50%; } }
+  .lg-frame > .card.login { max-width: none; width: 100%; margin: 0; border: 0; border-radius: 20.5px; background: #111933; padding: clamp(20px, 3vw, 32px); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45); }
+  .lg-split .login-tabs button.on { background: #c9a227; color: #1b1405; }
+  .lg-split .card.login .inp { height: 52px; border-radius: 14px; font-size: 16px; background: #0b1430; border-color: #2a3870; }
+  .lg-split .card.login .inp:focus, .lg-split .card.login .inp:focus-visible { outline: none; border-color: #c9a227; box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.28); }
+  .lg-split .card.login .btn.lg.block { height: 52px; padding-block: 0; border-radius: 14px; background: #c9a227; color: #1b1405; font-weight: 800; }
+  .lg-split .card.login .btn.lg.block:hover:not(:disabled) { background: #d8b23a; box-shadow: 0 0 0 4px rgba(201, 162, 39, 0.25), 0 10px 28px rgba(201, 162, 39, 0.35); }
+  .lg-demo { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 8px; color: #9aa6c8; font-size: 13px; }
+  .lg-demo p { margin: 0; font-weight: 700; }
+  .lg-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .lg-chip { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(201, 162, 39, 0.35); background: rgba(201, 162, 39, 0.08); color: #eef2ff; font: inherit; font-size: 13px; cursor: pointer; transition: background 0.15s ease, transform 0.15s ease; }
+  .lg-chip:hover { background: rgba(201, 162, 39, 0.18); transform: translateY(-1px); }
+  .lg-chip b { color: #f2c46a; }
+  .lg-chip span { color: #9aa6c8; }
+  @media (max-width: 900px) {
+    .lg-split { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
+    /* On a phone the building is a slim strip: logo, name and languages. */
+    .lg-hero { padding: 14px 16px; gap: 6px; }
+    .lg-hero-text { animation: none; }
+    .lg-eyebrow, .lg-sub, .lg-facts { display: none; }
+    .lg-name { font-size: 20px; margin: 4px 0 0; }
+    .lg-side { justify-content: flex-start; padding: 20px 16px 32px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .lg-sky i, .lg-frame, .lg-hero-text { animation: none; } .lg-sky i { opacity: 0.4; } }
+</style>
 </head>
 <body data-page="login">
 <div id="app"></div>

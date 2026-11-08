@@ -58,6 +58,7 @@
   function plural(n, key) {
     const f = t(key).split('|');
     if (f.length < 3) return f[0];
+    if (S.lang === 'en') return n === 1 ? f[0] : f[2];
     const m10 = n % 10, m100 = n % 100;
     return m10 === 1 && m100 !== 11 ? f[0] : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? f[1] : f[2];
   }
@@ -106,7 +107,7 @@
     const col = (title, ...items) => h('div', { class: 'foot-col' }, h('h4', null, title), ...items);
     return h('footer', { class: 'footer lux-footer' }, h('div', { class: 'wrap' },
       h('div', { class: 'foot-grid' },
-        h('div', { class: 'foot-brand' }, h('a', { class: 'row', href: '/', style: { gap: '10px' } }, S.logo(), h('b', null, 'Sitora Residence')), h('p', null, t('foot.tagline')),
+        h('div', { class: 'foot-brand' }, h('a', { class: 'row', href: '/', style: { gap: '10px' } }, S.logo(), h('b', null, 'Некруз Резиденс')), h('p', null, t('foot.tagline')),
           h('div', { class: 'foot-social' },
             c.telegram ? h('a', { class: 'soc tg', href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener', 'aria-label': 'Telegram', title: 'Telegram' }, landIcon('send')) : null,
             c.phone ? h('a', { class: 'soc wa', href: 'https://wa.me/' + phoneDigits(c.phone), target: '_blank', rel: 'noopener', 'aria-label': 'WhatsApp', title: 'WhatsApp' }, landIcon('chat')) : null,
@@ -114,7 +115,7 @@
         col(t('foot.apts'), h('a', { href: '/apartments' }, t('foot.catalog')), h('a', { href: '/apartments#calc' }, t('foot.calc')), h('a', { href: '/apartments' }, t('foot.3d'))),
         col(t('foot.info'), h('a', { href: '/#why' }, t('foot.why')), h('a', { href: '/#steps' }, t('foot.steps')), h('a', { href: '/login' }, t('foot.cabinet'))),
         col(t('foot.contacts'), h('span', null, c.address || ''), c.phone ? h('a', { href: 'tel:+' + phoneDigits(c.phone) }, c.phone) : null, c.telegram ? h('a', { href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, c.telegram) : null, h('a', { href: '/contact' }, t('foot.write')))),
-      h('div', { class: 'foot-bottom' }, h('span', null, '© ' + new Date().getFullYear() + ' Sitora Residence. ' + t('footer.rights') + ' · ' + t('footer.platform')),
+      h('div', { class: 'foot-bottom' }, h('span', null, '© ' + new Date().getFullYear() + ' Некруз Резиденс. ' + t('footer.rights') + ' · ' + t('footer.platform')), // TODO: i18n
         h('span', { class: 'foot-dev' }, t('foot.dev') + ' ', h('a', { href: '/register' }, t('foot.devLink'))))));
   }
 
@@ -228,7 +229,7 @@
       const b = st.building, free = st.apts.filter((a) => a.status === 'free').length;
       heroTitle.replaceChildren(
         h('span', { class: 'eyebrow' }, S.icon('pin'), b.address || t('hero.city')),
-        h('h1', null, b.name || 'Sitora Residence'),
+        h('h1', null, b.name || 'Некруз Резиденс'),
         h('p', null, S.lang === 'tg' && b.descriptionTg ? b.descriptionTg : (b.description || t('hero.sub'))),
         h('div', { class: 'hero-cta pe' }, h('button', { class: 'btn gold lg', onclick: () => scrollTo('apartments') }, t('hero.cta1')), h('button', { class: 'btn ghost lg', style: { color: '#fff', borderColor: 'rgba(255,255,255,.4)' }, onclick: () => scrollTo('calc') }, t('hero.cta2'))));
       stats.replaceChildren(
@@ -239,7 +240,7 @@
     function renderFloors() {
       const list = st.floors.slice().sort((a, b) => b.number - a.number);
       const free = (n) => st.apts.filter((a) => a.floor === n && a.status === 'free').length;
-      floorbar.replaceChildren(h('h4', null, t('hero.floors')), list.map((f) => { const c = free(f.number); return h('button', { class: 'fbtn' + (st.floor === f.number ? ' on' : '') + (c ? '' : ' zero'), title: f.commercial ? t('floor.commercial') : t('floor.n', { n: f.number }) + ', ' + t('floor.free', { n: c }), onclick: () => selectFloor(f.number) }, h('span', null, f.commercial ? 'К' : f.number), h('small', null, f.commercial ? '' : c)); }));
+      floorbar.replaceChildren(h('h4', null, t('hero.floors')), list.map((f) => { const c = free(f.number); return h('button', { class: 'fbtn' + (st.floor === f.number ? ' on' : '') + (c ? '' : ' zero'), title: f.commercial ? t('floor.commercial') : t('floor.n', { n: f.number }) + ', ' + t('floor.free', { n: c }), onclick: () => selectFloor(f.number) }, h('span', null, f.commercial ? 'К' : f.number), h('small', null, f.commercial ? '' : c)); })); // TODO: i18n
     }
     function selectFloor(n) {
       st.floor = st.floor === n ? null : n; st.sel = null;
@@ -424,7 +425,7 @@
     const stars = h('div', { class: 'stars', 'aria-hidden': 'true' }, Array.from({ length: 60 }, () => { const s = (1 + rnd(1.6)).toFixed(1) + 'px'; return h('i', { style: { left: rnd(100).toFixed(1) + '%', top: rnd(62).toFixed(1) + '%', width: s, height: s, animationDelay: rnd(4).toFixed(2) + 's', animationDuration: (2.4 + rnd(3)).toFixed(2) + 's' } }); }));
     const mountains = h('div', { class: 'mountains', 'aria-hidden': 'true', html: '<svg viewBox="0 0 1440 320" preserveAspectRatio="none"><path fill="currentColor" opacity=".55" d="M0 230 120 150l70 40 110-110 90 70 80-50 120 120 90-60 140 90 100-80 120 70 110-100 130 110 80-40 80 50v120H0z"/><path fill="currentColor" d="M0 270 90 220l90 30 120-70 100 60 90-40 130 70 110-50 120 60 100-30 120 50 110-60 120 50 140-20v130H0z"/></svg>' });
     // The complex's name from the API (config's default until it loads): the first word in gold.
-    const nameParts = () => { const w = String(d.name || 'Sitora Residence').trim().split(/\s+/); return [h('span', { class: 'gold-text' }, w[0]), w.length > 1 ? w.slice(1).join(' ') : null]; };
+    const nameParts = () => { const w = String(d.name || 'Некруз Резиденс').trim().split(/\s+/); return [h('span', { class: 'gold-text' }, w[0]), w.length > 1 ? w.slice(1).join(' ') : null]; };
     const heroTitle = h('h1', { class: 'lux-title' });
     const aboutTitle = h('h2');
     const drawName = () => { const [first, rest] = nameParts(); heroTitle.replaceChildren(first, rest ? h('br') : null, rest); const [f2, r2] = nameParts(); aboutTitle.replaceChildren(f2, r2 ? ' ' + r2 : null); };

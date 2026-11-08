@@ -36,7 +36,7 @@
   };
 
   function applyTheme() {
-    if (isPublic) { document.documentElement.dataset.theme = 'dark'; return; }
+    if (isPublic || page === 'login') { document.documentElement.dataset.theme = 'dark'; return; }
     const v = S.store.get('sitora.theme'); if (v === 'dark' || v === 'light') document.documentElement.dataset.theme = v; else delete document.documentElement.dataset.theme;
   }
   function isDark() { const v = document.documentElement.dataset.theme; return v ? v === 'dark' : window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches; }
@@ -50,7 +50,7 @@
         S.api.isCustomer() ? link('/cabinet', t('nav.cabinet'), page === 'cabinet') : null,
         S.api.isStaff() ? link('/crm', t('nav.crm'), page === 'crm') : null,
         S.api.isPlatform() ? link('/platform', t('nav.platform'), page === 'platform') : null);
-    const lang = h('div', { class: 'seg', role: 'group', 'aria-label': 'Language' }, [['ru', 'RU'], ['tg', 'TJ']].map(([k, l]) => h('button', { class: S.lang === k ? 'on' : '', onclick: () => { if (S.lang !== k) S.setLang(k); } }, l)));
+    const lang = h('div', { class: 'seg', role: 'group', 'aria-label': 'Language' }, S.LANGS.map(([k, l]) => h('button', { class: S.lang === k ? 'on' : '', onclick: () => { if (S.lang !== k) S.setLang(k); } }, l)));
     const theme = h('button', { class: 'icon-btn', title: t('nav.theme'), 'aria-label': t('nav.theme'), onclick: () => { S.store.set('sitora.theme', isDark() ? 'light' : 'dark'); applyTheme(); drawHeader(); S.bus.emit('theme'); } }, S.icon(isDark() ? 'sun' : 'moon'));
     const who = !u
       ? h('a', { class: 'btn sm', href: '/login' }, t('nav.login'))
@@ -67,7 +67,7 @@
     const link = (href, label, key) => h('a', { class: page === key ? 'on' : '', href, 'aria-current': page === key ? 'page' : null }, label);
     const menu = h('nav', { class: 'nav lux-nav', 'aria-label': t('nav.main') },
       link('/', t('nav.home'), 'home'), link('/apartments', t('nav.apartments'), 'apartments'), link('/contact', t('nav.contact'), 'contact'));
-    const lang = h('div', { class: 'seg', role: 'group', 'aria-label': 'Language' }, [['ru', 'RU'], ['tg', 'TJ']].map(([k, l]) => h('button', { class: S.lang === k ? 'on' : '', onclick: () => { if (S.lang !== k) S.setLang(k); } }, l)));
+    const lang = h('div', { class: 'seg', role: 'group', 'aria-label': 'Language' }, S.LANGS.map(([k, l]) => h('button', { class: S.lang === k ? 'on' : '', onclick: () => { if (S.lang !== k) S.setLang(k); } }, l)));
     const toggle = h('button', { class: 'icon-btn menu-btn', 'aria-label': t('nav.menu'), 'aria-expanded': 'false', onclick: () => { const open = menu.classList.toggle('open'); toggle.setAttribute('aria-expanded', String(open)); document.body.classList.toggle('menu-open', open); } }, S.icon('menu'));
     header.className = 'top lux-top';
     header.replaceChildren(h('div', { class: 'wrap top-in' }, h('a', { class: 'brand', href: '/', 'aria-label': 'Binosoz' }, S.logo(), h('span', null, 'BINOSOZ')), menu, h('span', { class: 'spacer' }),
@@ -101,9 +101,11 @@
   const TITLES = { apartments: 'nav.apartments', contact: 'nav.contact', login: 'nav.login', cabinet: 'nav.cabinet', crm: 'nav.crm', platform: 'nav.platform' };
   const htmlTitle = document.title;
   function setTitle() {
-    if (S.lang !== 'tg') { document.title = htmlTitle; return; }
-    const brand = htmlTitle.split(' — ').pop();
-    document.title = page === 'home' ? 'Sitora Residence — ' + t('home.tagline') : TITLES[page] ? t(TITLES[page]) + ' — ' + brand : document.title;
+    if (S.lang === 'ru') { document.title = htmlTitle; return; }
+    // The complex's own name is translated too ("Nekruz Residence" in English); Binosoz stays as it is.
+    const last = htmlTitle.split(' — ').pop();
+    const brand = last === 'Некруз Резиденс' ? t('login.heroName') : last;
+    document.title = page === 'home' ? t('login.heroName') + ' — ' + t('home.tagline') : TITLES[page] ? t(TITLES[page]) + ' — ' + brand : document.title;
   }
 
   function render() {

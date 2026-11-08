@@ -3,10 +3,10 @@
    Empty (the default) runs the built-in demo backend: no server needed; the address of a real API
    is entered in the page itself (gear button, bottom right) and remembered in the browser.
    ORG_SLUG: short name of the developer whose buildings and USD rate the public site shows
-   ('sitora' is the default organization). Empty — buildings of all developers on the platform. */
+   ('nekruz' is the default organization, «Некруз Резиденс»). Empty — buildings of all developers on the platform. */
 window.SITORA_CONFIG = {
   API_BASE: '',
-  ORG_SLUG: 'sitora',
+  ORG_SLUG: 'nekruz',
   DEFAULT_BUILDING_ID: null,
   // Numbers for the landing's stats bar when the API is unavailable; with the API the real ones are shown.
   DEFAULT_FLOORS: 16,
@@ -14,7 +14,7 @@ window.SITORA_CONFIG = {
   CONTACT: {
     phone: '+992 98 363 70 70',
     telegram: '@nekru01',
-    address: 'Душанбе, пр. Рудаки, 124',
+    address: 'г. Душанбе, пр. Борбад, 15',
     hours: 'Пн–Сб 9:00–19:00',
     // Contact page: the manager who answers, and the office hours day by day (day keys: monFri, sat, sun; null — day off).
     manager: 'Некруз',

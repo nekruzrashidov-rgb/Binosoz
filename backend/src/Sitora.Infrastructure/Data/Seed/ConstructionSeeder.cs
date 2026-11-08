@@ -3,7 +3,7 @@ using Sitora.Domain.Entities;
 
 namespace Sitora.Infrastructure.Data.Seed;
 
-// Этапы стройки «Sitora Residence» с примерными процентами для разработки.
+// Этапы стройки «Некруз Резиденс» с примерными процентами для разработки.
 public static class ConstructionSeeder
 {
     public static readonly (string Name, int Percent)[] Stages =
