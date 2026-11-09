@@ -1,0 +1,2974 @@
+<!DOCTYPE html>
+<html lang="ru" id="htmlRoot">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Некруз Резиденс · Душанбе</title>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;700;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babylonjs/6.26.0/babylon.js"></script>
+<style>
+:root{
+  --bg:#04080f;--gold:#c8a84b;--gold2:#e8cc6a;--golddk:#5a4010;
+  --free:#22c55e;--res:#f59e0b;--sold:#ef4444;--none:#334155;
+  --fg:#ddd6c0;--fg2:#6b8099;--fg3:#1e2d40;
+  color-scheme:dark
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:'Inter',sans-serif;color:var(--fg)}
+#c{position:fixed;inset:0;width:100%!important;height:100%!important;touch-action:none}
+
+/* HEADER */
+#hd{position:fixed;top:0;left:0;right:0;z-index:30;
+  padding:10px 16px;display:flex;align-items:center;justify-content:space-between;
+  background:linear-gradient(to bottom,rgba(2,5,10,.98) 60%,transparent)}
+.logo{font-family:'Unbounded',sans-serif;font-size:11px;font-weight:900;color:var(--gold);letter-spacing:.12em;line-height:1.4}
+.logo-s{font-size:7px;color:var(--fg3);letter-spacing:.24em}
+.hd-r{display:flex;align-items:center;gap:8px}
+.stat-pill{display:flex;align-items:center;gap:4px;background:rgba(2,5,10,.85);
+  border:1px solid rgba(200,168,75,.12);border-radius:4px;padding:3px 8px;font-size:9px;color:var(--fg2)}
+.sp-dot{width:5px;height:5px;border-radius:50%}
+
+/* TOOLBAR */
+#tb{position:fixed;left:10px;top:58px;z-index:30;display:flex;flex-direction:column;gap:3px}
+.tg{display:flex;flex-direction:column;gap:2px;margin-bottom:4px}
+.tl{font-size:6px;color:var(--fg3);letter-spacing:.18em;text-align:center;padding:2px 0}
+.tbtn{width:44px;height:34px;background:rgba(2,5,10,.88);border:1px solid rgba(200,168,75,.1);
+  border-radius:5px;color:var(--fg2);font-size:9px;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;transition:.14s;backdrop-filter:blur(8px);
+  font-family:'Unbounded',sans-serif;font-weight:700;-webkit-tap-highlight-color:transparent}
+.tbtn:hover,.tbtn.on{background:rgba(200,168,75,.14);border-color:rgba(200,168,75,.44);color:var(--gold)}
+#flsc{max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;scrollbar-width:none}
+#flsc::-webkit-scrollbar{display:none}
+.fbtn{width:44px;height:28px;background:rgba(2,5,10,.85);border:1px solid rgba(200,168,75,.08);
+  border-radius:4px;color:var(--fg2);font-size:9px;cursor:pointer;transition:.12s;
+  font-family:'Unbounded',sans-serif;font-weight:700;-webkit-tap-highlight-color:transparent}
+.fbtn:hover,.fbtn.on{background:rgba(200,168,75,.12);border-color:rgba(200,168,75,.36);color:var(--gold)}
+
+/* LEGEND */
+#leg{position:fixed;bottom:60px;right:12px;z-index:30;
+  background:rgba(2,5,10,.9);border:1px solid rgba(200,168,75,.1);
+  border-radius:6px;padding:9px 13px;backdrop-filter:blur(10px)}
+.lr{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--fg2);margin-bottom:3px}
+.lr:last-child{margin:0}.lsq{width:8px;height:8px;border-radius:2px}
+
+/* BOTTOM */
+#bot{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);
+  display:flex;gap:3px;z-index:30;
+  background:rgba(2,5,10,.9);border:1px solid rgba(200,168,75,.1);
+  border-radius:7px;padding:3px;backdrop-filter:blur(12px)}
+.bbtn{padding:6px 12px;border-radius:4px;border:none;background:transparent;
+  font-size:9px;font-weight:600;color:var(--fg2);cursor:pointer;transition:.13s}
+.bbtn:hover,.bbtn.on{background:rgba(200,168,75,.13);color:var(--gold)}
+
+/* PROGRESS */
+#pgw{position:fixed;bottom:60px;left:10px;z-index:30;
+  background:rgba(2,5,10,.9);border:1px solid rgba(200,168,75,.1);
+  border-radius:6px;padding:9px 13px;min-width:160px;backdrop-filter:blur(10px)}
+.pgl{font-size:7px;color:var(--fg3);letter-spacing:.16em;margin-bottom:5px}
+.pgb{height:3px;background:rgba(255,255,255,.05);border-radius:2px;overflow:hidden}
+.pgf{height:100%;background:linear-gradient(to right,var(--golddk),var(--gold));width:0;transition:width 1.6s ease}
+.pgm{display:flex;justify-content:space-between;margin-top:3px;font-size:8px;color:var(--fg3)}
+
+/* TOOLTIP */
+#tip{position:fixed;background:rgba(2,5,10,.96);border:1px solid rgba(200,168,75,.2);
+  border-radius:4px;padding:4px 9px;font-size:9px;pointer-events:none;
+  opacity:0;transition:opacity .1s;z-index:50;white-space:nowrap}
+
+/* ══ APARTMENT OVERLAY ══ */
+#aptPg{position:fixed;inset:0;z-index:100;background:rgba(2,5,12,.98);
+  backdrop-filter:blur(24px);display:flex;flex-direction:column;
+  opacity:0;pointer-events:none;transition:opacity .24s;overflow-y:auto}
+#aptPg.open{opacity:1;pointer-events:auto}
+.ov-nav{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid rgba(200,168,75,.08);flex-shrink:0}
+.back-btn{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.04);
+  border:1px solid rgba(200,168,75,.12);border-radius:4px;padding:5px 11px;
+  font-size:10px;color:var(--fg2);cursor:pointer;transition:.14s}
+.back-btn:hover{border-color:rgba(200,168,75,.36);color:var(--gold)}
+.ov-status{font-size:8px;font-weight:700;padding:4px 10px;border-radius:3px;
+  border:1px solid;letter-spacing:.1em}
+.st-f{color:var(--free);background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.26)}
+.st-r{color:var(--res);background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.26)}
+.st-s{color:var(--sold);background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.26)}
+.st-n{color:var(--none);background:rgba(51,65,85,.2);border-color:rgba(51,65,85,.4)}
+
+.ov-body{padding:14px 16px 28px;max-width:580px;margin:0 auto;width:100%;display:flex;flex-direction:column;gap:12px}
+.apt-num{font-family:'Unbounded',sans-serif;font-size:52px;font-weight:900;color:var(--gold);line-height:.8}
+.apt-addr{font-size:10px;color:var(--fg3);margin-top:7px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.row4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px}
+.ic{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.055);border-radius:5px;padding:10px 12px}
+.ic .cl{font-size:7px;color:var(--fg3);letter-spacing:.1em;margin-bottom:3px}
+.ic .cv{font-family:'Unbounded',sans-serif;font-size:14px;font-weight:700;color:var(--fg)}
+.pbox{background:linear-gradient(135deg,rgba(200,168,75,.06),rgba(200,168,75,.02));
+  border:1px solid rgba(200,168,75,.2);border-radius:5px;padding:12px 14px}
+.pbox .pl{font-size:7px;color:var(--golddk);letter-spacing:.12em;margin-bottom:3px}
+.pbox .pv{font-family:'Unbounded',sans-serif;font-size:28px;font-weight:900;color:var(--gold)}
+.pbox .pu{font-size:10px;color:var(--fg2);margin-top:2px}
+.pbox .psm{font-size:8px;color:var(--fg3);margin-top:1px}
+
+/* PLAN CANVAS */
+.planbox{background:#010610;border:1px solid rgba(255,255,255,.05);border-radius:5px;overflow:hidden}
+.planbox-hd{padding:7px 11px 3px;font-size:7px;color:var(--fg3);letter-spacing:.12em;
+  display:flex;justify-content:space-between;align-items:center}
+.planbox-hd span{font-size:8px;color:var(--fg2)}
+
+/* FEATURES */
+.feats{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.feat{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.045);
+  border-radius:5px;padding:9px 10px;text-align:center;font-size:9px;color:var(--fg2)}
+.feat .fi{font-size:16px;margin-bottom:3px}
+.feat-p{color:var(--gold)!important;border-color:rgba(200,168,75,.14)!important;background:rgba(200,168,75,.04)!important}
+
+/* MORTGAGE */
+.mort{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:5px;padding:11px 13px}
+.mort-h{font-size:7px;color:var(--fg3);letter-spacing:.1em;margin-bottom:7px}
+.mort-g{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.mi .mv{font-family:'Unbounded',sans-serif;font-size:12px;font-weight:700;color:var(--gold)}
+.mi .ml2{font-size:7px;color:var(--fg3);margin-top:1px}
+
+/* FLOOR PROGRESS */
+.flprog{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:5px;padding:11px 13px}
+.flprog-h{font-size:7px;color:var(--fg3);letter-spacing:.1em;margin-bottom:7px}
+.flrows{display:flex;flex-direction:column;gap:4px}
+.flrow{display:grid;grid-template-columns:60px 1fr 40px;align-items:center;gap:7px}
+.flrow-l{font-size:8px;color:var(--fg3)}
+.flrow-b{height:4px;background:rgba(255,255,255,.05);border-radius:2px;overflow:hidden}
+.flrow-f{height:100%;border-radius:2px;transition:width 1.4s ease}
+.flrow-n{font-size:8px;color:var(--fg2);text-align:right}
+
+/* CTA */
+.cta1{width:100%;padding:13px;background:linear-gradient(135deg,var(--golddk),var(--gold));
+  color:var(--bg);border:none;border-radius:5px;font-family:'Unbounded',sans-serif;
+  font-size:10px;font-weight:700;letter-spacing:.06em;cursor:pointer;transition:.16s}
+.cta1:hover{transform:translateY(-1px);box-shadow:0 5px 20px rgba(200,168,75,.28)}
+.cta1:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.cta2{width:100%;padding:11px;background:transparent;border:1px solid rgba(200,168,75,.18);
+  color:var(--fg2);border-radius:5px;font-size:10px;cursor:pointer;transition:.14s;margin-top:6px}
+.cta2:hover{border-color:rgba(200,168,75,.36);color:var(--gold)}
+
+/* FLOOR OVERLAY */
+#flPg{position:fixed;inset:0;z-index:100;background:rgba(2,5,12,.98);
+  backdrop-filter:blur(24px);display:flex;flex-direction:column;
+  opacity:0;pointer-events:none;transition:opacity .22s;overflow-y:auto}
+#flPg.open{opacity:1;pointer-events:auto}
+.fl-h{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid rgba(200,168,75,.08);flex-shrink:0}
+.fl-t{font-family:'Unbounded',sans-serif;font-size:18px;font-weight:900;color:var(--gold)}
+.fl-s{font-size:9px;color:var(--fg3);margin-top:2px}
+.fl-b{padding:14px 16px 28px;max-width:680px;margin:0 auto;width:100%;display:flex;flex-direction:column;gap:12px}
+.fl-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.fa{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.055);
+  border-radius:5px;padding:10px 12px;cursor:pointer;transition:.14s;display:flex;align-items:center;justify-content:space-between}
+.fa:hover{border-color:rgba(200,168,75,.28);transform:translateY(-1px)}
+.fa.ff{border-left:3px solid var(--free)}
+.fa.fr{border-left:3px solid var(--res)}
+.fa.fs{border-left:3px solid var(--sold)}
+.fa.fn{border-left:3px solid var(--none)}
+.fa-n{font-family:'Unbounded',sans-serif;font-size:13px;font-weight:900;color:var(--gold)}
+.fa-i{font-size:9px;color:var(--fg3);margin-top:1px}
+.fa-st{font-size:8px;font-weight:600}
+.fa.ff .fa-st{color:var(--free)}.fa.fr .fa-st{color:var(--res)}
+.fa.fs .fa-st{color:var(--sold)}.fa.fn .fa-st{color:var(--none)}
+
+/* LOADER */
+#ld{position:fixed;inset:0;background:var(--bg);z-index:999;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .7s}
+.ld-logo{font-family:'Unbounded',sans-serif;font-size:20px;font-weight:900;color:var(--gold);letter-spacing:.12em}
+.ld-logo em{color:var(--fg3);font-style:normal;font-weight:300}
+.ld-city{font-size:7px;color:var(--fg3);letter-spacing:.3em}
+.ld-bar{width:180px;height:2px;background:rgba(255,255,255,.05);border-radius:2px;overflow:hidden}
+.ld-fill{height:100%;background:linear-gradient(to right,var(--golddk),var(--gold));width:0;transition:width .18s}
+.ld-msg{font-size:8px;color:var(--fg3);letter-spacing:.16em;text-align:center}
+
+@media(max-width:560px){
+  .feats{grid-template-columns:1fr 1fr}
+  .mort-g{grid-template-columns:1fr 1fr}
+  .fl-grid{grid-template-columns:1fr}
+  #leg{display:none}
+  .apt-num{font-size:38px}
+  .row4{grid-template-columns:1fr 1fr}
+}
+
+/* ══ SIDE PANELS (bottom-tab content) ══ */
+.side-panel{position:fixed;left:60px;top:58px;bottom:52px;width:280px;z-index:25;
+  background:rgba(2,5,12,.97);border:1px solid rgba(200,168,75,.1);border-radius:8px;
+  overflow-y:auto;display:none;flex-direction:column;
+  backdrop-filter:blur(16px);scrollbar-width:thin;scrollbar-color:var(--golddk) transparent}
+.side-panel::-webkit-scrollbar{width:3px}.side-panel::-webkit-scrollbar-thumb{background:var(--golddk);border-radius:2px}
+.sp-hdr{padding:12px 14px 8px;border-bottom:1px solid rgba(200,168,75,.08);flex-shrink:0}
+.sp-hdr h3{font-family:'Unbounded',sans-serif;font-size:11px;font-weight:700;color:var(--gold);letter-spacing:.12em}
+.sp-hdr p{font-size:9px;color:var(--fg3);margin-top:2px}
+.sp-body{padding:10px 12px;display:flex;flex-direction:column;gap:9px}
+
+/* Filter */
+.filt-row{display:flex;flex-direction:column;gap:4px}
+.filt-lbl{font-size:7px;color:var(--fg3);letter-spacing:.12em}
+.filt-opts{display:flex;gap:4px;flex-wrap:wrap}
+.fopt{padding:3px 8px;border-radius:3px;border:1px solid rgba(200,168,75,.1);
+  background:rgba(255,255,255,.025);font-size:9px;color:var(--fg2);cursor:pointer;transition:.12s}
+.fopt:hover,.fopt.on{background:rgba(200,168,75,.12);border-color:rgba(200,168,75,.36);color:var(--gold)}
+.filt-range{display:flex;gap:5px;align-items:center}
+.filt-range input{flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(200,168,75,.1);
+  border-radius:3px;padding:3px 6px;font-size:9px;color:var(--fg);outline:none;width:0;
+  font-family:inherit}
+.filt-range span{font-size:8px;color:var(--fg3)}
+.search-res{display:flex;flex-direction:column;gap:4px;max-height:240px;overflow-y:auto;scrollbar-width:none}
+.search-res::-webkit-scrollbar{display:none}
+.sr-item{padding:8px 10px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.045);
+  border-radius:4px;cursor:pointer;transition:.12s;display:flex;justify-content:space-between;align-items:center}
+.sr-item:hover{border-color:rgba(200,168,75,.3);transform:translateY(-1px)}
+.sr-item.ff{border-left:3px solid var(--free)}.sr-item.fr{border-left:3px solid var(--res)}
+.sr-item.fs{border-left:3px solid var(--sold)}.sr-item.fn{border-left:3px solid var(--none)}
+.sri-l{font-family:'Unbounded',sans-serif;font-size:11px;font-weight:900;color:var(--gold)}
+.sri-r{font-size:8px;color:var(--fg3);text-align:right}
+.sri-p{font-size:8px;color:var(--fg2);margin-top:1px}
+
+/* Analytics panel */
+.stat-row{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.stat-box{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05);
+  border-radius:5px;padding:9px 11px;text-align:center}
+.stat-box .sv{font-family:'Unbounded',sans-serif;font-size:18px;font-weight:900;color:var(--gold)}
+.stat-box .sl{font-size:7px;color:var(--fg3);letter-spacing:.1em;margin-top:2px}
+.chart-wrap{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);
+  border-radius:5px;padding:9px 11px;overflow:hidden}
+.chart-lbl{font-size:7px;color:var(--fg3);letter-spacing:.12em;margin-bottom:7px}
+.mini-bars{display:flex;align-items:flex-end;gap:3px;height:60px}
+.mb{flex:1;min-width:0;background:linear-gradient(to top,var(--golddk),var(--gold));
+  border-radius:2px 2px 0 0;transition:height 1s ease;cursor:pointer;position:relative}
+.mb:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);
+  background:rgba(2,5,12,.98);border:1px solid rgba(200,168,75,.2);border-radius:3px;
+  padding:2px 6px;font-size:7px;color:var(--gold);white-space:nowrap;z-index:99}
+.mb-free{background:linear-gradient(to top,rgba(34,197,94,.5),rgba(34,197,94,.9))}
+.mb-res{background:linear-gradient(to top,rgba(245,158,11,.5),rgba(245,158,11,.9))}
+.mb-sold{background:linear-gradient(to top,rgba(239,68,68,.5),rgba(239,68,68,.9))}
+.bar-xlbls{display:flex;gap:3px;margin-top:3px}
+.bar-xlbls span{flex:1;text-align:center;font-size:6px;color:var(--fg3)}
+.price-line{display:flex;align-items:center;gap:5px;padding:4px 0;
+  border-bottom:1px solid rgba(255,255,255,.04)}
+.price-line:last-child{border:none}
+.pl-rooms{font-size:9px;color:var(--gold);font-weight:600;width:40px;flex-shrink:0}
+.pl-bar{flex:1;height:4px;background:rgba(255,255,255,.05);border-radius:2px;overflow:hidden}
+.pl-fill{height:100%;border-radius:2px;background:linear-gradient(to right,var(--golddk),var(--gold))}
+.pl-price{font-size:8px;color:var(--fg2);text-align:right;width:70px;flex-shrink:0}
+
+/* Env panel */
+.env-item{display:flex;align-items:flex-start;gap:9px;padding:8px 10px;
+  background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.045);border-radius:5px}
+.env-icon{font-size:20px;flex-shrink:0;margin-top:1px}
+.env-title{font-size:10px;color:var(--fg);font-weight:500;margin-bottom:2px}
+.env-desc{font-size:8px;color:var(--fg3);line-height:1.5}
+.env-dist{font-size:8px;color:var(--gold);margin-top:3px}
+
+/* Floor panel */
+.fp-mini-grid{display:flex;flex-direction:column;gap:4px}
+.fp-fl-row{display:flex;align-items:center;gap:7px;padding:5px 8px;cursor:pointer;
+  border-radius:4px;transition:.12s;border:1px solid rgba(255,255,255,.04)}
+.fp-fl-row:hover{background:rgba(200,168,75,.06);border-color:rgba(200,168,75,.2)}
+.fp-fl-row.cur{background:rgba(200,168,75,.1);border-color:rgba(200,168,75,.36)}
+.fp-num{font-family:'Unbounded',sans-serif;font-size:10px;font-weight:700;color:var(--gold);width:34px}
+.fp-dots{display:flex;gap:3px;flex:1}
+.fp-dot{width:12px;height:12px;border-radius:2px;flex-shrink:0}
+.fp-free{background:var(--free)}.fp-res{background:var(--res)}
+.fp-sold{background:var(--sold)}.fp-none{background:var(--none)}
+.fp-pct{font-size:8px;color:var(--fg3);width:28px;text-align:right}
+
+/* Fav count badge */
+#favBadge{position:absolute;top:-4px;right:-5px;background:var(--sold);color:#fff;
+  font-size:7px;font-weight:700;padding:1px 4px;border-radius:8px;min-width:14px;
+  text-align:center;display:none;line-height:14px}
+
+/* Compare bar */
+#cmpBar{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);
+  background:rgba(2,5,12,.97);border:1px solid rgba(200,168,75,.2);border-radius:7px;
+  padding:7px 12px;display:none;align-items:center;gap:10px;z-index:40;
+  backdrop-filter:blur(12px)}
+.ctag{background:rgba(200,168,75,.12);border:1px solid rgba(200,168,75,.3);
+  border-radius:3px;padding:2px 6px;font-size:8px;color:var(--gold)}
+#cmpBtn{padding:5px 11px;background:linear-gradient(135deg,var(--golddk),var(--gold));
+  color:var(--bg);border:none;border-radius:4px;font-size:8px;font-weight:700;
+  cursor:pointer;opacity:.4;transition:.14s}
+
+/* Booking Modal */
+#bookModal{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.85);
+  display:none;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
+#bookModal.open{display:flex}
+.modal-box{background:rgba(2,5,12,.99);border:1px solid rgba(200,168,75,.2);
+  border-radius:8px;padding:22px 24px;max-width:380px;width:90%;max-height:85vh;overflow-y:auto}
+.modal-title{font-family:'Unbounded',sans-serif;font-size:14px;font-weight:900;color:var(--gold);margin-bottom:4px}
+.modal-sub{font-size:9px;color:var(--fg3);margin-bottom:16px}
+.form-row{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.form-lbl{font-size:8px;color:var(--fg3);letter-spacing:.1em}
+.form-inp{background:rgba(255,255,255,.04);border:1px solid rgba(200,168,75,.14);
+  border-radius:4px;padding:8px 11px;font-size:11px;color:var(--fg);outline:none;
+  font-family:inherit;transition:.14s;width:100%}
+.form-inp:focus{border-color:rgba(200,168,75,.44)}
+.form-inp::placeholder{color:var(--fg3)}
+.form-select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b8099'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center}
+.form-row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.form-note{font-size:8px;color:var(--fg3);margin-top:12px;line-height:1.5;
+  padding:8px;background:rgba(255,255,255,.02);border-radius:4px}
+
+/* Compare Modal */
+#cmpModal{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.88);
+  display:none;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
+#cmpModal.open{display:flex}
+.cmp-box{background:rgba(2,5,12,.99);border:1px solid rgba(200,168,75,.2);
+  border-radius:8px;padding:18px 20px;max-width:92vw;width:720px;max-height:88vh;overflow-y:auto}
+.cmp-grid{display:grid;gap:10px}
+.cmp-col{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);
+  border-radius:6px;overflow:hidden}
+.cmp-apt-n{font-family:'Unbounded',sans-serif;font-size:18px;font-weight:900;color:var(--gold);
+  padding:12px 14px 2px}
+.cmp-attr{padding:7px 14px;border-bottom:1px solid rgba(255,255,255,.04);
+  display:flex;justify-content:space-between;align-items:center;font-size:9px}
+.cmp-k{color:var(--fg3)}.cmp-v{color:var(--fg);font-weight:600;text-align:right}
+.cmp-attr.best .cmp-v{color:var(--free)}
+.cmp-attr.worst .cmp-v{color:var(--sold)}
+
+/* Amort table */
+.amort-wrap{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);
+  border-radius:5px;overflow:hidden;margin-top:6px}
+.amort-hdr{display:grid;grid-template-columns:40px 1fr 1fr 1fr;
+  padding:7px 11px;border-bottom:1px solid rgba(255,255,255,.07);
+  font-size:7px;color:var(--fg3);letter-spacing:.1em;gap:4px}
+.amort-row{display:grid;grid-template-columns:40px 1fr 1fr 1fr;
+  padding:5px 11px;border-bottom:1px solid rgba(255,255,255,.03);
+  font-size:8px;color:var(--fg2);gap:4px;transition:.1s}
+.amort-row:last-child{border:none}
+.amort-row:hover{background:rgba(200,168,75,.04)}
+.amort-row.yr{background:rgba(200,168,75,.06);color:var(--gold);font-weight:600}
+.amort-tabs{display:flex;gap:4px;margin-bottom:9px}
+.at{padding:4px 10px;border-radius:3px;border:1px solid rgba(200,168,75,.12);
+  background:transparent;font-size:8px;color:var(--fg2);cursor:pointer;transition:.12s}
+.at.on,.at:hover{background:rgba(200,168,75,.12);color:var(--gold);border-color:rgba(200,168,75,.3)}
+
+/* Share toast */
+#shareToast{position:fixed;top:70px;left:50%;transform:translateX(-50%) translateY(-10px);
+  background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);border-radius:5px;
+  padding:8px 16px;font-size:10px;color:var(--free);z-index:300;
+  opacity:0;transition:all .3s;pointer-events:none}
+#shareToast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* Mortgage tabs in apt overlay */
+.mort-tabs{display:flex;gap:4px;margin-bottom:9px}
+.mt{padding:4px 10px;border-radius:3px;border:1px solid rgba(200,168,75,.12);
+  background:transparent;font-size:8px;color:var(--fg2);cursor:pointer;transition:.12s}
+.mt.on,.mt:hover{background:rgba(200,168,75,.12);color:var(--gold);border-color:rgba(200,168,75,.3)}
+
+/* ══ LANGUAGE SWITCHER ══ */
+#langBar{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:35;
+  display:flex;gap:2px;background:rgba(2,5,12,.9);border:1px solid rgba(200,168,75,.12);
+  border-radius:5px;padding:2px;backdrop-filter:blur(10px)}
+.lbtn{padding:3px 9px;border-radius:3px;border:none;background:transparent;
+  font-size:8px;font-weight:700;color:var(--fg3);cursor:pointer;transition:.12s;letter-spacing:.08em}
+.lbtn.on,.lbtn:hover{background:rgba(200,168,75,.14);color:var(--gold)}
+
+/* ══ GALLERY MODAL ══ */
+#galModal{position:fixed;inset:0;z-index:250;background:rgba(0,0,0,.96);
+  display:none;flex-direction:column;align-items:center;justify-content:center}
+#galModal.open{display:flex}
+.gal-close{position:absolute;top:16px;right:20px;background:none;border:none;
+  color:var(--fg2);font-size:28px;cursor:pointer;z-index:5;line-height:1}
+.gal-main{width:min(90vw,780px);height:min(55vh,500px);border-radius:8px;overflow:hidden;
+  position:relative;background:#0a1428}
+.gal-img{width:100%;height:100%;object-fit:cover;display:none;position:absolute;inset:0}
+.gal-img.cur{display:block}
+.gal-img-placeholder{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:14px;color:var(--fg2)}
+.gal-prev,.gal-next{position:absolute;top:50%;transform:translateY(-50%);
+  background:rgba(2,5,12,.7);border:1px solid rgba(200,168,75,.2);border-radius:4px;
+  color:var(--gold);font-size:20px;cursor:pointer;padding:8px 14px;z-index:4;transition:.14s}
+.gal-prev{left:12px}.gal-next{right:12px}
+.gal-prev:hover,.gal-next:hover{background:rgba(200,168,75,.14)}
+.gal-thumbs{display:flex;gap:7px;margin-top:14px;max-width:90vw;overflow-x:auto;
+  scrollbar-width:none;padding-bottom:4px}
+.gal-thumbs::-webkit-scrollbar{display:none}
+.gal-thumb{width:80px;height:52px;border-radius:4px;overflow:hidden;cursor:pointer;
+  border:2px solid transparent;transition:.14s;flex-shrink:0;background:#0a1428;
+  display:flex;align-items:center;justify-content:center;font-size:20px}
+.gal-thumb.cur{border-color:var(--gold)}
+.gal-caption{color:var(--fg2);font-size:11px;margin-top:10px;text-align:center}
+.gal-counter{color:var(--fg3);font-size:9px;margin-top:4px;letter-spacing:.1em}
+
+/* ══ CONTACT FLOATING BUTTON ══ */
+#floatContact{position:fixed;right:12px;bottom:65px;z-index:35;
+  display:flex;flex-direction:column;gap:7px;align-items:flex-end}
+.fc-btn{display:flex;align-items:center;gap:7px;padding:7px 12px;border-radius:20px;
+  border:none;cursor:pointer;font-size:10px;font-weight:600;transition:.16s;
+  backdrop-filter:blur(10px)}
+.fc-wa{background:rgba(37,211,102,.15);border:1px solid rgba(37,211,102,.3);color:#25d366}
+.fc-ph{background:rgba(200,168,75,.12);border:1px solid rgba(200,168,75,.3);color:var(--gold)}
+.fc-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.4)}
+
+/* ══ ROI CALCULATOR ══ */
+#roiModal{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.88);
+  display:none;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
+#roiModal.open{display:flex}
+.roi-box{background:rgba(2,5,12,.99);border:1px solid rgba(200,168,75,.2);
+  border-radius:8px;padding:22px 24px;max-width:420px;width:90%;max-height:85vh;overflow-y:auto}
+.roi-title{font-family:'Unbounded',sans-serif;font-size:13px;font-weight:900;color:var(--gold);margin-bottom:14px}
+.roi-slider{width:100%;accent-color:var(--gold);cursor:pointer;margin:4px 0}
+.roi-val{font-family:'Unbounded',sans-serif;font-size:22px;font-weight:900;color:var(--gold)}
+.roi-row{display:flex;justify-content:space-between;align-items:center;
+  padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:9px}
+.roi-row:last-child{border:none}
+.roi-k{color:var(--fg3)}.roi-v{color:var(--fg);font-weight:600}
+.roi-v.pos{color:var(--free)}.roi-v.neg{color:var(--sold)}
+
+/* ══ QR MODAL ══ */
+#qrModal{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.88);
+  display:none;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
+#qrModal.open{display:flex}
+.qr-box{background:rgba(2,5,12,.99);border:1px solid rgba(200,168,75,.2);
+  border-radius:8px;padding:24px;text-align:center;max-width:300px;width:90%}
+#qrCanvas{border-radius:4px;margin:14px auto;display:block}
+.qr-hint{font-size:9px;color:var(--fg3);margin-top:8px;line-height:1.5}
+
+/* ══ PDF BUTTON in apt overlay ══ */
+.pdf-btn{display:flex;align-items:center;justify-content:center;gap:6px;
+  width:100%;padding:9px;background:transparent;
+  border:1px solid rgba(200,168,75,.18);color:var(--fg2);border-radius:5px;
+  font-size:9px;cursor:pointer;transition:.14s;margin-top:-4px}
+.pdf-btn:hover{border-color:rgba(200,168,75,.36);color:var(--gold)}
+</style>
+</head>
+<body>
+<div id="ld">
+  <div class="ld-logo">НЕКРУЗ<em> РЕЗИДЕНС</em></div>
+  <div class="ld-city">ДУШАНБЕ · ТАДЖИКИСТАН · 20 ЭТАЖЕЙ</div>
+  <div class="ld-bar"><div class="ld-fill" id="ldF"></div></div>
+  <div class="ld-msg" id="ldM">ИНИЦИАЛИЗАЦИЯ...</div>
+</div>
+
+<canvas id="c"></canvas>
+<div id="tip"></div>
+
+<!-- ══ LANGUAGE BAR ══ -->
+<div id="langBar">
+  <button class="lbtn on" onclick="setLang('ru')">РУС</button>
+  <button class="lbtn" onclick="setLang('tj')">ТОҶ</button>
+  <button class="lbtn" onclick="setLang('en')">ENG</button>
+</div>
+
+<!-- ══ FLOAT CONTACT BUTTONS ══ -->
+<div id="floatContact">
+  <button class="fc-btn fc-wa" onclick="openWA()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.126 1.533 5.86L.054 23.5l5.84-1.531A11.95 11.95 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.846 0-3.573-.498-5.057-1.367l-.363-.215-3.763.987.995-3.667-.236-.375A9.945 9.945 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+    WhatsApp
+  </button>
+  <button class="fc-btn fc-ph" onclick="callPhone()">📞 +992 44 600-00-00</button>
+</div>
+
+<div id="hd">
+  <div class="logo">НЕКРУЗ РЕЗИДЕНС<div class="logo-s">ЖК · ДУШАНБЕ · ТАДЖИКИСТАН</div></div>
+  <div class="hd-r">
+    <div class="stat-pill"><span class="sp-dot" style="background:var(--free)"></span><b id="sf">—</b>&thinsp;своб.</div>
+    <div class="stat-pill"><span class="sp-dot" style="background:var(--res)"></span><b id="sr">—</b>&thinsp;бронь</div>
+    <div class="stat-pill"><span class="sp-dot" style="background:var(--sold)"></span><b id="ss">—</b>&thinsp;прод.</div>
+    <button onclick="toggleSearch()" class="tbtn" title="Поиск" style="width:34px;height:28px;position:relative">🔍<span id="favCount" style="position:absolute;top:-4px;right:-4px;background:var(--gold);color:var(--bg);font-size:7px;font-weight:700;padding:0 3px;border-radius:8px;min-width:14px;text-align:center;line-height:14px;display:none"></span></button>
+    <button onclick="openFavs()" class="tbtn" title="Избранное" style="width:34px;height:28px;position:relative">♡<span id="favBadge" style="display:none"></span></button>
+  </div>
+</div>
+
+<div id="tb">
+  <div class="tg">
+    <div class="tl">ВИД</div>
+    <button class="tbtn on" id="v0">🔄</button>
+    <button class="tbtn" id="v1">▲</button>
+    <button class="tbtn" id="v2">◀</button>
+    <button class="tbtn" id="v3">🌅</button>
+    <button class="tbtn" id="v4">🏙️</button>
+  </div>
+  <div class="tg">
+    <div class="tl">РЕЖИМ</div>
+    <button class="tbtn" id="vXR">👁</button>
+    <button class="tbtn" id="vNT">🌙</button>
+  </div>
+  <div class="tg">
+    <div class="tl">ЭТАЖ</div>
+    <button class="fbtn on" data-fl="all">ВСЕ</button>
+    <div id="flsc"></div>
+  </div>
+</div>
+
+<div id="bot">
+  <button class="bbtn on" id="b0">🏢 Бино</button>
+  <button class="bbtn" id="b1">📐 Нақша</button>
+  <button class="bbtn" id="b2">📊 Аналитика</button>
+  <button class="bbtn" id="b3">🌳 Среда</button>
+</div>
+
+<div id="leg">
+  <div class="lr"><div class="lsq" style="background:var(--free)"></div>Свободна</div>
+  <div class="lr"><div class="lsq" style="background:var(--res)"></div>Забронирована</div>
+  <div class="lr"><div class="lsq" style="background:var(--sold)"></div>Продана</div>
+  <div class="lr"><div class="lsq" style="background:var(--none)"></div>Недоступна</div>
+</div>
+
+<div id="pgw">
+  <div class="pgl">ПРОГРЕСС ПРОДАЖ</div>
+  <div class="pgb"><div class="pgf" id="pgF"></div></div>
+  <div class="pgm"><span id="pgFree">—</span><span id="pgPct">—</span></div>
+</div>
+
+<!-- ══ GALLERY MODAL ══ -->
+<div id="galModal">
+  <button class="gal-close" onclick="document.getElementById('galModal').classList.remove('open')">×</button>
+  <div class="gal-main" id="galMain">
+    <button class="gal-prev" onclick="galNav(-1)">‹</button>
+    <button class="gal-next" onclick="galNav(1)">›</button>
+  </div>
+  <div class="gal-thumbs" id="galThumbs"></div>
+  <div class="gal-caption" id="galCaption"></div>
+  <div class="gal-counter" id="galCounter"></div>
+</div>
+
+<!-- ══ ROI MODAL ══ -->
+<div id="roiModal">
+  <div class="roi-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div class="roi-title">📈 КАЛЬКУЛЯТОР ROI</div>
+      <button onclick="document.getElementById('roiModal').classList.remove('open')"
+        style="background:none;border:none;color:var(--fg3);cursor:pointer;font-size:20px">×</button>
+    </div>
+    <div style="font-size:9px;color:var(--fg3);margin-bottom:14px" id="roiAptInfo">Выберите квартиру</div>
+    <div class="form-row">
+      <div class="filt-lbl">СРОК ИНВЕСТИЦИИ (лет)</div>
+      <input type="range" class="roi-slider" id="roiYears" min="1" max="10" value="5" oninput="calcROI()">
+      <div style="display:flex;justify-content:space-between;font-size:7px;color:var(--fg3)">
+        <span>1 год</span><span id="roiYrLbl">5 лет</span><span>10 лет</span>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="filt-lbl">ГОДОВОЙ РОСТ ЦЕН (%)</div>
+      <input type="range" class="roi-slider" id="roiGrowth" min="3" max="20" value="12" oninput="calcROI()">
+      <div style="display:flex;justify-content:space-between;font-size:7px;color:var(--fg3)">
+        <span>3%</span><span id="roiGrLbl">12%</span><span>20%</span>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="filt-lbl">АРЕНДА / МЕС. (TJS)</div>
+      <input type="range" class="roi-slider" id="roiRent" min="0" max="8000" step="200" value="2400" oninput="calcROI()">
+      <div style="display:flex;justify-content:space-between;font-size:7px;color:var(--fg3)">
+        <span>0</span><span id="roiRentLbl">2400 TJS</span><span>8000</span>
+      </div>
+    </div>
+    <div style="background:rgba(200,168,75,.06);border:1px solid rgba(200,168,75,.14);border-radius:6px;padding:12px 14px;margin-top:4px">
+      <div style="font-size:7px;color:var(--fg3);letter-spacing:.1em;margin-bottom:7px">РЕЗУЛЬТАТ ИНВЕСТИЦИИ</div>
+      <div style="text-align:center;margin-bottom:12px">
+        <div class="roi-val" id="roiProfit">+0 TJS</div>
+        <div style="font-size:8px;color:var(--fg3);margin-top:3px">Общая прибыль</div>
+      </div>
+      <div id="roiRows"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ QR MODAL ══ -->
+<div id="qrModal">
+  <div class="qr-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-family:'Unbounded',sans-serif;font-size:11px;font-weight:900;color:var(--gold)">QR-КОД</div>
+      <button onclick="document.getElementById('qrModal').classList.remove('open')"
+        style="background:none;border:none;color:var(--fg3);cursor:pointer;font-size:20px">×</button>
+    </div>
+    <div style="font-size:9px;color:var(--fg3);margin-bottom:10px" id="qrSub">Поделитесь квартирой</div>
+    <canvas id="qrCanvas" width="200" height="200"></canvas>
+    <div class="qr-hint">Отсканируйте QR-код для получения информации о квартире</div>
+    <button onclick="document.getElementById('qrModal').classList.remove('open')" class="cta1" style="margin-top:14px;font-size:9px;padding:9px">Закрыть</button>
+  </div>
+</div>
+
+<!-- ══════ SHARE TOAST ══════ -->
+<div id="shareToast">✓ Ссылка скопирована!</div>
+
+<!-- ══════ COMPARE BAR ══════ -->
+<div id="cmpBar" style="display:none">
+  <span style="font-size:9px;color:var(--fg3)">Сравнить:</span>
+  <div id="cmpList" style="display:flex;gap:4px"></div>
+  <button id="cmpBtn" onclick="openCompare()">СРАВНИТЬ</button>
+  <button onclick="compareList=[];updateCompareBar()" style="background:none;border:none;color:var(--fg3);cursor:pointer;font-size:14px;padding:0 2px">×</button>
+</div>
+
+<!-- ══════ PANEL: BUILDING (tab 0 — 3D view, no extra panel needed) ══════ -->
+
+<!-- ══════ PANEL: FLOOR SELECTOR (tab 1) ══════ -->
+<div id="panFloor" class="side-panel">
+  <div class="sp-hdr">
+    <h3>📐 НАҚШАИ ОШЁНА</h3>
+    <p>Выберите этаж для просмотра</p>
+  </div>
+  <div class="sp-body">
+    <div class="filt-row">
+      <div class="filt-lbl">ФИЛЬТР СТАТУСА</div>
+      <div class="filt-opts" id="fpFilt">
+        <button class="fopt on" data-st="all">Все</button>
+        <button class="fopt" data-st="free">Свободные</button>
+        <button class="fopt" data-st="sold">Проданные</button>
+      </div>
+    </div>
+    <div class="fp-mini-grid" id="fpMiniGrid"></div>
+  </div>
+</div>
+
+<!-- ══════ PANEL: ANALYTICS (tab 2) ══════ -->
+<div id="panAnalytics" class="side-panel">
+  <div class="sp-hdr">
+    <h3>📊 АНАЛИТИКА</h3>
+    <p>Статистика продаж ЖК</p>
+  </div>
+  <div class="sp-body" id="analyticsBody">
+    <!-- filled by renderAnalytics() -->
+  </div>
+</div>
+
+<!-- ══════ PANEL: ENVIRONMENT (tab 3) ══════ -->
+<div id="panEnv" class="side-panel">
+  <div class="sp-hdr">
+    <h3>🌳 ИНФРАСТРУКТУРА</h3>
+    <p>Окружение и расстояния</p>
+  </div>
+  <div class="sp-body" id="envBody">
+    <!-- filled by renderEnvPanel() -->
+  </div>
+</div>
+
+<!-- ══════ SEARCH PANEL (always visible when open) ══════ -->
+<div id="panSearch" style="position:fixed;right:10px;top:58px;bottom:52px;width:260px;z-index:25;
+  background:rgba(2,5,12,.97);border:1px solid rgba(200,168,75,.1);border-radius:8px;
+  overflow-y:auto;display:none;flex-direction:column;backdrop-filter:blur(16px)">
+  <div class="sp-hdr" style="display:flex;justify-content:space-between;align-items:center">
+    <div><h3>🔍 ПОИСК</h3><p id="srCount">Все квартиры</p></div>
+    <button onclick="document.getElementById('panSearch').style.display='none'"
+      style="background:none;border:none;color:var(--fg3);cursor:pointer;font-size:16px">×</button>
+  </div>
+  <div class="sp-body">
+    <div class="filt-row">
+      <div class="filt-lbl">КОМНАТ</div>
+      <div class="filt-opts" id="fRooms">
+        <button class="fopt on" data-v="0">Все</button>
+        <button class="fopt" data-v="1">1</button>
+        <button class="fopt" data-v="2">2</button>
+        <button class="fopt" data-v="3">3</button>
+        <button class="fopt" data-v="4">4+</button>
+      </div>
+    </div>
+    <div class="filt-row">
+      <div class="filt-lbl">СТАТУС</div>
+      <div class="filt-opts" id="fStatus">
+        <button class="fopt on" data-v="all">Все</button>
+        <button class="fopt" data-v="free">Свободные</button>
+        <button class="fopt" data-v="res">Бронь</button>
+      </div>
+    </div>
+    <div class="filt-row">
+      <div class="filt-lbl">ЦЕНА (тыс. TJS)</div>
+      <div class="filt-range">
+        <input type="number" id="prMin" placeholder="от" class="form-inp" style="font-size:9px;padding:4px 7px">
+        <span>—</span>
+        <input type="number" id="prMax" placeholder="до" class="form-inp" style="font-size:9px;padding:4px 7px">
+      </div>
+    </div>
+    <div class="filt-row">
+      <div class="filt-lbl">ЭТАЖ</div>
+      <div class="filt-range">
+        <input type="number" id="flMin" placeholder="от 1" min="1" max="20" class="form-inp" style="font-size:9px;padding:4px 7px">
+        <span>—</span>
+        <input type="number" id="flMax" placeholder="до 20" min="1" max="20" class="form-inp" style="font-size:9px;padding:4px 7px">
+      </div>
+    </div>
+    <button onclick="applySearch()" class="cta1" style="font-size:9px;padding:9px">Найти квартиры</button>
+    <div class="search-res" id="srResults"></div>
+  </div>
+</div>
+
+<!-- ══════ BOOKING MODAL ══════ -->
+<div id="bookModal">
+  <div class="modal-box">
+    <div class="modal-title">БРОНИРОВАНИЕ</div>
+    <div class="modal-sub" id="bookSub">Квартира — ЖК Некруз Резиденс</div>
+    <div class="form-row">
+      <div class="form-lbl">ФИО</div>
+      <input class="form-inp" placeholder="Иванов Иван Иванович" id="bkName">
+    </div>
+    <div class="form-row2">
+      <div class="form-row" style="margin-bottom:0">
+        <div class="form-lbl">ТЕЛЕФОН</div>
+        <input class="form-inp" placeholder="+992 90 000-00-00" id="bkPhone">
+      </div>
+      <div class="form-row" style="margin-bottom:0">
+        <div class="form-lbl">E-MAIL</div>
+        <input class="form-inp" placeholder="email@mail.ru" id="bkEmail">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-lbl">СПОСОБ ОПЛАТЫ</div>
+      <select class="form-inp form-select" id="bkPay">
+        <option value="cash">Наличные (100% / рассрочка)</option>
+        <option value="mort">Ипотека Эсхата банка</option>
+        <option value="inst">Рассрочка от застройщика</option>
+        <option value="mat">Материнский капитал</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-lbl">УДОБНОЕ ВРЕМЯ ЗВОНКА</div>
+      <select class="form-inp form-select" id="bkTime">
+        <option>09:00–11:00</option>
+        <option>11:00–13:00</option>
+        <option>14:00–16:00</option>
+        <option>16:00–18:00</option>
+        <option>18:00–20:00</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-lbl">КОММЕНТАРИЙ</div>
+      <textarea class="form-inp" rows="2" placeholder="Дополнительные пожелания..." id="bkNote" style="resize:none"></textarea>
+    </div>
+    <div class="form-note">
+      📌 Бронирование действует 5 рабочих дней. Залог 1 000 TJS (входит в стоимость).
+      Менеджер свяжется с вами в течение часа.
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="cta1" onclick="submitBooking()" style="flex:1">Забронировать</button>
+      <button class="cta2" onclick="document.getElementById('bookModal').classList.remove('open')" style="margin:0;flex:0 0 auto;padding:11px 16px">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ COMPARE MODAL ══════ -->
+<div id="cmpModal">
+  <div class="cmp-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-family:'Unbounded',sans-serif;font-size:13px;font-weight:900;color:var(--gold)">СРАВНЕНИЕ КВАРТИР</div>
+      <button onclick="document.getElementById('cmpModal').classList.remove('open')"
+        style="background:none;border:none;color:var(--fg3);cursor:pointer;font-size:20px;line-height:1">×</button>
+    </div>
+    <div class="cmp-grid" id="cmpGrid"></div>
+  </div>
+</div>
+
+<!-- ══════ AMORT MODAL ══════ -->
+<div id="amortModal" style="position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.88);
+  display:none;align-items:center;justify-content:center;backdrop-filter:blur(8px)">
+  <div class="cmp-box" style="max-width:520px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-family:'Unbounded',sans-serif;font-size:12px;font-weight:900;color:var(--gold)">ГРАФИК ПЛАТЕЖЕЙ</div>
+      <button onclick="document.getElementById('amortModal').style.display='none'"
+        style="background:none;border:none;color:var(--fg3);cursor:pointer;font-size:20px">×</button>
+    </div>
+    <div style="font-size:9px;color:var(--fg3);margin-bottom:11px" id="amortSub"></div>
+    <div class="amort-tabs">
+      <button class="at on" data-y="5" onclick="setAmortY(5,this)">5 лет</button>
+      <button class="at" data-y="10" onclick="setAmortY(10,this)">10 лет</button>
+      <button class="at" data-y="15" onclick="setAmortY(15,this)">15 лет</button>
+      <button class="at" data-y="20" onclick="setAmortY(20,this)">20 лет</button>
+    </div>
+    <div style="font-size:10px;color:var(--gold);margin-bottom:7px" id="amortTotal"></div>
+    <div class="amort-wrap" style="max-height:52vh;overflow-y:auto">
+      <div class="amort-hdr"><span>ГОД</span><span>МЕС. ПЛАТЁЖ</span><span>ОСНОВНОЙ</span><span>ПРОЦЕНТЫ</span></div>
+      <div id="amortRows"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ APARTMENT PAGE ══════════ -->
+<div id="aptPg">
+  <div class="ov-nav">
+    <button class="back-btn" onclick="closeApt()">← Назад к 3D</button>
+    <div class="ov-status st-f" id="apBadge">Свободна</div>
+  </div>
+  <div class="ov-body">
+    <div>
+      <div class="apt-num" id="apNum">101</div>
+      <div class="apt-addr" id="apAddr">ЖК Некруз Резиденс · 1 этаж · Секция А · Душанбе</div>
+    </div>
+    <div class="row4">
+      <div class="ic"><div class="cl">КОМНАТ</div><div class="cv" id="apRm">2</div></div>
+      <div class="ic"><div class="cl">ПЛОЩАДЬ</div><div class="cv" id="apSq">68 м²</div></div>
+      <div class="ic"><div class="cl">ЭТАЖ</div><div class="cv" id="apFl">1 из 20</div></div>
+      <div class="ic"><div class="cl">ПОТОЛОК</div><div class="cv">3.0 м</div></div>
+    </div>
+    <div class="pbox">
+      <div class="pl">СТОИМОСТЬ КВАРТИРЫ</div>
+      <div class="pv" id="apPr">0 TJS</div>
+      <div class="pu" id="apUs">≈ 0 USD</div>
+      <div class="psm" id="apPsm">≈ 0 TJS / м²</div>
+    </div>
+
+    <!-- REAL FLOOR PLAN -->
+    <div class="planbox">
+      <div class="planbox-hd">ПЛАНИРОВКА КВАРТИРЫ<span id="planSize">—</span></div>
+      <canvas id="bigPlan" width="548" height="320" style="display:block;width:100%"></canvas>
+    </div>
+
+    <div class="feats">
+      <div class="feat feat-p"><div class="fi">🏗️</div>Монолит ж/б</div>
+      <div class="feat feat-p"><div class="fi">🛗</div>2 лифта Otis</div>
+      <div class="feat feat-p"><div class="fi">🅿️</div>Паркинг Б1</div>
+      <div class="feat"><div class="fi">🔥</div>Теплый пол</div>
+      <div class="feat"><div class="fi">🔒</div>Охрана 24/7</div>
+      <div class="feat" id="apView"><div class="fi">🌆</div>Вид на город</div>
+      <div class="feat"><div class="fi">📡</div>Оптоволокно</div>
+      <div class="feat"><div class="fi">💧</div>Центр. вода</div>
+      <div class="feat"><div class="fi">🌡️</div>Центр. тепло</div>
+    </div>
+
+    <!-- FLOOR PROGRESS -->
+    <div class="flprog">
+      <div class="flprog-h">ПРОДАЖИ НА СОСЕДНИХ ЭТАЖАХ</div>
+      <div class="flrows" id="flRows"></div>
+    </div>
+
+    <div class="mort">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px">
+        <div class="mort-h">ИПОТЕКА · 30% ПЕРВЫЙ ВЗНОС · СТАВКА 11.5% / ГОД</div>
+        <button onclick="openAmort()" class="cta2" style="margin:0;padding:4px 10px;font-size:8px;width:auto">Таблица</button>
+      </div>
+      <div class="mort-g">
+        <div class="mi"><div class="mv" id="apM20">—</div><div class="ml2">20 лет · мес.</div></div>
+        <div class="mi"><div class="mv" id="apM10">—</div><div class="ml2">10 лет · мес.</div></div>
+        <div class="mi"><div class="mv" id="apM5">—</div><div class="ml2">5 лет · мес.</div></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:7px">
+      <button class="cta1" id="apCta" style="flex:1">Забронировать квартиру</button>
+    </div>
+    <div style="display:flex;gap:7px">
+      <button class="cta2" id="favBtn" onclick="toggleFavCurrent()" style="margin:0;flex:1">♡ В избранное</button>
+      <button class="cta2" onclick="addCompareCurrent()" style="margin:0;flex:0 0 auto;padding:11px 14px">⚖️</button>
+      <button class="cta2" onclick="shareApt()" style="margin:0;flex:0 0 auto;padding:11px 14px">🔗</button>
+    </div>
+    <button class="cta2" onclick="openConsult()">📞 Получить консультацию</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
+      <button class="pdf-btn" onclick="exportPDF()">📄 Скачать PDF</button>
+      <button class="pdf-btn" onclick="openROI()">📈 Доходность</button>
+      <button class="pdf-btn" onclick="openGallery()">🖼️ Фото объекта</button>
+      <button class="pdf-btn" onclick="openQR()">📱 QR-код</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ FLOOR PAGE ══════════ -->
+<div id="flPg">
+  <div class="fl-h">
+    <div>
+      <div class="fl-t" id="fpTitle">ЭТАЖ 1</div>
+      <div class="fl-s" id="fpSub">8 квартир · ЖК Некруз Резиденс</div>
+    </div>
+    <button class="back-btn" onclick="closeFl()">← Назад к 3D</button>
+  </div>
+  <div class="fl-b">
+    <div class="planbox">
+      <div class="planbox-hd">ПЛАН ЭТАЖА</div>
+      <canvas id="flPlan" width="648" height="260" style="display:block;width:100%"></canvas>
+    </div>
+    <div class="fl-grid" id="fpGrid"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ═══════════════════════════════════════
+   ДАННЫЕ — рақамгузорӣ аз 1
+═══════════════════════════════════════ */
+const FL=20, APFL=8, PPM=5200, USD_RATE=10.9;
+
+// 8 квартира: 4 рӯбарӯ (slot 0-3) + 4 паси (slot 4-7)
+const CFG=[
+  {rooms:1,area:42,orient:'front'},
+  {rooms:2,area:68,orient:'front'},
+  {rooms:3,area:95,orient:'front'},
+  {rooms:4,area:130,orient:'front'},
+  {rooms:2,area:72,orient:'back'},
+  {rooms:3,area:98,orient:'back'},
+  {rooms:2,area:65,orient:'back'},
+  {rooms:1,area:44,orient:'back'},
+];
+
+function rng(s){let x=s;return()=>{x=Math.imul(x^x>>>15,1|x);x^=x+Math.imul(x^x>>>7,61|x);return((x^x>>>14)>>>0)/4294967296}}
+const R=rng(2024);
+
+const apts=[];
+for(let f=1;f<=FL;f++){
+  for(let s=0;s<APFL;s++){
+    const v=R();
+    const {rooms,area,orient}=CFG[s];
+    const flBonus=1+(f-1)*.022;
+    const price=Math.round(area*PPM*flBonus/1000)*1000;
+    const status=v<.42?'free':v<.60?'res':v<.88?'sold':'none';
+    // Рақам аз 1 сар: хонаи 1-уми ошёнаи 1 = квартира №1
+    const num=(f-1)*APFL+(s+1); // 1,2...8,9...160
+    apts.push({floor:f,slot:s,rooms,area,price,status,num,orient});
+  }
+}
+
+const nF=apts.filter(a=>a.status==='free').length;
+const nR=apts.filter(a=>a.status==='res').length;
+const nS=apts.filter(a=>a.status==='sold').length;
+document.getElementById('sf').textContent=nF;
+document.getElementById('sr').textContent=nR;
+document.getElementById('ss').textContent=nS;
+const pct=Math.round((nS+nR)/apts.length*100);
+document.getElementById('pgFree').textContent=nF+' свободных';
+document.getElementById('pgPct').textContent=pct+'% реализовано';
+setTimeout(()=>document.getElementById('pgF').style.width=pct+'%',2400);
+
+// Floor buttons
+const flsc=document.getElementById('flsc');
+for(let f=FL;f>=1;f--){
+  const b=document.createElement('button');
+  b.className='fbtn';b.dataset.fl=f;b.textContent=f;
+  flsc.appendChild(b);
+}
+
+/* ═══════════════════════════════════════
+   BABYLON.JS ENGINE
+═══════════════════════════════════════ */
+const canvas=document.getElementById('c');
+const engine=new BABYLON.Engine(canvas,true,{antialias:true,stencil:true});
+engine.setHardwareScalingLevel(1/Math.min(devicePixelRatio,2));
+const scene=new BABYLON.Scene(engine);
+scene.clearColor=new BABYLON.Color4(.012,.026,.056,1);
+scene.fogMode=BABYLON.Scene.FOGMODE_EXP2;
+scene.fogColor=new BABYLON.Color3(.008,.02,.045);
+scene.fogDensity=.0038;
+
+const cam=new BABYLON.ArcRotateCamera('cam',-.42,1.08,96,new BABYLON.Vector3(0,32,0),scene);
+cam.lowerRadiusLimit=14;cam.upperRadiusLimit=180;
+cam.lowerBetaLimit=.05;cam.upperBetaLimit=1.5;
+cam.wheelDeltaPercentage=.016;cam.pinchDeltaPercentage=.016;
+cam.attachControl(canvas,true);
+
+// LIGHTS
+const sky=new BABYLON.HemisphericLight('sky',new BABYLON.Vector3(0,1,0),scene);
+sky.intensity=.28;sky.diffuse=new BABYLON.Color3(.08,.16,.36);
+sky.groundColor=new BABYLON.Color3(.018,.05,.1);
+
+const sun=new BABYLON.DirectionalLight('sun',new BABYLON.Vector3(-.65,-1.0,-.6),scene);
+sun.intensity=3.4;sun.diffuse=new BABYLON.Color3(1,.97,.92);
+sun.position=new BABYLON.Vector3(80,160,70);
+
+const fill=new BABYLON.DirectionalLight('fill',new BABYLON.Vector3(.5,-.15,.65),scene);
+fill.intensity=.44;fill.diffuse=new BABYLON.Color3(.16,.28,.54);
+
+const goldPt=new BABYLON.PointLight('gpt',new BABYLON.Vector3(0,5,16),scene);
+goldPt.intensity=3.0;goldPt.diffuse=new BABYLON.Color3(.8,.64,.14);goldPt.range=140;
+
+const shad=new BABYLON.ShadowGenerator(2048,sun);
+shad.useBlurExponentialShadowMap=true;shad.blurScale=2;
+
+const C3=BABYLON.Color3;
+
+/* PBR helpers */
+function pbr(col,met,rou,emi,ei){
+  const m=new BABYLON.PBRMaterial('p'+col+Math.random(),scene);
+  m.albedoColor=C3.FromHexString(col);
+  m.metallic=met||0;m.roughness=rou===undefined?.9:rou;
+  if(emi){m.emissiveColor=C3.FromHexString(emi);m.emissiveIntensity=ei||1;}
+  return m;
+}
+function std(col,emi,ei){
+  const m=new BABYLON.StandardMaterial('s'+Math.random(),scene);
+  m.diffuseColor=C3.FromHexString(col);
+  if(emi){m.emissiveColor=C3.FromHexString(emi);m.emissiveIntensity=ei||1;}
+  return m;
+}
+function glassM(r,g,b,a,ei){
+  const m=new BABYLON.PBRMaterial('gl'+Math.random(),scene);
+  m.albedoColor=new C3(r,g,b);m.alpha=a||.72;
+  m.metallic=.08;m.roughness=.04;
+  if(ei){m.emissiveColor=new C3(r*.5,g*.5,b*.5);m.emissiveIntensity=ei;}
+  return m;
+}
+
+/* Window material */
+const WMAT={};
+const WDEF={free:{a:'#082010',e:'#0a3814',ei:1.6},res:{a:'#201800',e:'#3d2a00',ei:1.1},
+            sold:{a:'#1e0808',e:'#380808',ei:.85},none:{a:'#06090e',e:'#000000',ei:.03}};
+function getWM(st){
+  if(!WMAT[st]){const d=WDEF[st];const m=new BABYLON.PBRMaterial('wm'+st,scene);
+    m.albedoColor=C3.FromHexString(d.a);m.emissiveColor=C3.FromHexString(d.e);
+    m.emissiveIntensity=d.ei;m.metallic=0;m.roughness=.05;m.alpha=.95;WMAT[st]=m;}
+  return WMAT[st];
+}
+
+/* Geometry helpers */
+const wmeshes=[];
+function bx(n,w,h,d,mat,pos,sh){
+  const m=BABYLON.MeshBuilder.CreateBox(n,{width:w,height:h,depth:d},scene);
+  m.position.set(pos[0],pos[1],pos[2]);m.material=mat;
+  if(sh){m.receiveShadows=true;shad.addShadowCaster(m);}
+  return m;
+}
+function cy(n,rt,rb,h,t,mat,pos,sh){
+  const m=BABYLON.MeshBuilder.CreateCylinder(n,{diameterTop:rt*2,diameterBottom:rb*2,height:h,tessellation:t},scene);
+  m.position.set(pos[0],pos[1],pos[2]);m.material=mat;
+  if(sh) shad.addShadowCaster(m);
+  return m;
+}
+
+/* ═══════════════════════════════════════
+   МАТЕРИАЛҲО
+═══════════════════════════════════════ */
+const M={
+  base: pbr('#070e1c',0,.97),
+  conc: pbr('#0c1826',0,.92),
+  face: pbr('#12223a',0,.86),
+  col:  pbr('#192d44',0,.82),
+  dark: pbr('#050810',0,.99),
+  gold: pbr('#c8a84b',.88,.2,'#7a6020',.7),
+  gld2: pbr('#a08030',.72,.3,'#4a3010',.45),
+  gld3: pbr('#e0c060',.92,.18,'#9a7828',.8),
+  rail: pbr('#182840',.36,.7),
+  gnd:  pbr('#03060e',0,1),
+  asph: pbr('#020408',0,1),
+  grass:pbr('#060e08',0,.98),
+};
+
+/* ═══════════════════════════════════════
+   БИНОИ АСОСӢ — АРХИТЕКТУРАИ ВОҚЕӢ
+═══════════════════════════════════════ */
+// Пропорсия: 28м × 14м, 20 ошёна × 3.5м + лоббӣ 7м
+const BW=28, BD=14, FH=3.5, LH=7.0;
+const COLS_F=4, COLS_B=4;
+const BAY=BW/COLS_F; // 7м ҳар бай
+
+function buildBuilding(){
+  /* ── ПОЙГОҲ ──*/
+  bx('f0',BW+10,.7,BD+10,M.dark,[0,-.35,0],true);
+  bx('f1',BW+6,.5,BD+6,M.base,[0,.25,0],true);
+  bx('f2',BW+3,.4,BD+3,M.conc,[0,.7,0],true);
+  bx('f3',BW+1,.24,BD+1,M.gld2,[0,.97,0]);
+  // Плитаи кориш
+  bx('kZ',BW+1.4,.12,BD+1.4,M.col,[0,1.08,0]);
+
+  /* ── ЛОББӢ / ПОДИУМ (7м) ──*/
+  // Корпус
+  bx('lbk',BW,.92*LH,BD,M.base,[0,LH*.46,0],true);
+  // Фасади пеш
+  bx('lbkF',BW,.92*LH,.18,M.face,[0,LH*.46,BD/2+.1],true);
+  // Фасади паҳлӯҳо
+  bx('lbkL',.18,.92*LH,BD,M.face,[-(BW/2+.09),LH*.46,0],true);
+  bx('lbkR',.18,.92*LH,BD,M.face,[ (BW/2+.09),LH*.46,0],true);
+  // Фасади пас
+  bx('lbkB',BW,.92*LH,.18,M.conc,[0,LH*.46,-(BD/2+.09)]);
+
+  // Бандҳои уфуқии лоббӣ
+  for(let y=1.8;y<LH;y+=1.4){
+    bx('lb'+y,BW+.3,.12,BD+.3,M.gld2,[0,y,0]);
+  }
+
+  // 6 КОЛОННАИ ДУМАЛОҚ ДАР ЛОББӢ
+  const colXS=[-11,-6.5,-2,2,6.5,11];
+  colXS.forEach((cx,i)=>{
+    cy(`lc${i}`,.3,.34,LH*.9,14,M.col,[cx,LH*.45,BD/2+.42],true);
+    bx(`lch${i}`,.7,.26,.7,M.gld2,[cx,LH-.16,BD/2+.42]);
+    bx(`lcb${i}`,.62,.22,.62,M.gld2,[cx,1.22,BD/2+.42]);
+  });
+
+  // ШИШАИ ЛОББӢ байни колоннаҳо
+  for(let i=0;i<5;i++){
+    const cx=(colXS[i]+colXS[i+1])/2;
+    const gw=Math.abs(colXS[i+1]-colXS[i])-.7;
+    const gm=glassM(.04,.18,.38,.75,.35);
+    bx(`lbg${i}`,gw,LH*.82,.07,gm,[cx,LH*.4,BD/2+.36]);
+  }
+
+  // КАРНИЗ ЛОББӢ 2 зина
+  bx('lc1',BW+.6,.36,BD+.6,M.gold,[0,LH-.18,0]);
+  bx('lc2',BW+1.0,.2,BD+1.0,M.gld2,[0,LH+.07,0]);
+  bx('lc3',BW+.3,.12,BD+.3,M.gld3,[0,LH+.3,0]);
+
+  // ВУРУДИ АСОСӢ — ПАДЕЗ
+  // Зинапоя 3 қадам
+  bx('es1',10.5,.22,5.0,M.base,[0,.24,BD/2+2.5],true);
+  bx('es2',9.5,.22,3.5,M.conc,[0,.46,BD/2+1.75],true);
+  bx('es3',8.5,.22,2.0,M.col,[0,.68,BD/2+1.0],true);
+  // Платформаи вуруд
+  bx('ep',8.0,.18,.8,M.gld2,[0,.86,BD/2+.4]);
+  // Дари шишаи вуруд
+  const dm=glassM(.05,.22,.44,.82,.4);
+  bx('d1',2.2,LH*.5,.08,dm,[  -1.1,LH*.25,BD/2+.14]);
+  bx('d2',2.2,LH*.5,.08,dm,[   1.1,LH*.25,BD/2+.14]);
+  // Деворчаи дари вуруд
+  bx('dW',6.0,LH*.5,.14,M.face,[0,LH*.25,BD/2+.14]);
+  bx('dW2',6.2,.22,.16,M.gold,[0,LH*.52,BD/2+.14]);
+  // 2 колоннаи бузурги вуруд
+  cy('ec1',.36,.42,LH*.72,12,M.gold,[-5.0,LH*.36,BD/2+5.2],true);
+  cy('ec2',.36,.42,LH*.72,12,M.gold,[ 5.0,LH*.36,BD/2+5.2],true);
+  // Навдаи вуруд (canopy)
+  bx('can',12.5,.34,6.0,M.gld2,[0,LH+.16,BD/2+2.8]);
+  bx('can2',11.8,.14,5.4,M.gold,[0,LH+.36,BD/2+2.8]);
+  bx('can3',12.0,.08,5.6,M.gld3,[0,LH+.5,BD/2+2.8]);
+  // Нури вуруд
+  const eL=new BABYLON.PointLight('eL',new BABYLON.Vector3(0,LH*.35,BD/2+6),scene);
+  eL.intensity=4.0;eL.diffuse=new C3(.85,.72,.18);eL.range=22;
+
+  /* ── 20 ОШЁНА ──*/
+  for(let fl=1;fl<=FL;fl++){
+    const y0=LH+(fl-1)*FH;
+    const ym=y0+FH/2;
+
+    // Деворҳои паҳлӯ ва пас
+    bx(`wkB${fl}`,BW+.2,.88*FH,.22,M.conc,[0,ym,-(BD/2+.1)],true);
+    bx(`wkL${fl}`,.22,.88*FH,BD+.2,M.conc,[-(BW/2+.1),ym,0],true);
+    bx(`wkR${fl}`,.22,.88*FH,BD+.2,M.conc,[ (BW/2+.1),ym,0],true);
+    bx(`slab${fl}`,BW+.4,.2,BD+.4,M.base,[0,y0+.1,0],true);
+
+    // Банди уфуқӣ ясамии 5 ошёна
+    if(fl%5===0){
+      bx(`gbig${fl}`,BW+.75,.34,BD+.75,M.gold,[0,y0-.15,0]);
+      bx(`gbig2${fl}`,BW+.55,.14,BD+.55,M.gld2,[0,y0+.1,0]);
+    } else if(fl%2===0){
+      bx(`gmd${fl}`,BW+.42,.14,BD+.42,M.gld2,[0,y0-.06,0]);
+    } else {
+      bx(`gsm${fl}`,BW+.3,.08,BD+.3,M.gld3,[0,y0-.03,0]);
+    }
+
+    // ── ФАСАДИ РӮБАРӯ — 4 бай ──
+    for(let col=0;col<COLS_F;col++){
+      const cx=(col-(COLS_F-1)/2)*BAY;
+      const apt=apts.find(a=>a.floor===fl&&a.slot===col);
+      if(!apt) continue;
+
+      // ПИЛАСТР (ғафс: 0.44м, чуқурӣ: 0.5м)
+      if(col===0){
+        bx(`pilL${fl}0`,.44,.88*FH,.5,M.col,[cx-BAY/2,ym,BD/2+.26],true);
+        bx(`pilLgT${fl}`,.44,.14,.52,M.gold,[cx-BAY/2,y0-.09,BD/2+.26]);
+        bx(`pilLgB${fl}`,.44,.14,.52,M.gold,[cx-BAY/2,y0+FH*.88,BD/2+.26]);
+      }
+      bx(`pilR${fl}${col}`,.44,.88*FH,.5,M.col,[cx+BAY/2,ym,BD/2+.26],true);
+      bx(`pilRgT${fl}${col}`,.44,.14,.52,M.gold,[cx+BAY/2,y0-.09,BD/2+.26]);
+      bx(`pilRgB${fl}${col}`,.44,.14,.52,M.gold,[cx+BAY/2,y0+FH*.88,BD/2+.26]);
+
+      // РЕЦЕССИЯИ ЧУҚУР байни тирезаҳо (спандрел)
+      bx(`spD${fl}${col}`,BAY-.52,.56,.44,M.dark,[cx,y0+.32,BD/2+.24]);
+      bx(`spF${fl}${col}`,BAY-.56,.48,.32,M.face,[cx,y0+.32,BD/2+.3]);
+      bx(`spGB${fl}${col}`,BAY-.46,.08,.46,M.gld2,[cx,y0+.62,BD/2+.22]);
+
+      // ЛИНТЕЛ (болои тиреза)
+      bx(`ltD${fl}${col}`,BAY-.52,.54,.44,M.dark,[cx,y0+FH*.78,BD/2+.24]);
+      bx(`ltF${fl}${col}`,BAY-.56,.46,.32,M.face,[cx,y0+FH*.78,BD/2+.3]);
+      bx(`ltGT${fl}${col}`,BAY-.46,.08,.46,M.gld3,[cx,y0+FH*.94,BD/2+.22]);
+
+      // ── ТИРЕЗА (чуқурии воқеӣ, 4-тарафа reveal) ──
+      const ww=BAY*.6, wh=FH*.54;
+      const wy=ym+.1;
+      // Reveal чуқур
+      bx(`rvT${fl}${col}`,ww+.22,.12,.3,M.dark,[cx,wy+wh/2+.07,BD/2+.14]);
+      bx(`rvB${fl}${col}`,ww+.22,.1,.3,M.dark,[cx,wy-wh/2+.0,BD/2+.14]);
+      bx(`rvL${fl}${col}`,.12,wh+.14,.3,M.dark,[cx-ww/2-.08,wy,BD/2+.14]);
+      bx(`rvR${fl}${col}`,.12,wh+.14,.3,M.dark,[cx+ww/2+.08,wy,BD/2+.14]);
+      // Windowsill
+      bx(`ws${fl}${col}`,ww+.3,.1,.26,M.gld3,[cx,wy-wh/2-.07,BD/2+.18]);
+
+      // ШИШАИ ТИРЕЗА (статус)
+      const wm=getWM(apt.status);
+      const wb=bx(`w${fl}${col}`,ww,wh,.09,wm,[cx,wy,BD/2+.3]);
+      wb.userData={apt};wb.isPickable=true;wmeshes.push(wb);
+
+      // МУЛИОН (+)
+      bx(`mH${fl}${col}`,ww,.052,.055,M.gold,[cx,wy,BD/2+.28]);
+      bx(`mV${fl}${col}`,.052,wh,.055,M.gold,[cx,wy,BD/2+.28]);
+      // Рамка берунӣ
+      bx(`fH${fl}${col}`,ww+.1,.068,.065,M.gold,[cx,wy,BD/2+.26]);
+      bx(`fV${fl}${col}`,.068,wh+.1,.065,M.gold,[cx,wy,BD/2+.26]);
+
+      // ── БАЛКОН (аз 2 ошёна) ──
+      if(fl>=2&&fl<FL){
+        const bz=BD/2+1.1;
+        const bw=BAY*.72, bdd=1.65, bh=1.08;
+        bx(`bpl${fl}${col}`,bw,.22,bdd,M.base,[cx,y0+.12,bz],true);
+        bx(`bfl${fl}${col}`,bw-.06,.04,bdd-.04,M.conc,[cx,y0+.24,bz]);
+        // Деворчаи паҳлӯ
+        bx(`bwL${fl}${col}`,.12,bh,bdd+.12,M.conc,[cx-bw/2+.06,y0+.72,bz-.06]);
+        bx(`bwR${fl}${col}`,.12,bh,bdd+.12,M.conc,[cx+bw/2-.06,y0+.72,bz-.06]);
+        // Постҳои нарда (5 дона)
+        for(let ri=0;ri<5;ri++){
+          const px=cx-bw*.36+ri*(bw*.18);
+          bx(`rp${fl}${col}${ri}`,.06,bh,.06,M.rail,[px,y0+.72,bz+bdd/2-.05]);
+        }
+        // Нардаи боло (тиллоӣ)
+        bx(`rhn${fl}${col}`,bw-.07,.08,.08,M.gold,[cx,y0+1.18,bz+bdd/2-.05]);
+        // Шишаи балкон
+        const bg=glassM(.04,.17,.34,.4);
+        bx(`bgl${fl}${col}`,bw-.14,bh-.1,.045,bg,[cx,y0+.72,bz+bdd/2-.03]);
+      }
+    }
+
+    // ── ФАСАДИ ПАС — 4 бай ──
+    const BAY_B=BW/COLS_B;
+    for(let col=0;col<COLS_B;col++){
+      const cx=(col-(COLS_B-1)/2)*BAY_B;
+      const apt=apts.find(a=>a.floor===fl&&a.slot===COLS_F+col);
+      if(!apt) continue;
+      const ww=BAY_B*.5, wh=FH*.44;
+      const wm=getWM(apt.status);
+      const wb=bx(`wbk${fl}${col}`,ww,wh,.08,wm,[cx,ym+.06,-(BD/2+.2)]);
+      wb.userData={apt};wb.isPickable=true;wmeshes.push(wb);
+      bx(`wbkFL${fl}${col}`,.055,wh+.08,.055,M.gld2,[cx,ym+.06,-(BD/2+.18)]);
+      bx(`wbkFR${fl}${col}`,.055,wh+.08,.055,M.gld2,[cx,ym+.06,-(BD/2+.18)]);
+    }
+  }
+
+  /* ── БОМ ──*/
+  const ry=LH+FL*FH;
+  // Парапет 4 тараф
+  bx('p1',BW+.6,2.6,.32,M.conc,[0,ry+1.3, BD/2+.16],true);
+  bx('p2',BW+.6,2.6,.32,M.conc,[0,ry+1.3,-(BD/2+.16)],true);
+  bx('p3',.32,2.6,BD+.6,M.conc,[-(BW/2+.16),ry+1.3,0],true);
+  bx('p4',.32,2.6,BD+.6,M.conc,[ (BW/2+.16),ry+1.3,0],true);
+  // Плитаи бом
+  bx('rf',BW+.4,.22,BD+.4,M.base,[0,ry+.11,0],true);
+  // Карниз тиллоӣ — 3 зина
+  bx('cr1',BW+.9,.36,BD+.9,M.gold,[0,ry-.16,0]);
+  bx('cr2',BW+1.2,.2,BD+1.2,M.gld2,[0,ry+.07,0]);
+  bx('cr3',BW+.65,.18,BD+.65,M.gld3,[0,ry+2.72,0]);
+  // Пентхаус (зинапоя + техника)
+  bx('ptx',7.0,4.8,5.0,M.base,[ BW*.18,ry+2.4,-BD*.04],true);
+  bx('ptxF',7.1,4.9,5.1,M.face,[ BW*.18,ry+2.4,-BD*.04]);
+  bx('ptxC',7.2,.24,5.2,M.gold,[ BW*.18,ry+4.96,-BD*.04]);
+  for(let i=0;i<2;i++){
+    const pgm=glassM(.04,.18,.38,.7,.35);
+    bx(`ptw${i}`,2.2,2.6,.07,pgm,[ BW*.18+(-1.4+i*2.8),ry+3.4,2.42]);
+  }
+  // Манбаи об 2 дона
+  cy('wt1',1.5,1.7,3.8,16,M.base,[ BW*.3,ry+1.95,-BD*.12],true);
+  cy('wt2',1.0,1.1,2.9,14,M.conc,[ BW*.38,ry+1.52, BD*.1],true);
+  // Гелипад
+  const hm=std('#070f1e','#000c14',.25);
+  bx('hpad',9,.18,9,hm,[-(BW*.16),ry+.48,0]);
+  const hW=std('#e0e0e0','#ffffff',.8);
+  bx('hH1',.24,.18,3.2,hW,[-(BW*.16)-1.1,ry+.56,0]);
+  bx('hH2',.24,.18,3.2,hW,[-(BW*.16)+1.1,ry+.56,0]);
+  bx('hH3',2.3,.18,.24,hW,[-(BW*.16),ry+.56,0]);
+  cy('hR',2.2,2.2,.12,32,std('#ddd','#fff',.35),[-(BW*.16),ry+.48,0]);
+  // Антенна
+  bx('ant',.12,10.5,.12,M.gold,[0,ry+7.3,0],true);
+  bx('antB',.26,.4,.26,M.gld2,[0,ry+2.52,0]);
+  bx('antT',.5,.14,.5,M.gold,[0,ry+13.0,0]);
+  cy('avL',.22,.22,.32,10,std('#ff1a1a','#ff0000',3.8),[0,ry+13.16,0]);
+  // Нур бомӣ
+  const tL=new BABYLON.PointLight('tL',new BABYLON.Vector3(0,ry+6,0),scene);
+  tL.intensity=2.0;tL.diffuse=new C3(.5,.4,.1);tL.range=70;
+}
+// The building's own meshes (not the surroundings): the construction animation of the WOW block grows them floor by floor.
+const BUILDING_MESHES=(()=>{const n=scene.meshes.length;buildBuilding();return scene.meshes.slice(n);})();
+
+/* ═══════════════════════════════════════
+   ЗАМИН ВА МУҲИТ
+═══════════════════════════════════════ */
+function buildEnv(){
+  const gm=M.gnd;
+  BABYLON.MeshBuilder.CreateGround('gnd',{width:380,height:380},scene).material=gm;
+
+  // Плаза
+  bx('plz',BW+28,.04,BD+36,M.grass,[0,.02,0]);
+  bx('plz2',BW+22,.04,BD+30,pbr('#091408'),[0,.028,0]);
+  bx('plz3',BW+18,.04,BD+22,pbr('#0a1a0a'),[0,.036,0]);
+
+  // Роҳҳо
+  bx('rd1',300,.07,13,M.asph,[0,.04,48]);
+  bx('rd2',300,.07,11,M.asph,[0,.04,-38]);
+  bx('rd3',13,.07,80,M.asph,[0,.04,-6]);
+  // Хатҳои роҳ
+  for(let i=-6;i<=6;i++) bx(`rm${i}`,.26,.01,4.8,std('#b89020','#c8a84b',.9),[0,.045,i*9+48]);
+
+  // Дарахтон
+  const tPos=[[-13,-(BD/2+10)],[0,-(BD/2+10)],[13,-(BD/2+10)],
+              [-13,BD/2+22],[0,BD/2+22],[13,BD/2+22],
+              [-BW/2-6,-4],[-BW/2-6,4],[BW/2+6,-4],[BW/2+6,4],
+              [-22,32],[22,32],[-22,-30],[22,-30],[-38,10],[38,10]];
+  const tM1=pbr('#082c0a',0,.95,'#010602',.5);
+  const tM2=pbr('#0c3610',0,.95,'#020703',.4);
+  const tTr=pbr('#18100a',0,.96);
+  tPos.forEach(([x,z])=>{
+    const s=.85+R()*.5;
+    cy('tr'+x+z,.12*s,.17*s,2.4*s,8,tTr,[x,1.2*s,z],true);
+    cy('t1'+x+z,0,1.2*s,3.0*s,9,tM1,[x,2.9*s,z],true);
+    cy('t2'+x+z,0,.8*s,2.2*s,9,tM2,[x,4.3*s,z],true);
+    cy('t3'+x+z,0,.46*s,1.4*s,9,tM1,[x,5.3*s,z],true);
+  });
+
+  // Мошинҳои паркшуда
+  const pks=[[-24,0,-9],[-24,0,-2],[-24,0,5],[-30,0,-9],[-30,0,-2],[-30,0,5],
+             [24,0,-9],[24,0,-2],[24,0,5],[30,0,-9],[30,0,-2],[30,0,5]];
+  const pCC=['#141e2e','#2a1416','#141e14','#22201a','#141230'];
+  pks.forEach(([x,,z],i)=>{
+    const cm=pbr(pCC[i%5],.46,.56);
+    bx('pB'+i,2.9,.78,1.65,cm,[x,.52,z],true);
+    bx('pC'+i,1.8,.62,.78,cm,[x,.96,z-.1],true);
+    bx('pH'+i,.3,.14,.06,std('#fff0a0','#ffe880',1.3),[x+.98,.46,z+.84]);
+    bx('pT'+i,.3,.14,.06,std('#ff1818','#cc0000',1.0),[x+.98,.46,z-.84]);
+  });
+
+  // Чароғи кӯча
+  const lps=[[-12,-(BD/2+10)],[0,-(BD/2+10)],[12,-(BD/2+10)],
+             [-12,BD/2+24],[0,BD/2+24],[12,BD/2+24],
+             [-BW/2-4,-5],[-BW/2-4,4],[BW/2+4,-5],[BW/2+4,4]];
+  lps.forEach(([x,z],i)=>{
+    bx('lp'+i,.1,7.2,.1,M.rail,[x,3.6,z]);
+    bx('lh'+i,.4,.16,.4,std('#fff0b0','#ffd878',1.5),[x,7.3,z]);
+    const ll=new BABYLON.PointLight('ll'+i,new BABYLON.Vector3(x,7.0,z),scene);
+    ll.intensity=1.4;ll.diffuse=new C3(1,.88,.44);ll.range=22;
+  });
+
+  // Бирақ
+  bx('fp1',.1,10,.1,M.gold,[ BW/2+6,5,-(BD/2+5)],true);
+  bx('fp2',.1,10,.1,M.gold,[-(BW/2+6),5,-(BD/2+5)],true);
+
+  // Иловаи биноҳои шаҳрӣ (хеле содда — фон)
+  const cityBld=[
+    {x:-85,z:-30,w:14,h:52,d:12,c:'#06101e'},
+    {x:90,z:20,w:12,h:68,d:14,c:'#040d18'},
+    {x:-78,z:60,w:18,h:38,d:16,c:'#070e20'},
+    {x:95,z:-40,w:10,h:44,d:10,c:'#050c16'},
+    {x:-60,z:-80,w:16,h:32,d:14,c:'#060f1c'},
+    {x:72,z:70,w:14,h:58,d:12,c:'#04091a'},
+  ];
+  cityBld.forEach((b,i)=>{
+    const cm=pbr(b.c,0,.96);
+    bx('cb'+i,b.w,b.h,b.d,cm,[b.x,b.h/2,b.z],true);
+    // Тирезаҳои хурд (рандом)
+    for(let fy=3;fy<b.h-3;fy+=3.5){
+      for(let fx=-b.w/2+2;fx<b.w/2-1;fx+=3.5){
+        if(R()<.6){
+          const wm2=new BABYLON.PBRMaterial('cw'+Math.random(),scene);
+          wm2.albedoColor=new C3(.02,.06,.1);
+          wm2.emissiveColor=new C3(.02,.08,.18);wm2.emissiveIntensity=R()*.8+.2;
+          bx('cw'+i+fy+fx,1.0,1.4,.05,wm2,[b.x+fx,b.h/2-b.h/2+fy,b.z+b.d/2+.03]);
+        }
+      }
+    }
+  });
+}
+buildEnv();
+
+/* ═══════════════════════════════════════
+   МОШИНҲОИ ҲАРАКАТКУНАНДА
+═══════════════════════════════════════ */
+const cars=[];
+const cCC=['#121c2c','#241414','#121c12','#201e18','#101230'];
+function mkCar(x,z,dir,spd){
+  const col=cCC[Math.floor(R()*cCC.length)];
+  const cm=pbr(col,.42,.58);
+  const bd=bx('cB'+Math.random(),2.9,.78,1.68,cm,[x,.55,z]);
+  const cb=bx('cC'+Math.random(),1.78,.62,.8,cm,[x,1.0,z-.11]);
+  const hm=std('#fff0a0','#ffe880',1.4);
+  const hl=bx('cHl'+Math.random(),.3,.14,.06,hm,[x+1.0,.46,z+.88]);
+  const hr=bx('cHr'+Math.random(),.3,.14,.06,hm,[x-1.0,.46,z+.88]);
+  const tm=std('#ff1a1a','#cc0000',1.1);
+  const tl=bx('cTl'+Math.random(),.28,.13,.06,tm,[x+.98,.46,z-.88]);
+  const tr=bx('cTr'+Math.random(),.28,.13,.06,tm,[x-.98,.46,z-.88]);
+  const parts=[bd,cb,hl,hr,tl,tr];
+  if(dir==='z') parts.forEach(p=>p.rotation.y=Math.PI/2);
+  cars.push({parts,dir,spd});
+}
+for(let i=0;i<6;i++) mkCar(-90+i*34,47,'x',1.5+R()*.9);
+for(let i=0;i<5;i++) mkCar(80-i*34,49,'x',-(1.4+R()*.8));
+for(let i=0;i<4;i++) mkCar(-80+i*32,-35,'x',1.3+R()*.7);
+for(let i=0;i<4;i++) mkCar(60-i*30,-37,'x',-(1.3+R()*.7));
+for(let i=0;i<4;i++) mkCar(-2,-58+i*34,'z',1.4+R()*.8);
+for(let i=0;i<4;i++) mkCar(3,42-i*32,'z',-(1.5+R()*.7));
+
+function updateCars(){
+  const dt=engine.getDeltaTime()*.001;
+  cars.forEach(c=>{
+    c.parts.forEach(p=>{
+      if(c.dir==='x') p.position.x+=c.spd*dt;
+      else p.position.z+=c.spd*dt;
+    });
+    const r=c.parts[0];
+    if(c.dir==='x'){
+      if(r.position.x>140) c.parts.forEach(p=>p.position.x-=280);
+      if(r.position.x<-140) c.parts.forEach(p=>p.position.x+=280);
+    } else {
+      if(r.position.z>140) c.parts.forEach(p=>p.position.z-=280);
+      if(r.position.z<-140) c.parts.forEach(p=>p.position.z+=280);
+    }
+  });
+}
+
+/* ═══════════════════════════════════════
+   КАМЕРА
+═══════════════════════════════════════ */
+let autoRot=true;setTimeout(()=>autoRot=false,9000);
+const V3=BABYLON.Vector3;
+
+function animCam(a,b,r,tgt,ms=900){
+  const e=new BABYLON.CubicEase();e.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEOUT);
+  const f=Math.round(ms/1000*60);
+  BABYLON.Animation.CreateAndStartAnimation('ca',cam,'alpha',60,f,cam.alpha,a,0,e);
+  BABYLON.Animation.CreateAndStartAnimation('cb',cam,'beta',60,f,cam.beta,b,0,e);
+  BABYLON.Animation.CreateAndStartAnimation('cr',cam,'radius',60,f,cam.radius,r,0,e);
+  if(tgt) BABYLON.Animation.CreateAndStartAnimation('ct',cam,'target',60,f,cam.target.clone(),tgt,0,e);
+}
+
+function setV(id){['v0','v1','v2','v3','v4'].forEach(v=>document.getElementById(v).classList.toggle('on',v===id));}
+document.getElementById('v0').onclick=()=>{animCam(-.42,1.08,96,new V3(0,32,0));setV('v0');};
+document.getElementById('v1').onclick=()=>{animCam(-.4,.06,105,new V3(0,0,0));setV('v1');};
+document.getElementById('v2').onclick=()=>{animCam(0,.92,70,new V3(0,32,0));setV('v2');};
+document.getElementById('v3').onclick=()=>{animCam(-.3,.44,118,new V3(0,24,0));setV('v3');};
+document.getElementById('v4').onclick=()=>{animCam(-.65,.78,88,new V3(0,40,0));setV('v4');};
+
+let xrayOn=false;
+document.getElementById('vXR').onclick=()=>{
+  xrayOn=!xrayOn;document.getElementById('vXR').classList.toggle('on',xrayOn);
+  scene.meshes.forEach(m=>{if(m.material&&!wmeshes.includes(m)) m.material.alpha=xrayOn?.07:1;});
+};
+
+let nightOn=false;
+document.getElementById('vNT').onclick=()=>{
+  nightOn=!nightOn;const btn=document.getElementById('vNT');
+  btn.classList.toggle('on',nightOn);btn.textContent=nightOn?'☀️':'🌙';
+  if(nightOn){
+    scene.clearColor=new BABYLON.Color4(.002,.016,.038,1);
+    scene.fogColor=new C3(.002,.016,.038);
+    sun.intensity=.015;sky.intensity=.06;fill.intensity=.015;
+    goldPt.intensity=8;goldPt.range=360;
+    wmeshes.forEach(m=>{if(m.material) m.material.emissiveIntensity=WDEF[m.userData.apt.status].ei*2.4;});
+  } else {
+    scene.clearColor=new BABYLON.Color4(.012,.026,.056,1);
+    scene.fogColor=new C3(.008,.02,.045);
+    sun.intensity=3.4;sky.intensity=.28;fill.intensity=.44;
+    goldPt.intensity=3.0;goldPt.range=140;
+    wmeshes.forEach(m=>{if(m.material&&m.userData?.apt) m.material.emissiveIntensity=WDEF[m.userData.apt.status].ei;});
+  }
+};
+
+let activeFloor='all';
+document.querySelectorAll('[data-fl]').forEach(btn=>{
+  btn.onclick=()=>{
+    activeFloor=btn.dataset.fl==='all'?'all':parseInt(btn.dataset.fl);
+    document.querySelectorAll('[data-fl]').forEach(b=>b.classList.toggle('on',b===btn));
+    wmeshes.forEach(m=>{m.isVisible=activeFloor==='all'||m.userData.apt.floor===activeFloor;});
+    if(activeFloor!=='all'){
+      const fy=LH+(activeFloor-.5)*FH;
+      animCam(0,.88,46,new V3(0,fy,0));
+      openFl(activeFloor);
+    } else {
+      animCam(-.42,1.08,96,new V3(0,32,0));
+      closeFl();
+    }
+  };
+});
+
+/* ═══════════════════════════════════════
+   FAVORITES
+═══════════════════════════════════════ */
+let favorites=[];
+try{favorites=JSON.parse(localStorage.getItem('nk_favs')||'[]');}catch(e){}
+function saveFavs(){try{localStorage.setItem('nk_favs',JSON.stringify(favorites));}catch(e){}}
+function isFav(num){return favorites.includes(num);}
+function toggleFav(num){
+  if(isFav(num)) favorites=favorites.filter(n=>n!==num);
+  else favorites.push(num);
+  saveFavs();updateFavBtn(num);updateFavCount();
+}
+function updateFavBtn(num){
+  const btn=document.getElementById('favBtn');
+  if(btn) btn.textContent=isFav(num)?'♥ Убрать из избранного':'♡ В избранное';
+  if(btn) btn.style.borderColor=isFav(num)?'rgba(239,68,68,.5)':'rgba(200,168,75,.18)';
+  if(btn) btn.style.color=isFav(num)?'var(--sold)':'var(--fg2)';
+}
+function updateFavCount(){
+  const el=document.getElementById('favCount');
+  if(el) el.textContent=favorites.length>0?favorites.length:'';
+}
+
+/* ═══════════════════════════════════════
+   COMPARE
+═══════════════════════════════════════ */
+let compareList=[];
+function addToCompare(apt){
+  if(compareList.find(a=>a.num===apt.num)){
+    compareList=compareList.filter(a=>a.num!==apt.num);
+  } else {
+    if(compareList.length>=3){compareList.shift();}
+    compareList.push(apt);
+  }
+  updateCompareBar();
+}
+function updateCompareBar(){
+  const bar=document.getElementById('cmpBar');
+  if(!bar) return;
+  if(compareList.length===0){bar.style.display='none';return;}
+  bar.style.display='flex';
+  document.getElementById('cmpList').innerHTML=compareList.map(a=>`<span class="ctag">${a.num}</span>`).join('');
+  document.getElementById('cmpBtn').style.opacity=compareList.length>=2?'1':'.4';
+}
+
+/* ═══════════════════════════════════════
+   BOTTOM TABS — ПАНЕЛҲО
+═══════════════════════════════════════ */
+const PANELS=['panBuilding','panFloor','panAnalytics','panEnv'];
+function switchTab(idx){
+  ['b0','b1','b2','b3'].forEach((id,i)=>{
+    document.getElementById(id).classList.toggle('on',i===idx);
+  });
+  PANELS.forEach((p,i)=>{
+    const el=document.getElementById(p);
+    if(el) el.style.display=(i===idx)?'flex':'none';
+  });
+  if(idx===2) renderAnalytics();
+  if(idx===1) renderFloorPanel();
+  if(idx===3) renderEnvPanel();
+}
+['b0','b1','b2','b3'].forEach((id,i)=>{
+  document.getElementById(id).onclick=()=>switchTab(i);
+});
+
+/* ═══════════════════════════════════════
+   PICKING / HOVER
+═══════════════════════════════════════ */
+const tip=document.getElementById('tip');
+const SL={free:'Свободна',res:'Забронирована',sold:'Продана',none:'Недоступна'};
+
+scene.onPointerObservable.add(evt=>{
+  if(evt.type===BABYLON.PointerEventTypes.POINTERUP){
+    const p=scene.pick(scene.pointerX,scene.pointerY,m=>wmeshes.includes(m)&&m.isVisible);
+    if(p.hit&&p.pickedMesh?.userData?.apt) openApt(p.pickedMesh.userData.apt);
+  }
+  if(evt.type===BABYLON.PointerEventTypes.POINTERMOVE){
+    const p=scene.pick(scene.pointerX,scene.pointerY,m=>wmeshes.includes(m)&&m.isVisible);
+    if(p.hit&&p.pickedMesh?.userData?.apt){
+      const a=p.pickedMesh.userData.apt;
+      tip.style.cssText=`left:${scene.pointerX+14}px;top:${scene.pointerY-28}px;opacity:1`;
+      tip.textContent=`кв.${a.num} · ${a.rooms}-комн. · ${a.area}м² · ${SL[a.status]}`;
+      canvas.style.cursor='pointer';
+    } else {tip.style.opacity='0';canvas.style.cursor='';}
+  }
+});
+
+/* ═══════════════════════════════════════
+   НАҚШАИ ВОҚЕИИ КВАРТИРА
+   (тарзи нақша аз аксе ки дидем)
+═══════════════════════════════════════ */
+// Схемаи нақша ба асоси rooms-и квартира
+/* ═══ НАҚШАИ ВОҚЕИИ МЕЪМОРӢ ═══
+   Монанди аксе ки корфармо фиристод:
+   Спальня, С/У, Ванная/бойлерная, Холл, Тамбур, Кухня, Крыльцо
+*/
+const PLANS={
+  // 1-хона: Студия + СУ + Кухня + Тамбур (монанди нақшаи 9.7м × 7.25м)
+  1:{
+    zones:[
+      {n:'Студия',    x:.05,y:.05,w:.50,h:.60,c:'#061a10',icon:'🛋️'},
+      {n:'С/У',       x:.05,y:.67,w:.22,h:.29,c:'#06101a',icon:'🚿'},
+      {n:'Ванная',    x:.29,y:.67,w:.22,h:.29,c:'#06101a',icon:'🛁'},
+      {n:'Кухня',     x:.57,y:.05,w:.38,h:.50,c:'#141000',icon:'🍳'},
+      {n:'Холл',      x:.57,y:.57,w:.38,h:.18,c:'#0c1420',icon:'🚪'},
+      {n:'Тамбур',    x:.57,y:.77,w:.22,h:.19,c:'#0c1428',icon:'🔑'},
+    ],
+    dims:{w:'5.6м',h:'6.8м'},
+    entry:{x:.62,y:.93,w:.16,h:.05}
+  },
+  2:{
+    zones:[
+      {n:'Спальня',   x:.05,y:.05,w:.42,h:.46,c:'#06100e',icon:'🛏️'},
+      {n:'Гостиная',  x:.05,y:.53,w:.42,h:.43,c:'#061a10',icon:'🛋️'},
+      {n:'С/У',       x:.50,y:.05,w:.22,h:.26,c:'#06101a',icon:'🚿'},
+      {n:'Ванная',    x:.50,y:.33,w:.22,h:.23,c:'#06101a',icon:'🛁'},
+      {n:'Кухня',     x:.74,y:.05,w:.21,h:.51,c:'#141000',icon:'🍳'},
+      {n:'Холл',      x:.50,y:.58,w:.45,h:.22,c:'#0c1420',icon:'🚪'},
+      {n:'Тамбур',    x:.50,y:.82,w:.22,h:.14,c:'#0c1428',icon:'🔑'},
+    ],
+    dims:{w:'7.5м',h:'7.25м'},
+    entry:{x:.55,y:.93,w:.16,h:.05}
+  },
+  3:{
+    zones:[
+      {n:'Спальня 1', x:.05,y:.05,w:.40,h:.44,c:'#06100e',icon:'🛏️'},
+      {n:'Спальня 2', x:.05,y:.51,w:.40,h:.45,c:'#06100e',icon:'🛏️'},
+      {n:'Гостиная',  x:.48,y:.05,w:.47,h:.44,c:'#061a10',icon:'🛋️'},
+      {n:'С/У',       x:.48,y:.51,w:.22,h:.22,c:'#06101a',icon:'🚿'},
+      {n:'Ванная',    x:.48,y:.75,w:.22,h:.21,c:'#06101a',icon:'🛁'},
+      {n:'Кухня',     x:.72,y:.51,w:.23,h:.45,c:'#141000',icon:'🍳'},
+      {n:'Холл',      x:.48,y:.40,w:.47,h:.10,c:'#0c1420',icon:'🚪'},
+      {n:'Тамбур',    x:.60,y:.87,w:.18,h:.10,c:'#0c1428',icon:'🔑'},
+    ],
+    dims:{w:'9.7м',h:'7.25м'},
+    entry:{x:.64,y:.94,w:.14,h:.05}
+  },
+  4:{
+    zones:[
+      {n:'Спальня 1', x:.05,y:.05,w:.38,h:.44,c:'#06100e',icon:'🛏️'},
+      {n:'Спальня 2', x:.05,y:.51,w:.38,h:.45,c:'#06100e',icon:'🛏️'},
+      {n:'Гостиная',  x:.46,y:.05,w:.50,h:.44,c:'#061a10',icon:'🛋️'},
+      {n:'С/У',       x:.46,y:.51,w:.18,h:.22,c:'#06101a',icon:'🚿'},
+      {n:'Ванная/бойл.',x:.46,y:.75,w:.18,h:.22,c:'#06101a',icon:'🛁'},
+      {n:'Кухня',     x:.66,y:.51,w:.30,h:.46,c:'#141000',icon:'🍳'},
+      {n:'Холл',      x:.46,y:.42,w:.50,h:.08,c:'#0c1420',icon:'🚪'},
+      {n:'Тамбур',    x:.55,y:.82,w:.18,h:.12,c:'#0c1428',icon:'🔑'},
+    ],
+    dims:{w:'12.4м',h:'9.3м'},
+    entry:{x:.60,y:.92,w:.14,h:.06}
+  }
+};
+
+function drawAptPlan(cv,rooms,area,big){
+  const ctx=cv.getContext('2d');
+  const W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  // Фон — торики меъморӣ
+  ctx.fillStyle='#010a18';ctx.fillRect(0,0,W,H);
+  const p=PLANS[rooms]||PLANS[2];
+  const pd=big?22:12, pw=W-pd*2, ph=H-pd*2;
+  const fs=big?9:6.5;
+
+  // ── Деворҳои берунӣ (ғафс, монанди нақшаи меъморӣ) ──
+  ctx.fillStyle='#2a4060';
+  ctx.fillRect(pd-7,pd-7,pw+14,ph+14);
+  ctx.fillStyle='#010a18';
+  ctx.fillRect(pd,pd,pw,ph);
+
+  // ── Хонаҳо ──
+  (p.zones||[]).forEach(z=>{
+    const rx=pd+z.x*pw,ry=pd+z.y*ph,rw=z.w*pw,rh=z.h*ph;
+    // Пуркунии хона
+    ctx.fillStyle=z.c;ctx.fillRect(rx+1,ry+1,rw-2,rh-2);
+    // Девори дохилӣ
+    ctx.strokeStyle='#2a4a6a';ctx.lineWidth=1.5;ctx.setLineDash([]);
+    ctx.strokeRect(rx+.5,ry+.5,rw-1,rh-1);
+
+    if(rw>28&&rh>18){
+      // Иконка
+      if(big&&rw>50&&rh>32){
+        ctx.font=`${fs+4}px serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText(z.icon||'',rx+rw/2,ry+rh/2-fs-2);
+      }
+      // Ном
+      ctx.fillStyle='#6aacdd';ctx.font=`${fs}px Inter,sans-serif`;
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(z.n,rx+rw/2,ry+rh/2+(big&&rw>50&&rh>32?fs+2:0));
+      // Майдон (тахминан)
+      if(big&&rw>55&&rh>38){
+        const ra=Math.round(area*z.w*z.h*1.6);
+        ctx.fillStyle='#2a5a7a';ctx.font=`${fs-1}px Inter`;
+        ctx.fillText('~'+Math.max(4,Math.min(ra,area-4))+'м²',rx+rw/2,ry+rh/2+fs*2.4+(big&&rw>50&&rh>32?fs:0));
+      }
+    }
+  });
+
+  // ── Дарҳо (нимдоираи меъморӣ) ──
+  ctx.setLineDash([]);
+  (p.zones||[]).forEach((z,i)=>{
+    if(i<(p.zones||[]).length-2) return; // Танҳо тамбур ва охирин дар
+    const rx=pd+z.x*pw,ry=pd+z.y*ph,rw=z.w*pw,rh=z.h*ph;
+    // Дари нимдоира
+    if(rw>20){
+      const dr=rw*.4;
+      ctx.strokeStyle='rgba(200,168,75,.55)';ctx.lineWidth=.8;ctx.setLineDash([2,2]);
+      ctx.beginPath();ctx.arc(rx+dr,ry,dr,-Math.PI/2,0);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(rx,ry);ctx.lineTo(rx+dr,ry);ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  });
+  // Дари вуруди асосӣ
+  if(p.entry){
+    const e=p.entry;
+    const ex=pd+e.x*pw,ey=pd+e.y*ph,ew=e.w*pw;
+    ctx.strokeStyle='#c8a84b';ctx.lineWidth=1.5;ctx.setLineDash([]);
+    ctx.strokeRect(ex,ey,ew,ph-ey+pd+6);
+    ctx.strokeStyle='rgba(200,168,75,.5)';ctx.lineWidth=.9;ctx.setLineDash([2,2]);
+    ctx.beginPath();ctx.arc(ex,ey,ew,0,Math.PI/2);ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // ── Ченакҳои берунӣ (монанди нақшаи меъморӣ) ──
+  if(big&&p.dims){
+    ctx.strokeStyle='rgba(200,168,75,.4)';ctx.lineWidth=.7;ctx.setLineDash([3,3]);
+    // Уфуқӣ (болоӣ)
+    ctx.beginPath();ctx.moveTo(pd,pd-13);ctx.lineTo(pd+pw,pd-13);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(pd,pd-10);ctx.lineTo(pd,pd-16);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(pd+pw,pd-10);ctx.lineTo(pd+pw,pd-16);ctx.stroke();
+    // Амудӣ (чапак)
+    ctx.beginPath();ctx.moveTo(pd-13,pd);ctx.lineTo(pd-13,pd+ph);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(pd-10,pd);ctx.lineTo(pd-16,pd);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(pd-10,pd+ph);ctx.lineTo(pd-16,pd+ph);ctx.stroke();
+    ctx.setLineDash([]);
+    // Матни ченак
+    ctx.fillStyle='rgba(200,168,75,.8)';ctx.font='bold 8px Unbounded,sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(p.dims.w,pd+pw/2,pd-20);
+    ctx.save();ctx.translate(pd-20,pd+ph/2);ctx.rotate(-Math.PI/2);
+    ctx.fillText(p.dims.h,0,0);ctx.restore();
+  }
+
+  // ── Рамкаи берунӣ тиллоӣ ──
+  ctx.strokeStyle='#c8a84b';ctx.lineWidth=big?1.8:1;ctx.setLineDash([]);
+  ctx.strokeRect(pd-6,pd-6,pw+12,ph+12);
+
+  // ── Компас ──
+  const cr=W-pd-12,cy2=pd+14,cs=big?12:8;
+  ctx.fillStyle='rgba(200,168,75,.1)';ctx.beginPath();ctx.arc(cr,cy2,cs+2,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='rgba(200,168,75,.3)';ctx.lineWidth=1;ctx.stroke();
+  // Стрелка С
+  ctx.fillStyle='#c8a84b';
+  ctx.beginPath();ctx.moveTo(cr,cy2-cs);ctx.lineTo(cr-cs*.35,cy2+cs*.3);ctx.lineTo(cr,cy2+cs*.1);
+  ctx.lineTo(cr+cs*.35,cy2+cs*.3);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#c8a84b';ctx.font=`bold ${cs-2}px Unbounded`;
+  ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText('С',cr,cy2-cs-10);
+
+  // ── Майдон ──
+  ctx.fillStyle='rgba(200,168,75,.85)';ctx.font=`bold ${big?11:8}px Unbounded,sans-serif`;
+  ctx.textAlign='left';ctx.textBaseline='bottom';ctx.fillText(area+' м²',pd,H-4);
+  if(big){
+    ctx.fillStyle='#4a7aaa';ctx.font='8px Inter';
+    ctx.fillText(rooms+'-комн. · высота '+3.0+'м',pd,H-14);
+  }
+}
+
+/* ═══════════════════════════════════════
+   НАҚШАИ ОШЁНА
+═══════════════════════════════════════ */
+function drawFlPlan(fl){
+  const cv=document.getElementById('flPlan');
+  const ctx=cv.getContext('2d');
+  const W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);ctx.fillStyle='#010710';ctx.fillRect(0,0,W,H);
+  const pd=18,pw=W-pd*2,ph=H-pd*2;
+
+  // Деворҳои берунӣ
+  ctx.fillStyle='#1a2e44';ctx.fillRect(pd-6,pd-6,pw+12,ph+12);
+  ctx.fillStyle='#010710';ctx.fillRect(pd,pd,pw,ph);
+
+  // Ядрои марказӣ (лифт + зинапоя)
+  const kx=pd+pw*.32,kw=pw*.36;
+  ctx.fillStyle='#0a1828';ctx.fillRect(kx,pd,kw,ph);
+  ctx.strokeStyle='#1e3850';ctx.lineWidth=1;ctx.strokeRect(kx,pd,kw,ph);
+  // Лифт
+  ctx.fillStyle='#0c2040';ctx.fillRect(kx+kw*.05,pd+ph*.1,kw*.3,ph*.35);
+  ctx.fillStyle='#0c2040';ctx.fillRect(kx+kw*.55,pd+ph*.1,kw*.3,ph*.35);
+  ctx.fillStyle='#2a4a6a';ctx.font='8px Inter';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('🛗',kx+kw*.2,pd+ph*.28);ctx.fillText('🛗',kx+kw*.72,pd+ph*.28);
+  // Зинапоя
+  ctx.fillStyle='#071424';ctx.fillRect(kx+kw*.15,pd+ph*.55,kw*.7,ph*.38);
+  ctx.strokeStyle='#1e3860';ctx.setLineDash([]);ctx.lineWidth=.8;
+  for(let si=0;si<8;si++) ctx.strokeRect(kx+kw*.15+si*(kw*.7/8),pd+ph*.55,kw*.7/8,ph*.38);
+  ctx.fillStyle='#2a4a6a';ctx.font='8px Inter';ctx.textAlign='center';
+  ctx.fillText('Лестница',kx+kw/2,pd+ph*.74);
+
+  const flApts=apts.filter(a=>a.floor===fl);
+  const sc={free:'#22c55e',res:'#f59e0b',sold:'#ef4444',none:'#334155'};
+
+  // Пеш (slot 0-3)
+  flApts.filter(a=>a.slot<4).sort((a,b)=>a.slot-b.slot).forEach((apt,i)=>{
+    const idx=i<2?i:i;
+    const leftW=pw*.32,rightW=pw*.32;
+    const aw=i<2?leftW/2:rightW/2;
+    const sx=i<2?(pd+i*(leftW/2)):(pd+kx-pd+kw+i%2*(rightW/2));
+    // Правильный расчёт
+    const seg_w=pw*.3/2;
+    const seg_x=i<2?(pd+i*seg_w):(kx+kw+i%2*seg_w);
+    ctx.fillStyle=sc[apt.status]+'18';ctx.fillRect(seg_x,pd,seg_w,ph*.44);
+    ctx.strokeStyle=sc[apt.status];ctx.lineWidth=1.5;ctx.strokeRect(seg_x,pd,seg_w,ph*.44);
+    ctx.fillStyle=sc[apt.status];ctx.font='bold 9px Inter';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(apt.rooms+'к',seg_x+seg_w/2,pd+ph*.12);
+    ctx.fillStyle='#4a6a8a';ctx.font='8px Inter';
+    ctx.fillText(apt.area+'м²',seg_x+seg_w/2,pd+ph*.24);
+    ctx.fillStyle='rgba(200,168,75,.8)';ctx.font='bold 8px Unbounded';
+    ctx.fillText(apt.num,seg_x+seg_w/2,pd+ph*.35);
+    // Намо (Вид)
+    ctx.fillStyle='#2a4060';ctx.font='7px Inter';
+    ctx.fillText('→фасад',seg_x+seg_w/2,pd+ph*.44+8);
+  });
+
+  // Пас (slot 4-7)
+  flApts.filter(a=>a.slot>=4).sort((a,b)=>a.slot-b.slot).forEach((apt,i)=>{
+    const seg_w=pw*.3/2;
+    const seg_x=i<2?(pd+i*seg_w):(kx+kw+i%2*seg_w);
+    ctx.fillStyle=sc[apt.status]+'18';ctx.fillRect(seg_x,pd+ph*.58,seg_w,ph*.42);
+    ctx.strokeStyle=sc[apt.status];ctx.lineWidth=1.5;ctx.strokeRect(seg_x,pd+ph*.58,seg_w,ph*.42);
+    ctx.fillStyle=sc[apt.status];ctx.font='bold 9px Inter';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(apt.rooms+'к',seg_x+seg_w/2,pd+ph*.68);
+    ctx.fillStyle='#4a6a8a';ctx.font='8px Inter';
+    ctx.fillText(apt.area+'м²',seg_x+seg_w/2,pd+ph*.78);
+    ctx.fillStyle='rgba(200,168,75,.8)';ctx.font='bold 8px Unbounded';
+    ctx.fillText(apt.num,seg_x+seg_w/2,pd+ph*.9);
+    ctx.fillStyle='#2a4060';ctx.font='7px Inter';
+    ctx.fillText('←двор',seg_x+seg_w/2,pd+ph*.57-5);
+  });
+
+  ctx.strokeStyle='#c8a84b';ctx.lineWidth=1.5;ctx.setLineDash([]);
+  ctx.strokeRect(pd-5,pd-5,pw+10,ph+10);
+  ctx.fillStyle='#2a4060';ctx.font='8px Inter';ctx.textAlign='left';
+  ctx.fillText('↑ Фасад (север)',pd+2,pd-8);
+  ctx.textAlign='right';ctx.fillText('Двор (юг) ↓',pd+pw-2,pd+ph+14);
+}
+
+/* ═══════════════════════════════════════
+   OVERLAYS
+═══════════════════════════════════════ */
+function openApt(apt){
+  const BC={free:'st-f',res:'st-r',sold:'st-s',none:'st-n'};
+  const BN={free:'Свободна',res:'Забронирована',sold:'Продана',none:'Недоступна'};
+  const SEC={front:'А',back:'Б'};
+
+  document.getElementById('apNum').textContent=apt.num;
+  document.getElementById('apAddr').textContent=
+    `ЖК Некруз Резиденс · ${apt.floor} этаж · Секция ${SEC[apt.orient]} · ${apt.orient==='front'?'Вид на фасад':'Вид на двор'} · Душанбе`;
+  const badge=document.getElementById('apBadge');
+  badge.textContent=BN[apt.status];badge.className='ov-status '+BC[apt.status];
+
+  document.getElementById('apRm').textContent=apt.rooms;
+  document.getElementById('apSq').textContent=apt.area+' м²';
+  document.getElementById('apFl').textContent=apt.floor+' из '+FL;
+  document.getElementById('apPr').textContent=apt.price.toLocaleString('ru-RU')+' TJS';
+  document.getElementById('apUs').textContent='≈ '+Math.round(apt.price/USD_RATE).toLocaleString('ru-RU')+' USD';
+  document.getElementById('apPsm').textContent='≈ '+Math.round(apt.price/apt.area).toLocaleString('ru-RU')+' TJS / м²';
+  document.getElementById('planSize').textContent=apt.area+'м² · '+apt.rooms+'-комнатная';
+
+  document.getElementById('apView').innerHTML=
+    `<div class="fi">${apt.floor>=12?'🌆':apt.floor>=6?'🌇':'🏙️'}</div>${apt.floor>=12?'Панорамный вид':apt.floor>=6?'Вид на город':'Вид на двор'}`;
+
+  // Ипотека
+  const loan=apt.price*.7, r=.115/12;
+  const mort=(n)=>Math.round(loan*r/(1-Math.pow(1+r,-n*12))/1000)+'k TJS';
+  document.getElementById('apM20').textContent=mort(20);
+  document.getElementById('apM10').textContent=mort(10);
+  document.getElementById('apM5').textContent=mort(5);
+
+  // CTA
+  const cta=document.getElementById('apCta');
+  cta.textContent=apt.status==='free'?'Забронировать квартиру':
+    apt.status==='res'?'Уже забронирована':'Продано';
+  cta.disabled=apt.status!=='free';
+
+  // Нақшаи квартира
+  const cv=document.getElementById('bigPlan');
+  drawAptPlan(cv,apt.rooms,apt.area,true);
+
+  // Прогресси ошёнаҳои наздик
+  const flRows=document.getElementById('flRows');flRows.innerHTML='';
+  const sc={free:'var(--free)',res:'var(--res)',sold:'var(--sold)',none:'var(--none)'};
+  const flRange=[apt.floor-2,apt.floor-1,apt.floor,apt.floor+1,apt.floor+2].filter(f=>f>=1&&f<=FL);
+  flRange.forEach(f=>{
+    const flA=apts.filter(a=>a.floor===f);
+    const fFree=flA.filter(a=>a.status==='free').length;
+    const fSold=flA.filter(a=>a.status==='sold'||a.status==='res').length;
+    const pct2=Math.round(fSold/APFL*100);
+    const row=document.createElement('div');row.className='flrow';
+    row.innerHTML=`<div class="flrow-l">${f===apt.floor?'→ ЭТ.'+f:'Эт. '+f}</div>
+      <div class="flrow-b"><div class="flrow-f" style="width:${pct2}%;background:${f===apt.floor?'var(--gold)':'rgba(100,150,200,.5)'}"></div></div>
+      <div class="flrow-n">${fFree} своб.</div>`;
+    flRows.appendChild(row);
+  });
+  setTimeout(()=>flRows.querySelectorAll('.flrow-f').forEach(el=>el.style.width=el.style.width),50);
+
+  document.getElementById('aptPg').classList.add('open');
+}
+function closeApt(){document.getElementById('aptPg').classList.remove('open');}
+window.closeApt=closeApt;
+
+function openFl(fl){
+  const flApts=apts.filter(a=>a.floor===fl);
+  document.getElementById('fpTitle').textContent='ЭТАЖ '+fl;
+  const fFree=flApts.filter(a=>a.status==='free').length;
+  document.getElementById('fpSub').textContent=fFree+' своб. · '+(APFL-fFree)+' занято · ЖК Некруз Резиденс';
+  const grid=document.getElementById('fpGrid');grid.innerHTML='';
+  const SC2={free:'ff',res:'fr',sold:'fs',none:'fn'};
+  const SN={free:'Свободна',res:'Забронирована',sold:'Продана',none:'Недоступна'};
+  flApts.forEach(apt=>{
+    const d=document.createElement('div');d.className='fa '+SC2[apt.status];
+    d.innerHTML=`<div><div class="fa-n">${apt.num}</div><div class="fa-i">${apt.rooms}к · ${apt.area}м² · ${apt.orient==='front'?'фасад':'двор'}</div></div><div class="fa-st">${SN[apt.status]}</div>`;
+    d.onclick=()=>{closeFl();openApt(apt);};
+    grid.appendChild(d);
+  });
+  drawFlPlan(fl);
+  document.getElementById('flPg').classList.add('open');
+}
+function closeFl(){document.getElementById('flPg').classList.remove('open');}
+window.closeFl=closeFl;
+
+/* ═══════════════════════════════════════
+   RENDER LOOP
+═══════════════════════════════════════ */
+let tick=0;
+engine.runRenderLoop(()=>{
+  tick+=engine.getDeltaTime()*.001;
+  if(autoRot) cam.alpha+=.0012;
+  updateCars();
+  goldPt.intensity=(nightOn?8.0:3.0)+Math.sin(tick*1.2)*.5;
+  scene.render();
+});
+window.addEventListener('resize',()=>engine.resize());
+
+/* ═══════════════════════════════════════
+   NEW FUNCTIONALITY
+═══════════════════════════════════════ */
+
+// Current apt reference
+let curApt=null;
+
+// Patch openApt to also set curApt, favBtn, and booking onclick
+const _origOpenApt=openApt;
+openApt=function(apt){
+  curApt=apt;
+  _origOpenApt(apt);
+  updateFavBtn(apt.num);
+  // Wire CTA to booking form
+  const cta=document.getElementById('apCta');
+  if(apt.status==='free'){
+    cta.onclick=()=>openBooking(apt);
+  } else {
+    cta.onclick=null;
+  }
+};
+
+function toggleFavCurrent(){if(curApt) toggleFav(curApt.num);}
+function addCompareCurrent(){if(curApt) addToCompare(curApt);}
+
+// ── SEARCH ──
+function toggleSearch(){
+  const p=document.getElementById('panSearch');
+  p.style.display=(p.style.display==='flex')?'none':'flex';
+  if(p.style.display==='flex') applySearch();
+}
+
+let searchFilters={rooms:0,status:'all',prMin:0,prMax:0,flMin:1,flMax:20};
+
+// Filter buttons wiring
+document.querySelectorAll('#fRooms .fopt').forEach(btn=>{
+  btn.onclick=()=>{
+    document.querySelectorAll('#fRooms .fopt').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    searchFilters.rooms=parseInt(btn.dataset.v);
+    applySearch();
+  };
+});
+document.querySelectorAll('#fStatus .fopt').forEach(btn=>{
+  btn.onclick=()=>{
+    document.querySelectorAll('#fStatus .fopt').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    searchFilters.status=btn.dataset.v;
+    applySearch();
+  };
+});
+
+function applySearch(){
+  const prMin=parseInt(document.getElementById('prMin').value||'0')*1000||0;
+  const prMax=parseInt(document.getElementById('prMax').value||'0')*1000||Infinity;
+  const flMin=parseInt(document.getElementById('flMin').value||'1')||1;
+  const flMax=parseInt(document.getElementById('flMax').value||'20')||20;
+
+  let res=apts.filter(a=>{
+    if(searchFilters.rooms>0&&a.rooms!==searchFilters.rooms) return false;
+    if(searchFilters.status!=='all'&&a.status!==searchFilters.status) return false;
+    if(prMin>0&&a.price<prMin) return false;
+    if(prMax!==Infinity&&a.price>prMax) return false;
+    if(a.floor<flMin||a.floor>flMax) return false;
+    return true;
+  });
+
+  const cnt=document.getElementById('srCount');
+  if(cnt) cnt.textContent=`Найдено: ${res.length} квартир`;
+
+  const el=document.getElementById('srResults');
+  if(!el) return;
+  const SC2={free:'ff',res:'fr',sold:'fs',none:'fn'};
+  el.innerHTML=res.slice(0,40).map(a=>`
+    <div class="sr-item ${SC2[a.status]}" onclick="closeSearch();openApt(apts.find(x=>x.num===${a.num}))">
+      <div>
+        <div class="sri-l">№ ${a.num}</div>
+        <div class="sri-r">${a.rooms}-к · ${a.area}м² · эт.${a.floor}</div>
+        <div class="sri-p">${Math.round(a.price/1000)}k TJS ≈ ${Math.round(a.price/USD_RATE/1000)}k $</div>
+      </div>
+      <div style="font-size:7px;color:${a.status==='free'?'var(--free)':a.status==='res'?'var(--res)':'var(--sold)'}">
+        ${a.status==='free'?'СВОБОДНА':a.status==='res'?'БРОНЬ':'ПРОДАНА'}
+      </div>
+    </div>
+  `).join('');
+}
+function closeSearch(){document.getElementById('panSearch').style.display='none';}
+
+// ── ANALYTICS PANEL ──
+function renderAnalytics(){
+  const body=document.getElementById('analyticsBody');
+  if(!body) return;
+
+  const totalPrice=apts.reduce((s,a)=>s+(a.status==='sold'||a.status==='res'?a.price:0),0);
+  const avgFree=apts.filter(a=>a.status==='free').reduce((s,a,_,ar)=>s+a.price/ar.length,0);
+  const pct=Math.round((nS+nR)/apts.length*100);
+
+  // По комнатам — сколько свободных
+  const byRoom=[1,2,3,4].map(r=>({
+    r,
+    total:apts.filter(a=>a.rooms===r).length,
+    free:apts.filter(a=>a.rooms===r&&a.status==='free').length,
+    sold:apts.filter(a=>a.rooms===r&&(a.status==='sold'||a.status==='res')).length,
+    avg:Math.round(apts.filter(a=>a.rooms===r).reduce((s,a,_,ar)=>s+a.price/ar.length,0)/1000)
+  }));
+
+  // По этажам
+  const byFloor=Array.from({length:FL},(_,i)=>({
+    fl:i+1,
+    free:apts.filter(a=>a.floor===i+1&&a.status==='free').length,
+    sold:apts.filter(a=>a.floor===i+1&&(a.status==='sold'||a.status==='res')).length,
+  }));
+
+  // Максимум продаж по этажу (для scale)
+  const maxSold=Math.max(...byFloor.map(f=>f.sold));
+
+  body.innerHTML=`
+    <div class="stat-row">
+      <div class="stat-box"><div class="sv">${pct}%</div><div class="sl">РЕАЛИЗОВАНО</div></div>
+      <div class="stat-box"><div class="sv">${nF}</div><div class="sl">СВОБОДНЫХ</div></div>
+      <div class="stat-box"><div class="sv">${Math.round(totalPrice/1e6)}М</div><div class="sl">TJS ВЫРУЧКА</div></div>
+      <div class="stat-box"><div class="sv">${Math.round(avgFree/1000)}к</div><div class="sl">СРЕДН. ЦЕНА</div></div>
+    </div>
+
+    <div class="chart-wrap">
+      <div class="chart-lbl">ПРОДАЖИ ПО ЭТАЖАМ</div>
+      <div class="mini-bars" id="flChart">
+        ${byFloor.map(f=>`
+          <div class="mb ${f.sold>0?'mb-sold':''}"
+            style="height:${maxSold>0?Math.max(4,Math.round(f.sold/maxSold*54)):4}px"
+            data-tip="Эт.${f.fl}: ${f.sold} прод."
+            onclick="openFl(${f.fl})"></div>
+        `).join('')}
+      </div>
+      <div class="bar-xlbls">
+        ${Array.from({length:FL},(_,i)=>i%4===0?`<span>${i+1}</span>`:'<span></span>').join('')}
+      </div>
+    </div>
+
+    <div class="chart-wrap">
+      <div class="chart-lbl">СРЕДНЯЯ ЦЕНА ПО ТИПУ КВАРТИР</div>
+      ${byRoom.map(r=>`
+        <div class="price-line">
+          <div class="pl-rooms">${r.r}-комн.</div>
+          <div class="pl-bar"><div class="pl-fill" style="width:${Math.round(r.avg/byRoom[3].avg*100)}%"></div></div>
+          <div class="pl-price">${r.avg}к TJS</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="chart-wrap">
+      <div class="chart-lbl">СТРУКТУРА ПО ТИПУ (шт.)</div>
+      ${byRoom.map(r=>`
+        <div class="price-line">
+          <div class="pl-rooms">${r.r}к (${r.total}шт)</div>
+          <div class="pl-bar" style="position:relative;overflow:visible">
+            <div class="pl-fill mb-sold" style="width:${Math.round(r.sold/r.total*100)}%;height:4px;border-radius:2px;background:var(--sold);display:inline-block"></div>
+            <div class="pl-fill mb-free" style="width:${Math.round(r.free/r.total*100)}%;height:4px;border-radius:2px;background:var(--free);display:inline-block;margin-left:2px"></div>
+          </div>
+          <div class="pl-price">${r.free} своб.</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="chart-wrap">
+      <div class="chart-lbl">ПРОГНОЗ ЗАВЕРШЕНИЯ</div>
+      <div style="font-size:9px;color:var(--fg2);line-height:1.6">
+        При текущей динамике (~${Math.round((nS+nR)/12)} кв/мес.):<br>
+        <span style="color:var(--gold)">Полная реализация: ~${Math.round(nF/Math.max(1,Math.round((nS+nR)/12)))} мес.</span><br>
+        Дата сдачи: <span style="color:var(--gold)">I кв. 2026 года</span><br>
+        Гарантия: <span style="color:var(--free)">3 года на конструктив</span>
+      </div>
+    </div>
+  `;
+}
+
+// ── FLOOR PANEL ──
+function renderFloorPanel(){
+  const grid=document.getElementById('fpMiniGrid');
+  if(!grid) return;
+
+  // Filter state
+  let st='all';
+  document.querySelectorAll('#fpFilt .fopt').forEach(btn=>{
+    btn.onclick=()=>{
+      document.querySelectorAll('#fpFilt .fopt').forEach(b=>b.classList.remove('on'));
+      btn.classList.add('on');st=btn.dataset.st;buildFpGrid(st);
+    };
+  });
+  buildFpGrid(st);
+}
+
+function buildFpGrid(filterSt){
+  const grid=document.getElementById('fpMiniGrid');
+  if(!grid) return;
+  const DC={free:'fp-free',res:'fp-res',sold:'fp-sold',none:'fp-none'};
+  grid.innerHTML=Array.from({length:FL},(_,i)=>FL-i).map(fl=>{
+    const flApts=apts.filter(a=>a.floor===fl);
+    const flFree=flApts.filter(a=>a.status==='free').length;
+    const flPct=Math.round((APFL-flFree)/APFL*100);
+    const show=filterSt==='all'||(filterSt==='free'&&flFree>0)||(filterSt==='sold'&&flFree===0);
+    if(!show) return '';
+    return `
+      <div class="fp-fl-row" onclick="openFl(${fl})">
+        <div class="fp-num">ЭТ.${fl}</div>
+        <div class="fp-dots">
+          ${flApts.map(a=>`<div class="fp-dot ${DC[a.status]}" title="кв.${a.num}"></div>`).join('')}
+        </div>
+        <div class="fp-pct">${flPct}%</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ── ENVIRONMENT PANEL ──
+function renderEnvPanel(){
+  const body=document.getElementById('envBody');
+  if(!body||body.innerHTML.trim()) return;
+  const items=[
+    {icon:'🏫',title:'Школа №7 Душанбе',desc:'Одна из лучших школ города, 2 смены. Имеется спортзал и бассейн.',dist:'~500м · 7 мин пешком'},
+    {icon:'🏥',title:'Городская клиника №2',desc:'Круглосуточный приём, педиатрия, терапия, стоматология.',dist:'~1.2км · 15 мин пешком'},
+    {icon:'🛒',title:'ТЦ «Ориён»',desc:'Супермаркет, кинотеатр, рестораны, аптека, банкоматы.',dist:'~800м · 10 мин пешком'},
+    {icon:'🕌',title:'Мечеть Исмоили Сомони',desc:'Одна из крупнейших мечетей Душанбе, пятничный намоз.',dist:'~1.5км · 5 мин авто'},
+    {icon:'🌲',title:'Парк «Дружба»',desc:'Зелёная зона для прогулок, фонтаны, детские площадки.',dist:'~600м · 8 мин пешком'},
+    {icon:'✈️',title:'Аэропорт Душанбе',desc:'Международный аэропорт, рейсы в Россию, ОАЭ, Турцию.',dist:'~8км · 20 мин авто'},
+    {icon:'🏛️',title:'Президентский дворец',desc:'Административный центр города, ул. Рудаки.',dist:'~3км · 10 мин авто'},
+    {icon:'📚',title:'ТНУ и МГУ-филиал',desc:'Ведущие университеты города для детей жителей.',dist:'~2км · 6 мин авто'},
+    {icon:'⛽',title:'АЗС «Газпром»',desc:'Топливо, мойка, кафе, работает 24/7.',dist:'~300м · 4 мин пешком'},
+    {icon:'🏦',title:'Эсхата банк',desc:'Ипотека, кредиты, вклады. Партнёр ЖК Некруз Резиденс.',dist:'~400м · 5 мин пешком'},
+  ];
+  body.innerHTML=items.map(it=>`
+    <div class="env-item">
+      <div class="env-icon">${it.icon}</div>
+      <div>
+        <div class="env-title">${it.title}</div>
+        <div class="env-desc">${it.desc}</div>
+        <div class="env-dist">📍 ${it.dist}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── BOOKING ──
+let bookingApt=null;
+function openBooking(apt){
+  bookingApt=apt;
+  document.getElementById('bookSub').textContent=
+    `Квартира №${apt.num} · ${apt.rooms}-комн. · ${apt.area}м² · ${Math.round(apt.price/1000)}к TJS`;
+  document.getElementById('bookModal').classList.add('open');
+}
+function submitBooking(){
+  const name=document.getElementById('bkName').value.trim();
+  const phone=document.getElementById('bkPhone').value.trim();
+  if(!name||!phone){
+    alert('Пожалуйста, заполните ФИО и телефон');
+    return;
+  }
+  document.getElementById('bookModal').classList.remove('open');
+  // Show success toast
+  const t=document.getElementById('shareToast');
+  t.textContent=`✓ Заявка принята! Ожидайте звонка.`;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3500);
+  // Update apt status visually
+  if(bookingApt) bookingApt.status='res';
+}
+window.submitBooking=submitBooking;
+window.openBooking=openBooking;
+
+// ── CONSULT ──
+function openConsult(){
+  bookingApt=curApt;
+  document.getElementById('bookSub').textContent='Консультация по ЖК Некруз Резиденс';
+  document.getElementById('bookModal').classList.add('open');
+}
+window.openConsult=openConsult;
+
+// ── COMPARE ──
+function openCompare(){
+  if(compareList.length<2) return;
+  const grid=document.getElementById('cmpGrid');
+  grid.style.gridTemplateColumns=`repeat(${compareList.length},1fr)`;
+
+  // Find best values
+  const bestPrice=Math.min(...compareList.map(a=>a.price));
+  const bestArea=Math.max(...compareList.map(a=>a.area));
+  const bestFloor=Math.max(...compareList.map(a=>a.floor));
+  const bestPsm=Math.min(...compareList.map(a=>a.price/a.area));
+
+  grid.innerHTML=compareList.map(a=>{
+    const psm=Math.round(a.price/a.area);
+    const orient=a.orient==='front'?'На фасад':'На двор';
+    const view=a.floor>=12?'Панорамный':a.floor>=6?'На город':'На двор';
+    return `
+      <div class="cmp-col">
+        <div class="cmp-apt-n">№ ${a.num}</div>
+        <div class="cmp-attr"><span class="cmp-k">Комнат</span><span class="cmp-v">${a.rooms}</span></div>
+        <div class="cmp-attr ${a.area===bestArea?'best':''}"><span class="cmp-k">Площадь</span><span class="cmp-v">${a.area} м²</span></div>
+        <div class="cmp-attr"><span class="cmp-k">Этаж</span><span class="cmp-v">${a.floor} из ${FL}</span></div>
+        <div class="cmp-attr ${a.price===bestPrice?'best':compareList.length>1&&a.price===Math.max(...compareList.map(x=>x.price))?'worst':''}">
+          <span class="cmp-k">Цена</span><span class="cmp-v">${Math.round(a.price/1000)}к TJS</span></div>
+        <div class="cmp-attr ${psm===bestPsm?'best':''}"><span class="cmp-k">За м²</span><span class="cmp-v">${psm.toLocaleString('ru')} TJS</span></div>
+        <div class="cmp-attr"><span class="cmp-k">≈ USD</span><span class="cmp-v">${Math.round(a.price/USD_RATE/1000)}к $</span></div>
+        <div class="cmp-attr"><span class="cmp-k">Вид</span><span class="cmp-v">${orient}</span></div>
+        <div class="cmp-attr ${a.floor===bestFloor?'best':''}"><span class="cmp-k">Перспект.</span><span class="cmp-v">${view}</span></div>
+        <div class="cmp-attr"><span class="cmp-k">Статус</span>
+          <span class="cmp-v" style="color:${a.status==='free'?'var(--free)':a.status==='res'?'var(--res)':'var(--sold)'}">
+            ${a.status==='free'?'Свободна':a.status==='res'?'Забронирована':'Продана'}
+          </span></div>
+        ${a.status==='free'?`<div style="padding:10px 14px"><button class="cta1" style="font-size:9px;padding:8px" onclick="openBooking(compareList.find(x=>x.num===${a.num}))">Забронировать</button></div>`:''}
+      </div>
+    `;
+  }).join('');
+  document.getElementById('cmpModal').classList.add('open');
+}
+window.openCompare=openCompare;
+
+// ── FAVORITES ──
+function openFavs(){
+  if(favorites.length===0){
+    const t=document.getElementById('shareToast');
+    t.textContent='♡ Список избранного пуст';
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'),2000);
+    return;
+  }
+  // Build compare from favorites (up to 3)
+  compareList=favorites.slice(0,3).map(n=>apts.find(a=>a.num===n)).filter(Boolean);
+  updateCompareBar();
+  if(compareList.length>=2) openCompare();
+  else if(compareList.length===1) openApt(compareList[0]);
+}
+// Update fav badge
+function updateFavBadge(){
+  const b=document.getElementById('favBadge');
+  if(b){b.textContent=favorites.length;b.style.display=favorites.length>0?'block':'none';}
+}
+// Override toggleFav to also update badge
+const _origToggleFav=toggleFav;
+// already defined above, just ensure badge update on each call
+document.addEventListener('click',()=>updateFavBadge());
+setTimeout(updateFavBadge,100);
+
+// ── AMORTIZATION ──
+let amortApt=null,amortYears=5;
+function openAmort(){
+  amortApt=curApt;
+  if(!amortApt) return;
+  document.getElementById('amortSub').textContent=
+    `Квартира №${amortApt.num} · ${amortApt.area}м² · Цена: ${amortApt.price.toLocaleString('ru')} TJS · Первый взнос 30%`;
+  renderAmort(5);
+  document.getElementById('amortModal').style.display='flex';
+}
+function setAmortY(y,btn){
+  document.querySelectorAll('.at').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  amortYears=y;
+  renderAmort(y);
+}
+function renderAmort(years){
+  if(!amortApt) return;
+  const loan=amortApt.price*.7;
+  const r=.115/12;
+  const n=years*12;
+  const mp=loan*r/(1-Math.pow(1+r,-n));
+
+  document.getElementById('amortTotal').textContent=
+    `Ежемес. платёж: ${Math.round(mp).toLocaleString('ru')} TJS ≈ ${Math.round(mp/USD_RATE).toLocaleString('ru')} $ · Переплата: ${Math.round((mp*n-loan)/1000)}к TJS`;
+
+  const rows=document.getElementById('amortRows');
+  let bal=loan;
+  let html='';
+  let yearPrinc=0,yearInt=0;
+
+  for(let m=1;m<=n;m++){
+    const intPart=bal*r;
+    const prinPart=mp-intPart;
+    bal-=prinPart;
+    yearPrinc+=prinPart;yearInt+=intPart;
+
+    if(m%12===0||m===n){
+      const yr=Math.ceil(m/12);
+      html+=`<div class="amort-row yr">
+        <span>${yr} г.</span>
+        <span>${Math.round(mp).toLocaleString('ru')} TJS</span>
+        <span>${Math.round(yearPrinc).toLocaleString('ru')}</span>
+        <span>${Math.round(yearInt).toLocaleString('ru')}</span>
+      </div>`;
+      yearPrinc=0;yearInt=0;
+    }
+  }
+  rows.innerHTML=html;
+}
+window.openAmort=openAmort;
+window.setAmortY=setAmortY;
+
+// ── SHARE ──
+function shareApt(){
+  if(!curApt) return;
+  const text=`ЖК Некруз Резиденс · Квартира №${curApt.num} · ${curApt.rooms}-комн. · ${curApt.area}м² · ${Math.round(curApt.price/1000)}к TJS ≈ ${Math.round(curApt.price/USD_RATE/1000)}к $ · ${curApt.floor} этаж из 20`;
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(text).then(()=>{
+      const t=document.getElementById('shareToast');
+      t.textContent='✓ Информация скопирована!';
+      t.classList.add('show');
+      setTimeout(()=>t.classList.remove('show'),2500);
+    });
+  }
+}
+window.shareApt=shareApt;
+window.toggleFavCurrent=toggleFavCurrent;
+window.addCompareCurrent=addCompareCurrent;
+window.openFavs=openFavs;
+window.closeSearch=closeSearch;
+window.toggleSearch=toggleSearch;
+window.applySearch=applySearch;
+
+// Init compare bar + fav badge on load
+setTimeout(()=>{updateCompareBar();updateFavBadge();updateFavCount();},500);
+
+/* ═══════════════════════════════════════
+   LANGUAGE SYSTEM
+═══════════════════════════════════════ */
+const LANG={
+  ru:{
+    free:'Свободна',res:'Забронирована',sold:'Продана',none:'Недоступна',
+    book:'Забронировать квартиру',already_res:'Уже забронирована',already_sold:'Продано',
+    rooms:'Комнат',area:'Площадь',floor:'Этаж',ceil:'Потолок',
+    price:'Стоимость квартиры',consult:'📞 Получить консультацию',
+    back:'← Назад к 3D',section:'Секция',
+    bino:'🏢 Бино',floor_tab:'📐 Нақша',analytics:'📊 Аналитика',env:'🌳 Среда',
+    pdf:'📄 Скачать PDF',roi:'📈 Доходность',gallery:'🖼️ Фото объекта',qr:'📱 QR-код',
+    fav:'♡ В избранное',fav_rem:'♥ Убрать из избранного',
+  },
+  tj:{
+    free:'Озод',res:'Банд шудааст',sold:'Фурӯхта шуд',none:'Дастнорас',
+    book:'Иҷора кардан',already_res:'Аллакай банд',already_sold:'Фурӯхта шуд',
+    rooms:'Хонаҳо',area:'Масоҳат',floor:'Ошёна',ceil:'Баландии шип',
+    price:'Арзиши квартира',consult:'📞 Маслиҳат гирифтан',
+    back:'← Ба 3D',section:'Сексия',
+    bino:'🏢 Бино',floor_tab:'📐 Нақша',analytics:'📊 Таҳлил',env:'🌳 Муҳит',
+    pdf:'📄 PDF гирифтан',roi:'📈 Даромад',gallery:'🖼️ Аксҳо',qr:'📱 QR-код',
+    fav:'♡ Дӯстдоштниҳо',fav_rem:'♥ Хориҷ кардан',
+  },
+  en:{
+    free:'Available',res:'Reserved',sold:'Sold',none:'Not Available',
+    book:'Book Apartment',already_res:'Already Reserved',already_sold:'Sold',
+    rooms:'Rooms',area:'Area',floor:'Floor',ceil:'Ceiling',
+    price:'Apartment Price',consult:'📞 Get Consultation',
+    back:'← Back to 3D',section:'Section',
+    bino:'🏢 Building',floor_tab:'📐 Floor Plan',analytics:'📊 Analytics',env:'🌳 Environment',
+    pdf:'📄 Download PDF',roi:'📈 ROI Calc',gallery:'🖼️ Gallery',qr:'📱 QR Code',
+    fav:'♡ Save',fav_rem:'♥ Remove',
+  }
+};
+let curLang='ru';
+function setLang(l){
+  curLang=l;
+  document.querySelectorAll('.lbtn').forEach(b=>b.classList.toggle('on',b.textContent.toLowerCase().includes(l==='ru'?'рус':l==='tj'?'тоҷ':'eng')));
+  const T=LANG[l];
+  // Update bottom buttons
+  document.getElementById('b0').textContent=T.bino;
+  document.getElementById('b1').textContent=T.floor_tab;
+  document.getElementById('b2').textContent=T.analytics;
+  document.getElementById('b3').textContent=T.env;
+  // Update apt overlay if open
+  if(curApt) refreshAptLang(curApt);
+}
+function T(key){return (LANG[curLang]||LANG.ru)[key]||key;}
+function refreshAptLang(apt){
+  const BN={free:T('free'),res:T('res'),sold:T('sold'),none:T('none')};
+  const badge=document.getElementById('apBadge');
+  if(badge){badge.textContent=BN[apt.status];}
+  const cta=document.getElementById('apCta');
+  if(cta){cta.textContent=apt.status==='free'?T('book'):apt.status==='res'?T('already_res'):T('already_sold');}
+  const favBtn=document.getElementById('favBtn');
+  if(favBtn){favBtn.textContent=isFav(apt.num)?T('fav_rem'):T('fav');}
+}
+window.setLang=setLang;
+
+/* ═══════════════════════════════════════
+   NIGHT WINDOW ANIMATION
+═══════════════════════════════════════ */
+// Random flicker: some windows turn on/off gradually at night
+let winFlickerInterval=null;
+function startNightFlicker(){
+  if(winFlickerInterval) return;
+  winFlickerInterval=setInterval(()=>{
+    // Pick random 3–6 windows and toggle their emissive slightly
+    const count=3+Math.floor(Math.random()*4);
+    for(let i=0;i<count;i++){
+      const m=wmeshes[Math.floor(Math.random()*wmeshes.length)];
+      if(m&&m.material&&m.userData?.apt){
+        const base=WDEF[m.userData.apt.status].ei;
+        const flicker=base*(nightOn?2.4:1)*(0.7+Math.random()*0.6);
+        m.material.emissiveIntensity=flicker;
+      }
+    }
+  },280);
+}
+function stopNightFlicker(){
+  if(winFlickerInterval){clearInterval(winFlickerInterval);winFlickerInterval=null;}
+}
+// Patch night toggle to also start/stop flicker
+const _origNightBtn=document.getElementById('vNT').onclick;
+document.getElementById('vNT').onclick=function(){
+  _origNightBtn&&_origNightBtn.call(this);
+  if(nightOn) startNightFlicker(); else stopNightFlicker();
+};
+
+/* ═══════════════════════════════════════
+   GALLERY
+═══════════════════════════════════════ */
+// Placeholder gallery — rendered via Canvas 2D (imitates real photos)
+const GAL_SCENES=[
+  {caption:'Фасад — вид с главной улицы',icon:'🏢',desc:'28м ширина · 20 этажей · Монолит ж/б'},
+  {caption:'Лобби — зона ресепшн',icon:'🏛️',desc:'Мрамор · 7м потолки · 2 лифта Otis'},
+  {caption:'Вид с 15-го этажа на город',icon:'🌆',desc:'Панорамный вид · 180°'},
+  {caption:'Типовая планировка 2-комн.',icon:'🛋️',desc:'68 м² · Гостиная + спальня + кухня'},
+  {caption:'Стройплощадка — прогресс 78%',icon:'🏗️',desc:'Сдача: I квартал 2026'},
+  {caption:'Подземный паркинг Б1',icon:'🅿️',desc:'96 машиномест · Видеонаблюдение'},
+  {caption:'Детская площадка во дворе',icon:'🌳',desc:'Закрытый двор · Безопасность'},
+  {caption:'Тренажёрный зал на 1 этаже',icon:'💪',desc:'Для жителей бесплатно'},
+];
+let galIdx=0;
+function openGallery(){
+  galIdx=0;
+  buildGallery();
+  document.getElementById('galModal').classList.add('open');
+}
+function buildGallery(){
+  const main=document.getElementById('galMain');
+  // Remove old canvases
+  main.querySelectorAll('canvas').forEach(c=>c.remove());
+
+  GAL_SCENES.forEach((s,i)=>{
+    const cv=document.createElement('canvas');
+    cv.width=780;cv.height=500;cv.className='gal-img';
+    if(i===galIdx) cv.classList.add('cur');
+    const ctx=cv.getContext('2d');
+    // Draw scene
+    drawGalScene(ctx,780,500,s,i);
+    main.appendChild(cv);
+  });
+
+  // Thumbnails
+  const thumbs=document.getElementById('galThumbs');
+  thumbs.innerHTML=GAL_SCENES.map((s,i)=>`
+    <div class="gal-thumb ${i===galIdx?'cur':''}" onclick="galGoTo(${i})">${s.icon}</div>
+  `).join('');
+  updateGalInfo();
+}
+function drawGalScene(ctx,W,H,s,idx){
+  // Dark gradient background
+  const hues=[[10,20,40],[8,18,32],[12,22,38],[6,14,28],[4,10,22],[8,16,30],[10,18,36],[6,12,24]];
+  const h=hues[idx%hues.length];
+  const gr=ctx.createLinearGradient(0,0,W,H);
+  gr.addColorStop(0,`rgb(${h[0]},${h[1]},${h[2]})`);
+  gr.addColorStop(1,`rgb(${Math.round(h[0]*.4)},${Math.round(h[1]*.4)},${Math.round(h[2]*.4)})`);
+  ctx.fillStyle=gr;ctx.fillRect(0,0,W,H);
+
+  // Draw building silhouette for scene 0
+  if(idx===0){
+    // Sky gradient
+    const sky=ctx.createLinearGradient(0,0,0,H*.6);
+    sky.addColorStop(0,'#020810');sky.addColorStop(1,'#060e20');
+    ctx.fillStyle=sky;ctx.fillRect(0,0,W,H*.75);
+    // Building
+    ctx.fillStyle='#0c1a2e';ctx.fillRect(W*.3,H*.05,W*.4,H*.72);
+    ctx.fillStyle='#182840';ctx.fillRect(W*.31,H*.06,W*.38,H*.7);
+    // Windows grid
+    for(let fy=0;fy<18;fy++){for(let fx=0;fx<8;fx++){
+      const wx=W*.33+fx*(W*.04),wy=H*.08+fy*(H*.038);
+      const lit=Math.random()>.35;
+      ctx.fillStyle=lit?`rgba(${100+Math.random()*80},${120+Math.random()*80},${200+Math.random()*55},.7)`:'rgba(10,20,40,.8)';
+      ctx.fillRect(wx,wy,W*.028,H*.025);
+    }}
+    // Gold cornice
+    ctx.fillStyle='#c8a84b';ctx.fillRect(W*.29,H*.05,W*.42,H*.012);
+    ctx.fillStyle='rgba(200,168,75,.4)';ctx.fillRect(W*.28,H*.04,W*.44,H*.006);
+    // Ground
+    ctx.fillStyle='#030609';ctx.fillRect(0,H*.77,W,H*.23);
+    ctx.fillStyle='rgba(200,168,75,.12)';ctx.fillRect(0,H*.77,W,2);
+    // Street lights
+    [W*.15,W*.35,W*.65,W*.85].forEach(x=>{
+      ctx.fillStyle='#1a2840';ctx.fillRect(x-.025*W,H*.5,.025*W,H*.28);
+      ctx.fillStyle='rgba(255,220,80,.7)';ctx.beginPath();ctx.arc(x,H*.5,W*.015,0,Math.PI*2);ctx.fill();
+    });
+  } else if(idx===2){
+    // City view from high floor
+    const sky2=ctx.createLinearGradient(0,0,0,H*.5);
+    sky2.addColorStop(0,'#020c22');sky2.addColorStop(1,'#071530');
+    ctx.fillStyle=sky2;ctx.fillRect(0,0,W,H*.55);
+    // City buildings (distant)
+    [[W*.05,H*.38,W*.1,H*.2],[W*.18,H*.3,W*.08,H*.28],[W*.3,H*.35,W*.12,H*.22],
+     [W*.48,H*.28,W*.09,H*.3],[W*.62,H*.32,W*.11,H*.25],[W*.78,H*.36,W*.14,H*.2]].forEach(([x,y,w,h2])=>{
+      ctx.fillStyle='#07101e';ctx.fillRect(x,y,w,h2);
+      // Windows
+      for(let wy=y+5;wy<y+h2-5;wy+=8){for(let wx=x+4;wx<x+w-4;wx+=7){
+        if(Math.random()>.4){ctx.fillStyle='rgba(80,120,200,.5)';ctx.fillRect(wx,wy,4,5);}
+      }}
+    });
+    // Ground/city floor
+    ctx.fillStyle='#030810';ctx.fillRect(0,H*.55,W,H*.45);
+    // Roads
+    ctx.fillStyle='rgba(200,168,75,.08)';ctx.fillRect(0,H*.7,W,H*.04);
+    ctx.fillRect(W*.4,H*.55,W*.04,H*.45);
+    // Stars
+    for(let i=0;i<60;i++){
+      ctx.fillStyle=`rgba(255,255,255,${Math.random()*.7+.1})`;
+      ctx.beginPath();ctx.arc(Math.random()*W,Math.random()*H*.35,.5+Math.random()*1,0,Math.PI*2);ctx.fill();
+    }
+  } else {
+    // Generic interior/detail scene
+    // Grid background
+    ctx.strokeStyle='rgba(200,168,75,.06)';ctx.lineWidth=.5;
+    for(let i=0;i<W;i+=28){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,H);ctx.stroke();}
+    for(let i=0;i<H;i+=28){ctx.beginPath();ctx.moveTo(0,i);ctx.lineTo(W,i);ctx.stroke();}
+    // Central icon
+    ctx.font=`${Math.min(W,H)*.22}px serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle='rgba(200,168,75,.18)';ctx.fillText(s.icon,W/2,H*.4);
+    // Gold accent line
+    ctx.strokeStyle='rgba(200,168,75,.3)';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(W*.2,H*.62);ctx.lineTo(W*.8,H*.62);ctx.stroke();
+  }
+
+  // Caption overlay
+  const ov=ctx.createLinearGradient(0,H*.7,0,H);
+  ov.addColorStop(0,'transparent');ov.addColorStop(1,'rgba(2,5,12,.9)');
+  ctx.fillStyle=ov;ctx.fillRect(0,H*.7,W,H*.3);
+  ctx.fillStyle='rgba(200,168,75,.9)';ctx.font='bold 18px Inter,sans-serif';
+  ctx.textAlign='left';ctx.textBaseline='alphabetic';
+  ctx.fillText(s.caption,24,H-36);
+  ctx.fillStyle='rgba(180,200,220,.5)';ctx.font='12px Inter,sans-serif';
+  ctx.fillText(s.desc,24,H-14);
+  // Logo watermark
+  ctx.fillStyle='rgba(200,168,75,.2)';ctx.font='bold 10px Unbounded,sans-serif';
+  ctx.textAlign='right';ctx.fillText('НЕКРУЗ РЕЗИДЕНС',W-16,H-14);
+}
+function galNav(d){
+  galIdx=(galIdx+d+GAL_SCENES.length)%GAL_SCENES.length;
+  document.querySelectorAll('#galMain canvas').forEach((c,i)=>c.classList.toggle('cur',i===galIdx));
+  document.querySelectorAll('#galThumbs .gal-thumb').forEach((t,i)=>t.classList.toggle('cur',i===galIdx));
+  updateGalInfo();
+}
+function galGoTo(i){galIdx=i;galNav(0);}
+function updateGalInfo(){
+  const s=GAL_SCENES[galIdx];
+  document.getElementById('galCaption').textContent=s.caption;
+  document.getElementById('galCounter').textContent=`${galIdx+1} / ${GAL_SCENES.length}`;
+}
+window.openGallery=openGallery;
+window.galNav=galNav;
+window.galGoTo=galGoTo;
+
+/* ═══════════════════════════════════════
+   ROI CALCULATOR
+═══════════════════════════════════════ */
+function openROI(){
+  if(!curApt) return;
+  document.getElementById('roiAptInfo').textContent=
+    `Квартира №${curApt.num} · ${curApt.rooms}-к · ${curApt.area}м² · ${Math.round(curApt.price/1000)}к TJS`;
+  calcROI();
+  document.getElementById('roiModal').classList.add('open');
+}
+function calcROI(){
+  if(!curApt) return;
+  const years=parseInt(document.getElementById('roiYears').value);
+  const growth=parseInt(document.getElementById('roiGrowth').value)/100;
+  const rent=parseInt(document.getElementById('roiRent').value);
+  document.getElementById('roiYrLbl').textContent=years+' лет';
+  document.getElementById('roiGrLbl').textContent=Math.round(document.getElementById('roiGrowth').value)+'%';
+  document.getElementById('roiRentLbl').textContent=rent.toLocaleString('ru')+' TJS';
+
+  const P=curApt.price;
+  const finalPrice=P*Math.pow(1+growth,years);
+  const priceGain=finalPrice-P;
+  const rentTotal=rent*12*years;
+  const totalProfit=priceGain+rentTotal;
+  const roi=Math.round(totalProfit/P*100);
+
+  document.getElementById('roiProfit').textContent=
+    `+${Math.round(totalProfit/1000).toLocaleString('ru')}к TJS`;
+  document.getElementById('roiProfit').style.color=
+    totalProfit>0?'var(--free)':'var(--sold)';
+
+  document.getElementById('roiRows').innerHTML=`
+    <div class="roi-row"><span class="roi-k">Цена сейчас</span><span class="roi-v">${Math.round(P/1000)}к TJS</span></div>
+    <div class="roi-row"><span class="roi-k">Цена через ${years} лет</span><span class="roi-v pos">+${Math.round(priceGain/1000)}к TJS</span></div>
+    <div class="roi-row"><span class="roi-k">Доход от аренды</span><span class="roi-v pos">+${Math.round(rentTotal/1000)}к TJS</span></div>
+    <div class="roi-row"><span class="roi-k">Итого прибыль</span><span class="roi-v pos">+${Math.round(totalProfit/1000)}к TJS</span></div>
+    <div class="roi-row"><span class="roi-k">ROI</span><span class="roi-v ${roi>0?'pos':'neg'}">${roi}%</span></div>
+    <div class="roi-row"><span class="roi-k">≈ USD прибыль</span><span class="roi-v">${Math.round(totalProfit/USD_RATE/1000)}к $</span></div>
+  `;
+}
+window.openROI=openROI;
+window.calcROI=calcROI;
+
+/* ═══════════════════════════════════════
+   QR CODE (ручной рендер)
+═══════════════════════════════════════ */
+function openQR(){
+  if(!curApt) return;
+  document.getElementById('qrSub').textContent=
+    `Квартира №${curApt.num} · ${curApt.rooms}-к · ${curApt.area}м² · ${Math.round(curApt.price/1000)}к TJS`;
+  drawQR();
+  document.getElementById('qrModal').classList.add('open');
+}
+function drawQR(){
+  const cv=document.getElementById('qrCanvas');
+  const ctx=cv.getContext('2d');
+  const S=200;ctx.clearRect(0,0,S,S);
+  // White background
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,S,S);
+  // Simple QR-like pattern (decorative — real QR would need a library)
+  const cell=5;const cols=S/cell;
+  // Seed from apt num
+  const seed=(curApt?curApt.num:1)*7+13;
+  function qrRng(i){let x=seed^i*0x9e3779b9;x=((x>>>16)^x)*0x45d9f3b;x=((x>>>16)^x);return(x>>>0)/4294967296;}
+  ctx.fillStyle='#1a2840';
+  for(let r=0;r<cols;r++){for(let c=0;c<cols;c++){
+    if(qrRng(r*cols+c)>.42) ctx.fillRect(c*cell,r*cell,cell,cell);
+  }}
+  // Corner squares (finder patterns)
+  [[1,1],[1,cols-8],[cols-8,1]].forEach(([r,c])=>{
+    ctx.fillStyle='#1a2840';ctx.fillRect(c*cell,r*cell,7*cell,7*cell);
+    ctx.fillStyle='#fff';ctx.fillRect((c+1)*cell,(r+1)*cell,5*cell,5*cell);
+    ctx.fillStyle='#1a2840';ctx.fillRect((c+2)*cell,(r+2)*cell,3*cell,3*cell);
+  });
+  // Gold border
+  ctx.strokeStyle='#c8a84b';ctx.lineWidth=3;ctx.strokeRect(1,1,S-2,S-2);
+  // Center logo text
+  ctx.fillStyle='rgba(200,168,75,.12)';ctx.fillRect(S*.35,S*.4,S*.3,S*.2);
+  ctx.fillStyle='#c8a84b';ctx.font='bold 8px Unbounded,sans-serif';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('НР',S/2,S*.485);ctx.font='5px Inter';ctx.fillText(`№${curApt?curApt.num:''}`,S/2,S*.525);
+}
+window.openQR=openQR;
+
+/* ═══════════════════════════════════════
+   PDF EXPORT (canvas → download)
+═══════════════════════════════════════ */
+function exportPDF(){
+  if(!curApt) return;
+  // Create a canvas and render apartment info card
+  const cv=document.createElement('canvas');
+  cv.width=794;cv.height=1123; // A4 @96dpi
+  const ctx=cv.getContext('2d');
+
+  // Background
+  ctx.fillStyle='#04080f';ctx.fillRect(0,0,794,1123);
+
+  // Header gold bar
+  ctx.fillStyle='#c8a84b';ctx.fillRect(0,0,794,6);
+
+  // Logo
+  ctx.fillStyle='#c8a84b';ctx.font='bold 22px Unbounded,sans-serif';
+  ctx.textAlign='left';ctx.textBaseline='alphabetic';
+  ctx.fillText('НЕКРУЗ РЕЗИДЕНС',40,60);
+  ctx.fillStyle='#1e2d40';ctx.font='10px Inter,sans-serif';
+  ctx.fillText('ЖК · ДУШАНБЕ · ТАДЖИКИСТАН',40,80);
+
+  // Apt number big
+  ctx.fillStyle='#c8a84b';ctx.font='bold 90px Unbounded,sans-serif';
+  ctx.fillText(`№${curApt.num}`,40,200);
+
+  // Status badge
+  const stCol={free:'#22c55e',res:'#f59e0b',sold:'#ef4444',none:'#334155'};
+  const stTxt={free:'СВОБОДНА',res:'ЗАБРОНИРОВАНА',sold:'ПРОДАНА',none:'НЕДОСТУПНА'};
+  ctx.fillStyle=stCol[curApt.status]+'22';ctx.fillRect(500,120,254,44);
+  ctx.strokeStyle=stCol[curApt.status];ctx.lineWidth=1;ctx.strokeRect(500,120,254,44);
+  ctx.fillStyle=stCol[curApt.status];ctx.font='bold 12px Unbounded,sans-serif';
+  ctx.textAlign='center';ctx.fillText(stTxt[curApt.status],627,148);
+
+  // Info grid
+  ctx.textAlign='left';
+  const info=[
+    ['КОМНАТ',curApt.rooms],['ПЛОЩАДЬ',curApt.area+'м²'],
+    ['ЭТАЖ',`${curApt.floor} из 20`],['ВЫСОТА ПОТОЛКОВ','3.0м'],
+    ['СЕКЦИЯ',curApt.orient==='front'?'А (фасад)':'Б (двор)'],
+    ['КОРПУС','Монолит ж/б'],
+  ];
+  info.forEach(([k,v],i)=>{
+    const col=i%2===0?40:420;const row=250+Math.floor(i/2)*70;
+    ctx.fillStyle='#1e2d40';ctx.font='8px Inter,sans-serif';ctx.fillText(k,col,row);
+    ctx.fillStyle='#ddd6c0';ctx.font='bold 20px Inter,sans-serif';ctx.fillText(v,col,row+28);
+    ctx.strokeStyle='rgba(200,168,75,.12)';ctx.lineWidth=.5;
+    ctx.beginPath();ctx.moveTo(col,row+36);ctx.lineTo(col+340,row+36);ctx.stroke();
+  });
+
+  // Price box
+  ctx.fillStyle='rgba(200,168,75,.06)';ctx.fillRect(40,470,714,100);
+  ctx.strokeStyle='rgba(200,168,75,.2)';ctx.lineWidth=1;ctx.strokeRect(40,470,714,100);
+  ctx.fillStyle='#5a4010';ctx.font='8px Inter,sans-serif';ctx.textAlign='left';
+  ctx.fillText('СТОИМОСТЬ КВАРТИРЫ',55,495);
+  ctx.fillStyle='#c8a84b';ctx.font='bold 38px Unbounded,sans-serif';
+  ctx.fillText(`${curApt.price.toLocaleString('ru')} TJS`,55,545);
+  ctx.fillStyle='#6b8099';ctx.font='14px Inter,sans-serif';
+  ctx.fillText(`≈ ${Math.round(curApt.price/USD_RATE).toLocaleString('ru')} USD`,55,565);
+
+  // Floor plan canvas
+  const planCv=document.getElementById('bigPlan');
+  ctx.drawImage(planCv,40,590,370,220);
+  ctx.strokeStyle='rgba(200,168,75,.1)';ctx.lineWidth=1;ctx.strokeRect(40,590,370,220);
+
+  // Mortgage
+  ctx.fillStyle='#1e2d40';ctx.font='8px Inter,sans-serif';ctx.textAlign='left';
+  ctx.fillText('ИПОТЕКА · 30% ПЕРВЫЙ ВЗНОС · 11.5% ГОДОВЫХ',430,600);
+  const loan=curApt.price*.7,r=.115/12;
+  [[5,'5 ЛЕТ'],[10,'10 ЛЕТ'],[20,'20 ЛЕТ']].forEach(([n,lbl],i)=>{
+    const mp=Math.round(loan*r/(1-Math.pow(1+r,-n*12))/1000);
+    const y=630+i*55;
+    ctx.fillStyle='rgba(255,255,255,.03)';ctx.fillRect(430,y,314,44);
+    ctx.strokeStyle='rgba(255,255,255,.06)';ctx.lineWidth=.5;ctx.strokeRect(430,y,314,44);
+    ctx.fillStyle='#c8a84b';ctx.font='bold 20px Unbounded,sans-serif';
+    ctx.fillText(`${mp}к TJS/мес.`,445,y+30);
+    ctx.fillStyle='#1e2d40';ctx.font='8px Inter,sans-serif';ctx.fillText(lbl,430+265,y+30);
+  });
+
+  // Features
+  const feats=['🏗️ Монолит ж/б','🛗 2 лифта Otis','🅿️ Паркинг Б1','🔥 Тёплый пол','🔒 Охрана 24/7','📡 Оптоволокно'];
+  ctx.fillStyle='#1e2d40';ctx.font='8px Inter,sans-serif';ctx.fillText('ИНФРАСТРУКТУРА',40,840);
+  feats.forEach((f,i)=>{
+    const col=40+(i%3)*250,row=855+Math.floor(i/3)*30;
+    ctx.fillStyle='#6b8099';ctx.font='11px Inter,sans-serif';ctx.fillText(f,col,row);
+  });
+
+  // Footer
+  ctx.fillStyle='rgba(200,168,75,.2)';ctx.fillRect(0,1080,794,1);
+  ctx.fillStyle='#1e2d40';ctx.font='9px Inter,sans-serif';ctx.textAlign='left';
+  ctx.fillText('ЖК Некруз Резиденс · г. Душанбе · +992 44 600-00-00 · nekruz-residence.tj',40,1105);
+  ctx.textAlign='right';
+  ctx.fillText(`Создано ${new Date().toLocaleDateString('ru')}`,754,1105);
+  ctx.fillStyle='#c8a84b';ctx.fillRect(0,1117,794,6);
+
+  // Download
+  const link=document.createElement('a');
+  link.download=`nekruz-apt-${curApt.num}.png`;
+  link.href=cv.toDataURL('image/png');
+  link.click();
+
+  const t=document.getElementById('shareToast');
+  t.textContent='📄 PDF сохранён!';t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+window.exportPDF=exportPDF;
+
+/* ═══════════════════════════════════════
+   CONTACT
+═══════════════════════════════════════ */
+function openWA(){
+  const msg=curApt?
+    `Здравствуйте! Интересует квартира №${curApt.num} (${curApt.rooms}-к, ${curApt.area}м²) в ЖК Некруз Резиденс. Прошу связаться.`:
+    'Здравствуйте! Интересует квартира в ЖК Некруз Резиденс. Прошу связаться.';
+  window.open('https://wa.me/992446000000?text='+encodeURIComponent(msg),'_blank');
+}
+function callPhone(){
+  const t=document.getElementById('shareToast');
+  t.textContent='📞 +992 44 600-00-00';t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+  if(navigator.userAgent.match(/mobile/i)) window.location.href='tel:+992446000000';
+}
+window.openWA=openWA;
+window.callPhone=callPhone;
+
+/* ═══════════════════════════════════════
+   LOADER
+═══════════════════════════════════════ */
+const ldMsgs=['ИНИЦИАЛИЗАЦИЯ...','ПОЙГОҲ...','PBR МАТЕРИАЛЫ...','20 ЭТАЖЕЙ...','ДЕТАЛИ ФАСАДА...','БАЛКОНЫ + ОКНА...','СРЕДА + ДЕРЕВЬЯ...','ГОТОВО!'];
+let ldP=0,ldS=0;
+const ldFEl=document.getElementById('ldF'),ldMEl=document.getElementById('ldM');
+const ldInt=setInterval(()=>{
+  ldP+=Math.random()*8+3;if(ldP>100)ldP=100;
+  ldFEl.style.width=ldP+'%';
+  if(ldS<ldMsgs.length-1&&ldP>ldS*(100/ldMsgs.length)) ldMEl.textContent=ldMsgs[ldS++];
+  if(ldP>=100){
+    clearInterval(ldInt);
+    setTimeout(()=>{const ld=document.getElementById('ld');ld.style.opacity='0';setTimeout(()=>ld.hidden=true,750);},600);
+  }
+},130);
+</script>
+<!-- ══ WOW: стройка, этажи, презентация, режим встраивания (?embed=1) ══ -->
+<style>
+#wowFloor{position:fixed;left:60px;top:58px;width:260px;z-index:28;padding:18px 18px 16px;border-radius:16px;
+  background:rgba(4,8,16,.94);border:1px solid rgba(200,168,75,.3);box-shadow:0 24px 60px rgba(0,0,0,.55);
+  color:#e9edfa;font-family:Inter,system-ui,sans-serif;transform:translateX(-120%);transition:transform .35s cubic-bezier(.2,.8,.2,1)}
+#wowFloor.open{transform:translateX(0)}
+#wowFloor h3{margin:0 0 4px;font-family:Unbounded,sans-serif;font-size:18px;color:var(--gold)}
+#wowFloor .wf-sub{font-size:12px;color:#8894ba;margin-bottom:12px}
+#wowFloor .wf-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed rgba(255,255,255,.08);font-size:13px}
+#wowFloor .wf-row b{color:#fff}
+#wowFloor .wf-btn{display:block;width:100%;margin-top:14px;padding:11px;border-radius:10px;border:1px solid rgba(200,168,75,.45);
+  background:rgba(200,168,75,.14);color:var(--gold);font:600 13px Inter,sans-serif;cursor:pointer}
+#wowFloor .wf-btn:hover{background:rgba(200,168,75,.24)}
+#wowFloor .wf-x{position:absolute;top:8px;right:8px;width:30px;height:30px;border:0;background:none;color:#8894ba;font-size:20px;cursor:pointer}
+#wowVignette{position:fixed;inset:0;pointer-events:none;z-index:5;opacity:0;transition:opacity .5s;
+  background:radial-gradient(ellipse 80% 80% at 50% 50%,transparent 50%,rgba(201,162,39,.16) 100%)}
+#wowHint{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:6;padding:6px 14px;border-radius:999px;
+  background:rgba(4,8,16,.7);color:#c8a84b;font:600 12px Inter,sans-serif;opacity:0;transition:opacity .5s;pointer-events:none}
+body.wow-show #wowVignette,body.wow-show #wowHint{opacity:1}
+body.wow-show #hd,body.wow-show #tb,body.wow-show #bot,body.wow-show #leg,body.wow-show #pgw,body.wow-show #langBar,
+body.wow-show #floatContact,body.wow-show #wowFloor,body.wow-show .side-panel,body.wow-show #cmpBar,body.wow-show #tip{opacity:0!important;pointer-events:none!important;transition:opacity .4s}
+/* Встраивание в героя главной: только сцена, без интерфейса. */
+body.wow-embed #hd,body.wow-embed #tb,body.wow-embed #bot,body.wow-embed #leg,body.wow-embed #pgw,body.wow-embed #langBar,
+body.wow-embed #floatContact,body.wow-embed #cmpBar,body.wow-embed #tip,body.wow-embed .side-panel,body.wow-embed #wowFloor{display:none!important}
+@media (max-width:600px){#wowFloor{left:10px;right:10px;width:auto;top:auto;bottom:62px;transform:translateY(130%)}#wowFloor.open{transform:translateY(0)}}
+@media (prefers-reduced-motion:reduce){#wowFloor,#wowVignette,#wowHint{transition:none}}
+</style>
+<div id="wowFloor" role="dialog" aria-live="polite"></div>
+<div id="wowVignette" aria-hidden="true"></div>
+<div id="wowHint"></div>
+<script>
+'use strict';
+(function(){
+  const embed=/(^|[?&])embed=1(&|$)/.test(location.search);
+  // Без WebGL основной скрипт останавливается на создании движка: вместо вечной «инициализации» — понятное сообщение.
+  let ready=false;
+  try{ready=!!(scene&&cam&&canvas&&BUILDING_MESHES);}catch(e){ready=false;}
+  if(!ready){
+    if(embed)document.body.classList.add('wow-embed');
+    const msg=document.getElementById('ldM');
+    let lang='ru';try{lang=curLang;}catch(e){/* the main script stopped before declaring it */}
+    if(msg)msg.textContent=({tj:'Модели 3D дар ин браузер кор намекунад (WebGL нест)',en:'The 3D model needs WebGL, which this browser does not provide'})[lang]||'3D-модель недоступна в этом браузере: нет WebGL';
+    return;
+  }
+  const reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const W={
+    ru:{build:'Стройка',show:'Презентация',labels:'Номера этажей',floor:'Этаж',of:'из',free:'Свободно',res:'Бронь',sold:'Продано',total:'Квартир на этаже',showApts:'Показать квартиры этажа',exit:'Esc или клик — выход из презентации',close:'Закрыть'},
+    tj:{build:'Сохтмон',show:'Намоиш',labels:'Рақами ошёнаҳо',floor:'Ошёна',of:'аз',free:'Холӣ',res:'Банд',sold:'Фурӯхта',total:'Манзилҳо дар ошёна',showApts:'Нишон додани манзилҳои ошёна',exit:'Esc ё клик — баромад аз намоиш',close:'Пӯшидан'},
+    en:{build:'Construction',show:'Presentation',labels:'Floor numbers',floor:'Floor',of:'of',free:'Available',res:'Reserved',sold:'Sold',total:'Apartments on the floor',showApts:'Show this floor\'s apartments',exit:'Esc or click to leave the presentation',close:'Close'}
+  };
+  const L=()=>W[typeof curLang==='string'&&W[curLang]?curLang:'ru'];
+  const ease=(p)=>{const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(p-1,3)+c1*Math.pow(p-1,2);}; // BackEase out: a slight overshoot
+  const smooth=(p)=>p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2;
+
+  /* ── Меши здания: этаж по нижней отметке; сквозные (выше двух этажей) растут вместе со зданием ── */
+  const parts=(typeof BUILDING_MESHES!=='undefined'?BUILDING_MESHES:[]).filter(m=>!m.parent&&m.getBoundingInfo).map(m=>{
+    m.computeWorldMatrix(true);
+    const bb=m.getBoundingInfo().boundingBox, minY=bb.minimumWorld.y, maxY=bb.maximumWorld.y;
+    const fl=minY<LH-.5?0:Math.max(1,Math.min(FL+1,Math.floor((minY-LH)/FH)+1));
+    return {m,minY,h:Math.max(.001,maxY-minY),fl,tall:(maxY-minY)>FH*2.2&&fl<=1,y0:m.position.y,s0:m.scaling.y};
+  });
+  // Высота k (0…1) от нижней отметки: меш «вырастает» снизу, а не из центра.
+  const grow=(p,k)=>{const kk=Math.max(.001,k);p.m.scaling.y=p.s0*kk;p.m.position.y=p.y0-(p.h/2)*(1-kk);};
+
+  /* ── 🏗️ Стройка: этажи поднимаются по одному (150 мс), с искрами наверху ── */
+  let building=false;
+  function spawnSpark(x,y,z){
+    const s=BABYLON.MeshBuilder.CreateSphere('spark',{diameter:.18,segments:4},scene);
+    s.position.set(x+(Math.random()-.5)*2,y,z+(Math.random()-.5)*2);s.isPickable=false;
+    const mat=new BABYLON.StandardMaterial('sparkM',scene);mat.emissiveColor=new BABYLON.Color3(1,.85,.2);mat.disableLighting=true;s.material=mat;
+    let vy=.08+Math.random()*.06,vx=(Math.random()-.5)*.05,vz=(Math.random()-.5)*.05,life=1;
+    const obs=scene.onBeforeRenderObservable.add(()=>{
+      s.position.y+=vy;s.position.x+=vx;s.position.z+=vz;vy-=.004;life-=.03;mat.alpha=Math.max(0,life);
+      if(life<=0){scene.onBeforeRenderObservable.remove(obs);s.dispose();mat.dispose();}
+    });
+  }
+  function construct(){
+    if(building||!parts.length)return;
+    building=true;
+    const STEP=150,GROW=420,START=250,total=START+(FL+1)*STEP+GROW;
+    parts.forEach(p=>grow(p,p.fl===0?1:0));
+    const seen=new Set(),t0=performance.now();
+    const obs=scene.onBeforeRenderObservable.add(()=>{
+      const t=performance.now()-t0;
+      parts.forEach(p=>{
+        if(p.fl===0)return;
+        if(p.tall){grow(p,smooth(Math.min(1,t/total)));return;}
+        const at=START+(p.fl-1)*STEP,q=(t-at)/GROW;
+        if(q<=0)return;grow(p,q>=1?1:ease(q));
+      });
+      const f=Math.floor((t-START)/STEP)+1;
+      if(f>=1&&f<=FL&&!seen.has(f)){seen.add(f);if(!reduce)for(let i=0;i<5;i++)spawnSpark(0,LH+f*FH,0);}
+      if(t>=total){scene.onBeforeRenderObservable.remove(obs);parts.forEach(p=>grow(p,1));building=false;}
+    });
+  }
+
+  /* ── Камера: плавный перелёт к цели ── */
+  let flight=null;
+  function flyTo(y,radius,beta){
+    if(flight)scene.onBeforeRenderObservable.remove(flight);
+    const from={y:cam.target.y,r:cam.radius,b:cam.beta},t0=performance.now(),D=reduce?1:900;
+    flight=scene.onBeforeRenderObservable.add(()=>{
+      const p=Math.min(1,(performance.now()-t0)/D),k=smooth(p);
+      cam.target.y=from.y+(y-from.y)*k;cam.radius=from.r+(radius-from.r)*k;cam.beta=from.b+(beta-from.b)*k;
+      if(p>=1){scene.onBeforeRenderObservable.remove(flight);flight=null;}
+    });
+  }
+
+  /* ── Этажи: золотые таблички у здания; клик — перелёт и панель этажа ── */
+  const panel=document.getElementById('wowFloor');
+  let openFloor=null;
+  function showFloor(f){
+    openFloor=f;
+    const list=apts.filter(a=>a.floor===f),n=(st)=>list.filter(a=>a.status===st).length,T=L();
+    panel.replaceChildren();
+    const el=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt!==undefined)e.textContent=txt;return e;};
+    const x=el('button','wf-x','×');x.type='button';x.setAttribute('aria-label',T.close);x.onclick=()=>{panel.classList.remove('open');openFloor=null;};
+    const row=(k,v)=>{const r=el('div','wf-row');r.append(el('span',null,k),el('b',null,String(v)));return r;};
+    const go=el('button','wf-btn',T.showApts);go.type='button';
+    go.onclick=()=>{const b=document.querySelector('.fbtn[data-fl="'+f+'"]');if(b)b.click();};
+    panel.append(x,el('h3',null,T.floor+' '+f),el('div','wf-sub',T.free+': '+n('free')+' '+T.of+' '+list.length),
+      row(T.total,list.length),row(T.free,n('free')),row(T.res,n('res')),row(T.sold,n('sold')),go);
+    panel.classList.add('open');
+    flyTo(LH+(f-.5)*FH,Math.max(cam.lowerRadiusLimit+4,46),1.22);
+  }
+  const labels=[];
+  function makeLabel(f){
+    const tex=new BABYLON.DynamicTexture('fl'+f,{width:256,height:128},scene,true);tex.hasAlpha=true;
+    const g=tex.getContext();g.clearRect(0,0,256,128);
+    g.fillStyle='rgba(6,13,31,.82)';g.strokeStyle='#c9a227';g.lineWidth=6;
+    g.beginPath();if(g.roundRect)g.roundRect(8,14,240,100,50);else g.rect(8,14,240,100);g.fill();g.stroke();
+    g.fillStyle='#f2d27a';g.font='700 62px Inter, sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(String(f),128,66);
+    tex.update();
+    const mat=new BABYLON.StandardMaterial('flm'+f,scene);mat.diffuseTexture=tex;mat.emissiveTexture=tex;mat.useAlphaFromDiffuseTexture=true;
+    mat.disableLighting=true;mat.backFaceCulling=false;
+    const p=BABYLON.MeshBuilder.CreatePlane('flLabel'+f,{width:2.4,height:1.2},scene);
+    p.position.set(BW/2+3.4,LH+(f-.5)*FH,BD/2+1.2);p.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL;p.material=mat;p.metadata={floor:f};
+    p.actionManager=new BABYLON.ActionManager(scene);
+    p.actionManager.registerAction(new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger,()=>{if(!showing)showFloor(f);}));
+    labels.push(p);
+  }
+  if(!embed)for(let f=1;f<=FL;f++)makeLabel(f);
+  const setLabels=(on)=>labels.forEach(p=>p.setEnabled(on));
+
+  /* ── 🎥 Презентация: интерфейс уходит, камера медленно облетает здание, золотая виньетка ── */
+  let showing=false,swing=null,baseBeta=cam.beta;
+  const hint=document.getElementById('wowHint');
+  function autoRotate(on){
+    cam.useAutoRotationBehavior=on;
+    if(on&&cam.autoRotationBehavior){const b=cam.autoRotationBehavior;b.idleRotationSpeed=.25;b.idleRotationWaitTime=0;b.idleRotationSpinupTime=600;b.zoomStopsAnimation=false;}
+  }
+  function startShow(){
+    if(showing)return;showing=true;baseBeta=Math.min(1.3,Math.max(.7,cam.beta));
+    panel.classList.remove('open');hint.textContent=L().exit;
+    document.body.classList.add('wow-show');autoRotate(true);
+    flyTo(32,Math.min(cam.upperRadiusLimit,104),baseBeta);
+    const t0=performance.now();
+    swing=scene.onBeforeRenderObservable.add(()=>{if(flight)return;cam.beta=baseBeta+.2*Math.sin((performance.now()-t0)/10000*Math.PI*2);});
+  }
+  function stopShow(){
+    if(!showing)return;showing=false;
+    document.body.classList.remove('wow-show');autoRotate(false);
+    if(swing){scene.onBeforeRenderObservable.remove(swing);swing=null;}
+    cam.beta=baseBeta;
+  }
+  document.addEventListener('keydown',(e)=>{if(e.key==='Escape'){stopShow();panel.classList.remove('open');}});
+  // Клик по сцене во время показа — выход (pointerdown, чтобы это не стало началом вращения).
+  canvas.addEventListener('pointerdown',()=>{if(showing)stopShow();},true);
+
+  /* ── Кнопки в панели вида ── */
+  const tb=document.getElementById('tb');
+  if(tb&&!embed){
+    const grp=document.createElement('div');grp.className='tg';
+    const tl=document.createElement('div');tl.className='tl';tl.textContent='ШОУ';
+    const btn=(icon,key,fn)=>{const b=document.createElement('button');b.className='tbtn';b.type='button';b.textContent=icon;b.title=L()[key];b.setAttribute('aria-label',L()[key]);b.dataset.wow=key;b.addEventListener('click',fn);return b;};
+    const lb=btn('🏷️','labels',()=>{const on=!lb.classList.contains('on');lb.classList.toggle('on',on);setLabels(on);});
+    lb.classList.add('on');
+    grp.append(tl,btn('🏗️','build',construct),btn('🎥','show',startShow),lb);
+    tb.insertBefore(grp,tb.children[1]||null);
+    // Подписи кнопок — на языке страницы.
+    const old=window.setLang;
+    if(typeof old==='function')window.setLang=function(l){old(l);grp.querySelectorAll('[data-wow]').forEach(b=>{b.title=L()[b.dataset.wow];b.setAttribute('aria-label',L()[b.dataset.wow]);});if(openFloor)showFloor(openFloor);};
+  }
+
+  /* ── ?embed=1: только сцена — без интерфейса, без колеса мыши (страница не «застревает»), медленный облёт ── */
+  if(embed){
+    document.body.classList.add('wow-embed');
+    cam.inputs.removeByType('ArcRotateCameraMouseWheelInput');
+    autoRotate(true);
+  }
+})();
+</script>
+</body>
+</html>

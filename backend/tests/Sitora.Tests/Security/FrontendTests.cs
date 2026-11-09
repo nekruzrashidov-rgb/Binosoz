@@ -52,6 +52,26 @@ public class FrontendTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFa
         Assert.Contains("script-src 'self' https://cdnjs.cloudflare.com;", response.Headers.GetValues("Content-Security-Policy").Single());
     }
 
+    // 3D-модель встраивается только страницами сайта и работает в песочнице без доступа к origin сайта;
+    // остальные страницы по-прежнему нельзя встроить никуда.
+    [Fact]
+    public async Task Model3dPage_IsSandboxed_AndFramedOnlyBySite()
+    {
+        var client = factory.CreateClient();
+        var model = await client.GetAsync("/nekruz3d.html");
+        Assert.Equal(HttpStatusCode.OK, model.StatusCode);
+        Assert.Equal("SAMEORIGIN", model.Headers.GetValues("X-Frame-Options").Single());
+        var policy = model.Headers.GetValues("Content-Security-Policy").Single();
+        Assert.StartsWith("sandbox allow-scripts ", policy);
+        Assert.DoesNotContain("allow-same-origin", policy);
+        Assert.Contains("connect-src 'none'", policy);
+        Assert.Contains("frame-ancestors 'self'", policy);
+
+        var site = await client.GetAsync("/apartments");
+        Assert.Equal("DENY", site.Headers.GetValues("X-Frame-Options").Single());
+        Assert.Contains("frame-ancestors 'none'", site.Headers.GetValues("Content-Security-Policy").Single());
+    }
+
     [Fact]
     public async Task UnknownApiPath_IsNotFound_NotSitePage()
     {

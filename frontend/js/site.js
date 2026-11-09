@@ -11,6 +11,7 @@
   const FEATURES = [['mountain', 'why.view'], ['screen', 'why.cabinet'], ['card', 'why.plan'], ['crane', 'why.dev'], ['pin', 'why.center'], ['key', 'why.keys']];
   // Public-site icons (24×24, stroke).
   const LAND_ICONS = {
+    cube: '<path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="m3 7 9 5 9-5M12 12v10"/>',
     crane: '<path d="M4 21h9"/><path d="M7 21V3l12 4H7"/><path d="M15 7v5"/><path d="M13.5 12h3v2.5h-3z"/><path d="M7 7 4 3h3"/><path d="M7 11h3M7 15h3"/>',
     check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
     mountain: '<path d="m2 20 7-11 4 6 3-4 6 9z"/><path d="m7.5 11.5 1.5 1 1.5-1"/>',
@@ -132,13 +133,23 @@
     root.appendChild(page);
     // Page hero: breadcrumbs, title, and the ways to reach the manager on the right.
     const cc = contacts();
-    page.appendChild(h('section', { class: 'cat-hero' }, h('div', { class: 'wrap cat-hero-in' },
+    const topStats = h('div', { class: 'apts-hero-stats' });
+    page.appendChild(h('section', { class: 'cat-hero apts-hero' }, h('div', { class: 'wrap cat-hero-in' },
       h('div', { class: 'cat-hero-text' },
         h('nav', { class: 'crumbs', 'aria-label': t('cat.crumbs') }, h('a', { href: '/' }, t('nav.home')), h('span', { 'aria-hidden': 'true' }, '/'), h('span', { 'aria-current': 'page' }, t('nav.apartments'))),
-        h('h1', null, accentFirst(t('cat.title'))), h('p', null, t('cat.sub'))),
+        h('h1', { class: 'apts-hero-title' }, accentFirst(t('cat.title'))), h('p', { class: 'apts-hero-sub' }, t('cat.sub')), topStats),
       (cc.phone || cc.telegram) ? h('div', { class: 'cat-hero-contact' },
         cc.phone ? h('a', { class: 'cat-call', href: 'tel:+' + phoneDigits(cc.phone) }, h('span', { class: 'ct-ic' }, landIcon('phone')), h('span', null, h('small', null, t('home.call')), h('b', null, cc.phone))) : null,
         cc.telegram ? h('a', { class: 'btn gold', href: telegramUrl(cc.telegram), target: '_blank', rel: 'noopener' }, landIcon('send'), 'Telegram') : null) : null)));
+
+    // The standalone 3D model of the complex (nekruz3d.html in an iframe; its markup is in apartments.html) goes under the head.
+    // A redraw (another language) puts the same element back; the loading veil goes away when the model's page has loaded.
+    S.model3d = S.model3d || document.getElementById('model3d-wrap');
+    if (S.model3d) {
+      page.appendChild(S.model3d);
+      const frame3d = S.model3d.querySelector('iframe'), veil = S.model3d.querySelector('#model3d-loading');
+      if (frame3d && veil && !frame3d.dataset.wired) { frame3d.dataset.wired = '1'; frame3d.addEventListener('load', () => veil.classList.add('hidden')); }
+    }
 
     const houseBox = h('div', { class: 'house3d', id: 'house3d' });
     const tip = h('div', { class: 'tip', hidden: true });
@@ -224,7 +235,17 @@
     function pushToHouse() { if (!house) return; house.setData(st.apts.map((a) => ({ id: a.id, floor: a.floor, planSlot: a.planSlot, number: a.number, status: a.status, rooms: a.rooms, area: a.area, price: a.price }))); if (st.sel) house.selectApartment(st.sel.id); else if (st.floor !== null) house.selectFloor(st.floor); }
 
     // ---------- render ----------
-    function renderAll() { renderHero(); renderFloors(); renderSheet(); renderPlans(); renderApartments(); renderCalc(); }
+    function renderAll() { renderHero(); renderTopStats(); renderFloors(); renderSheet(); renderPlans(); renderApartments(); renderCalc(); }
+
+    // Numbers in the page head: free apartments, the lowest price of a free one, floors.
+    function renderTopStats() {
+      const free = st.apts.filter((a) => a.status === 'free');
+      const prices = (free.length ? free : st.apts).map((a) => a.price).filter((p) => p > 0);
+      const stat = (v, l) => h('div', { class: 'apts-hero-stat' }, h('b', { class: 'apts-hero-stat-num' }, v), h('span', { class: 'apts-hero-stat-label' }, l));
+      topStats.replaceChildren(stat(S.fmt.n(free.length), t('wow.cat.free')),
+        prices.length ? stat(S.fmt.money(Math.min(...prices), 'TJS'), t('wow.cat.from')) : null,
+        stat(S.fmt.n(st.building.floorsCount || st.floors.length), t('wow.cat.floors')));
+    }
 
     // Studio, 1-, 2- and 3-room: the smallest area and the price range of that type in this building (the type's typical
     // area when the building has none). The button filters the list below by that type and scrolls to it.
@@ -391,12 +412,20 @@
         grid, more));
       drawList();
     }
+    // Catalog card: the floor plan of its type on top with the status and floor badges; number, rooms, area, price.
     function renderCard(a) {
-      return h('button', { class: 'card hover apt-card', onclick: () => { scrollTo('home'); setTimeout(() => pickApt(a), 350); }, 'aria-label': t('apt.title', { n: a.number }) },
-        h('div', { class: 'top2' }, h('span', { class: 'no' }, '№ ' + a.number), S.statusChip(a.status)),
-        h('div', { class: 'meta' }, h('span', null, t('floor.n', { n: a.floor })), h('span', null, S.fmt.rooms(a.rooms)), h('span', null, S.fmt.area(a.area))),
-        h('div', null, h('div', { style: { fontFamily: 'var(--display)', fontWeight: 600, fontSize: '19px' } }, S.fmt.money(a.price, 'TJS')), h('div', { class: 'muted', style: { fontSize: '12.5px' } }, S.fmt.n(a.pricePerSqm) + ' TJS / ' + t('u.m2'))),
-        h('span', { class: 'row', style: { color: 'var(--accent)', fontWeight: 800, fontSize: '13.5px' } }, t('card.show'), ' →'));
+      const plan = h('canvas', { width: 320, height: 180, 'aria-hidden': 'true' });
+      drawFloorPlan(plan, Math.min(3, a.rooms));
+      return h('button', { class: 'apt-card wow-apt', type: 'button', onclick: () => { scrollTo('home'); setTimeout(() => pickApt(a), 350); }, 'aria-label': t('apt.title', { n: a.number }) },
+        h('div', { class: 'apt-card-top' }, plan,
+          h('span', { class: 'apt-status-badge ' + a.status }, t('status.' + a.status)),
+          h('span', { class: 'apt-floor-badge' }, t('floor.n', { n: a.floor }))),
+        h('div', { class: 'apt-card-body' },
+          h('div', { class: 'apt-card-num' }, '№ ' + a.number),
+          h('div', { class: 'apt-card-rooms' }, S.fmt.rooms(a.rooms)),
+          h('div', { class: 'apt-card-area' }, S.fmt.area(a.area)),
+          h('div', { class: 'apt-card-price' }, S.fmt.money(a.price, 'TJS'), h('span', { class: 'apt-card-price-label' }, S.fmt.n(a.pricePerSqm) + ' TJS / ' + t('u.m2'))),
+          h('span', { class: 'apt-card-cta' }, t('card.show') + ' →')));
     }
 
     // ---------- calculator ----------
@@ -442,32 +471,36 @@
     let alive = true;
     const page = h('div', { class: 'page-in lux lux-home' });
     root.appendChild(page);
-    const rnd = (n) => Math.random() * n;
 
-    // 1. Fullscreen hero: night sky, Tajik mountains, the name of the complex.
-    const stars = h('div', { class: 'stars', 'aria-hidden': 'true' }, Array.from({ length: 60 }, () => { const s = (1 + rnd(1.6)).toFixed(1) + 'px'; return h('i', { style: { left: rnd(100).toFixed(1) + '%', top: rnd(62).toFixed(1) + '%', width: s, height: s, animationDelay: rnd(4).toFixed(2) + 's', animationDuration: (2.4 + rnd(3)).toFixed(2) + 's' } }); }));
-    const mountains = h('div', { class: 'mountains', 'aria-hidden': 'true', html: '<svg viewBox="0 0 1440 320" preserveAspectRatio="none"><path fill="currentColor" opacity=".55" d="M0 230 120 150l70 40 110-110 90 70 80-50 120 120 90-60 140 90 100-80 120 70 110-100 130 110 80-40 80 50v120H0z"/><path fill="currentColor" d="M0 270 90 220l90 30 120-70 100 60 90-40 130 70 110-50 120 60 100-30 120 50 110-60 120 50 140-20v130H0z"/></svg>' });
-    // The complex's name from the API (config's default until it loads): the first word in gold.
-    const nameParts = () => { const w = String(d.name || 'Некруз Резиденс').trim().split(/\s+/); return [h('span', { class: 'gold-text' }, w[0]), w.length > 1 ? w.slice(1).join(' ') : null]; };
-    const heroTitle = h('h1', { class: 'lux-title' });
+    // 1. Hero: a slowly drifting gradient mesh, the name on two lines with a gold underline, two actions and three counters;
+    //    on the right the interactive 3D model (nekruz3d.html in its embed mode) in a gold frame.
+    const heroTitle = h('h1', { class: 'wow-title' });
     const aboutTitle = h('h2');
-    const drawName = () => { const [first, rest] = nameParts(); heroTitle.replaceChildren(first, rest ? h('br') : null, rest); const [f2, r2] = nameParts(); aboutTitle.replaceChildren(f2, r2 ? ' ' + r2 : null); };
+    const nameWords = () => String(d.name || 'Некруз Резиденс').trim().split(/\s+/);
+    const drawName = () => {
+      const w = nameWords();
+      heroTitle.replaceChildren(h('span', { class: 'wow-l1' }, w[0]),
+        w.length > 1 ? h('span', { class: 'wow-l2' }, w.slice(1).join(' '), h('i', { class: 'wow-underline', 'aria-hidden': 'true' })) : null);
+      aboutTitle.replaceChildren(h('span', { class: 'gold-text' }, w[0]), w.length > 1 ? ' ' + w.slice(1).join(' ') : null);
+    };
     drawName();
-    const chips = h('div', { class: 'hero-chips' });
+    const badge = h('span', { class: 'wow-badge' });
     const proof = h('p', { class: 'hero-proof', hidden: true });
     const freeCard = h('div', { class: 'float-card glass' });
-    const hero = h('section', { class: 'lux-hero', id: 'top' }, stars, mountains,
-      h('div', { class: 'wrap lux-hero-in' },
-        h('div', { class: 'lux-hero-text' },
-          h('span', { class: 'lux-pill' }, landIcon('pin'), t('home.place')),
-          heroTitle,
-          h('i', { class: 'gold-line', 'aria-hidden': 'true' }),
-          h('p', { class: 'lux-tagline' }, t('home.tagline')),
-          chips, proof,
-          h('div', { class: 'lux-cta' }, h('a', { class: 'btn gold lg', href: '/apartments' }, t('home.cta1')), h('a', { class: 'btn ghost lg', href: '/apartments#calc' }, t('home.cta2')))),
-        h('div', { class: 'lux-hero-side' }, freeCard,
-          c.phone ? h('a', { class: 'float-card glass second', href: 'tel:+' + phoneDigits(c.phone) }, landIcon('phone'), h('div', null, h('small', null, t('home.call')), h('b', null, c.phone))) : null,
-          c.telegram ? h('a', { class: 'float-card glass tg', href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, landIcon('send'), h('div', null, h('small', null, t('home.tgCard')), h('b', null, c.telegram))) : null)),
+    const heroCounters = [['floors', (v) => S.fmt.n(v)], ['apts', (v) => S.fmt.n(v)], ['zero', (v) => v + '%']]
+      .map(([k, fmt]) => ({ k, fmt, el: h('b', { class: 'wow-stat-num' }, '0') }));
+    const countHero = () => heroCounters.forEach((x) => countUp(x.el, valueOf(x.k), x.fmt));
+    const frame = h('div', { class: 'hero-3d-frame' }, h('iframe', { src: '/nekruz3d.html?embed=1', title: t('wow.3d.title'), loading: 'lazy', allow: 'fullscreen' }));
+    const hero = h('section', { class: 'lux-hero wow-hero', id: 'top' },
+      h('div', { class: 'hero-mesh', 'aria-hidden': 'true' }),
+      h('div', { class: 'wrap wow-hero-in' },
+        h('div', { class: 'wow-hero-text' },
+          badge, heroTitle, h('p', { class: 'wow-sub' }, t('wow.hero.sub')), proof,
+          h('div', { class: 'lux-cta' },
+            h('a', { class: 'btn gold lg wow-cta', href: '/apartments' }, t('wow.hero.pick'), h('span', { class: 'wow-arrow', 'aria-hidden': 'true' }, '→')),
+            h('a', { class: 'btn ghost lg', href: '/apartments#model3d-wrap' }, landIcon('cube'), t('wow.hero.3d'))),
+          h('div', { class: 'wow-stats' }, heroCounters.map((x) => h('div', { class: 'wow-stat' }, x.el, h('span', null, t('wow.stat.' + x.k)))))),
+        h('div', { class: 'wow-hero-side' }, frame, h('p', { class: 'hero-3d-label' }, t('wow.3d.hint')), freeCard)),
       h('button', { class: 'scroll-hint', type: 'button', 'aria-label': t('home.scroll'), onclick: () => document.getElementById('numbers').scrollIntoView({ behavior: 'smooth' }) }, landIcon('down')));
 
     // 2. Numbers.
@@ -554,21 +587,19 @@
       callBox));
 
     page.append(hero, numbers, why, steps, about, layouts, gallery, planBand, reviews, teaser, contactBand, siteFooter());
+    S.$$('section', page).forEach((sec) => { if (sec !== hero) sec.classList.add('section-reveal'); });
     renderData(); renderCall();
     const stopReveal = revealIn(page, (el) => { if (el.closest('#numbers')) count(); });
 
-    // Mountains and stars drift a little slower than the page.
+    // The hero background drifts a little slower than the page (--py).
     let ticking = false;
     const onScroll = () => { if (ticking) return; ticking = true; requestAnimationFrame(() => { ticking = false; hero.style.setProperty('--py', Math.min(window.scrollY, 900) + 'px'); }); };
     window.addEventListener('scroll', onScroll, { passive: true });
 
     function renderData() {
       drawName();
-      chips.replaceChildren(
-        h('span', { class: 'chip-lux' }, counted(d.floors, 'home.chip.floors')),
-        h('span', { class: 'chip-lux' }, counted(d.apts, 'home.chip.apts')),
-        h('span', { class: 'chip-lux' }, t('home.chip.year', { y: d.year })),
-        h('span', { class: 'chip-lux' }, t('home.chip.from', { p: S.fmt.money(d.minPrice, 'TJS') })));
+      badge.textContent = '✦ ' + t('wow.hero.badge', { y: d.year });
+      countHero();
       freeCard.replaceChildren(h('i', { class: 'live-dot' }), h('div', null, h('small', null, t('home.freeNow')), h('b', null, d.free === null ? t('home.freeSome') : counted(d.free, 'home.chip.apts'))));
       allBtn.textContent = t('teaser.all', { n: S.fmt.n(d.apts) });
       aptGrid.replaceChildren(...(d.list ? d.list.map(aptCard) : [0, 1, 2].map(typeCard)));
@@ -592,13 +623,18 @@
         h('span', { class: 'layout-price' }, t('home.chip.from', { p: S.fmt.money(x.priceFrom, 'TJS') })),
         h('span', { class: 'apt-lux-more' }, t('layouts.cta')));
     }
+    // A free apartment: its floor plan type drawn on top, the status badge, rooms, area and price.
     function aptCard(a) {
-      return h('a', { class: 'apt-lux', href: '/apartments' },
-        h('div', { class: 'apt-lux-top' }, S.statusChip(a.status), h('span', { class: 'apt-no' }, '№ ' + a.number)),
-        h('div', { class: 'apt-lux-meta' }, t('floor.n', { n: a.floor }) + ' · ' + S.fmt.rooms(a.rooms) + ' · ' + S.fmt.area(a.area)),
-        h('div', { class: 'apt-lux-price' }, S.fmt.money(a.price, 'TJS')),
-        h('div', { class: 'apt-lux-sqm' }, S.fmt.n(a.pricePerSqm) + ' TJS / ' + t('u.m2')),
-        h('span', { class: 'apt-lux-more' }, t('teaser.more')));
+      const plan = h('canvas', { width: 320, height: 200, 'aria-hidden': 'true' });
+      drawFloorPlan(plan, Math.min(3, a.rooms));
+      return h('a', { class: 'apt-showcase-card stagger', href: '/apartments' },
+        h('div', { class: 'apt-card-visual' }, plan, h('span', { class: 'apt-card-badge' }, t('status.' + a.status))),
+        h('div', { class: 'apt-card-body' },
+          h('div', { class: 'apt-card-num' }, '№ ' + a.number + ' · ' + t('floor.n', { n: a.floor })),
+          h('div', { class: 'apt-card-rooms' }, S.fmt.rooms(a.rooms)),
+          h('div', { class: 'apt-card-area' }, S.fmt.area(a.area) + ' · ' + S.fmt.n(a.pricePerSqm) + ' TJS / ' + t('u.m2')),
+          h('div', { class: 'apt-card-price' }, S.fmt.money(a.price, 'TJS')),
+          h('span', { class: 'apt-card-btn' }, t('teaser.more'))));
     }
     // Without the API: apartment types instead of made-up apartments.
     function typeCard(i) {

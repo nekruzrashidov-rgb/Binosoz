@@ -59,6 +59,7 @@
         h('a', { class: 'btn ghost lg', href: '/contact' }, t('aboutpg.cta.contact')))));
 
     page.append(hero, complex, team, timeline, cta, site.footer());
+    [complex, team, timeline, cta].forEach((sec) => sec.classList.add('section-reveal'));
     const stopReveal = site.reveal(page);
 
     // The building's own numbers: floors, apartments (planned or counted) and the delivery year.

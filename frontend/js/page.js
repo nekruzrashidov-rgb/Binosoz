@@ -182,12 +182,30 @@
     document.title = page === 'home' ? t('login.heroName') + ' — ' + t('home.tagline') : TITLES[page] ? t(TITLES[page]) + ' — ' + brand : document.title;
   }
 
+  // Sections marked .section-reveal slide up once they come into view; without IntersectionObserver they are simply shown.
+  const revealer = 'IntersectionObserver' in window
+    ? new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('visible'); revealer.unobserve(e.target); } }), { threshold: 0.1 })
+    : null;
+  S.revealSections = (root) => S.$$('.section-reveal:not(.visible)', root || document).forEach((el) => (revealer ? revealer.observe(el) : el.classList.add('visible')));
+
+  // Button ripple: the light spot of .btn:active (styles.css) starts where the pointer is. One listener for all buttons, new ones too.
+  const ripple = (e) => {
+    const b = e.target && e.target.closest ? e.target.closest('.btn') : null;
+    if (!b) return;
+    const r = b.getBoundingClientRect();
+    b.style.setProperty('--rx', ((e.clientX - r.left) / r.width) * 100 + '%');
+    b.style.setProperty('--ry', ((e.clientY - r.top) / r.height) * 100 + '%');
+  };
+  document.addEventListener('pointermove', ripple, { passive: true });
+  document.addEventListener('pointerdown', ripple, { passive: true });
+
   function render() {
     setTitle();
     if (cleanup) { try { cleanup(); } catch (e) { console.error(e); } cleanup = null; }
     S.clear(main); drawHeader();
     window.scrollTo(0, 0);
     try { const c = view()(main); cleanup = typeof c === 'function' ? c : null; } catch (e) { console.error(e); main.replaceChildren(S.errorCard(e)); }
+    S.revealSections(main);
   }
 
   // Links of the SPA (#crm, #invite=...) still arrive at the site root, e.g. from invitation letters.

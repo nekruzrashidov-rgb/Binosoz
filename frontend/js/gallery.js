@@ -233,7 +233,7 @@
     }
 
     drawBar(); drawGrid();
-    page.append(head, h('section', { class: 'section lux-sec' }, h('div', { class: 'wrap' }, bar, grid, h('p', { class: 'gal-note' }, t('galpg.note')))), site.footer());
+    page.append(head, h('section', { class: 'section lux-sec section-reveal' }, h('div', { class: 'wrap' }, bar, grid, h('p', { class: 'gal-note' }, t('galpg.note')))), site.footer());
     return () => close();
   };
 })();

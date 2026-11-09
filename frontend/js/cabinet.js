@@ -231,6 +231,20 @@
     let tab = CAB_TABS.some((x) => x[0] === S.store.get('sitora.cab.tab')) ? S.store.get('sitora.cab.tab') : 'apt';
     const tabsBar = h('div', { class: 'cab-tabs', role: 'tablist', 'aria-label': t('cab.tabs') });
     const panel = h('section', { class: 'cab-panel', role: 'tabpanel' });
+    // Phones: a swipe left or right on the tab's content goes to the next or previous tab; dots under the tabs show where you are.
+    const dots = h('div', { class: 'swipe-dots mob-only', 'aria-hidden': 'true' });
+    const step = (d) => { const i = CAB_TABS.findIndex((x) => x[0] === tab); const n = CAB_TABS[i + d]; if (n) go(n[0]); };
+    let sx = 0, sy = 0, skip = false;
+    panel.addEventListener('touchstart', (e) => {
+      sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+      // Not over a field, a table that scrolls sideways or the payment card (it turns over on a tap).
+      skip = !!(e.target.closest && e.target.closest('input, textarea, select, .tbl-wrap, .ptrack-wrap, .chat-list'));
+    }, { passive: true });
+    panel.addEventListener('touchend', (e) => {
+      if (skip) return;
+      const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) step(dx < 0 ? 1 : -1);
+    }, { passive: true });
     const fab = h('button', { class: 'cab-fab', type: 'button', 'aria-label': t('cab.t.chat'), onclick: () => go('chat') }, '💬', h('span', { class: 'cab-fab-badge', hidden: true }));
 
     (async () => {
@@ -259,10 +273,30 @@
         h('a', { class: 'btn gold lg', href: '/apartments' }, t('cab.seeObjects')));
     }
 
+    // Greeting card: the name, the apartment, three numbers (apartment, paid share, next payment) and the paid bar.
+    function welcome() {
+      const stat = (val, lbl) => h('div', { class: 'cab-stat' }, val, h('div', { class: 'cab-stat-lbl' }, lbl));
+      const next = h('div', { class: 'cab-stat-val' }, '…');
+      const card = h('section', { class: 'cab-welcome' },
+        h('div', { class: 'cab-welcome-top' },
+          h('div', null, h('h1', { class: 'cab-welcome-name' }, t('cab.hi', { name: firstName(ov.customerName) })), h('p', { class: 'cab-welcome-sub' }, aptTitle(deal))),
+          picker()),
+        h('div', { class: 'cab-welcome-stats' },
+          stat(h('div', { class: 'cab-stat-val' }, '№ ' + deal.apartmentNumber), t('wow.cab.apt')),
+          stat(h('div', { class: 'cab-stat-val' }, deal.paidPercent + '%'), t('wow.cab.paid')),
+          stat(next, t('wow.cab.next'))),
+        progress(deal.paidPercent, true));
+      // The next payment comes from the schedule: the first item that is not paid yet.
+      if (deal.stage === 'Cancelled') next.textContent = '—';
+      else ensureSchedule().then((s) => {
+        const it = !s.none && s.items.find((i) => i.status !== 'Paid');
+        next.textContent = it && s.remaining > 0 ? longDate(it.dueDate) + ' · ' + S.fmt.money(Math.min(it.amountDue - it.amountPaid, s.remaining), s.currency) : '—';
+      }).catch(() => { next.textContent = '—'; });
+      return card;
+    }
+
     function drawShell() {
-      page.replaceChildren(
-        h('div', { class: 'cab-head' }, h('div', null, h('h1', null, t('cab.hi', { name: firstName(ov.customerName) })), h('p', { class: 'muted' }, aptTitle(deal))), picker()),
-        tabsBar, panel);
+      page.replaceChildren(welcome(), tabsBar, dots, panel);
       // On the body: the page's entrance animation leaves a transform, and position: fixed would follow the page.
       if (!fab.isConnected) document.body.appendChild(fab);
       drawTabs(); show();
@@ -281,6 +315,7 @@
       tabsBar.replaceChildren(...CAB_TABS.map(([k, icon, key]) => h('button', { type: 'button', role: 'tab', id: 'cab-tab-' + k, class: 'cab-tab' + (tab === k ? ' on' : ''), 'aria-selected': String(tab === k), onclick: () => go(k) },
         h('span', { class: 'cab-tab-i', 'aria-hidden': 'true' }, icon), h('span', null, t(key)), k === 'chat' && chat.unread ? h('span', { class: 'cab-badge' }, chat.unread) : null)));
       panel.setAttribute('aria-labelledby', 'cab-tab-' + tab);
+      dots.replaceChildren(...CAB_TABS.map(([k]) => h('i', { class: 'swipe-dot' + (tab === k ? ' on' : '') })));
       const badge = S.$('.cab-fab-badge', fab); badge.hidden = !chat.unread; badge.textContent = chat.unread || '';
       fab.hidden = tab === 'chat';
       const on = S.$('.cab-tab.on', tabsBar);
@@ -508,9 +543,13 @@
     }
 
     /* ---- helpers ---- */
-    function progress(pct) {
+    // Paid bar: a gold shimmer that grows from 0 to the paid share (0.8 s pause, then 1 s); withPct shows the number above it.
+    function progress(pct, withPct) {
       const v = Math.max(0, Math.min(100, pct || 0));
-      return h('div', { class: 'cab-progress', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(v) }, S.bar(v, 'gold'));
+      const fill = h('div', { class: 'pay-progress-fill' });
+      setTimeout(() => { fill.style.width = v + '%'; }, 800);
+      return h('div', { class: 'pay-progress-wrap cab-progress', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(v) },
+        h('div', { class: 'pay-progress-track' }, fill), withPct ? h('span', { class: 'pay-progress-pct' }, v + '%') : null);
     }
     const stars = (n) => h('span', { class: 'cab-stars-ro', 'aria-label': t('rev.stars', { n }) }, '★'.repeat(n), h('span', null, '★'.repeat(5 - n)));
     // "15 декабря 2026" / "15 декабри 2026" — in the chosen language.

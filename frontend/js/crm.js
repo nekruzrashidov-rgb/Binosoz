@@ -93,7 +93,7 @@
           h('div', { class: 'card' }, h('h3', null, t('dash.byStage')), STAGES.map((s) => { const n = +stages[s] || 0; return h('div', { class: 'hbar' }, S.stageChip(s), S.bar((n / total) * 100), h('b', { class: 'num', style: { textAlign: 'right' } }, n)); }),
             rate && rate.rate ? h('p', { class: 'hint', style: { marginTop: '14px' } }, t('dash.rate', { r: rate.rate, d: S.fmt.date(rate.date) })) : h('p', { class: 'hint', style: { marginTop: '14px' } }, t('dash.noRate')),
             r.salesNote === 'usdWithoutRate' ? h('p', { class: 'hint' }, t('dash.usdNoRate')) : null),
-          S.isDemo() ? null : salesCharts());
+          S.isDemo() ? null : salesCharts(salesRows));
       },
 
       async pipeline(body) {
@@ -806,18 +806,82 @@
     }
 
     // The overview's statistics: apartments, contract money (a CSS ring), sales by month (CSS bars), overdue payments.
-    // Sales analytics on the dashboard: deals per month (12 months) and the funnel, drawn with Canvas 2D (no chart library).
-    function salesCharts() {
+    // One KPI tile. o: { gold, fmt, note, delta: { up, text }, series } — the number counts up (800 ms, ease-out) when the
+    // tile first comes into view; the sparkline is drawn when there is a series of at least two points.
+    function kpiCard(icon, label, n, o) {
+      o = o || {};
+      const fmt = o.fmt || ((v) => S.fmt.n(v));
+      const num = h('div', { class: 'kpi-num' + (o.gold ? ' gold' : '') }, fmt(0));
+      const spark = o.series && o.series.length > 1 ? h('canvas', { class: 'kpi-spark', 'aria-hidden': 'true' }) : null;
+      const el = h('div', { class: 'card kpi-card' },
+        h('div', { class: 'kpi-icon', 'aria-hidden': 'true' }, icon), num, h('div', { class: 'kpi-label' }, label),
+        o.delta ? h('span', { class: 'kpi-delta ' + (o.delta.up ? 'up' : 'down') }, o.delta.text) : o.note ? h('div', { class: 'kpi-note' }, o.note) : null,
+        spark);
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const run = () => {
+        if (spark) drawSparkline(spark, o.series, getComputedStyle(document.documentElement).getPropertyValue('--gold').trim() || '#c9a227');
+        if (reduce) { num.textContent = fmt(n); return; }
+        const t0 = performance.now();
+        const step = (now) => { const p = Math.min(1, (now - t0) / 800); num.textContent = fmt(Math.round(n * (1 - Math.pow(1 - p, 3)))); if (p < 1) requestAnimationFrame(step); };
+        requestAnimationFrame(step);
+      };
+      if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); run(); } }, { threshold: 0.3 });
+        requestAnimationFrame(() => io.observe(el));
+      } else requestAnimationFrame(run);
+      return el;
+    }
+    // Sparkline: the line of the series, a soft fill under it and a dot on the last point.
+    function drawSparkline(canvas, data, color) {
+      const W = Math.max(80, canvas.parentNode.clientWidth - 40), H = 60, dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = W * dpr; canvas.height = H * dpr; canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+      const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const max = Math.max(...data), min = Math.min(...data), range = max - min || 1;
+      const pts = data.map((v, i) => [(i / (data.length - 1)) * (W - 6) + 3, H - ((v - min) / range) * H * 0.8 - H * 0.1]);
+      ctx.beginPath(); ctx.moveTo(pts[0][0], H); pts.forEach(([x, y]) => ctx.lineTo(x, y)); ctx.lineTo(pts[pts.length - 1][0], H); ctx.closePath();
+      const grad = ctx.createLinearGradient(0, 0, 0, H); grad.addColorStop(0, color + '40'); grad.addColorStop(1, color + '00');
+      ctx.fillStyle = grad; ctx.fill();
+      ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); pts.forEach(([x, y]) => ctx.lineTo(x, y)); ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
+      const [lx, ly] = pts[pts.length - 1]; ctx.beginPath(); ctx.arc(lx, ly, 3, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+    }
+
+    // Sales analytics on the dashboard (Canvas 2D, no chart library): deals per month — bars grow in turn, the current month
+    // in gold, a tooltip with the month, deals, completed and money; the funnel leads → bookings → deals → completed.
+    // `money` — rows of /stats/sales (month, deals, revenue) for the tooltip's sums.
+    function salesCharts(money) {
       const months = h('canvas', { class: 'chart-canvas', role: 'img', 'aria-label': t('an.months') });
       const funnel = h('canvas', { class: 'chart-canvas', role: 'img', 'aria-label': t('an.funnel') });
+      const tip = h('div', { class: 'chart-tip', hidden: true });
       const box = h('div', { class: 'grid g2 an-grid' },
-        h('div', { class: 'card' }, h('h3', null, t('an.months')), h('div', { class: 'chart-box' }, months), h('p', { class: 'hint chart-legend' }, h('i', { class: 'lg-a' }), t('an.signed'), h('i', { class: 'lg-b' }), t('an.completed'))),
+        h('div', { class: 'card' }, h('h3', null, t('an.months')), h('div', { class: 'chart-box' }, months, tip),
+          h('p', { class: 'hint chart-legend' }, h('i', { class: 'lg-a' }), t('wow.an.current'), h('i', { class: 'lg-b' }), t('wow.an.past'))),
         h('div', { class: 'card' }, h('h3', null, t('an.funnel')), h('div', { class: 'chart-box' }, funnel)));
       S.api.salesAnalytics().then((data) => {
-        const draw = () => { if (!box.isConnected) { window.removeEventListener('resize', onResize); return; } drawMonths(months, data.months); drawFunnel(funnel, data.funnel); };
-        const onResize = S.debounce(draw, 150);
+        let animated = false;
+        const draw = (animate) => {
+          if (!box.isConnected) { window.removeEventListener('resize', onResize); return; }
+          drawMonths(months, data.months, animate); drawFunnel(funnel, data.funnel);
+        };
+        const onResize = S.debounce(() => draw(false), 150);
         window.addEventListener('resize', onResize);
-        requestAnimationFrame(draw);
+        requestAnimationFrame(() => { draw(!animated); animated = true; });
+        // Tooltip: the month under the pointer.
+        const byMonth = {}; (money || []).forEach((r) => { byMonth[r.month] = r; });
+        const names = t('top.months').split(',');
+        months.addEventListener('pointermove', (e) => {
+          const r = months.getBoundingClientRect(), slot = (r.width - 34) / data.months.length;
+          const i = Math.floor((e.clientX - r.left - 28) / slot);
+          const row = data.months[i];
+          if (!row) { tip.hidden = true; return; }
+          const m = byMonth[row.month];
+          tip.replaceChildren(h('b', null, names[+row.month.slice(5) - 1] + ' ' + row.month.slice(0, 4)),
+            h('span', null, t('an.signed') + ': ' + row.deals), h('span', null, t('an.completed') + ': ' + row.completed),
+            m ? h('span', null, t('wow.an.money') + ': ' + statMoney(m.revenue)) : null);
+          tip.hidden = false;
+          const x = Math.min(r.width - 150, Math.max(0, e.clientX - r.left + 12));
+          tip.style.left = x + 'px'; tip.style.top = Math.max(0, e.clientY - r.top - 70) + 'px';
+        });
+        months.addEventListener('pointerleave', () => { tip.hidden = true; });
       }).catch((e) => box.replaceChildren(h('div', { class: 'form-err' }, e.message)));
       return box;
     }
@@ -825,35 +889,62 @@
     function prepare(canvas, height) {
       const w = Math.max(240, canvas.parentNode.clientWidth), dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = w * dpr; canvas.height = height * dpr; canvas.style.width = w + 'px'; canvas.style.height = height + 'px';
-      const g = canvas.getContext('2d'); g.scale(dpr, dpr);
+      const g = canvas.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
       const css = getComputedStyle(document.documentElement);
-      return { g, w, h: height, ink: css.getPropertyValue('--ink-2').trim() || '#888', muted: css.getPropertyValue('--muted').trim() || '#888', line: css.getPropertyValue('--line').trim() || '#ccc', gold: css.getPropertyValue('--gold').trim() || '#c9a227', info: css.getPropertyValue('--info').trim() || '#4a7bd8' };
+      return { g, w, h: height, ink: css.getPropertyValue('--ink-2').trim() || '#888', muted: css.getPropertyValue('--muted').trim() || '#888', line: css.getPropertyValue('--line').trim() || '#ccc', gold: css.getPropertyValue('--gold').trim() || '#c9a227' };
     }
-    function drawMonths(canvas, rows) {
-      const c = prepare(canvas, 220), g = c.g, padL = 28, padB = 26, top = 12;
-      const max = Math.max(1, ...rows.map((r) => Math.max(r.deals, r.completed)));
-      const plotW = c.w - padL - 6, plotH = c.h - padB - top, slot = plotW / rows.length, bw = Math.max(3, slot * 0.32);
-      g.font = '11px Inter, system-ui, sans-serif'; g.fillStyle = c.muted; g.strokeStyle = c.line; g.lineWidth = 1;
-      [0, 0.5, 1].forEach((f) => { const y = top + plotH * (1 - f); g.beginPath(); g.moveTo(padL, y); g.lineTo(c.w - 6, y); g.stroke(); g.textAlign = 'right'; g.textBaseline = 'middle'; g.fillText(String(Math.round(max * f)), padL - 6, y); });
-      const names = t('top.months').split(',');
-      rows.forEach((r, i) => {
-        const x = padL + slot * i + slot / 2;
-        const hA = (r.deals / max) * plotH, hB = (r.completed / max) * plotH;
-        g.fillStyle = c.gold; g.fillRect(x - bw - 1, top + plotH - hA, bw, hA);
-        g.fillStyle = c.info; g.fillRect(x + 1, top + plotH - hB, bw, hB);
-        // Narrow chart: every other month, counted from the current one so that it always has its label.
-        if (slot > 26 || (rows.length - 1 - i) % 2 === 0) { g.fillStyle = c.muted; g.textAlign = 'center'; g.textBaseline = 'top'; g.fillText(names[+r.month.slice(5) - 1] || r.month.slice(5), x, top + plotH + 6); }
-      });
+    // Bars of signed deals: they grow from the bottom one after another (600 ms each, 50 ms apart); the last one is the current month.
+    function drawMonths(canvas, rows, animate) {
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const t0 = performance.now(), D = 600, GAP = 50, total = D + GAP * rows.length;
+      const frame = () => {
+        const c = prepare(canvas, 220), g = c.g, padL = 28, padB = 26, top = 12;
+        const max = Math.max(1, ...rows.map((r) => r.deals));
+        const plotW = c.w - padL - 6, plotH = c.h - padB - top, slot = plotW / rows.length, bw = Math.max(6, slot * 0.56);
+        g.font = '11px Inter, system-ui, sans-serif'; g.fillStyle = c.muted; g.strokeStyle = c.line; g.lineWidth = 1;
+        [0, 0.5, 1].forEach((f) => { const y = top + plotH * (1 - f); g.beginPath(); g.moveTo(padL, y); g.lineTo(c.w - 6, y); g.stroke(); g.textAlign = 'right'; g.textBaseline = 'middle'; g.fillText(String(Math.round(max * f)), padL - 6, y); });
+        const names = t('top.months').split(',');
+        const el = performance.now() - t0;
+        rows.forEach((r, i) => {
+          const x = padL + slot * i + slot / 2;
+          const p = !animate || reduce ? 1 : Math.max(0, Math.min(1, (el - i * GAP) / D));
+          const k = 1 - Math.pow(1 - p, 3);
+          const hh = (r.deals / max) * plotH * k;
+          const last = i === rows.length - 1;
+          g.fillStyle = last ? c.gold : c.muted; g.globalAlpha = last ? 1 : 0.45;
+          const y = top + plotH - hh, rad = Math.min(4, bw / 2, hh);
+          g.beginPath(); g.moveTo(x - bw / 2, top + plotH); g.lineTo(x - bw / 2, y + rad); g.quadraticCurveTo(x - bw / 2, y, x - bw / 2 + rad, y);
+          g.lineTo(x + bw / 2 - rad, y); g.quadraticCurveTo(x + bw / 2, y, x + bw / 2, y + rad); g.lineTo(x + bw / 2, top + plotH); g.closePath(); g.fill();
+          g.globalAlpha = 1;
+          // Narrow chart: every other month, counted from the current one so that it always has its label.
+          if (slot > 26 || (rows.length - 1 - i) % 2 === 0) { g.fillStyle = last ? c.gold : c.muted; g.textAlign = 'center'; g.textBaseline = 'top'; g.fillText(names[+r.month.slice(5) - 1] || r.month.slice(5), x, top + plotH + 6); }
+        });
+        if (animate && !reduce && el < total && canvas.isConnected) requestAnimationFrame(frame);
+      };
+      frame();
     }
+    // Funnel: one rounded bar per step, centred, its width by the count, a slope down to the next one; blue, amber, gold, green.
     function drawFunnel(canvas, steps) {
-      const c = prepare(canvas, 220), g = c.g, rowH = 46, labelW = Math.min(120, c.w * 0.34);
-      g.font = '600 12px Inter, system-ui, sans-serif'; g.textBaseline = 'middle';
+      const COLORS = { leads: '#3b82f6', bookings: '#f59e0b', deals: '#c9a227', completed: '#22c55e' };
+      const c = prepare(canvas, 220), g = c.g, W = c.w, H = c.h, n = steps.length, rowH = H / n, gap = 8, barH = rowH - gap;
+      const maxCount = Math.max(1, ...steps.map((s) => s.count));
+      // The narrowest bar still holds its label.
+      const width = (s) => Math.max(W * 0.34, (s.count / maxCount) * W * 0.9);
+      g.font = '700 13px Inter, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
       steps.forEach((s, i) => {
-        const y = 10 + i * rowH, barW = Math.max(2, (c.w - labelW - 70) * (s.percent / 100));
-        g.fillStyle = c.ink; g.textAlign = 'left'; g.fillText(t('an.step.' + s.key), 0, y + 14);
-        g.fillStyle = c.line; g.fillRect(labelW, y + 4, c.w - labelW - 70, 20);
-        g.globalAlpha = 1 - i * 0.15; g.fillStyle = c.gold; g.fillRect(labelW, y + 4, barW, 20); g.globalAlpha = 1;
-        g.fillStyle = c.ink; g.textAlign = 'right'; g.fillText(s.count + ' · ' + s.percent + '%', c.w, y + 14);
+        const y = i * rowH, w = width(s), x = (W - w) / 2;
+        if (i < n - 1) {
+          const nw = width(steps[i + 1]), nx = (W - nw) / 2;
+          g.globalAlpha = 0.25; g.fillStyle = COLORS[s.key] || c.gold;
+          g.beginPath(); g.moveTo(x + 8, y + barH); g.lineTo(x + w - 8, y + barH); g.lineTo(nx + nw - 8, y + barH + gap); g.lineTo(nx + 8, y + barH + gap); g.closePath(); g.fill();
+          g.globalAlpha = 1;
+        }
+        g.fillStyle = COLORS[s.key] || c.gold;
+        g.beginPath();
+        if (g.roundRect) g.roundRect(x, y, w, barH, 8); else g.rect(x, y, w, barH);
+        g.fill();
+        g.fillStyle = '#fff';
+        g.fillText(t('an.step.' + s.key) + ' · ' + s.count + ' (' + s.percent + '%)', W / 2, y + barH / 2);
       });
     }
 
@@ -875,9 +966,30 @@
         h('span', { class: 'hint' }, t('stats.week', { l: st.newLeadsThisWeek, d: st.newDealsThisMonth, c: Math.round((+st.conversionRate || 0) * 100) })),
         h('span', { class: 'spacer' }),
         canExport() ? exportRange() : null);
-      const card = (label, n, color) => h('div', { class: 'card kpi', style: { '--k': color } }, h('span', null, label), h('b', null, n), h('i'));
+      // KPI tiles: an icon, the number counting up, a note under it; where a monthly series exists — the change against the
+      // previous month and a sparkline of the last 7 months. Apartment statuses have no history: their note is the share of all.
+      const share = (n) => (st.totalApartments ? t('wow.kpi.share', { p: Math.round((n * 100) / st.totalApartments) }) : null);
+      const last7 = rows.slice(-7);
+      const dealsSeries = last7.map((r) => r.deals), moneySeries = last7.map(value);
+      const change = (series) => {
+        if (series.length < 2) return null;
+        const cur = series[series.length - 1], prev = series[series.length - 2];
+        if (!prev) return null;
+        const p = Math.round(((cur - prev) * 100) / prev);
+        return { up: p >= 0, text: (p >= 0 ? '↑ +' : '↓ ') + p + '% ' + t('wow.kpi.month') };
+      };
+      const thisMonth = rows.length ? rows[rows.length - 1] : null;
       return [head,
-        h('div', { class: 'kpis' }, card(t('stats.total'), st.totalApartments, 'var(--accent)'), card(t('status.free'), st.free, 'var(--good)'), card(t('status.booked'), st.booked, 'var(--warn)'), card(t('status.sold'), st.sold, 'var(--info)')),
+        h('div', { class: 'kpis' },
+          kpiCard('🏢', t('stats.total'), st.totalApartments, { note: t('wow.kpi.inBuildings') }),
+          kpiCard('🟢', t('status.free'), st.free, { note: share(st.free) }),
+          kpiCard('🟡', t('status.booked'), st.booked, { note: share(st.booked) }),
+          kpiCard('🔑', t('status.sold'), st.sold, { gold: true, note: share(st.sold) })),
+        rows.length ? h('div', { class: 'kpis' },
+          kpiCard('📋', t('wow.kpi.deals'), thisMonth ? thisMonth.deals : 0, { delta: change(dealsSeries), series: dealsSeries }),
+          kpiCard('💰', t('wow.kpi.money'), thisMonth ? value(thisMonth) : 0, { gold: true, fmt: (v) => S.fmt.money(v, 'TJS'), delta: change(moneySeries), series: moneySeries }),
+          kpiCard('📥', t('wow.kpi.leads'), st.newLeadsThisWeek || 0, { note: t('wow.kpi.week') }),
+          kpiCard('🎯', t('wow.kpi.conversion'), Math.round((+st.conversionRate || 0) * 100), { fmt: (v) => v + '%', note: t('wow.kpi.convNote') })) : null,
         h('div', { class: 'grid g2' },
           h('div', { class: 'card' }, h('h3', null, t('stats.money')), h('div', { class: 'money-wrap' }, ring,
             h('dl', { class: 'kv money-legend' }, h('dt', null, t('stats.contracts')), h('dd', null, statMoney(st.totalRevenue)),

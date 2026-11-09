@@ -2,6 +2,15 @@
 (function () {
   const S = (window.S = window.S || {});
   const ru = {
+    'wow.hero.badge': 'ДУШАНБЕ · {y}', 'wow.hero.sub': 'Элитный жилой комплекс бизнес-класса в сердце Душанбе', 'wow.hero.pick': 'Выбрать квартиру',
+    'wow.hero.3d': 'Смотреть 3D-модель', 'wow.stat.floors': 'Этажей', 'wow.stat.apts': 'Квартир',
+    'wow.stat.zero': 'Переплаты', 'wow.3d.title': 'Некруз Резиденс — интерактивная 3D-модель', 'wow.3d.hint': '🔄 Интерактивная 3D-модель · Вращайте мышью',
+    'wow.cat.free': 'свободно сейчас', 'wow.cat.from': 'цена от', 'wow.cat.floors': 'этажей',
+    'wow.cab.apt': 'Квартира', 'wow.cab.paid': 'Оплачено', 'wow.cab.next': 'Следующий платёж',
+    'wow.an.current': 'текущий месяц', 'wow.an.past': 'прошлые месяцы', 'wow.an.money': 'Поступления',
+    'wow.kpi.share': '{p}% от всех', 'wow.kpi.month': 'за месяц', 'wow.kpi.inBuildings': 'в ваших домах',
+    'wow.kpi.deals': 'Сделок за месяц', 'wow.kpi.money': 'Поступления за месяц', 'wow.kpi.leads': 'Заявок за неделю',
+    'wow.kpi.week': 'последние 7 дней', 'wow.kpi.conversion': 'Конверсия', 'wow.kpi.convNote': 'из заявки в сделку',
     'nav.gallery': 'Галерея', 'nav.project': 'О проекте', 'common.delete': 'Удалить',
     'aboutpg.hero.sub': 'Элитный жилой комплекс в сердце Душанбе', 'aboutpg.chip.floors': '{n} этажей', 'aboutpg.chip.apts': '{n} квартир',
     'aboutpg.chip.delivery': 'Сдача {y}', 'aboutpg.complex': 'О комплексе', 'aboutpg.p1': 'Некруз Резиденс — современный жилой комплекс бизнес-класса: монолитный каркас, панорамные окна, продуманные планировки от студий до трёхкомнатных квартир.',
@@ -195,6 +204,15 @@
   };
 
   const tg = {
+    'wow.hero.badge': 'ДУШАНБЕ · {y}', 'wow.hero.sub': 'Маҷмааи истиқоматии элитии синфи бизнес дар маркази Душанбе', 'wow.hero.pick': 'Интихоби манзил',
+    'wow.hero.3d': 'Дидани модели 3D', 'wow.stat.floors': 'Ошёна', 'wow.stat.apts': 'Манзил',
+    'wow.stat.zero': 'Пардохти иловагӣ', 'wow.3d.title': 'Некруз Резиденс — модели интерактивии 3D', 'wow.3d.hint': '🔄 Модели интерактивии 3D · Бо муш гардонед',
+    'wow.cat.free': 'ҳозир холӣ', 'wow.cat.from': 'нарх аз', 'wow.cat.floors': 'ошёна',
+    'wow.cab.apt': 'Манзил', 'wow.cab.paid': 'Пардохт шуд', 'wow.cab.next': 'Пардохти навбатӣ',
+    'wow.an.current': 'моҳи ҷорӣ', 'wow.an.past': 'моҳҳои гузашта', 'wow.an.money': 'Воридот',
+    'wow.kpi.share': '{p}% аз ҳама', 'wow.kpi.month': 'дар як моҳ', 'wow.kpi.inBuildings': 'дар биноҳои шумо',
+    'wow.kpi.deals': 'Аҳдҳо дар моҳ', 'wow.kpi.money': 'Воридот дар моҳ', 'wow.kpi.leads': 'Дархостҳо дар ҳафта',
+    'wow.kpi.week': '7 рӯзи охир', 'wow.kpi.conversion': 'Табдил', 'wow.kpi.convNote': 'аз дархост ба аҳд',
     'nav.gallery': 'Галерея', 'nav.project': 'Дар бораи лоиҳа', 'common.delete': 'Нест кардан',
     'aboutpg.hero.sub': 'Маҷмааи истиқоматии элитӣ дар маркази Душанбе', 'aboutpg.chip.floors': '{n} ошёна', 'aboutpg.chip.apts': '{n} манзил',
     'aboutpg.chip.delivery': 'Супурдан {y}', 'aboutpg.complex': 'Дар бораи маҷмаа', 'aboutpg.p1': 'Некруз Резиденс — маҷмааи истиқоматии муосири синфи бизнес: чорчӯбаи монолитӣ, тирезаҳои панорамӣ, нақшаҳои андешидашуда аз студия то манзилҳои сеҳуҷрагӣ.',
@@ -631,6 +649,15 @@
 
   // English. Proof-read by a native speaker before launch.
   const en = {
+    'wow.hero.badge': 'DUSHANBE · {y}', 'wow.hero.sub': 'An elite business-class residential complex in the heart of Dushanbe', 'wow.hero.pick': 'Choose an apartment',
+    'wow.hero.3d': 'View the 3D model', 'wow.stat.floors': 'Floors', 'wow.stat.apts': 'Apartments',
+    'wow.stat.zero': 'Overpayment', 'wow.3d.title': 'Nekruz Residence — interactive 3D model', 'wow.3d.hint': '🔄 Interactive 3D model · Drag to rotate',
+    'wow.cat.free': 'available now', 'wow.cat.from': 'price from', 'wow.cat.floors': 'floors',
+    'wow.cab.apt': 'Apartment', 'wow.cab.paid': 'Paid', 'wow.cab.next': 'Next payment',
+    'wow.an.current': 'this month', 'wow.an.past': 'past months', 'wow.an.money': 'Received',
+    'wow.kpi.share': '{p}% of all', 'wow.kpi.month': 'this month', 'wow.kpi.inBuildings': 'in your buildings',
+    'wow.kpi.deals': 'Deals this month', 'wow.kpi.money': 'Received this month', 'wow.kpi.leads': 'Leads this week',
+    'wow.kpi.week': 'last 7 days', 'wow.kpi.conversion': 'Conversion', 'wow.kpi.convNote': 'lead to deal',
     'nav.gallery': 'Gallery', 'nav.project': 'About', 'common.delete': 'Delete',
     'aboutpg.hero.sub': 'An elite residential complex in the heart of Dushanbe', 'aboutpg.chip.floors': '{n} floors', 'aboutpg.chip.apts': '{n} apartments',
     'aboutpg.chip.delivery': 'Delivery {y}', 'aboutpg.complex': 'About the complex', 'aboutpg.p1': 'Nekruz Residence is a modern business-class residential complex: a monolithic frame, panoramic windows and well-planned layouts from studios to three-room apartments.',
