@@ -41,6 +41,66 @@
   }
   function isDark() { const v = document.documentElement.dataset.theme; return v ? v === 'dark' : window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches; }
 
+  const PHONE = '+992 98 363 70 70';
+  const PHONE_HREF = 'tel:+992983637070';
+
+  // Gold bar across the top while the page boots, then it fades out.
+  function startProgress() {
+    const bar = h('div', { class: 'top-bar', 'aria-hidden': 'true' });
+    document.body.prepend(bar);
+    requestAnimationFrame(() => { bar.style.width = '35%'; });
+    setTimeout(() => {
+      bar.style.width = '100%';
+      setTimeout(() => { bar.classList.add('done'); setTimeout(() => bar.remove(), 900); }, 400);
+    }, 300);
+  }
+
+  // RU · TJ · EN (S.LANGS).
+  function langSwitch() {
+    return h('div', { class: 'seg', role: 'group', 'aria-label': 'Language' }, S.LANGS.map(([k, l]) => h('button', { class: S.lang === k ? 'on' : '', onclick: () => { if (S.lang !== k) S.setLang(k); } }, l)));
+  }
+
+  // Staff pages: weekday, date and time, refreshed every 30 seconds; one timer for the page however often the header is redrawn.
+  let clockTimer = null;
+  function liveClock() {
+    const el = h('span', { class: 'top-clock desk-only' });
+    const tick = () => {
+      const d = new Date();
+      const days = t('top.days').split(','), months = t('top.months').split(',');
+      el.textContent = `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    };
+    tick();
+    if (clockTimer) clearInterval(clockTimer);
+    clockTimer = setInterval(() => { if (el.isConnected) tick(); else { clearInterval(clockTimer); clockTimer = null; } }, 30000);
+    return el;
+  }
+
+  // Phone and tablet menu: a dark full-screen layer with large links, the languages and the phone. Closes on ×, Escape or a link.
+  let overlay = null;
+  function buildMobileOverlay(navItems) {
+    if (overlay) overlay.remove();
+    const close = () => {
+      overlay.classList.remove('open');
+      document.body.classList.remove('menu-open');
+      btn.setAttribute('aria-expanded', 'false');
+    };
+    const navEls = navItems.map(([href, label, active]) => h('a', { href, class: active ? 'on' : '', 'aria-current': active ? 'page' : null, onclick: close }, label));
+    const langRow = h('div', { class: 'mob-lang', role: 'group', 'aria-label': 'Language' },
+      S.LANGS.map(([k, l]) => h('button', { class: 'mob-lang-btn' + (S.lang === k ? ' on' : ''), type: 'button', onclick: () => { close(); if (S.lang !== k) S.setLang(k); } }, l)));
+    const el = h('div', { class: 'mob-overlay', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('nav.menu') },
+      h('button', { class: 'mob-close', type: 'button', 'aria-label': t('common.close'), onclick: close }, '×'),
+      h('nav', { class: 'mob-nav', 'aria-label': t('nav.main') }, ...navEls),
+      langRow,
+      h('div', { class: 'mob-contact' }, h('a', { href: PHONE_HREF, class: 'mob-phone' }, PHONE)));
+    el.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    overlay = el;
+    document.body.appendChild(el);
+    document.body.classList.remove('menu-open');
+    const btn = h('button', { class: 'icon-btn menu-btn', type: 'button', 'aria-label': t('nav.menu'), 'aria-expanded': 'false',
+      onclick: () => { el.classList.add('open'); document.body.classList.add('menu-open'); btn.setAttribute('aria-expanded', 'true'); setTimeout(() => el.querySelector('.mob-close').focus(), 30); } }, S.icon('menu'));
+    return { btn, overlay: el };
+  }
+
   function drawHeader() {
     if (page === 'login' || page === 'accept-invite') return;
     if (isPublic) { drawPublicHeader(); return; }
@@ -50,7 +110,14 @@
         S.api.isCustomer() ? link('/cabinet', t('nav.cabinet'), page === 'cabinet') : null,
         S.api.isStaff() ? link('/crm', t('nav.crm'), page === 'crm') : null,
         S.api.isPlatform() ? link('/platform', t('nav.platform'), page === 'platform') : null);
-    const lang = h('div', { class: 'seg', role: 'group', 'aria-label': 'Language' }, S.LANGS.map(([k, l]) => h('button', { class: S.lang === k ? 'on' : '', onclick: () => { if (S.lang !== k) S.setLang(k); } }, l)));
+    const staffNavItems = [
+      ['/', t('nav.home'), false],
+      S.api.isCustomer() ? ['/cabinet', t('nav.cabinet'), page === 'cabinet'] : null,
+      S.api.isStaff() ? ['/crm', t('nav.crm'), page === 'crm'] : null,
+      S.api.isPlatform() ? ['/platform', t('nav.platform'), page === 'platform'] : null,
+    ].filter(Boolean);
+    const { btn: menuBtn } = buildMobileOverlay(staffNavItems);
+    const lang = langSwitch();
     const theme = h('button', { class: 'icon-btn', title: t('nav.theme'), 'aria-label': t('nav.theme'), onclick: () => { S.store.set('sitora.theme', isDark() ? 'light' : 'dark'); applyTheme(); drawHeader(); S.bus.emit('theme'); } }, S.icon(isDark() ? 'sun' : 'moon'));
     const who = !u
       ? h('a', { class: 'btn sm', href: '/login' }, t('nav.login'))
@@ -58,8 +125,7 @@
         h('span', { class: 'userchip', title: [u.email || u.phone, t('role.' + u.role, null, u.role), u.organizationName].filter(Boolean).join(' · ') }, h('span', { class: 'avatar' }, S.fmt.initials(u.name)), h('span', { class: 'nm' }, u.name, u.organizationName ? h('small', { class: 'org' }, u.organizationName) : null)),
         h('button', { class: 'icon-btn', title: t('nav.logout'), 'aria-label': t('nav.logout'), onclick: async () => { await S.api.logout(); location.href = '/'; } }, S.icon('out')));
     header.replaceChildren(impBanner(), h('div', { class: 'wrap top-in' }, h('a', { class: 'brand', href: '/', 'aria-label': 'Binosoz' }, S.logo(), h('span', null, 'BINOSOZ')), menu, h('span', { class: 'spacer' }),
-      lang, theme, u && !S.isDemo() ? S.notifBell() : null, who,
-      h('button', { class: 'icon-btn menu-btn', 'aria-label': t('nav.menu'), onclick: () => menu.classList.toggle('open') }, S.icon('menu'))));
+      S.api.isCustomer() ? null : liveClock(), lang, theme, u && !S.isDemo() ? S.notifBell() : null, who, menuBtn));
   }
 
   // Buyer-facing pages: the complex, its apartments and contacts; on a phone the menu opens over the whole screen.
@@ -67,11 +133,16 @@
     const link = (href, label, key) => h('a', { class: page === key ? 'on' : '', href, 'aria-current': page === key ? 'page' : null }, label);
     const menu = h('nav', { class: 'nav lux-nav', 'aria-label': t('nav.main') },
       link('/', t('nav.home'), 'home'), link('/apartments', t('nav.apartments'), 'apartments'), link('/contact', t('nav.contact'), 'contact'));
-    const lang = h('div', { class: 'seg', role: 'group', 'aria-label': 'Language' }, S.LANGS.map(([k, l]) => h('button', { class: S.lang === k ? 'on' : '', onclick: () => { if (S.lang !== k) S.setLang(k); } }, l)));
-    const toggle = h('button', { class: 'icon-btn menu-btn', 'aria-label': t('nav.menu'), 'aria-expanded': 'false', onclick: () => { const open = menu.classList.toggle('open'); toggle.setAttribute('aria-expanded', String(open)); document.body.classList.toggle('menu-open', open); } }, S.icon('menu'));
-    header.className = 'top lux-top';
+    const lang = langSwitch();
+    const phone = h('a', { class: 'top-phone desk-only', href: PHONE_HREF }, PHONE);
+    const { btn: menuBtn } = buildMobileOverlay([
+      ['/', t('nav.home'), page === 'home'],
+      ['/apartments', t('nav.apartments'), page === 'apartments'],
+      ['/contact', t('nav.contact'), page === 'contact'],
+    ]);
+    header.className = 'top lux-top' + (S.api.isAuthed ? ' authed' : '');
     header.replaceChildren(h('div', { class: 'wrap top-in' }, h('a', { class: 'brand', href: '/', 'aria-label': 'Binosoz' }, S.logo(), h('span', null, 'BINOSOZ')), menu, h('span', { class: 'spacer' }),
-      lang, accountLink(), toggle));
+      phone, lang, accountLink(), menuBtn));
   }
 
   // Signed in: the gold button leads to the person's own workspace instead of the login page.
@@ -139,6 +210,7 @@
     if (page === 'home' && oldLink()) { location.replace(oldLink()); return; }
     S.initLang();
     applyTheme();
+    startProgress();
     app.replaceChildren(header, main);
     await S.api.restore();
     if (guarded && !S.api.isAuthed) { location.replace('/login'); return; }

@@ -1,4 +1,4 @@
-/* AI assistant: a bubble above the settings button opens a chat panel on the right.
+/* AI assistant: a gold bubble in the corner opens a chat panel (on the right; a bottom sheet on phones).
    The question goes to the API (/ai/chat), which picks the prompt by the user's role; the history lives only in this tab. */
 (function () {
   const S = (window.S = window.S || {});
@@ -43,8 +43,36 @@
     return el;
   }
 
+  // The greeting and quick questions follow the role: buyer, platform owner (SuperAdmin) or staff.
+  function getGreeting() {
+    if (S.api.isCustomer()) return t('ai.helloBuyer');
+    if (S.api.isPlatform()) return t('ai.helloPlatform');
+    return t('ai.helloStaff');
+  }
+  function getChips() {
+    if (S.api.isCustomer()) return ['ai.chip.nextPay', 'ai.chip.layout', 'ai.chip.contacts'].map((k) => t(k));
+    if (S.api.isPlatform()) return ['ai.chip.platformStats', 'ai.chip.tariffs', 'ai.chip.users'].map((k) => t(k));
+    return ['ai.chip.newDeal', 'ai.chip.addPay', 'ai.chip.dashboard'].map((k) => t(k));
+  }
+  // A chip sends its text without the leading emoji.
+  function renderChips() {
+    return h('div', { class: 'ai-chips', role: 'group', 'aria-label': t('ai.chips') },
+      ...getChips().map((c) => h('button', { class: 'ai-chip', type: 'button', onclick: () => { if (busy) return; input.value = c.replace(/^\S+\s/, ''); send(); } }, c)));
+  }
+  function intro() { return [h('div', { class: 'ai-msg bot' }, getGreeting()), renderChips()]; }
+
+  // A new conversation: the history is forgotten and a reply still on its way is ignored.
+  let generation = 0;
+  function clearChat() {
+    generation++;
+    history = [];
+    busy = false; sendBtn.disabled = false;
+    list.replaceChildren(...intro());
+    input.focus();
+  }
+
   function build() {
-    list = h('div', { class: 'ai-list', 'aria-live': 'polite' }, h('div', { class: 'ai-msg bot' }, S.api.isCustomer() ? t('ai.helloBuyer') : t('ai.helloStaff')));
+    list = h('div', { class: 'ai-list', 'aria-live': 'polite' }, ...intro());
     input = h('textarea', { class: 'inp ai-input', rows: 2, maxlength: 2000, placeholder: t('ai.ph'), 'aria-label': t('ai.ph') });
     sendBtn = h('button', { class: 'btn', type: 'submit', 'aria-label': t('ai.send') }, S.icon('send'));
     const form = h('form', { class: 'ai-form' }, input, sendBtn);
@@ -52,7 +80,10 @@
     // Enter sends, Shift+Enter makes a new line.
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
     panel = h('aside', { class: 'ai-panel', role: 'dialog', 'aria-label': t('ai.title') },
-      h('div', { class: 'ai-head' }, h('b', null, '✦ ', t('ai.title')), h('button', { class: 'icon-btn', type: 'button', title: t('common.close'), 'aria-label': t('common.close'), onclick: () => toggle(false) }, S.icon('x'))),
+      h('div', { class: 'ai-head' }, h('b', null, '✦ ', t('ai.title')),
+        h('div', { class: 'ai-head-btns' },
+          h('button', { class: 'icon-btn', type: 'button', title: t('ai.clearChat'), 'aria-label': t('ai.clearChat'), onclick: clearChat }, '🗑️'),
+          h('button', { class: 'icon-btn', type: 'button', title: t('common.close'), 'aria-label': t('common.close'), onclick: () => toggle(false) }, S.icon('x')))),
       list, form);
     document.body.appendChild(panel);
   }
@@ -63,28 +94,34 @@
     busy = true; sendBtn.disabled = true;
     input.value = '';
     addMessage('user', text);
-    const typing = addMessage('bot', t('ai.typing'));
-    typing.classList.add('typing');
+    // Three gold dots while the answer is on its way; screen readers hear "typing…".
+    const typing = h('div', { class: 'ai-msg bot typing-dots', role: 'status', 'aria-label': t('ai.typing') }, h('span'), h('span'), h('span'));
+    list.appendChild(typing);
+    list.scrollTop = list.scrollHeight;
+    const gen = generation;
     try {
       const r = await S.api.aiChat(text, history);
+      if (gen !== generation) return;
       typing.remove();
       addMessage('bot', r.reply);
       history.push({ role: 'user', content: text }, { role: 'assistant', content: r.reply });
       if (history.length > MAX_HISTORY) history = history.slice(-MAX_HISTORY);
     } catch (e) {
+      if (gen !== generation) return;
       typing.remove();
       addMessage('error', e.message || t('err.unknown'));
     } finally {
-      busy = false; sendBtn.disabled = false; input.focus();
+      if (gen === generation) { busy = false; sendBtn.disabled = false; input.focus(); }
     }
   }
 
   function toggle(open) {
     if (open && !panel) build();
     if (!panel) return;
-    panel.classList.toggle('open', open);
+    // On the first open the panel needs one frame in the closed position, or it appears without sliding in.
+    requestAnimationFrame(() => panel.classList.toggle('open', open));
     bubble.classList.toggle('hidden', open);
-    if (open) setTimeout(() => input.focus(), 50);
+    if (open) setTimeout(() => input.focus(), 320);
   }
 
   // The assistant is for signed-in people only; signing out forgets the conversation.
@@ -95,6 +132,10 @@
   }
 
   S.bus.on('auth', sync);
-  S.bus.on('lang', () => { bubble.title = t('ai.open'); bubble.setAttribute('aria-label', t('ai.open')); });
+  S.bus.on('lang', () => {
+    bubble.title = t('ai.open'); bubble.setAttribute('aria-label', t('ai.open'));
+    // A conversation not yet started greets again in the new language.
+    if (panel && !history.length && !busy) list.replaceChildren(...intro());
+  });
   if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', sync); else sync();
 })();

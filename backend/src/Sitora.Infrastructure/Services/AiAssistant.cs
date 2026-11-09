@@ -10,7 +10,7 @@ using Sitora.Infrastructure.Integrations;
 
 namespace Sitora.Infrastructure.Services;
 
-// Помощник: покупателю — вопросы о квартире, сделке и сроках; сотрудникам — документы, CRM и письма.
+// Помощник: покупателю — его квартира, платежи и дом; сотрудникам — CRM, правила и API; создателю платформы — организации и тарифы.
 // История диалога приходит из браузера и в базе не хранится.
 public class AiAssistant(IChatModel model, ICurrentUser currentUser, IOptions<ClaudeOptions> options, AppDbContext db, DealAccess access, TimeProvider time) : IAiAssistant
 {
@@ -19,24 +19,59 @@ public class AiAssistant(IChatModel model, ICurrentUser currentUser, IOptions<Cl
     private const int MaxHistory = 20;
     private const int MaxCustomerDeals = 3;
 
-    // Общее для обоих промптов: страна, валюта и язык. Без этого модель пишет «руб.» и ссылается на российские законы.
+    // Общее для всех промптов: валюта и законы. Без этого модель пишет «руб.» и ссылается на российские законы.
     private const string Region =
-        "Застройщик работает в Таджикистане (Душанбе). Цены и платежи — в сомони (TJS) и долларах США (USD), " +
-        "рубли не упоминай. Если речь о законах, имей в виду законодательство Республики Таджикистан, а не России. " +
-        "Отвечай на языке вопроса: на русском или на таджикском.";
+        "Prices and payments are in Tajik somoni (TJS) and US dollars (USD); never mention rubles. " +
+        "When laws come up, refer to the legislation of the Republic of Tajikistan, not Russia.";
 
+    // Покупатель: его квартира, платежи и дом; отвечает на языке вопроса (таджикский, русский, английский).
     public const string CustomerPrompt =
-        "Ты помощник жилого комплекса Некруз Резиденс. " + Region + " " +
-        "Помогай покупателям с вопросами о квартирах, документах, рассрочке и сроках сдачи. " +
-        "Если выше есть данные сделок покупателя, отвечай по ним: суммы, даты, просрочки. " +
-        "Чего в данных нет, не придумывай, а предложи уточнить у менеджера. " +
-        "Не давай юридических советов. Будь вежливым и кратким.";
+        "You are the personal assistant of \"Некруз Резиденс\" residential complex in Dushanbe, Tajikistan.\n" +
+        "You are speaking with a BUYER. Answer in the same language the user writes in (Tajik, Russian, or English).\n" +
+        "Be concise and warm. Answer questions about:\n" +
+        "- Their apartment (number, floor, area, layout, ceiling height)\n" +
+        "- Payment schedule (next payment date, amount, remaining balance)\n" +
+        "- Deal status and next steps toward ownership\n" +
+        "- Building infrastructure (2 Otis elevators, underground parking B1, 24/7 security, children's playground, gym)\n" +
+        "- Construction progress and delivery timeline\n" +
+        "- Contact info: +992 98 363 70 70, Telegram @nekru01, office hours Mon-Fri 9-19, Sat 10-17\n" +
+        "- General questions about buying real estate in Tajikistan\n" +
+        "Never discuss other clients' data. Keep answers under 150 words unless breakdown is needed.\n" +
+        "If context data is provided above, use it to give personalized answers. " +
+        "What is not in the context, do not make up: suggest asking the manager.\n" + Region;
 
-    public const string StaffPrompt =
-        "Ты помощник для сотрудников застройщика. " + Region + " " +
-        "Помогай создавать документы (договоры, акты, счета), анализировать данные CRM, " +
-        "составлять шаблоны писем клиентам. Если выше есть данные сделки, опирайся на них и не придумывай недостающие цифры. " +
-        "Будь профессиональным и точным.";
+    // Сотрудники организации (владелец, админ объекта, менеджер, бухгалтер, контент): CRM, правила, API. {role} — роль.
+    public const string StaffPromptTemplate =
+        "You are a CRM assistant for \"Binosoz\" real estate platform. Working language: Russian.\n" +
+        "You are speaking with a staff member (role: {role}).\n" +
+        "Answer questions about:\n" +
+        "- CRM workflows: leads → booking → deal → contract → payment → completed\n" +
+        "- How to perform actions: create deal, add payment, upload document, build payment schedule\n" +
+        "- Business rules: one active booking per apartment (48h), no payment deletion only reversal (ReversalOfId),\n" +
+        "  audit log for all status/price/payment changes, JWT access 15min + refresh 30 days\n" +
+        "- API endpoints: prefix /api/v1, Problem Details errors, pagination page/pageSize\n" +
+        "- Hangfire jobs: ExpireBookingsJob, UpdateRatesJob, OverduePaymentJob, PaymentReminderJob\n" +
+        "- Troubleshooting: 409 conflict on double booking, 402 on tariff limit, 422 on business rule violation\n" +
+        "If deal data is provided above, rely on it and do not invent missing numbers.\n" +
+        "Be precise and professional. Under 200 words unless technical detail needed.\n" + Region;
+
+    // Создатель платформы (SuperAdmin, раньше PlatformOwner): организации, тарифы, пользователи, деплой.
+    public const string PlatformPrompt =
+        "You are a platform administration assistant for \"Binosoz\" SaaS. Working language: Russian.\n" +
+        "You are speaking with the PLATFORM OWNER (superadmin).\n" +
+        "Answer questions about:\n" +
+        "- Managing organizations: create, suspend (DELETE .../suspend), activate (POST .../activate)\n" +
+        "- Tariff plans: Free/Basic/Pro, limits on buildings and staff, assigning via POST /platform/organizations/{id}/tariff\n" +
+        "- Dashboard metrics: organizations, deals, payments, top-5 orgs, monthly deals chart\n" +
+        "- User management: block/unblock, password reset via POST /platform/users/{id}/reset-password\n" +
+        "- Deployment: Docker Compose + Caddy reverse proxy, migrations with dotnet run --migrate\n" +
+        "- Tech: .NET 10, PostgreSQL 18, EF Core, Hangfire, SignalR, QuestPDF, ClosedXML\n" +
+        "Under 200 words. Be technical and precise.\n" + Region;
+
+    public static string StaffPrompt(string role) => StaffPromptTemplate.Replace("{role}", role);
+
+    // Роль сотрудника в промпте: первая из ролей организации, которая есть у пользователя.
+    private static readonly string[] StaffRoles = [RoleNames.Owner, RoleNames.ObjectAdmin, RoleNames.Manager, RoleNames.Accountant, RoleNames.Content];
 
     public Task<AiChatResponse> ChatAsync(AiChatRequest request, CancellationToken ct = default) =>
         ChatWithContextAsync(request, null, ct);
@@ -54,40 +89,109 @@ public class AiAssistant(IChatModel model, ICurrentUser currentUser, IOptions<Cl
         if (message.Length > MaxMessageLength)
             throw new BusinessRuleException($"Вопрос — не длиннее {MaxMessageLength} символов");
 
-        // Покупатель получает свой промпт; все роли застройщика и платформы — промпт сотрудника.
+        // Покупатель — свой промпт и данные своих сделок; создатель платформы — промпт платформы (а «как владелец» —
+        // промпт сотрудника); все остальные роли — промпт сотрудника с названием роли.
         string system;
         if (currentUser.IsInRole(RoleNames.Customer))
             system = await CustomerContextAsync(ct) is { } mine ? mine + "\n\n" + CustomerPrompt : CustomerPrompt;
-        else if (dealId is { } id)
-        {
-            if (!await access.CanViewAsync(id, ct))
-                throw new NotFoundException("Сделка не найдена");
-            system = "Текущая сделка: " + await DealContextAsync(id, ct) + "\n\n" + StaffPrompt;
-        }
         else
-            system = StaffPrompt;
+        {
+            var prompt = currentUser.IsInRole(RoleNames.SuperAdmin) && currentUser.ImpersonatorId is null
+                ? PlatformPrompt
+                : StaffPrompt(StaffRoles.FirstOrDefault(currentUser.IsInRole) ?? RoleNames.Owner);
+            if (dealId is { } id)
+            {
+                if (!await access.CanViewAsync(id, ct))
+                    throw new NotFoundException("Сделка не найдена");
+                system = "Текущая сделка: " + await DealContextAsync(id, ct) + "\n\n" + prompt;
+            }
+            else
+                system = prompt;
+        }
 
         var messages = Conversation(request.History, message);
         var reply = await model.CompleteAsync(system, messages, ct);
         return new AiChatResponse(reply);
     }
 
+    // Блок BUYER CONTEXT на каждую действующую сделку покупателя (до трёх, новые первыми).
+    // Оплачено и остаток — как в обзоре кабинета: сумма платежей (сторно с минусом) от цены со скидкой.
     private async Task<string?> CustomerContextAsync(CancellationToken ct)
     {
         if (currentUser.UserId is not { } userId)
             return null;
-        var ids = await db.Deals.AsNoTracking()
+        var deals = await db.Deals.AsNoTracking()
             .Where(d => d.Customer.UserId == userId && d.Stage != DealStage.Cancelled)
-            .OrderByDescending(d => d.CreatedAt).Select(d => d.Id).Take(MaxCustomerDeals)
+            .OrderByDescending(d => d.CreatedAt).Take(MaxCustomerDeals)
+            .Select(d => new
+            {
+                d.Id,
+                Name = d.Customer.FullName,
+                d.Apartment.Number,
+                Floor = d.Apartment.Floor.Number,
+                d.Apartment.Rooms,
+                d.Apartment.Area,
+                d.Apartment.Floor.BuildingId,
+                Building = d.Apartment.Floor.Building.NameRu,
+                d.Apartment.Floor.Building.FloorsCount,
+                d.Apartment.Floor.Building.CompletionYear,
+                Apartments = d.Apartment.Floor.Building.Floors.SelectMany(f => f.Apartments).Count(),
+                Price = d.Price - d.Discount,
+                d.Currency,
+                d.Stage,
+                Paid = db.Payments.Where(p => p.DealId == d.Id).Sum(p => (decimal?)p.AmountInDealCurrency) ?? 0m
+            })
             .ToListAsync(ct);
-        if (ids.Count == 0)
+        if (deals.Count == 0)
             return null;
 
-        var lines = new List<string>();
-        foreach (var id in ids)
-            lines.Add("- " + await DealContextAsync(id, ct));
-        return "Сделки покупателя:\n" + string.Join("\n", lines);
+        var ids = deals.Select(d => d.Id).ToList();
+        var items = await db.PaymentScheduleItems.AsNoTracking().Where(i => ids.Contains(i.Plan.DealId))
+            .OrderBy(i => i.DueDate)
+            .Select(i => new { i.Plan.DealId, i.DueDate, i.AmountDue, i.AmountPaid })
+            .ToListAsync(ct);
+        var buildingIds = deals.Select(d => d.BuildingId).Distinct().ToList();
+        var readiness = (await db.ConstructionStages.AsNoTracking().Where(s => buildingIds.Contains(s.BuildingId))
+                .Select(s => new { s.BuildingId, s.Percent }).ToListAsync(ct))
+            .GroupBy(s => s.BuildingId).ToDictionary(g => g.Key, g => Math.Round(g.Average(s => s.Percent)));
+        var today = DushanbeTime.Today(time.GetUtcNow().UtcDateTime);
+
+        var blocks = deals.Select(d =>
+        {
+            string Money(decimal amount) => amount.ToString("N2", Invariant) + " " + d.Currency;
+            string Date(DateOnly date) => date.ToString("dd.MM.yyyy", Invariant);
+            var remaining = Math.Max(0m, d.Price - d.Paid);
+            var percent = d.Price > 0 ? (int)Math.Clamp(Math.Floor(d.Paid * 100m / d.Price), 0m, 100m) : 0;
+            var schedule = items.Where(i => i.DealId == d.Id).ToList();
+            var open = schedule.Where(i => i.AmountPaid < i.AmountDue).ToList();
+            var overdue = open.Where(i => i.DueDate < today).ToList();
+            var next = open.FirstOrDefault(i => i.DueDate >= today);
+
+            var lines = new List<string>
+            {
+                "=== BUYER CONTEXT ===",
+                $"Name: {d.Name}",
+                $"Apartment: №{d.Number}, floor {d.Floor}, {d.Rooms} rooms, {d.Area.ToString("0.##", Invariant)} m²",
+                $"Price: {Money(d.Price)} | Paid: {Money(d.Paid)} ({percent}%) | Remaining: {Money(remaining)}",
+                next is not null ? $"Next payment: {Date(next.DueDate)} — {Money(next.AmountDue - next.AmountPaid)}"
+                    : schedule.Count == 0 ? "Next payment: no payment schedule yet" : "Next payment: none scheduled"
+            };
+            if (overdue.Count > 0)
+                lines.Add($"Overdue: {overdue.Count} payment(s), {Money(overdue.Sum(i => i.AmountDue - i.AmountPaid))}, earliest since {Date(overdue[0].DueDate)}");
+            lines.Add($"Deal stage: {d.Stage}");
+            var building = $"Building: {d.Building}, {d.FloorsCount} floors, {d.Apartments} apartments";
+            if (d.CompletionYear is { } year)
+                building += $", delivery {year}";
+            if (readiness.TryGetValue(d.BuildingId, out var ready))
+                building += $", construction {ready}% complete";
+            lines.Add(building);
+            lines.Add("===================");
+            return string.Join("\n", lines);
+        });
+        return string.Join("\n\n", blocks);
     }
+
+    private static readonly System.Globalization.CultureInfo Invariant = System.Globalization.CultureInfo.InvariantCulture;
 
     // Сделка одной строкой: квартира, дом и стройка, цена, оплачено и остаток, просрочка, следующий платёж.
     // Права проверяет вызывающий: сотрудника — DealAccess, покупателя — выборка по его учётной записи.

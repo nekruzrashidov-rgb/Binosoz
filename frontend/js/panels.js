@@ -19,7 +19,16 @@
       });
       tabs.replaceChildren(...items.map((it) => h('button', { class: it.key === cur ? 'on' : '', role: 'tab', onclick: () => go(it.key) }, it.label, it.badge ? h('span', { class: 'badge' }, it.badge) : null)));
     };
-    const go = (k) => { cur = k; draw(); onSelect(k, main); const m = document.getElementById('ws-main'); if (m && window.scrollY > 140) window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    // Phones: the side menu is a drawer, opened by a round button bottom-left over a dim backdrop.
+    // Both live on <body> (position: fixed breaks inside a transformed ancestor); a redrawn page replaces them.
+    document.querySelectorAll('body > .mob-sidebar-toggle, body > .mob-backdrop').forEach((n) => n.remove());
+    const closeDrawer = () => { side.classList.remove('mob-open'); backdrop.classList.remove('open'); toggleBtn.setAttribute('aria-expanded', 'false'); };
+    const backdrop = h('div', { class: 'mob-backdrop', onclick: closeDrawer });
+    const toggleBtn = h('button', { class: 'mob-sidebar-toggle mob-only', type: 'button', 'aria-label': t('nav.sections'), 'aria-expanded': 'false',
+      onclick: () => { const open = side.classList.toggle('mob-open'); backdrop.classList.toggle('open', open); toggleBtn.setAttribute('aria-expanded', String(open)); } }, S.icon('menu'));
+    side.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
+    document.body.append(toggleBtn, backdrop);
+    const go = (k) => { cur = k; closeDrawer(); draw(); onSelect(k, main); const m = document.getElementById('ws-main'); if (m && window.scrollY > 140) window.scrollTo({ top: 0, behavior: 'smooth' }); };
     const el = h('div', null, tabs, h('div', { class: 'ws' }, side, main));
     draw();
     return { el, main, go, get current() { return cur; }, redraw: draw, setItems(n) { items = n; draw(); } };

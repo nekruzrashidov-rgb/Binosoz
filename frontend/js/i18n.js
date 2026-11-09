@@ -2,6 +2,7 @@
 (function () {
   const S = (window.S = window.S || {});
   const ru = {
+    'ai.helloPlatform': '👑 Здравствуйте! Я ассистент платформы Binosoz. Помогу с организациями, тарифами и настройками.', 'ai.clearChat': 'Очистить чат', 'ai.chips': 'Быстрые вопросы', 'ai.chip.nextPay': '💳 Следующий платёж', 'ai.chip.layout': '📐 Моя планировка', 'ai.chip.contacts': '📞 Контакты офиса', 'ai.chip.newDeal': '📋 Как создать сделку?', 'ai.chip.addPay': '💰 Как внести платёж?', 'ai.chip.dashboard': '📊 Что в дашборде?', 'ai.chip.platformStats': '📊 Статистика платформы', 'ai.chip.tariffs': '📦 Тарифные планы', 'ai.chip.users': '👥 Пользователи', 'top.days': 'Вс,Пн,Вт,Ср,Чт,Пт,Сб', 'top.months': 'янв,фев,мар,апр,мая,июн,июл,авг,сен,окт,ноя,дек',
     'common.cancel': 'Отмена', 'common.close': 'Закрыть', 'common.confirm': 'Подтверждение', 'common.copied': 'Скопировано', 'common.copy': 'Копировать', 'common.edit': 'Изменить', 'common.nothing': 'Здесь пока ничего нет', 'common.ok': 'Готово', 'common.retry': 'Повторить', 'common.save': 'Сохранить', 'common.saved': 'Сохранено', 'common.search': 'Поиск',
     'nav.main': 'Главное меню', 'nav.home': 'Главная', 'nav.apartments': 'Квартиры', 'nav.calc': 'Рассрочка', 'nav.about': 'О комплексе', 'nav.contact': 'Контакты', 'nav.cabinet': 'Кабинет', 'nav.crm': 'Управление', 'nav.login': 'Войти', 'nav.logout': 'Выйти', 'nav.loggedOut': 'Вы вышли из системы', 'nav.menu': 'Меню', 'nav.theme': 'Сменить тему', 'nav.sections': 'Разделы',
     'hero.city': 'Душанбе', 'hero.sub': 'Жилой комплекс в центре города: выберите этаж и квартиру прямо на 3D-модели дома.', 'hero.cta1': 'Выбрать квартиру', 'hero.cta2': 'Рассчитать рассрочку', 'hero.floors': 'Этажи', 'hero.loading': 'Загружаем дом…', 'hero.time': 'Время суток', 'hero.statuses': 'Статусы', 'hero.photo': 'Фасад', 'hero.zoomIn': 'Приблизить', 'hero.zoomOut': 'Отдалить', 'hero.reset': 'Вернуть обзор',
@@ -113,6 +114,7 @@
   };
 
   const tg = {
+    'ai.helloPlatform': '👑 Салом! Ман ёрдамчии платформаи Binosoz ҳастам. Дар ташкилотҳо, тарифҳо ва танзимот кӯмак мекунам. Ёрдамчӣ ба забони русӣ ҷавоб медиҳад.', 'ai.clearChat': 'Тоза кардан', 'ai.chips': 'Саволҳои зуд', 'ai.chip.nextPay': '💳 Пардохти навбатӣ', 'ai.chip.layout': '📐 Нақшаи манзили ман', 'ai.chip.contacts': '📞 Тамосҳои офис', 'ai.chip.newDeal': '📋 Чӣ тавр аҳд эҷод кунам?', 'ai.chip.addPay': '💰 Чӣ тавр пардохт ворид кунам?', 'ai.chip.dashboard': '📊 Дар дашборд чӣ ҳаст?', 'ai.chip.platformStats': '📊 Омори платформа', 'ai.chip.tariffs': '📦 Нақшаҳои тарифӣ', 'ai.chip.users': '👥 Корбарон', 'top.days': 'Яш,Дш,Сш,Чш,Пш,Ҷм,Шб', 'top.months': 'янв,фев,мар,апр,май,июн,июл,авг,сен,окт,ноя,дек',
     'common.cancel': 'Бекор кардан', 'common.close': 'Пӯшидан', 'common.confirm': 'Тасдиқ', 'common.copied': 'Нусха шуд', 'common.copy': 'Нусха', 'common.edit': 'Тағйир додан', 'common.nothing': 'Ҳоло чизе нест', 'common.ok': 'Тайёр', 'common.retry': 'Бори дигар', 'common.save': 'Захира кардан', 'common.saved': 'Захира шуд', 'common.search': 'Ҷустуҷӯ',
     'nav.main': 'Менюи асосӣ', 'nav.home': 'Асосӣ', 'nav.apartments': 'Манзилҳо', 'nav.calc': 'Қисмбандӣ', 'nav.about': 'Дар бораи мачмааъ', 'nav.contact': 'Тамос', 'nav.cabinet': 'Кабинет', 'nav.crm': 'Идоракунӣ', 'nav.login': 'Ворид шудан', 'nav.logout': 'Баромадан', 'nav.loggedOut': 'Шумо аз система баромадед', 'nav.menu': 'Меню', 'nav.theme': 'Иваз кардани мавзӯъ', 'nav.sections': 'Бахшҳо',
     'hero.city': 'Душанбе', 'hero.sub': 'Маҷмааи манзилӣ дар маркази шаҳр: ошёна ва манзилро рост дар модели 3D интихоб кунед.', 'hero.cta1': 'Интихоби манзил', 'hero.cta2': 'Ҳисоби қисмбандӣ', 'hero.floors': 'Ошёнаҳо', 'hero.loading': 'Бор мешавад…', 'hero.time': 'Вақти шабонарӯз', 'hero.statuses': 'Ҳолатҳо', 'hero.photo': 'Фасад', 'hero.zoomIn': 'Наздик кардан', 'hero.zoomOut': 'Дур кардан', 'hero.reset': 'Бозгашт ба намуди умумӣ',
@@ -225,7 +227,7 @@
 
   // Sign-in by e-mail, roles inside an organization, invitations and the platform section.
   Object.assign(ru, {
-    'ai.open': 'Помощник', 'ai.title': 'Помощник', 'ai.ph': 'Ваш вопрос…', 'ai.send': 'Отправить', 'ai.typing': 'печатает…', 'ai.helloBuyer': 'Здравствуйте! Спросите о квартире, документах, рассрочке или сроках сдачи.', 'ai.helloStaff': 'Здравствуйте! Помогу с документами, данными CRM и письмами клиентам.',
+    'ai.open': 'Помощник', 'ai.title': 'Помощник', 'ai.ph': 'Ваш вопрос…', 'ai.send': 'Отправить', 'ai.typing': 'печатает…', 'ai.helloBuyer': 'Здравствуйте! Я ваш ассистент ЖК Некруз Резиденс 🏢 Спросите про квартиру, платежи или стройку.', 'ai.helloStaff': '💼 Здравствуйте! Я CRM-ассистент Binosoz. Спросите про лиды, сделки, платежи или что угодно по системе.',
     'reg.ask': 'Нет учётной записи?', 'reg.link': 'Зарегистрироваться', 'reg.title': 'Регистрация', 'reg.sub': 'Пароль не нужен: укажите имя, фамилию, почту и телефон — мы пришлём код для входа.', 'reg.submit': 'Зарегистрироваться', 'reg.haveAccount': 'Уже есть учётная запись — войти',
     'login.title': 'Вход', 'login.sub': 'Покупатели и сотрудники входят одинаково: укажите почту, и мы пришлём код. Покупателю — почта из договора.',
     'login.codeSub': 'Если почта зарегистрирована, код отправлен на {p}. Он действует 10 минут.', 'login.code': 'Код из письма', 'login.codeHint': '6 цифр. Не пришло — проверьте «Спам».',
@@ -257,7 +259,7 @@
     'book.doneNote': 'Менеджер позвонит вам в ближайшее время. После оформления договора вы сможете войти в кабинет по коду из почты.',
   });
   Object.assign(tg, {
-    'ai.open': 'Ёрдамчӣ', 'ai.title': 'Ёрдамчӣ', 'ai.ph': 'Саволи шумо…', 'ai.send': 'Фиристодан', 'ai.typing': 'менависад…', 'ai.helloBuyer': 'Салом! Дар бораи манзил, ҳуҷҷатҳо, қисмбандӣ ё мӯҳлати супоридан пурсед. Ёрдамчӣ ба забони русӣ ҷавоб медиҳад.', 'ai.helloStaff': 'Салом! Дар ҳуҷҷатҳо, маълумоти CRM ва мактубҳо ба мизоҷон кӯмак мекунам. Ёрдамчӣ ба забони русӣ ҷавоб медиҳад.',
+    'ai.open': 'Ёрдамчӣ', 'ai.title': 'Ёрдамчӣ', 'ai.ph': 'Саволи шумо…', 'ai.send': 'Фиристодан', 'ai.typing': 'менависад…', 'ai.helloBuyer': 'Салом! Ман ёрдамчии Некруз Резиденс ҳастам 🏢 Дар бораи квартира, пардохтҳо ё ҳар савол диҳед.', 'ai.helloStaff': '💼 Салом! Ман ёрдамчии CRM-и Binosoz ҳастам. Дар бораи лидҳо, аҳдҳо, пардохтҳо ё ҳар чизи система пурсед. Ёрдамчӣ ба забони русӣ ҷавоб медиҳад.',
     'reg.ask': 'Ҳисоб надоред?', 'reg.link': 'Сабти ном', 'reg.title': 'Сабти ном', 'reg.sub': 'Рамзи убур лозим нест: ном, насаб, почта ва телефонро нависед — мо рамзи воридшавӣ мефиристем.', 'reg.submit': 'Сабти ном', 'reg.haveAccount': 'Ҳисоб дорам — ворид шудан',
     'login.title': 'Ворид шудан', 'login.sub': 'Харидорон ва кормандон якхела ворид мешаванд: почтаро нависед, мо рамз мефиристем. Харидор — почтаи шартнома.',
     'login.codeSub': 'Агар почта сабт шуда бошад, рамз ба {p} фиристода шуд. Он 10 дақиқа амал мекунад.', 'login.code': 'Рамз аз мактуб', 'login.codeHint': '6 рақам. Наомад — «Спам»-ро санҷед.',
@@ -467,6 +469,7 @@
 
   // English. Proof-read by a native speaker before launch.
   const en = {
+    'ai.helloPlatform': '👑 Hello! I\'m the Binosoz platform assistant. I can help with organizations, tariffs and settings. Replies come in Russian.', 'ai.clearChat': 'Clear chat', 'ai.chips': 'Quick questions', 'ai.chip.nextPay': '💳 Next payment', 'ai.chip.layout': '📐 My layout', 'ai.chip.contacts': '📞 Office contacts', 'ai.chip.newDeal': '📋 How do I create a deal?', 'ai.chip.addPay': '💰 How do I add a payment?', 'ai.chip.dashboard': '📊 What\'s on the dashboard?', 'ai.chip.platformStats': '📊 Platform statistics', 'ai.chip.tariffs': '📦 Tariff plans', 'ai.chip.users': '👥 Users', 'top.days': 'Sun,Mon,Tue,Wed,Thu,Fri,Sat', 'top.months': 'Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec',
     'common.cancel': 'Cancel', 'common.close': 'Close', 'common.confirm': 'Confirmation', 'common.copied': 'Copied',
     'common.copy': 'Copy', 'common.edit': 'Edit', 'common.nothing': 'Nothing here yet', 'common.ok': 'Done',
     'common.retry': 'Retry', 'common.save': 'Save', 'common.saved': 'Saved', 'common.search': 'Search',
@@ -697,8 +700,8 @@
     'settings.api': 'API address', 'settings.apiHint': 'For example, http://localhost:5194/api/v1', 'settings.test': 'Test', 'settings.ok': 'The API responds',
     'settings.http': 'The API responded with code {s}', 'settings.cors': 'Could not connect. Check the address and the CORS setting (Cors__AllowedOrigins).', 'settings.cors2': 'This website\'s address must be in the Cors__AllowedOrigins list on the server.', 'settings.saved': 'Connection saved',
     'settings.demoOn': 'Demo mode turned on', 'settings.useDemo': 'Demo mode', 'ai.open': 'Assistant', 'ai.title': 'Assistant',
-    'ai.ph': 'Your question…', 'ai.send': 'Send', 'ai.typing': 'typing…', 'ai.helloBuyer': 'Hello! Ask about an apartment, documents, installments or completion dates.',
-    'ai.helloStaff': 'Hello! I can help with documents, CRM data and letters to customers.', 'reg.ask': 'No account?', 'reg.link': 'Sign up', 'reg.title': 'Sign up',
+    'ai.ph': 'Your question…', 'ai.send': 'Send', 'ai.typing': 'typing…', 'ai.helloBuyer': 'Hello! I\'m your Nekruz Residence assistant 🏢 Ask me about your apartment, payments, or anything else.',
+    'ai.helloStaff': '💼 Hello! I\'m the Binosoz CRM assistant. Ask about leads, deals, payments or anything in the system. Replies come in Russian.', 'reg.ask': 'No account?', 'reg.link': 'Sign up', 'reg.title': 'Sign up',
     'reg.sub': 'No password needed: enter your first name, last name, email and phone — we\'ll send you a sign-in code.', 'reg.submit': 'Sign up', 'reg.haveAccount': 'Already have an account — sign in', 'login.title': 'Sign in',
     'login.sub': 'Buyers and staff sign in the same way: enter your email and we\'ll send a code. Buyers use the email from their contract.', 'login.codeHint': '6 digits. Not received? Check your spam folder.', 'login.changeEmail': 'Different email', 'login.secondTitle': 'Sign-in confirmation',
     'login.secondSub': 'This account needs a second step.', 'login.secondLabel': 'Password or code from the app', 'login.secondHint': '6 digits — a code from the authenticator app, otherwise your password.', 'login.again': 'Start over',

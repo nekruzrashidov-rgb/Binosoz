@@ -1,3 +1,4 @@
+using Sitora.Domain.Enums;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Headers;
@@ -114,13 +115,13 @@ public class AiDocumentTests(AiDocumentFactory factory) : IClassFixture<AiDocume
         Assert.StartsWith("Текущая сделка: покупатель Покупатель Кабинета, квартира ", system);
         Assert.Contains("этап сделки: договор", system);
         Assert.Contains("закрыто платежей по графику: 0 из ", system);
-        Assert.EndsWith(AiAssistant.StaffPrompt, system);
+        Assert.EndsWith(AiAssistant.StaffPrompt(RoleNames.Manager), system);
 
         var customer = await factory.CreateCustomerClientAsync(deal.Phone);
         await TestScenarios.ReadAsync<AiChatResponse>(await customer.PostAsJsonAsync($"/api/v1/ai/chat?dealId={deal.DealId}",
             new AiChatRequest("Когда платить?", null)));
         // Покупателю dealId не нужен: в промпт попадают его собственные сделки.
-        Assert.StartsWith("Сделки покупателя:\n- покупатель Покупатель Кабинета", factory.Model.LastSystem);
+        Assert.StartsWith("=== BUYER CONTEXT ===\nName: Покупатель Кабинета", factory.Model.LastSystem);
         Assert.EndsWith(AiAssistant.CustomerPrompt, factory.Model.LastSystem);
 
         Assert.Equal(HttpStatusCode.NotFound, (await manager.PostAsJsonAsync($"/api/v1/ai/chat?dealId={Guid.NewGuid()}",

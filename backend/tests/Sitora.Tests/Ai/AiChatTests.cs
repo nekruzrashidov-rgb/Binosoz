@@ -1,3 +1,4 @@
+using Sitora.Domain.Enums;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
@@ -61,14 +62,32 @@ public class AiChatTests(AiFactory factory) : IClassFixture<AiFactory>
 
         await TestScenarios.ReadAsync<AiChatResponse>(await manager.PostAsJsonAsync("/api/v1/ai/chat",
             new AiChatRequest("Составь шаблон договора", null)));
-        Assert.Equal(AiAssistant.StaffPrompt, factory.Model.LastSystem);
-        // Оба промпта знают страну и валюту и отвечают на языке вопроса.
-        Assert.All([AiAssistant.CustomerPrompt, AiAssistant.StaffPrompt], p =>
+        Assert.Equal(AiAssistant.StaffPrompt(RoleNames.Manager), factory.Model.LastSystem);
+        Assert.Contains("(role: Manager)", factory.Model.LastSystem);
+        // Все промпты знают страну и валюту; покупатель получает ответ на языке вопроса, сотрудники — на русском.
+        Assert.All([AiAssistant.CustomerPrompt, AiAssistant.StaffPromptTemplate, AiAssistant.PlatformPrompt], p =>
         {
-            Assert.Contains("Таджикистан", p);
+            Assert.Contains("Tajikistan", p);
             Assert.Contains("TJS", p);
-            Assert.Contains("на таджикском", p);
         });
+        Assert.Contains("(Tajik, Russian, or English)", AiAssistant.CustomerPrompt);
+        Assert.Contains("Working language: Russian", AiAssistant.StaffPromptTemplate);
+        Assert.Contains("Working language: Russian", AiAssistant.PlatformPrompt);
+    }
+
+    [Fact]
+    public async Task Accountant_GetsStaffPromptWithRole_SuperAdminGetsPlatformPrompt()
+    {
+        var accountant = await factory.CreateAccountantClientAsync();
+        await TestScenarios.ReadAsync<AiChatResponse>(await accountant.PostAsJsonAsync("/api/v1/ai/chat",
+            new AiChatRequest("Как провести сторно?", null)));
+        Assert.Equal(AiAssistant.StaffPrompt(RoleNames.Accountant), factory.Model.LastSystem);
+
+        var superAdmin = await factory.CreateSuperAdminClientAsync();
+        await TestScenarios.ReadAsync<AiChatResponse>(await superAdmin.PostAsJsonAsync("/api/v1/ai/chat",
+            new AiChatRequest("Как сменить тариф организации?", null)));
+        Assert.Equal(AiAssistant.PlatformPrompt, factory.Model.LastSystem);
+        Assert.Contains("PLATFORM OWNER", factory.Model.LastSystem);
     }
 
     [Fact]
@@ -87,11 +106,15 @@ public class AiChatTests(AiFactory factory) : IClassFixture<AiFactory>
         await TestScenarios.ReadAsync<AiChatResponse>(await customer.PostAsJsonAsync($"/api/v1/ai/chat?dealId={other.DealId}",
             new AiChatRequest("Сколько мне осталось заплатить?", null)));
         var buyer = factory.Model.LastSystem!;
-        Assert.StartsWith("Сделки покупателя:\n- покупатель Покупатель Кабинета", buyer);
-        Assert.Contains($"Оплачено {Paid} TJS", buyer);
-        Assert.Contains("остаток ", buyer);
-        Assert.Contains("Просрочено платежей: ", buyer);
-        Assert.Single(buyer.Split('\n'), l => l.StartsWith("- "));
+        Assert.StartsWith("=== BUYER CONTEXT ===\nName: Покупатель Кабинета\nApartment: №", buyer);
+        Assert.Contains("Paid: 1,000.00 TJS (", buyer);
+        Assert.Contains("| Remaining: ", buyer);
+        Assert.Contains("\nNext payment: ", buyer);
+        Assert.Contains("\nOverdue: ", buyer);
+        Assert.Contains("\nDeal stage: ", buyer);
+        Assert.Contains("\nBuilding: ", buyer);
+        Assert.Single(buyer.Split('\n'), l => l == "=== BUYER CONTEXT ===");
+        Assert.EndsWith(AiAssistant.CustomerPrompt, buyer);
 
         // Сотрудник со сделкой: те же данные; без доступа к сделке — 404.
         await TestScenarios.ReadAsync<AiChatResponse>(await manager.PostAsJsonAsync($"/api/v1/ai/chat?dealId={deal.DealId}",
@@ -100,7 +123,7 @@ public class AiChatTests(AiFactory factory) : IClassFixture<AiFactory>
         Assert.StartsWith("Текущая сделка: покупатель Покупатель Кабинета", staff);
         Assert.Contains($"Оплачено {Paid} TJS", staff);
         Assert.Contains("Следующий платёж по графику: ", staff);
-        Assert.EndsWith(AiAssistant.StaffPrompt, staff);
+        Assert.EndsWith(AiAssistant.StaffPrompt(RoleNames.Manager), staff);
         Assert.Equal(HttpStatusCode.NotFound, (await manager.PostAsJsonAsync($"/api/v1/ai/chat?dealId={Guid.NewGuid()}",
             new AiChatRequest("Кратко по сделке", null))).StatusCode);
     }
