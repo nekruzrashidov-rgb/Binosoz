@@ -36,6 +36,9 @@ public class HttpCurrentUser(IHttpContextAccessor accessor, HubCaller hubCaller)
 
     public Guid? ImpersonatorId => ReadGuid(AccessClaims.ImpersonatedBy);
 
+    // После UseForwardedHeaders здесь адрес клиента, а не прокси Caddy. Вызовы хаба SignalR — без адреса.
+    public string? IpAddress => hubCaller.Principal is null ? accessor.HttpContext?.Connection.RemoteIpAddress?.ToString() : null;
+
     private Guid? ReadGuid(string claim) =>
         Guid.TryParse(Principal?.FindFirst(claim)?.Value, out var id) ? id : null;
 }

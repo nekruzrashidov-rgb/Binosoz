@@ -331,6 +331,37 @@
     }
 
     /* ---- 💰 payments ---- */
+    // «Моя карта оплаты»: a payment tracker shaped like a card (not a bank card). Front — paid share and the next date;
+    // back — the next three payments. Turns over on a click, a tap, Enter or Space.
+    function payCard(s, pct, open, next) {
+      const dueDay = (i) => new Date(i.dueDate + 'T00:00:00').toLocaleDateString(S.lang === 'en' ? 'en-GB' : 'ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+      const bar = h('div', { class: 'ptrack-bar-fill', style: { width: '0%' } });
+      requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.width = pct + '%'; }));
+      const pdf = h('button', { class: 'ptrack-pdf', type: 'button', onclick: (e) => { e.stopPropagation(); S.busy(e.currentTarget, () => S.api.openDoc('/deals/' + deal.dealId + '/statement.pdf', { date: S.today() }, t('cab.pdfAct')).catch(S.err)); } }, '⬇ ' + t('pcard.pdf'));
+      const front = h('div', { class: 'ptrack-front' },
+        h('span', { class: 'ptrack-ornament', 'aria-hidden': 'true' }),
+        h('div', { class: 'ptrack-head' }, h('div', { class: 'ptrack-brand' }, '💎 ' + t('login.heroName').toUpperCase()), pdf),
+        h('div', { class: 'ptrack-name' }, ov.customerName || ''),
+        h('div', { class: 'ptrack-apt' }, t('cab.aptNo', { n: deal.apartmentNumber }) + ' · ' + t('pcard.floor', { n: deal.floor })),
+        h('div', { class: 'ptrack-bar-track' }, bar),
+        h('div', { class: 'ptrack-pct' }, t('pcard.paidPct', { n: pct })),
+        h('dl', { class: 'ptrack-sums' },
+          h('div', null, h('dt', null, t('cab.paidSum')), h('dd', null, S.fmt.money(s.paid, s.currency))),
+          h('div', null, h('dt', null, t('cab.left')), h('dd', null, S.fmt.money(s.remaining, s.currency))),
+          h('div', null, h('dt', null, t('pcard.next')), h('dd', null, next && s.remaining > 0 ? dueDay(next) : '—'))));
+      const rows = open.slice(0, 3);
+      const back = h('div', { class: 'ptrack-back' },
+        h('div', { class: 'ptrack-brand' }, t('pcard.schedule')),
+        rows.length ? h('ul', { class: 'ptrack-list' }, rows.map((i) => h('li', null, h('span', null, dueDay(i)), h('b', null, S.fmt.money(i.amountDue - i.amountPaid, s.currency)), h('span', { 'aria-label': t('pay.' + i.status) }, i.status === 'Overdue' ? '⚠️' : '⏳'))))
+          : h('p', { class: 'ptrack-empty' }, t('pcard.allPaid')),
+        h('span', { class: 'ptrack-backlink' }, '← ' + t('pcard.back')));
+      const card = h('div', { class: 'ptrack' }, front, back);
+      const flip = () => { const on = card.classList.toggle('flipped'); wrap.setAttribute('aria-pressed', String(on)); };
+      const wrap = h('div', { class: 'ptrack-wrap', role: 'button', tabindex: 0, 'aria-pressed': 'false', 'aria-label': t('pcard.title') + ': ' + t('pcard.flip'), onclick: flip,
+        onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } } }, card);
+      return h('section', { class: 'ptrack-sec' }, h('h3', null, '💳 ' + t('pcard.title')), wrap, h('p', { class: 'muted cab-small' }, t('pcard.hint')));
+    }
+
     async function payTab() {
       const s = await ensureSchedule();
       if (s.none) return h('div', { class: 'card' }, S.empty(t('cab.noSchedule'), 'wallet'));
@@ -350,7 +381,7 @@
         h('div', null, h('b', null, S.fmt.money(p.amountDeal || p.amount, s.currency)), h('small', { class: 'muted' }, S.fmt.date(p.date) + (p.method ? ' · ' + t('cab.m.' + p.method, null, '') : ''))),
         h('span', { class: 'cab-paid-ok' }, t('cab.paidOk'))))) : h('p', { class: 'muted' }, t('cab.noPayments'));
       const upcoming = open.slice(next ? 1 : 0);
-      return h('div', { class: 'stack' }, head, nextCard,
+      return h('div', { class: 'stack' }, payCard(s, pct, open, next), head, nextCard,
         h('div', { class: 'card' }, h('h3', null, t('cab.paidList', { x: paidItems.length, y: s.items.length })), paidList),
         upcoming.length ? h('div', { class: 'card' }, h('h3', null, t('cab.upcoming')), S.tbl([
           { label: t('cab.dueDate'), render: (i) => S.fmt.date(i.dueDate) },

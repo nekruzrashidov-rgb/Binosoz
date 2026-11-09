@@ -168,7 +168,9 @@
 
     const aptSection = h('section', { class: 'section', id: 'apartments' });
     const calcSection = h('section', { class: 'section alt', id: 'calc' });
-    page.append(aptSection, calcSection, siteFooter());
+    // Floor plans: one drawn plan per apartment type, with the areas and prices of this building.
+    const plansSection = h('section', { class: 'section lux-sec', id: 'plans' });
+    page.append(plansSection, aptSection, calcSection, siteFooter());
 
     // ---------- data ----------
     async function load() {
@@ -222,7 +224,28 @@
     function pushToHouse() { if (!house) return; house.setData(st.apts.map((a) => ({ id: a.id, floor: a.floor, planSlot: a.planSlot, number: a.number, status: a.status, rooms: a.rooms, area: a.area, price: a.price }))); if (st.sel) house.selectApartment(st.sel.id); else if (st.floor !== null) house.selectFloor(st.floor); }
 
     // ---------- render ----------
-    function renderAll() { renderHero(); renderFloors(); renderSheet(); renderApartments(); renderCalc(); }
+    function renderAll() { renderHero(); renderFloors(); renderSheet(); renderPlans(); renderApartments(); renderCalc(); }
+
+    // Studio, 1-, 2- and 3-room: the smallest area and the price range of that type in this building (the type's typical
+    // area when the building has none). The button filters the list below by that type and scrolls to it.
+    function renderPlans() {
+      const cards = PLAN_TYPES.map((type) => {
+        const list = st.apts.filter((a) => (type === 3 ? a.rooms >= 3 : a.rooms === type));
+        const area = list.length ? Math.min(...list.map((a) => a.area)) : PLAN_AREAS[type];
+        const prices = list.map((a) => a.price).filter((p) => p > 0);
+        const lo = Math.min(...prices), hi = Math.max(...prices);
+        const range = !prices.length ? t('plans.onRequest') : lo === hi ? S.fmt.money(lo, 'TJS') : S.fmt.money(lo, 'TJS') + ' – ' + S.fmt.money(hi, 'TJS');
+        const canvas = h('canvas', { class: 'plan-canvas', width: 320, height: 220, role: 'img', 'aria-label': t('layouts.type' + type) });
+        drawFloorPlan(canvas, type);
+        return h('article', { class: 'plan-card' }, canvas,
+          h('div', { class: 'plan-card-body' }, h('h3', null, t('layouts.type' + type)),
+            h('div', { class: 'plan-badges' }, h('span', { class: 'plan-badge' }, t('plans.from') + ' ' + S.fmt.area(area)), h('span', { class: 'plan-badge gold' }, range)),
+            h('button', { class: 'btn gold block', type: 'button', onclick: () => { st.rooms = String(type); st.shown = 12; renderApartments(); scrollTo('apartments'); } }, t('plans.pick'))));
+      });
+      plansSection.replaceChildren(h('div', { class: 'wrap' },
+        h('div', { class: 'lux-head' }, h('h2', null, accentFirst(t('plans.title'))), h('p', null, t('plans.sub'))),
+        h('div', { class: 'plan-grid' }, cards)));
+    }
 
     function minPrice() { const f = st.apts.filter((a) => a.status === 'free'); return f.length ? Math.min(...f.map((a) => a.price)) : 0; }
     function renderHero() {
@@ -881,4 +904,38 @@
     else S.api.invitationInfo(token).then(form, (er) => { if (er.status === 404 || er.status === 401 || er.status === 400) invalid(); else card.replaceChildren(brand(), h('div', { class: 'form-err' }, er.message)); });
     return () => {};
   };
+  /* ---------- floor plans drawn on a canvas (catalog) ---------- */
+  const PLAN_TYPES = [0, 1, 2, 3];
+  const PLAN_AREAS = { 0: 28, 1: 42, 2: 65, 3: 88 };
+  // Rooms as parts of the plan (x, y, w, h from 0 to 1) and the i18n key of their name.
+  const PLAN_ROOMS = {
+    0: [[0, 0, 0.62, 0.72, 'living'], [0.62, 0, 0.38, 0.42, 'kitchen'], [0.62, 0.42, 0.38, 0.3, 'bath'], [0, 0.72, 0.62, 0.28, 'hall'], [0.62, 0.72, 0.38, 0.28, 'balcony']],
+    1: [[0, 0, 0.5, 0.62, 'bedroom'], [0.5, 0, 0.5, 0.45, 'kitchen'], [0.5, 0.45, 0.25, 0.27, 'bath'], [0.75, 0.45, 0.25, 0.27, 'wc'], [0, 0.62, 0.5, 0.38, 'hall'], [0.5, 0.72, 0.5, 0.28, 'balcony']],
+    2: [[0, 0, 0.42, 0.58, 'living'], [0.42, 0, 0.3, 0.58, 'bedroom'], [0.72, 0, 0.28, 0.42, 'kitchen'], [0.72, 0.42, 0.28, 0.3, 'bath'], [0, 0.58, 0.72, 0.42, 'hall'], [0.72, 0.72, 0.28, 0.28, 'balcony']],
+    3: [[0, 0, 0.36, 0.55, 'living'], [0.36, 0, 0.32, 0.55, 'bedroom'], [0.68, 0, 0.32, 0.55, 'bedroom2'], [0, 0.55, 0.3, 0.45, 'kitchen'], [0.3, 0.55, 0.3, 0.45, 'hall'], [0.6, 0.55, 0.2, 0.25, 'bath'], [0.8, 0.55, 0.2, 0.25, 'wc'], [0.6, 0.8, 0.4, 0.2, 'balcony']]
+  };
+  // Walls in gold on the night navy, room names in the middle, a window on the top wall; sharp on high-density screens.
+  function drawFloorPlan(canvas, type) {
+    const W = +canvas.getAttribute('width'), H = +canvas.getAttribute('height'), dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    const g = canvas.getContext('2d'); if (!g) return;
+    g.scale(dpr, dpr);
+    g.fillStyle = '#0b1430'; g.fillRect(0, 0, W, H);
+    const pad = 16, x0 = pad, y0 = pad, w = W - pad * 2, ht = H - pad * 2;
+    g.font = '600 11px Inter, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    (PLAN_ROOMS[type] || PLAN_ROOMS[1]).forEach(([rx, ry, rw, rh, key]) => {
+      const x = x0 + rx * w, y = y0 + ry * ht, ww = rw * w, hh = rh * ht;
+      g.fillStyle = key === 'balcony' ? 'rgba(53, 214, 161, 0.08)' : key === 'bath' || key === 'wc' ? 'rgba(111, 139, 255, 0.10)' : 'rgba(255, 255, 255, 0.04)';
+      g.fillRect(x, y, ww, hh);
+      g.strokeStyle = 'rgba(201, 162, 39, 0.75)'; g.lineWidth = 2; g.strokeRect(x, y, ww, hh);
+      const label = t('plans.room.' + key);
+      g.fillStyle = '#b9c3e3';
+      if (ww > 30 && hh > 18) g.fillText(label.length * 6.2 > ww - 6 ? label.slice(0, Math.max(3, Math.floor((ww - 6) / 6.2) - 1)) + '.' : label, x + ww / 2, y + hh / 2);
+    });
+    g.strokeStyle = '#c9a227'; g.lineWidth = 4; g.strokeRect(x0, y0, w, ht);
+    g.strokeStyle = '#8fb3ff'; g.beginPath(); g.moveTo(x0 + w * 0.12, y0); g.lineTo(x0 + w * 0.3, y0); g.stroke();
+  }
+
+  // For the other public pages (about.js, gallery.js): the same footer, reveal on scroll, icons and headings.
+  S.site = { footer: siteFooter, reveal: revealIn, icon: landIcon, accentFirst, contacts, drawFloorPlan, building: siteBuilding };
 })();

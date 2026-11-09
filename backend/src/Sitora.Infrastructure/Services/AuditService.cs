@@ -29,7 +29,8 @@ public class AuditService(AppDbContext db, ICurrentUser currentUser, TimeProvide
             Action = action,
             Before = Serialize(before),
             After = Serialize(after),
-            At = timeProvider.GetUtcNow().UtcDateTime
+            At = timeProvider.GetUtcNow().UtcDateTime,
+            Ip = currentUser.IpAddress
         });
     }
 

@@ -5,19 +5,28 @@
   const t = (...a) => S.t(...a);
   S.panels = {};
 
-  /* Workspace shell: side menu on desktop, scrolling tabs on phones. */
-  S.workspace = (items, initial, onSelect) => {
-    let cur = initial || items.filter((i) => !i.group)[0].key;
+  /* Workspace shell: side menu on desktop, scrolling tabs on phones.
+     opts.topTabs: a sticky tab bar under the top bar on every screen (CRM) instead of the phone-only tabs;
+     the section is kept in the address (#leads) and comes back on reload. An item's emoji goes before its label there. */
+  S.workspace = (items, initial, onSelect, opts) => {
+    const top = !!(opts && opts.topTabs);
+    const fromHash = top ? decodeURIComponent(location.hash.slice(1)) : '';
+    let cur = items.some((i) => i.key === fromHash) ? fromHash : initial || items.filter((i) => !i.group)[0].key;
     const main = h('main', { class: 'main', id: 'ws-main' });
     const side = h('nav', { class: 'side', 'aria-label': t('nav.sections') });
-    const tabs = h('div', { class: 'tabs mobile-only', style: { margin: 0, padding: '0 12px', background: 'var(--surface)' }, role: 'tablist' });
+    const tabs = top
+      ? h('nav', { class: 'crm-tabs', role: 'tablist', 'aria-label': t('nav.sections') })
+      : h('div', { class: 'tabs mobile-only', style: { margin: 0, padding: '0 12px', background: 'var(--surface)' }, role: 'tablist' });
     const draw = () => {
       side.replaceChildren(); let lastGroup = null;
       items.forEach((it) => {
         if (it.group !== undefined && it.group !== lastGroup) { lastGroup = it.group; if (it.group) side.appendChild(h('div', { class: 'grp' }, it.group)); }
         side.appendChild(h('button', { class: it.key === cur ? 'on' : '', onclick: () => go(it.key), 'aria-current': it.key === cur ? 'page' : null }, S.icon(it.icon || 'grid'), h('span', { class: 'grow' }, it.label), it.badge ? h('span', { class: 'badge' }, it.badge) : null));
       });
-      tabs.replaceChildren(...items.map((it) => h('button', { class: it.key === cur ? 'on' : '', role: 'tab', onclick: () => go(it.key) }, it.label, it.badge ? h('span', { class: 'badge' }, it.badge) : null)));
+      tabs.replaceChildren(...items.map((it) => h('button', { class: (top ? 'crm-tab' : '') + (it.key === cur ? ' on' : ''), type: 'button', role: 'tab', 'aria-selected': String(it.key === cur), 'data-key': it.key, onclick: () => go(it.key) },
+        top && it.emoji ? h('span', { 'aria-hidden': 'true' }, it.emoji) : null, it.label, it.badge ? h('span', { class: 'badge' }, it.badge) : null)));
+      // The active tab stays visible in a bar that scrolls sideways (a phone, many sections).
+      if (top) requestAnimationFrame(() => { const on = tabs.querySelector('.crm-tab.on'); if (on && tabs.scrollWidth > tabs.clientWidth) on.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); });
     };
     // Phones: the side menu is a drawer, opened by a round button bottom-left over a dim backdrop.
     // Both live on <body> (position: fixed breaks inside a transformed ancestor); a redrawn page replaces them.
@@ -28,8 +37,13 @@
       onclick: () => { const open = side.classList.toggle('mob-open'); backdrop.classList.toggle('open', open); toggleBtn.setAttribute('aria-expanded', String(open)); } }, S.icon('menu'));
     side.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
     document.body.append(toggleBtn, backdrop);
-    const go = (k) => { cur = k; closeDrawer(); draw(); onSelect(k, main); const m = document.getElementById('ws-main'); if (m && window.scrollY > 140) window.scrollTo({ top: 0, behavior: 'smooth' }); };
-    const el = h('div', null, tabs, h('div', { class: 'ws' }, side, main));
+    const go = (k) => {
+      cur = k; closeDrawer(); draw(); onSelect(k, main);
+      // replaceState: the address can be bookmarked, but every click is not a step of the Back button.
+      if (top && location.hash.slice(1) !== k) history.replaceState(null, '', '#' + k);
+      const m = document.getElementById('ws-main'); if (m && window.scrollY > 140) window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    const el = h('div', null, tabs, h('div', { class: 'ws' + (top ? ' with-tabs' : '') }, side, main));
     draw();
     return { el, main, go, get current() { return cur; }, redraw: draw, setItems(n) { items = n; draw(); } };
   };

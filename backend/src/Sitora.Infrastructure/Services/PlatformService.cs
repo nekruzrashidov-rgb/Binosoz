@@ -25,6 +25,7 @@ public class PlatformService(
     IAuditService audit,
     StaffAccounts accounts,
     ITariffService tariffs,
+    IPlatformToolsService platformTools,
     ILogger<PlatformService> logger) : IPlatformService
 {
     // Организации с логотипом, владельцами, домами, счётчиками сделок и покупателей, последней активностью и тарифом.
@@ -155,6 +156,8 @@ public class PlatformService(
         var ownerEmail = EmailAddress.Normalize(request.OwnerEmail) ?? throw new BusinessRuleException("Неверный адрес почты владельца");
         if (await userManager.FindByEmailAsync(ownerEmail) is not null)
             throw new ConflictException("Пользователь с такой почтой уже есть");
+        // Лимит из «Настроек платформы» (если задан): и для создания вручную, и для одобрения заявки застройщика.
+        await platformTools.EnsureOrganizationLimitAsync(ct);
 
         var organization = new Organization { Name = request.Name.Trim(), Slug = slug };
         db.Organizations.Add(organization);

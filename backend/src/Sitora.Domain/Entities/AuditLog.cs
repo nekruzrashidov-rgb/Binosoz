@@ -16,4 +16,7 @@ public class AuditLog : BaseEntity
     public string? Before { get; set; }
     public string? After { get; set; }
     public DateTime At { get; set; }
+
+    // Адрес, с которого пришёл запрос (за Caddy — из X-Forwarded-For); null — фоновая задача или сидер.
+    public string? Ip { get; set; }
 }

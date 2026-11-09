@@ -26,4 +26,7 @@ public interface ICurrentUser
     bool IsDealStaff => IsLeader || IsInRole(RoleNames.Manager) || IsInRole(RoleNames.Accountant);
 
     bool CanAccessBuilding(Guid buildingId) => BuildingIds is null || BuildingIds.Contains(buildingId);
+
+    // IP-адрес запроса для журнала; вне HTTP-запроса (фоновые задачи, тесты сервисов) — null.
+    string? IpAddress => null;
 }

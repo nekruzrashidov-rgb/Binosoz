@@ -347,6 +347,10 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Property<Guid?>("ImpersonatedById")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Ip")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)");
+
                     b.Property<Guid?>("OrganizationId")
                         .HasColumnType("uuid");
 
@@ -1112,6 +1116,44 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.ToTable("Leads", (string)null);
                 });
 
+            modelBuilder.Entity("Sitora.Domain.Entities.MessageTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("MessageTemplates", (string)null);
+                });
+
             modelBuilder.Entity("Sitora.Domain.Entities.Notification", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1578,6 +1620,25 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.HasIndex("PlanId", "DueDate");
 
                     b.ToTable("PaymentScheduleItems", (string)null);
+                });
+
+            modelBuilder.Entity("Sitora.Domain.Entities.PlatformSetting", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("PlatformSettings", (string)null);
                 });
 
             modelBuilder.Entity("Sitora.Domain.Entities.RefreshToken", b =>
@@ -2133,6 +2194,15 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Navigation("Apartment");
 
                     b.Navigation("Manager");
+                });
+
+            modelBuilder.Entity("Sitora.Domain.Entities.MessageTemplate", b =>
+                {
+                    b.HasOne("Sitora.Domain.Entities.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Sitora.Domain.Entities.Notification", b =>

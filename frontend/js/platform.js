@@ -14,6 +14,8 @@
       { key: 'dashboard', label: t('plat.dashboard'), icon: 'chart' }, { key: 'orgs', label: t('plat.orgs'), icon: 'building' },
       { key: 'users', label: t('plat.usersTitle'), icon: 'users' }, { key: 'reviews', label: t('plat.reviews'), icon: 'star' },
       { key: 'tariffs', label: t('plat.tariffs'), icon: 'wallet' }, { key: 'apps', label: t('apps.title'), icon: 'inbox' },
+      { key: 'activity', label: t('pact.title'), icon: 'clock' }, { key: 'notify', label: t('pnot.titleNav'), icon: 'bell' },
+      { key: 'psettings', label: t('pset.title'), icon: 'gear' },
       { key: 'security', label: t('plat.security'), icon: 'shield' }];
     // The number of applications waiting for a decision, on the section's label.
     let focusOrg = null;
@@ -270,6 +272,93 @@
           }
         }
         draw();
+      },
+
+      // Activity of the whole platform: who did what, in which organization, from which address. Filters and pages.
+      async activity(body) {
+        const q = { organizationId: '', action: '', from: '', to: '', page: 1 };
+        const holder = h('div');
+        const pager = h('div', { class: 'row between', style: { marginTop: '12px' } });
+        const [orgs, actions] = await Promise.all([S.api.organizations().catch(() => []), S.api.platformActivityActions().catch(() => [])]);
+        const org = S.select('org', [['', t('pact.allOrgs')], ...orgs.map((o) => [o.id, o.name])], '');
+        const act = S.select('action', [['', t('pact.allActions')], ...actions.map((a) => [a, t('audit.act.' + a, null, a)])], '');
+        const from = S.input('from', { type: 'date' }), to = S.input('to', { type: 'date' });
+        // The date filter is by Dushanbe days: [from 00:00; to + 1 day 00:00) in UTC+5.
+        const utc = (d, addDay) => { if (!d) return ''; const x = new Date(d + 'T00:00:00+05:00'); if (addDay) x.setUTCDate(x.getUTCDate() + 1); return x.toISOString(); };
+        const apply = () => { q.organizationId = org.value; q.action = act.value; q.from = utc(from.value); q.to = utc(to.value, true); q.page = 1; load(); };
+        [org, act, from, to].forEach((el) => el.addEventListener('change', apply));
+        const kind = (a) => (/creat|add|import|register|approv|activat|sent/i.test(a) ? 'good' : /delet|remov|cancel|suspend|revers|reject|block/i.test(a) ? 'bad' : /login|sign|auth|code|token|password/i.test(a) ? 'muted' : 'info');
+        async function load() {
+          holder.replaceChildren(S.skeleton(6, 34));
+          try {
+            const r = await S.api.platformActivity(q);
+            holder.replaceChildren(S.tbl([
+              { label: t('pact.time'), render: (x) => S.fmt.dt(x.at) },
+              { label: t('pact.action'), render: (x) => h('span', { class: 'chip act-' + kind(x.action) }, t('audit.act.' + x.action, null, x.action)) },
+              { label: t('pact.entity'), render: (x) => t('audit.ent.' + x.entity, null, x.entity) },
+              { label: t('pact.org'), render: (x) => x.organizationName || h('span', { class: 'muted' }, t('pact.platform')) },
+              { label: t('pact.user'), render: (x) => [x.userEmail || h('span', { class: 'muted' }, t('audit.system', null, 'система')), x.impersonated ? h('small', { class: 'muted' }, ' · ' + t('pact.asOwner')) : null] },
+              { label: 'IP', render: (x) => h('code', null, x.ip || '—') }], r.items, { empty: t('pact.none') }));
+            const pages = Math.max(1, Math.ceil(r.totalCount / r.pageSize));
+            pager.replaceChildren(h('span', { class: 'muted' }, t('pact.total', { n: r.totalCount })),
+              h('div', { class: 'row', style: { gap: '8px' } },
+                h('button', { class: 'btn ghost sm', type: 'button', disabled: q.page <= 1, onclick: () => { q.page--; load(); } }, '‹'),
+                h('span', null, q.page + ' / ' + pages),
+                h('button', { class: 'btn ghost sm', type: 'button', disabled: q.page >= pages, onclick: () => { q.page++; load(); } }, '›')));
+          } catch (e) { fail(holder, e); }
+        }
+        body.replaceChildren(h('div', { class: 'card filters-row' }, S.field(t('pact.org'), org), S.field(t('pact.action'), act), S.field(t('pact.from'), from), S.field(t('pact.to'), to)), holder, pager);
+        load();
+      },
+
+      // A message to the bell of every user of one organization or of all organizations.
+      async notify(body) {
+        const orgs = await S.api.organizations().catch(() => []);
+        const to = S.select('to', [['', t('pnot.all')], ...orgs.map((o) => [o.id, o.name])], '');
+        const type = S.select('type', [['info', t('pnot.info')], ['warning', t('pnot.warning')], ['error', t('pnot.error')]], 'info');
+        const title = S.input('title', { maxlength: 200 });
+        const message = h('textarea', { class: 'inp', name: 'message', rows: 5, maxlength: 2000 });
+        const send = h('button', { class: 'btn', type: 'submit' }, t('pnot.send'));
+        const form = h('form', { class: 'card stack', style: { maxWidth: '620px' }, novalidate: true },
+          S.field(t('pnot.to'), to), S.field(t('pnot.type'), type), S.field(t('pnot.title'), title), S.field(t('pnot.message'), message), send);
+        form.addEventListener('submit', (e) => {
+          e.preventDefault(); S.showErrors(form, null);
+          S.busy(send, async () => {
+            try {
+              const r = await S.api.platformNotify({ organizationId: to.value, type: type.value, title: title.value, message: message.value });
+              S.toast(t('pnot.sent', { n: r.recipients }), 'ok'); title.value = ''; message.value = '';
+            } catch (er) { S.showErrors(form, er); }
+          });
+        });
+        body.replaceChildren(form);
+      },
+
+      // Platform settings: organization limit, demo mode, version (read only), contact email.
+      async psettings(body) {
+        const holder = h('div', { class: 'card stack', style: { maxWidth: '560px' } }, S.skeleton(4, 30));
+        body.replaceChildren(holder);
+        let s;
+        try { s = await S.api.platformSettings(); } catch (e) { fail(holder, e); return; }
+        const max = S.input('max', { type: 'number', min: 1, step: 1, value: s.maxOrganizations == null ? '' : s.maxOrganizations, placeholder: t('pset.noLimit') });
+        const demo = h('input', { type: 'checkbox', class: 'switch', checked: s.demoMode, 'aria-label': t('pset.demo') });
+        const version = S.input('version', { value: s.version, readonly: true });
+        const email = S.input('email', { type: 'email', value: s.contactEmail || '', placeholder: 'support@binosoz.tj' });
+        const save = h('button', { class: 'btn', type: 'submit' }, t('common.save'));
+        const form = h('form', { class: 'stack', novalidate: true },
+          S.field(t('pset.max'), max, t('pset.maxHint', { n: s.organizations })),
+          h('label', { class: 'switch-row' }, demo, h('span', null, t('pset.demo')), h('small', { class: 'muted' }, t('pset.demoHint'))),
+          S.field(t('pset.version'), version), S.field(t('pset.email'), email), save);
+        form.addEventListener('submit', (e) => {
+          e.preventDefault(); S.showErrors(form, null);
+          S.busy(save, async () => {
+            try {
+              const v = max.value.trim();
+              s = await S.api.savePlatformSettings({ maxOrganizations: v ? +v : null, clearMaxOrganizations: !v, demoMode: demo.checked, contactEmail: email.value.trim() });
+              S.toast(t('common.saved'), 'ok');
+            } catch (er) { S.showErrors(form, er); }
+          });
+        });
+        holder.replaceChildren(form);
       },
     };
 

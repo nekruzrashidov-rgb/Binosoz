@@ -309,6 +309,19 @@
     setOrganizationActive(id, isActive) { return isActive ? request('POST', '/platform/organizations/' + id + '/activate') : request('DELETE', '/platform/organizations/' + id + '/suspend'); },
     // Super admin's panel: platform dashboard, organization card, owners, users, reviews and tariffs.
     platformDashboard() { return request('GET', '/platform/dashboard'); },
+    // Block 3: platform activity log, notifications to organizations, platform settings.
+    platformActivity(q) { return request('GET', '/platform/activity', { query: { organizationId: q.organizationId || undefined, action: q.action || undefined, from: q.from || undefined, to: q.to || undefined, page: q.page || 1, pageSize: q.pageSize || 50 } }); },
+    platformActivityActions() { return request('GET', '/platform/activity/actions'); },
+    platformNotify(b) { return request('POST', '/platform/notifications', { body: { organizationId: b.organizationId || null, type: b.type, title: b.title, message: b.message } }); },
+    platformSettings() { return request('GET', '/platform/settings'); },
+    savePlatformSettings(b) { return request('PATCH', '/platform/settings', { body: b }); },
+    // Block 3, CRM: clients from Excel (dryRun — preview), message templates, sales analytics, project card.
+    importClients(file, dryRun) { const f = new FormData(); f.append('file', file); return request('POST', '/crm/clients/import', { form: f, file, query: { dryRun: dryRun ? 'true' : undefined } }); },
+    templates() { return request('GET', '/crm/templates'); },
+    saveTemplate(id, b) { return request(id ? 'PUT' : 'POST', '/crm/templates' + (id ? '/' + id : ''), { body: { name: b.name, text: b.text, type: b.type } }); },
+    deleteTemplate(id) { return request('DELETE', '/crm/templates/' + id); },
+    salesAnalytics() { return request('GET', '/crm/analytics/sales'); },
+    projectCards() { return request('GET', '/crm/analytics/project'); },
     async organizationDetails(id) { const d = await request('GET', '/platform/organizations/' + id); return Object.assign({}, d, { organization: M.organization(d.organization) }); },
     updateOrganization(id, b) { return withFields(request('PUT', '/platform/organizations/' + id, { body: { name: b.name, slug: b.slug || null } })); },
     inviteOwner(id, b) { return withFields(request('POST', '/platform/organizations/' + id + '/invite-owner', { body: { email: b.email, firstName: b.firstName, lastName: b.lastName } })); },

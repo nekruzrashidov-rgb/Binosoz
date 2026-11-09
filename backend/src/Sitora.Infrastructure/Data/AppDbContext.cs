@@ -51,6 +51,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider t
     public DbSet<ConstructionStage> ConstructionStages => Set<ConstructionStage>();
     public DbSet<ConstructionPhoto> ConstructionPhotos => Set<ConstructionPhoto>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+    public DbSet<PlatformSetting> PlatformSettings => Set<PlatformSetting>();
+    public DbSet<MessageTemplate> MessageTemplates => Set<MessageTemplate>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -105,6 +107,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider t
         builder.Entity<Invitation>().HasQueryFilter(x => ScopeAll || x.OrganizationId == ScopeOrganizationId);
         builder.Entity<Organization>().HasQueryFilter(x => ScopeAll || x.Id == ScopeOrganizationId);
         builder.Entity<OrganizationTariff>().HasQueryFilter(x => ScopeAll || x.OrganizationId == ScopeOrganizationId);
+        builder.Entity<MessageTemplate>().HasQueryFilter(x => ScopeAll || x.OrganizationId == ScopeOrganizationId);
     }
 
     private void ByBuilding<T>(ModelBuilder builder, Expression<Func<T, Guid>> organizationId, Expression<Func<T, Guid>> buildingId)

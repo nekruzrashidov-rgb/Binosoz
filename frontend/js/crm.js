@@ -40,11 +40,14 @@
     // An accountant reads deals too (to post the first payment); creating deals and moving stages stays with sales.
     add('deals', t('crm.deals'), 'file', t('crm.g.sales'), has('Manager', 'Accountant'));
     add('customers', t('crm.customers'), 'users', t('crm.g.sales'), has('Manager'));
+    add('templates', t('tpl.title'), 'send', t('crm.g.sales'), has('Manager') && !S.isDemo());
     add('chats', t('chats.title'), 'send', t('crm.g.sales'), has('Manager', 'Accountant'));
     add('payments', t('crm.payments'), 'wallet', t('crm.g.finance'), has('Accountant'));
     add('debts', t('crm.debts'), 'shield', t('crm.g.finance'), has('Accountant'));
     add('cash', t('cash.title'), 'wallet', t('crm.g.finance'), has('Accountant') && !S.isDemo());
     add('rate', t('crm.rate'), 'chart', t('crm.g.finance'), has('Accountant'));
+    // The developer's view of a building: construction, sales and money on one card (owner and building admin).
+    add('project', t('proj.title'), 'building', t('crm.g.catalog'), S.api.isLeader() && !S.isDemo());
     // Leaders manage buildings; a manager uses the apartment lists to book and sell.
     add('objects', t('obj.title'), 'home', t('crm.g.catalog'), S.api.isLeader() || has('Manager'));
     // Floor plans: leaders and managers book from the drawing (the demo backend has no plans).
@@ -54,10 +57,15 @@
     add('users', t('crm.users'), 'users', t('crm.g.system'), S.api.isLeader());
     add('audit', t('crm.audit'), 'shield', t('crm.g.system'), S.api.isOwner());
     add('settings', t('set.title'), 'gear', t('crm.g.system'), S.api.isOwner());
+    // Emoji of the top tab bar.
+    const EMOJI = { dashboard: '📊', pipeline: '🧭', leads: '👥', deals: '📋', customers: '👤', templates: '✉️', chats: '💬', payments: '💰', debts: '⏰', cash: '🏦', rate: '💱',
+      project: '🏗️', objects: '🏠', plan: '🗺️', catalog: '🏢', construction: '🧱', users: '🧑‍💼', audit: '🛡️', settings: '⚙️' };
+    items.forEach((it) => { it.emoji = EMOJI[it.key]; });
     const user = S.api.user;
-    const ws = S.workspace(items, items[0].key, (k, main) => { S.clear(main); main.append(h('h1', null, items.find((i) => i.key === k).label), h('p', { class: 'sub' }, t('crm.sub.' + k))); const body = h('div', { class: 'stack' }); main.appendChild(body); try { views[k](body); } catch (e) { body.appendChild(h('div', { class: 'form-err' }, e.message)); console.error(e); } });
+    const ws = S.workspace(items, items[0].key, (k, main) => { S.clear(main); main.append(h('h1', null, items.find((i) => i.key === k).label), h('p', { class: 'sub' }, t('crm.sub.' + k))); const body = h('div', { class: 'stack' }); main.appendChild(body); try { views[k](body); } catch (e) { body.appendChild(h('div', { class: 'form-err' }, e.message)); console.error(e); } }, { topTabs: true });
     page.appendChild(ws.el);
-    queueMicrotask(() => ws.go(items[0].key));
+    // The section from the address (/crm#leads) or the first one.
+    queueMicrotask(() => ws.go(ws.current));
     const openTab = (k) => ws.go(k);
     S.crmGo = openTab;
     // Unread messages from buyers across all conversations, on the section's label.
@@ -84,7 +92,8 @@
           h('div', { class: 'kpis' }, kp.map(([l, v, c]) => h('div', { class: 'card kpi', style: { '--k': c } }, h('span', null, l), h('b', null, v), h('i')))),
           h('div', { class: 'card' }, h('h3', null, t('dash.byStage')), STAGES.map((s) => { const n = +stages[s] || 0; return h('div', { class: 'hbar' }, S.stageChip(s), S.bar((n / total) * 100), h('b', { class: 'num', style: { textAlign: 'right' } }, n)); }),
             rate && rate.rate ? h('p', { class: 'hint', style: { marginTop: '14px' } }, t('dash.rate', { r: rate.rate, d: S.fmt.date(rate.date) })) : h('p', { class: 'hint', style: { marginTop: '14px' } }, t('dash.noRate')),
-            r.salesNote === 'usdWithoutRate' ? h('p', { class: 'hint' }, t('dash.usdNoRate')) : null));
+            r.salesNote === 'usdWithoutRate' ? h('p', { class: 'hint' }, t('dash.usdNoRate')) : null),
+          S.isDemo() ? null : salesCharts());
       },
 
       async pipeline(body) {
@@ -149,7 +158,72 @@
         const holder = h('div'); const search = S.input('q', { type: 'search', placeholder: t('cust.search'), 'aria-label': t('cust.search') });
         const load = async () => { holder.replaceChildren(S.skeleton(5, 38)); const l = await S.api.customers(search.value.trim()); holder.replaceChildren(S.tbl([{ label: t('f.fullName'), render: (c) => h('b', null, c.fullName) }, { label: t('f.phone'), render: (c) => c.phone }, { label: t('f.email'), render: (c) => c.email }, { label: t('crm.deals'), r: true, render: (c) => c.dealsCount }, { label: t('lead.date'), render: (c) => S.fmt.date(c.createdAt) }], l, { onRow: (c) => customerModal(c.id), empty: t('cust.none') })); };
         search.addEventListener('input', S.debounce(load, 250));
-        body.replaceChildren(h('div', { class: 'toolbar' }, search, h('span', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => customerForm(null, load) }, t('cust.new'))), holder); load();
+        body.replaceChildren(h('div', { class: 'toolbar' }, search, h('span', { class: 'spacer' }),
+          S.isDemo() ? null : h('button', { class: 'btn ghost', type: 'button', onclick: () => importClientsModal(load) }, '📥 ', t('cimp.btn')),
+          h('button', { class: 'btn', onclick: () => customerForm(null, load) }, t('cust.new'))), holder); load();
+      },
+
+      // Message templates (SMS / WhatsApp) with {name}, {apt}, {amount}: a list, then a form in a dialog.
+      async templates(body) {
+        const holder = h('div');
+        const TYPES = ['payment', 'booking', 'welcome'];
+        const load = async () => {
+          holder.replaceChildren(S.skeleton(3, 60));
+          const list = await S.api.templates();
+          holder.replaceChildren(list.length ? h('div', { class: 'tpl-grid' }, list.map((tp) => h('article', { class: 'card tpl-card' },
+            h('div', { class: 'row between' }, h('b', null, tp.name), S.chip(tp.type, t('tpl.type.' + tp.type))),
+            h('p', { class: 'tpl-text' }, highlightVars(tp.text)),
+            h('div', { class: 'row', style: { gap: '8px' } },
+              h('button', { class: 'btn soft sm', type: 'button', onclick: () => form(tp) }, t('common.edit')),
+              h('button', { class: 'btn ghost sm', type: 'button', onclick: async (e) => { if (!(await S.confirm(t('tpl.delAsk', { n: tp.name }), t('common.delete'), true))) return; await S.busy(e.currentTarget, () => S.api.deleteTemplate(tp.id)); S.toast(t('tpl.deleted'), 'ok'); load(); } }, t('common.delete'))))))
+            : h('div', { class: 'empty card' }, t('tpl.none')));
+        };
+        function highlightVars(text) { return String(text).split(/(\{(?:name|apt|amount)\})/).map((p) => (/^\{(name|apt|amount)\}$/.test(p) ? h('code', null, p) : p)); }
+        function form(tp) {
+          const name = S.input('name', { value: tp ? tp.name : '', maxlength: 120 });
+          const text = h('textarea', { class: 'inp', rows: 5, maxlength: 1000 }, tp ? tp.text : '');
+          const type = S.select('type', TYPES.map((k) => [k, t('tpl.type.' + k)]), tp ? tp.type : 'payment');
+          const err = h('div', { class: 'form-err', hidden: true });
+          const insert = (v) => { const at = text.selectionStart ?? text.value.length; text.value = text.value.slice(0, at) + v + text.value.slice(text.selectionEnd ?? at); text.focus(); };
+          const save = h('button', { class: 'btn', type: 'button', onclick: (e) => S.busy(e.currentTarget, async () => {
+            err.hidden = true;
+            try { await S.api.saveTemplate(tp && tp.id, { name: name.value, text: text.value, type: type.value }); md.close(); S.toast(t('common.saved'), 'ok'); load(); } catch (ex) { err.textContent = ex.message; err.hidden = false; }
+          }) }, t('common.save'));
+          const md = S.modal({ title: tp ? t('tpl.edit') : t('tpl.new'), body: h('div', { class: 'stack' },
+            S.field(t('tpl.name'), name), S.field(t('tpl.type'), type), S.field(t('tpl.text'), text, t('tpl.hint')),
+            h('div', { class: 'row', style: { gap: '6px' } }, ['{name}', '{apt}', '{amount}'].map((v) => h('button', { class: 'btn soft sm', type: 'button', onclick: () => insert(v) }, v))), err), actions: [save] });
+        }
+        body.replaceChildren(h('div', { class: 'toolbar' }, h('p', { class: 'hint', style: { margin: 0 } }, t('tpl.sub')), h('span', { class: 'spacer' }), h('button', { class: 'btn', type: 'button', onclick: () => form(null) }, t('tpl.new'))), holder);
+        load();
+      },
+
+      // Project card per building (developer's view) and three small tiles under it.
+      async project(body) {
+        body.replaceChildren(S.skeleton(2, 220));
+        const cards = await S.api.projectCards();
+        if (!cards.length) { body.replaceChildren(h('div', { class: 'empty card' }, t('proj.none'))); return; }
+        body.replaceChildren(...cards.map((c) => {
+          const soldPct = c.totalApartments ? Math.round((c.sold * 100) / c.totalApartments) : 0;
+          const revPct = c.plan > 0 ? Math.min(100, Math.round((c.revenue * 100) / c.plan)) : 0;
+          return h('section', { class: 'proj-wrap' },
+            h('div', { class: 'proj-card' },
+              h('span', { class: 'proj-corner', 'aria-hidden': 'true' }),
+              h('div', { class: 'proj-brand' }, '🏗️ ', c.name),
+              h('div', { class: 'proj-dev' }, t('proj.developer'), ': ', h('b', null, c.developer)),
+              h('div', { class: 'proj-label' }, t('proj.construction'), h('b', null, c.constructionPercent + '%')),
+              h('div', { class: 'pay-card-bar-track' }, h('div', { class: 'pay-card-bar-fill', style: { width: c.constructionPercent + '%' } })),
+              h('dl', { class: 'proj-stats' },
+                h('div', null, h('dt', null, t('proj.sold')), h('dd', null, c.sold + ' / ' + c.totalApartments + ' ', h('small', null, soldPct + '%'))),
+                h('div', null, h('dt', null, t('proj.booked')), h('dd', null, String(c.booked))),
+                h('div', null, h('dt', null, t('proj.free')), h('dd', null, String(c.free))),
+                h('div', null, h('dt', null, t('proj.revenue')), h('dd', { class: 'gold' }, S.fmt.money(c.revenue, c.currency))),
+                h('div', null, h('dt', null, t('proj.plan')), h('dd', null, S.fmt.money(c.plan, c.currency), ' ', h('small', null, revPct + '%'))))),
+            h('div', { class: 'proj-tiles' },
+              h('div', { class: 'card proj-tile' }, h('span', { 'aria-hidden': 'true' }, '📅'), h('small', null, t('proj.next')), h('b', null, c.nextStage || (c.completionYear ? t('proj.delivery', { y: c.completionYear }) : '—'))),
+              // Crews and tasks are not tracked yet: example numbers, marked as such.
+              h('div', { class: 'card proj-tile' }, h('span', { 'aria-hidden': 'true' }, '👷'), h('small', null, t('proj.crews')), h('b', null, '8'), h('em', null, t('proj.example'))),
+              h('div', { class: 'card proj-tile' }, h('span', { 'aria-hidden': 'true' }, '📋'), h('small', null, t('proj.tasks')), h('b', null, '3'), h('em', null, t('proj.example')))));
+        }));
       },
 
       async payments(body) {
@@ -576,6 +650,39 @@
         actions: [h('button', { class: 'btn danger', onclick: reasonBtn }, t('book.cancel')), h('button', { class: 'btn ghost', onclick: async (e) => { await S.busy(e.currentTarget, async () => { try { await S.api.extendBooking(it.id); S.toast(t('book.extended'), 'ok'); md.close(); done && done(); } catch (er) { S.err(er); } }); } }, t('book.extend')), h('button', { class: 'btn', onclick: () => { md.close(); newDealModal(done, it); } }, t('deal.fromBooking'))] });
     }
 
+    // Clients from Excel (Имя | Телефон | Email | Комментарий): the file is checked first (nothing is saved),
+    // the preview shows each row's status, then «Загрузить N клиентов» saves the new ones.
+    function importClientsModal(done) {
+      let file = null;
+      const input = h('input', { type: 'file', class: 'inp', accept: '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'aria-label': t('cimp.file') });
+      const out = h('div', { class: 'stack' });
+      const confirmBtn = h('button', { class: 'btn', type: 'button', disabled: true }, t('cimp.load', { n: 0 }));
+      const STATUS = { new: 'good', duplicate: 'warn', invalid: 'bad' };
+      input.addEventListener('change', () => S.busy(confirmBtn, async () => {
+        file = input.files && input.files[0];
+        confirmBtn.disabled = true; out.replaceChildren();
+        if (!file) return;
+        try {
+          const r = await S.api.importClients(file, true);
+          out.replaceChildren(
+            h('p', { class: 'hint' }, t('cimp.summary', { a: r.added, s: r.skipped, i: r.invalid })),
+            S.tbl([{ label: '#', render: (x) => x.row }, { label: t('f.fullName'), render: (x) => x.name }, { label: t('f.phone'), render: (x) => x.phone },
+              { label: t('f.email'), render: (x) => x.email || '' }, { label: t('cimp.status'), render: (x) => S.chip(STATUS[x.status], t('cimp.st.' + x.status) + (x.error ? ': ' + x.error : '')) }], r.rows, { empty: t('cimp.empty') }));
+          confirmBtn.textContent = t('cimp.load', { n: r.added });
+          confirmBtn.disabled = r.added === 0;
+        } catch (e) { out.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
+      }));
+      confirmBtn.addEventListener('click', () => S.busy(confirmBtn, async () => {
+        try {
+          const r = await S.api.importClients(file, false);
+          md.close();
+          S.toast(t('cimp.done', { a: r.added, s: r.skipped + r.invalid }), 'ok');
+          done && done();
+        } catch (e) { out.prepend(h('div', { class: 'form-err' }, e.message)); }
+      }));
+      const md = S.modal({ title: t('cimp.title'), wide: true, body: h('div', { class: 'stack' }, h('p', { class: 'hint' }, t('cimp.hint')), S.field(t('cimp.file'), input), out), actions: [confirmBtn] });
+    }
+
     function customerForm(pre, done) {
       pre = pre || {};
       const name = S.input('fullName', { value: pre.fullName || '', autocomplete: 'off' }), phone = S.input('phone', { type: 'tel', value: pre.phone || '+992' }), email = S.input('email', { type: 'email' }), pass = S.input('passport');
@@ -699,6 +806,57 @@
     }
 
     // The overview's statistics: apartments, contract money (a CSS ring), sales by month (CSS bars), overdue payments.
+    // Sales analytics on the dashboard: deals per month (12 months) and the funnel, drawn with Canvas 2D (no chart library).
+    function salesCharts() {
+      const months = h('canvas', { class: 'chart-canvas', role: 'img', 'aria-label': t('an.months') });
+      const funnel = h('canvas', { class: 'chart-canvas', role: 'img', 'aria-label': t('an.funnel') });
+      const box = h('div', { class: 'grid g2 an-grid' },
+        h('div', { class: 'card' }, h('h3', null, t('an.months')), h('div', { class: 'chart-box' }, months), h('p', { class: 'hint chart-legend' }, h('i', { class: 'lg-a' }), t('an.signed'), h('i', { class: 'lg-b' }), t('an.completed'))),
+        h('div', { class: 'card' }, h('h3', null, t('an.funnel')), h('div', { class: 'chart-box' }, funnel)));
+      S.api.salesAnalytics().then((data) => {
+        const draw = () => { if (!box.isConnected) { window.removeEventListener('resize', onResize); return; } drawMonths(months, data.months); drawFunnel(funnel, data.funnel); };
+        const onResize = S.debounce(draw, 150);
+        window.addEventListener('resize', onResize);
+        requestAnimationFrame(draw);
+      }).catch((e) => box.replaceChildren(h('div', { class: 'form-err' }, e.message)));
+      return box;
+    }
+    // A canvas the width of its box, sharp on high-density screens; the colours follow the theme.
+    function prepare(canvas, height) {
+      const w = Math.max(240, canvas.parentNode.clientWidth), dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = w * dpr; canvas.height = height * dpr; canvas.style.width = w + 'px'; canvas.style.height = height + 'px';
+      const g = canvas.getContext('2d'); g.scale(dpr, dpr);
+      const css = getComputedStyle(document.documentElement);
+      return { g, w, h: height, ink: css.getPropertyValue('--ink-2').trim() || '#888', muted: css.getPropertyValue('--muted').trim() || '#888', line: css.getPropertyValue('--line').trim() || '#ccc', gold: css.getPropertyValue('--gold').trim() || '#c9a227', info: css.getPropertyValue('--info').trim() || '#4a7bd8' };
+    }
+    function drawMonths(canvas, rows) {
+      const c = prepare(canvas, 220), g = c.g, padL = 28, padB = 26, top = 12;
+      const max = Math.max(1, ...rows.map((r) => Math.max(r.deals, r.completed)));
+      const plotW = c.w - padL - 6, plotH = c.h - padB - top, slot = plotW / rows.length, bw = Math.max(3, slot * 0.32);
+      g.font = '11px Inter, system-ui, sans-serif'; g.fillStyle = c.muted; g.strokeStyle = c.line; g.lineWidth = 1;
+      [0, 0.5, 1].forEach((f) => { const y = top + plotH * (1 - f); g.beginPath(); g.moveTo(padL, y); g.lineTo(c.w - 6, y); g.stroke(); g.textAlign = 'right'; g.textBaseline = 'middle'; g.fillText(String(Math.round(max * f)), padL - 6, y); });
+      const names = t('top.months').split(',');
+      rows.forEach((r, i) => {
+        const x = padL + slot * i + slot / 2;
+        const hA = (r.deals / max) * plotH, hB = (r.completed / max) * plotH;
+        g.fillStyle = c.gold; g.fillRect(x - bw - 1, top + plotH - hA, bw, hA);
+        g.fillStyle = c.info; g.fillRect(x + 1, top + plotH - hB, bw, hB);
+        // Narrow chart: every other month, counted from the current one so that it always has its label.
+        if (slot > 26 || (rows.length - 1 - i) % 2 === 0) { g.fillStyle = c.muted; g.textAlign = 'center'; g.textBaseline = 'top'; g.fillText(names[+r.month.slice(5) - 1] || r.month.slice(5), x, top + plotH + 6); }
+      });
+    }
+    function drawFunnel(canvas, steps) {
+      const c = prepare(canvas, 220), g = c.g, rowH = 46, labelW = Math.min(120, c.w * 0.34);
+      g.font = '600 12px Inter, system-ui, sans-serif'; g.textBaseline = 'middle';
+      steps.forEach((s, i) => {
+        const y = 10 + i * rowH, barW = Math.max(2, (c.w - labelW - 70) * (s.percent / 100));
+        g.fillStyle = c.ink; g.textAlign = 'left'; g.fillText(t('an.step.' + s.key), 0, y + 14);
+        g.fillStyle = c.line; g.fillRect(labelW, y + 4, c.w - labelW - 70, 20);
+        g.globalAlpha = 1 - i * 0.15; g.fillStyle = c.gold; g.fillRect(labelW, y + 4, barW, 20); g.globalAlpha = 1;
+        g.fillStyle = c.ink; g.textAlign = 'right'; g.fillText(s.count + ' · ' + s.percent + '%', c.w, y + 14);
+      });
+    }
+
     function statsBlock(st, rows) {
       const total = statTjs(st.totalRevenue), got = statTjs(st.collectedRevenue);
       const pct = total ? Math.min(100, Math.round(((got || 0) * 100) / total)) : 0;

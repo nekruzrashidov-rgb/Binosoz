@@ -5,11 +5,11 @@
   const S = (window.S = window.S || {});
   const h = (...a) => S.h(...a);
   const t = (...a) => S.t(...a);
-  const PAGES = { home: '/', apartments: '/apartments', contact: '/contact', register: '/register', 'accept-invite': '/accept-invite', login: '/login', cabinet: '/cabinet', crm: '/crm', platform: '/platform', invite: '/accept-invite' };
+  const PAGES = { home: '/', apartments: '/apartments', gallery: '/gallery', about: '/about', contact: '/contact', register: '/register', 'accept-invite': '/accept-invite', login: '/login', cabinet: '/cabinet', crm: '/crm', platform: '/platform', invite: '/accept-invite' };
   const page = document.body.dataset.page;
   const guarded = page === 'cabinet' || page === 'crm' || page === 'platform';
   // The buyer-facing pages are always dark: the design of the showroom is built for it.
-  const isPublic = page === 'home' || page === 'apartments' || page === 'contact' || page === 'register' || page === 'accept-invite' || page === 'notfound';
+  const isPublic = page === 'home' || page === 'apartments' || page === 'gallery' || page === 'about' || page === 'contact' || page === 'register' || page === 'accept-invite' || page === 'notfound';
   const app = document.getElementById('app');
   const header = h('header', { class: 'top' });
   const main = h('div', { id: 'view' });
@@ -132,12 +132,15 @@
   function drawPublicHeader() {
     const link = (href, label, key) => h('a', { class: page === key ? 'on' : '', href, 'aria-current': page === key ? 'page' : null }, label);
     const menu = h('nav', { class: 'nav lux-nav', 'aria-label': t('nav.main') },
-      link('/', t('nav.home'), 'home'), link('/apartments', t('nav.apartments'), 'apartments'), link('/contact', t('nav.contact'), 'contact'));
+      link('/', t('nav.home'), 'home'), link('/apartments', t('nav.apartments'), 'apartments'), link('/gallery', t('nav.gallery'), 'gallery'),
+      link('/about', t('nav.project'), 'about'), link('/contact', t('nav.contact'), 'contact'));
     const lang = langSwitch();
     const phone = h('a', { class: 'top-phone desk-only', href: PHONE_HREF }, PHONE);
     const { btn: menuBtn } = buildMobileOverlay([
       ['/', t('nav.home'), page === 'home'],
       ['/apartments', t('nav.apartments'), page === 'apartments'],
+      ['/gallery', t('nav.gallery'), page === 'gallery'],
+      ['/about', t('nav.project'), page === 'about'],
       ['/contact', t('nav.contact'), page === 'contact'],
     ]);
     header.className = 'top lux-top' + (S.api.isAuthed ? ' authed' : '');
@@ -169,7 +172,7 @@
   }
 
   // The tab title in the chosen language: the page's name and the brand (the landing keeps the complex's name).
-  const TITLES = { apartments: 'nav.apartments', contact: 'nav.contact', login: 'nav.login', cabinet: 'nav.cabinet', crm: 'nav.crm', platform: 'nav.platform' };
+  const TITLES = { apartments: 'nav.apartments', gallery: 'nav.gallery', about: 'nav.project', contact: 'nav.contact', login: 'nav.login', cabinet: 'nav.cabinet', crm: 'nav.crm', platform: 'nav.platform' };
   const htmlTitle = document.title;
   function setTitle() {
     if (S.lang === 'ru') { document.title = htmlTitle; return; }
@@ -212,6 +215,8 @@
     applyTheme();
     startProgress();
     app.replaceChildren(header, main);
+    // The real height of the top bar (taller with the "as owner" banner): sticky bars under it (CRM tabs) start there.
+    if ('ResizeObserver' in window) new ResizeObserver(() => document.documentElement.style.setProperty('--hdr-h', header.offsetHeight + 'px')).observe(header);
     await S.api.restore();
     if (guarded && !S.api.isAuthed) { location.replace('/login'); return; }
     // Invitation links of older letters (/login#invite=…) now open their own page.

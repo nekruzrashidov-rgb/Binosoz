@@ -84,6 +84,8 @@ public static class DependencyInjection
         services.AddScoped<IOnlinePaymentService, OnlinePaymentService>();
         services.AddScoped<IInvitationService, InvitationService>();
         services.AddScoped<IPlatformService, PlatformService>();
+        services.AddScoped<IPlatformToolsService, PlatformToolsService>();
+        services.AddScoped<ICrmToolsService, CrmToolsService>();
         services.AddScoped<IOrgApplicationService, OrgApplicationService>();
         services.AddScoped<IBrandService, BrandService>();
         services.AddSingleton<IChatModel, ClaudeChatModel>();
