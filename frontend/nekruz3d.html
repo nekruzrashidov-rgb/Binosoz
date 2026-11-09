@@ -2780,6 +2780,9 @@ const ldInt=setInterval(()=>{
 </script>
 <!-- ══ WOW: стройка, этажи, презентация, режим встраивания (?embed=1) ══ -->
 <style>
+/* The loader gets hidden after loading, but "#ld{display:flex}" beats the hidden attribute: the transparent layer
+   (z-index 999) stayed over the scene and swallowed every click and drag. */
+#ld[hidden]{display:none!important}
 #wowFloor{position:fixed;left:60px;top:58px;width:260px;z-index:28;padding:18px 18px 16px;border-radius:16px;
   background:rgba(4,8,16,.94);border:1px solid rgba(200,168,75,.3);box-shadow:0 24px 60px rgba(0,0,0,.55);
   color:#e9edfa;font-family:Inter,system-ui,sans-serif;transform:translateX(-120%);transition:transform .35s cubic-bezier(.2,.8,.2,1)}
