@@ -16,8 +16,6 @@ public class Deal : BaseEntity
 
     public DealStage Stage { get; private set; } = DealStage.Lead;
     public string? StageReason { get; private set; }
-
-    // Цена копируется из квартиры при создании и дальше от прайса не зависит.
     public decimal Price { get; private set; }
     public decimal Discount { get; private set; }
     public string? DiscountReason { get; private set; }
@@ -26,7 +24,6 @@ public class Deal : BaseEntity
     public decimal FinalPrice => Price - Discount;
     public bool IsClosed => Stage is DealStage.Completed or DealStage.Cancelled;
 
-    // Квартира удерживается сделкой с этапа «Бронь», продана — с этапа «Договор».
     public static bool HoldsApartment(DealStage stage) => stage is >= DealStage.Booking and <= DealStage.Completed;
     public static bool SellsApartment(DealStage stage) => stage is >= DealStage.Contract and <= DealStage.Completed;
 

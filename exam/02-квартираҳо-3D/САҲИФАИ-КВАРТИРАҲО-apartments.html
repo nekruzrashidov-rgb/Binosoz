@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Квартиры — Некруз Резиденс</title>
+<meta name="description" content="Каталог квартир Некруз Резиденс — 1–4-комнатные. Фильтры, 3D-модель, ROI-калькулятор, галерея.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Unbounded:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="/css/styles.css">
+<style>
+/* ── 3D iframe wrapper ── */
+#model3d-wrap {
+  width: 100%;
+  height: 100vh;
+  min-height: 600px;
+  position: relative;
+  border: none;
+  background: #04080f;
+}
+#model3d-wrap iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+/* loading overlay */
+#model3d-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #04080f;
+  color: #c8a84b;
+  font-family: 'Unbounded', sans-serif;
+  font-size: 13px;
+  gap: 16px;
+  pointer-events: none;
+  transition: opacity .4s;
+  z-index: 10;
+}
+#model3d-loading .spin {
+  width: 40px; height: 40px;
+  border: 2px solid rgba(200,168,75,.2);
+  border-top-color: #c8a84b;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#model3d-loading.hidden { opacity: 0; }
+</style>
+</head>
+<body data-page="apartments">
+
+<!-- ──────────────────────────────────────────
+  3D MODEL SECTION — Некруз Резиденс
+  site.js moves this block under the catalog's page head and hides the loading veil when the model has loaded
+  (an inline onload would be blocked by the site's Content-Security-Policy).
+─────────────────────────────────────────── -->
+<div id="model3d-wrap">
+  <div id="model3d-loading">
+    <div class="spin"></div>
+    НЕКРУЗ РЕЗИДЕНС · Загрузка 3D-модели…
+  </div>
+  <iframe
+    id="nekruz3d"
+    src="/nekruz3d.html"
+    title="Некруз Резиденс — интерактивная 3D-модель"
+    allow="fullscreen"
+    loading="lazy"
+  ></iframe>
+</div>
+
+<!-- ──────────────────────────────────────────
+  SPA app container (каталог, фильтры и т.д.)
+─────────────────────────────────────────── -->
+<div id="app"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="/js/config.js"></script>
+<script src="/js/i18n.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/house3d.js"></script>
+<script src="/js/site.js"></script>
+<script src="/js/page.js"></script>
+</body>
+</html>

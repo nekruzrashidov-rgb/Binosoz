@@ -9,8 +9,6 @@ public class Booking : BaseEntity
 
     public Guid ApartmentId { get; set; }
     public Apartment Apartment { get; set; } = null!;
-
-    // Бронь оформлена либо на клиента, либо на заявку с сайта.
     public Guid? CustomerId { get; set; }
     public Customer? Customer { get; set; }
     public Guid? LeadId { get; set; }
@@ -20,7 +18,6 @@ public class Booking : BaseEntity
     public BookingStatus Status { get; private set; } = BookingStatus.Active;
     public string? CancelReason { get; private set; }
 
-    // Продление считается от более позднего момента: текущего окончания брони или «сейчас».
     public void Extend(DateTime now)
     {
         EnsureActive();

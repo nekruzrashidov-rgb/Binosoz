@@ -12,16 +12,13 @@ public class AppUser : IdentityUser<Guid>, IHasTimestamps
     public string FullName { get; set; } = string.Empty;
     public bool IsActive { get; set; } = true;
 
-    // Организация сотрудника; у покупателей и создателя платформы её нет.
     public Guid? OrganizationId { get; set; }
     public Organization? Organization { get; set; }
 
-    // Дома, доступные сотруднику; пусто — все дома организации.
     public List<UserBuilding> Buildings { get; set; } = [];
 
     // Личный чат в Telegram для уведомлений; null — не привязан.
     public long? TelegramChatId { get; set; }
-
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

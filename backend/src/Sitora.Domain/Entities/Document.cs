@@ -9,7 +9,6 @@ public class Document : BaseEntity
 
     public DocumentType Type { get; set; }
 
-    // Ключ в файловом хранилище; формирует сервер, имя от пользователя в путь не попадает.
     public string FileKey { get; set; } = string.Empty;
     public string FileName { get; set; } = string.Empty;
     public string ContentType { get; set; } = string.Empty;

@@ -13,20 +13,16 @@ public class Apartment : BaseEntity
 
     public int Number { get; set; }
 
-    // Позиция квартиры на плане этажа (0–7): по ней сайт находит квартиру на плане и в 3D-модели.
     public int PlanSlot { get; set; }
 
-    // Идентификатор объекта квартиры в 3D-модели дома; появляется, когда модель готова.
     public string? Model3dId { get; set; }
 
-    // 0 — студия.
     public int Rooms { get; set; }
     public decimal Area { get; private set; }
     public decimal PricePerM2 { get; private set; }
     public decimal Price { get; private set; }
     public Currency Currency { get; private set; } = Currency.TJS;
 
-    // Статус меняется только методами ниже: их вызывают операции брони, сделки и каталога.
     public ApartmentStatus Status { get; private set; } = ApartmentStatus.Free;
 
     public static decimal CalculatePrice(decimal area, decimal pricePerM2) =>
@@ -77,7 +73,6 @@ public class Apartment : BaseEntity
         Status = ApartmentStatus.Sold;
     }
 
-    // Сделка вернулась с этапа «Договор» назад: квартира снова только забронирована.
     public void RevertSale()
     {
         EnsureStatus(ApartmentStatus.Sold, "Квартира не продана");

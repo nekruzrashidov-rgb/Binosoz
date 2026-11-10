@@ -9,8 +9,7 @@ public class ChatMessage : BaseEntity
 
     public Guid SenderId { get; set; }
     public AppUser Sender { get; set; } = null!;
-
-    // Сторона переписки: покупатель или сотрудник. По ней понятно, чьи сообщения отмечать прочитанными.
+    
     public bool FromCustomer { get; set; }
     public string Text { get; set; } = string.Empty;
     public DateTime? ReadAt { get; set; }
