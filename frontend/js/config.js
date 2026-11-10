@@ -25,4 +25,13 @@ window.SITORA_CONFIG = {
   DEFAULT_TYPES: [[0, 28, 35, 250000], [1, 45, 58, 340000], [2, 65, 80, 480000], [3, 90, 110, 650000]],
   // Installment terms: the landing shows them, the catalog's calculator uses them as its limits.
   INSTALLMENT: { downFrom: 10, years: 10 },
+  // Sites without their own API (the static copy on Vercel) use the API on Render. The site served by the API itself
+  // (localhost, Docker) keeps its own /api/v1: its Content-Security-Policy (connect-src 'self') would block another host.
+  // The API must allow the site in Cors:AllowedOrigins (on Render: Cors__AllowedOrigins__0=https://binosoz.vercel.app).
+  API_BASE_BY_HOST: { 'binosoz.vercel.app': 'https://binosoz-1.onrender.com/api/v1' },
 };
+(function () {
+  const cfg = window.SITORA_CONFIG;
+  const api = cfg.API_BASE_BY_HOST[location.hostname];
+  if (api) cfg.API_BASE = api;
+})();
