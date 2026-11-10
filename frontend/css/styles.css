@@ -743,7 +743,10 @@ body:has(.lux) { background: #060d1f; }
 .success-box b { font-family: var(--display); font-size: 22px; }
 .success-box p { color: var(--lux-mute); max-width: 32ch; }
 
-.reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.6s cubic-bezier(.2, .8, .2, 1), transform 0.6s cubic-bezier(.2, .8, .2, 1); }
+/* Hidden until it scrolls into view only when page.js set .motion-ok (observer available, not a robot, motion allowed):
+   without JS, for audit tools and screenshots, and in print everything is visible. */
+.reveal { transition: opacity 0.6s cubic-bezier(.2, .8, .2, 1), transform 0.6s cubic-bezier(.2, .8, .2, 1); }
+.motion-ok .reveal:not(.in) { opacity: 0; transform: translateY(18px); }
 .reveal.in { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) {
   .reveal { opacity: 1; transform: none; }
@@ -1682,7 +1685,11 @@ body.menu-open { overflow: hidden; }
 .hero-3d-frame { position: relative; border-radius: 24px; overflow: hidden; aspect-ratio: 4 / 5; max-height: 72vh; background: #04080f;
   border: 1px solid rgba(201, 162, 39, 0.2); box-shadow: 0 0 60px rgba(201, 162, 39, 0.1), 0 40px 80px rgba(0, 0, 0, 0.6); }
 .hero-3d-frame::before { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 60%, rgba(6, 13, 31, 0.8)); pointer-events: none; z-index: 2; }
-.hero-3d-frame iframe { display: block; width: 100%; height: 100%; border: 0; }
+/* The drawn building is always there; the live model fades in over it once it has drawn its first frame. */
+.hero-poster { position: absolute; inset: 0; display: block; width: 100%; height: 100%; transition: opacity 0.8s; }
+.hero-3d-live { position: absolute; inset: 0; display: block; width: 100%; height: 100%; border: 0; opacity: 0; pointer-events: none; transition: opacity 0.8s; }
+.hero-3d-frame.is-3d .hero-3d-live { opacity: 1; pointer-events: auto; }
+.hero-3d-frame.is-3d .hero-poster { opacity: 0; }
 .hero-3d-label { margin: 0; text-align: center; font-size: 13px; color: rgba(238, 242, 255, 0.6); }
 .wow-hero-side .float-card { justify-self: center; }
 @media (max-width: 900px) {
@@ -1735,20 +1742,22 @@ body.menu-open { overflow: hidden; }
 .apt-showcase-card:hover .apt-card-btn { background: rgba(201, 162, 39, 0.2); }
 
 /* Sections slide up as they come into view (page.js); cards inside can follow one after another */
-.section-reveal { opacity: 0; transform: translateY(32px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.section-reveal { transition: opacity 0.6s ease, transform 0.6s ease; }
+.motion-ok .section-reveal:not(.visible) { opacity: 0; transform: translateY(32px); }
 .section-reveal.visible { opacity: 1; transform: none; }
-.section-reveal .stagger { opacity: 0; transform: translateY(20px); transition: opacity 0.5s ease, transform 0.5s ease; }
+.section-reveal .stagger { transition: opacity 0.5s ease, transform 0.5s ease; }
+.motion-ok .section-reveal:not(.visible) .stagger { opacity: 0; transform: translateY(20px); }
 .section-reveal.visible .stagger { opacity: 1; transform: none; }
 .section-reveal.visible .stagger:nth-child(1) { transition-delay: 0.1s; } .section-reveal.visible .stagger:nth-child(2) { transition-delay: 0.2s; }
 .section-reveal.visible .stagger:nth-child(3) { transition-delay: 0.3s; } .section-reveal.visible .stagger:nth-child(4) { transition-delay: 0.4s; }
 .section-reveal.visible .stagger:nth-child(5) { transition-delay: 0.5s; } .section-reveal.visible .stagger:nth-child(6) { transition-delay: 0.6s; }
 
-/* Button ripple: a light spot where the pointer is (page.js keeps --rx / --ry) */
+/* Button ripple: a circle spreads from the point of the press (page.js sets --rx / --ry and .ripple-active) */
 .btn { position: relative; overflow: hidden; isolation: isolate; }
-.btn::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1;
-  background: radial-gradient(circle at var(--rx, 50%) var(--ry, 50%), rgba(255, 255, 255, 0.3) 0%, transparent 60%); opacity: 0; transition: opacity 0.4s; }
-.btn:hover::after { opacity: 0.35; }
-.btn:active::after { opacity: 1; transition: opacity 0s; }
+.btn::after { content: ''; position: absolute; left: var(--rx, 50%); top: var(--ry, 50%); width: 100px; height: 100px; margin: -50px 0 0 -50px;
+  border-radius: 50%; background: rgba(255, 255, 255, 0.3); transform: scale(0); opacity: 0; pointer-events: none; z-index: -1; }
+.btn.ripple-active::after { animation: btnRipple 0.6s ease-out; }
+@keyframes btnRipple { from { transform: scale(0); opacity: 0.5; } to { transform: scale(4); opacity: 0; } }
 
 /* ── Catalog ── */
 .apts-hero { min-height: 280px; display: flex; align-items: center; position: relative; overflow: hidden; background: linear-gradient(135deg, #060d1f 0%, #0d1f3c 50%, #060d1f 100%); }
@@ -1862,3 +1871,8 @@ body.menu-open { overflow: hidden; }
 .inp, select.inp, textarea.inp { background: var(--inp-bg); border: 1px solid var(--inp-line); border-radius: 10px; transition: border-color 0.2s, box-shadow 0.2s; }
 .inp:focus, .inp:focus-visible { border-color: rgba(201, 162, 39, 0.5); box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.12); outline: none; }
 select.inp option { background: var(--surface); color: var(--ink); }
+@media print { .reveal, .section-reveal, .section-reveal .stagger { opacity: 1 !important; transform: none !important; } }
+/* Block 4 fixes: plan previews on the landing, hover lift with a gold glow */
+.layout-plan { display: block; width: 100%; height: auto; aspect-ratio: 26 / 16; border-radius: 12px; margin-bottom: 14px; border: 1px solid rgba(201, 162, 39, 0.18); }
+.plan-card, .layout-card { transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease; }
+.plan-card:hover, .layout-card:hover { transform: translateY(-6px); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 20px rgba(201, 162, 39, 0.08); border-color: rgba(201, 162, 39, 0.4); }

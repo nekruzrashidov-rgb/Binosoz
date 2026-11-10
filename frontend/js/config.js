@@ -9,8 +9,8 @@ window.SITORA_CONFIG = {
   ORG_SLUG: 'nekruz',
   DEFAULT_BUILDING_ID: null,
   // Numbers for the landing's stats bar when the API is unavailable; with the API the real ones are shown.
-  DEFAULT_FLOORS: 16,
-  DEFAULT_APTS: 128,
+  DEFAULT_FLOORS: 20,
+  DEFAULT_APTS: 160,
   CONTACT: {
     phone: '+992 98 363 70 70',
     telegram: '@nekru01',

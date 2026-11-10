@@ -15,18 +15,18 @@ public class CatalogTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
     private readonly HttpClient _guest = factory.CreateClient();
 
     [Fact]
-    public async Task SeededBuilding_Has16ResidentialFloorsAnd128ApartmentsWithStatuses()
+    public async Task SeededBuilding_Has20ResidentialFloorsAnd160ApartmentsWithStatuses()
     {
         var building = await GetSeededBuildingAsync();
         var floors = await GetAsync<PagedResult<FloorResponse>>($"/api/v1/buildings/{building.Id}/floors?pageSize=100");
 
-        Assert.Equal(17, floors.TotalCount);
+        Assert.Equal(21, floors.TotalCount);
         var commercial = Assert.Single(floors.Items, f => f.IsCommercial);
         Assert.Equal(0, commercial.Number);
         Assert.Equal(0, commercial.TotalApartments);
 
         var residential = floors.Items.Where(f => !f.IsCommercial).ToList();
-        Assert.Equal(Enumerable.Range(1, 16), residential.Select(f => f.Number));
+        Assert.Equal(Enumerable.Range(1, 20), residential.Select(f => f.Number));
 
         var apartments = new List<ApartmentResponse>();
         foreach (var floor in residential)
@@ -37,8 +37,8 @@ public class CatalogTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
             apartments.AddRange(page.Items);
         }
 
-        Assert.Equal(128, apartments.Count);
-        Assert.Equal(128, building.TotalApartments);
+        Assert.Equal(160, apartments.Count);
+        Assert.Equal(160, building.TotalApartments);
         Assert.Equal(apartments.Count(a => a.Status == ApartmentStatus.Free), building.FreeApartments);
         Assert.Contains(apartments, a => a.Status == ApartmentStatus.Free);
         Assert.Contains(apartments, a => a.Status == ApartmentStatus.Sold);

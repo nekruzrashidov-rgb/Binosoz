@@ -182,22 +182,34 @@
     document.title = page === 'home' ? t('login.heroName') + ' — ' + t('home.tagline') : TITLES[page] ? t(TITLES[page]) + ' — ' + brand : document.title;
   }
 
-  // Sections marked .section-reveal slide up once they come into view; without IntersectionObserver they are simply shown.
-  const revealer = 'IntersectionObserver' in window
-    ? new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('visible'); revealer.unobserve(e.target); } }), { threshold: 0.1 })
+  // Sections marked .section-reveal (and the site's .reveal blocks) slide up once they come into view. They are hidden
+  // beforehand only under html.motion-ok: an observer exists, the page is not driven by a robot (audit tools and
+  // screenshot services take the page without scrolling) and the person has not asked for less motion. Otherwise
+  // everything is simply shown; what is already on screen is shown at once, without waiting for the observer.
+  const motionOk = 'IntersectionObserver' in window && !navigator.webdriver
+    && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  if (motionOk) document.documentElement.classList.add('motion-ok');
+  S.motionOk = motionOk;
+  const revealer = motionOk
+    ? new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('visible'); revealer.unobserve(e.target); } }), { threshold: 0.05, rootMargin: '0px 0px -50px 0px' })
     : null;
-  S.revealSections = (root) => S.$$('.section-reveal:not(.visible)', root || document).forEach((el) => (revealer ? revealer.observe(el) : el.classList.add('visible')));
+  S.revealSections = (root) => S.$$('.section-reveal:not(.visible)', root || document).forEach((el) => {
+    if (!revealer || el.getBoundingClientRect().top < window.innerHeight) el.classList.add('visible');
+    else revealer.observe(el);
+  });
+  window.addEventListener('beforeprint', () => S.$$('.section-reveal, .reveal').forEach((el) => el.classList.add('visible', 'in')));
 
-  // Button ripple: the light spot of .btn:active (styles.css) starts where the pointer is. One listener for all buttons, new ones too.
-  const ripple = (e) => {
+  // Button ripple: a circle spreads from the point of the press (styles.css, .ripple-active). One listener for every
+  // .btn, also those drawn later.
+  document.addEventListener('pointerdown', (e) => {
     const b = e.target && e.target.closest ? e.target.closest('.btn') : null;
-    if (!b) return;
+    if (!b || b.disabled) return;
     const r = b.getBoundingClientRect();
-    b.style.setProperty('--rx', ((e.clientX - r.left) / r.width) * 100 + '%');
-    b.style.setProperty('--ry', ((e.clientY - r.top) / r.height) * 100 + '%');
-  };
-  document.addEventListener('pointermove', ripple, { passive: true });
-  document.addEventListener('pointerdown', ripple, { passive: true });
+    b.style.setProperty('--rx', e.clientX - r.left + 'px');
+    b.style.setProperty('--ry', e.clientY - r.top + 'px');
+    b.classList.remove('ripple-active'); void b.offsetWidth; b.classList.add('ripple-active');
+    clearTimeout(b._ripple); b._ripple = setTimeout(() => b.classList.remove('ripple-active'), 650);
+  }, { passive: true });
 
   function render() {
     setTitle();

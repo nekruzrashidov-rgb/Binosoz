@@ -2818,7 +2818,10 @@ body.wow-embed #floatContact,body.wow-embed #cmpBar,body.wow-embed #tip,body.wow
   // Без WebGL основной скрипт останавливается на создании движка: вместо вечной «инициализации» — понятное сообщение.
   let ready=false;
   try{ready=!!(scene&&cam&&canvas&&BUILDING_MESHES);}catch(e){ready=false;}
+  // Страница сайта, в которую встроена модель, показывает свою картинку, пока модель не скажет, что нарисовала первый кадр.
+  const tell=(type)=>{try{if(window.parent!==window)window.parent.postMessage({type:type},'*');}catch(e){/* no parent */}};
   if(!ready){
+    tell('nekruz3d:unavailable');
     if(embed)document.body.classList.add('wow-embed');
     const msg=document.getElementById('ldM');
     let lang='ru';try{lang=curLang;}catch(e){/* the main script stopped before declaring it */}
@@ -2835,26 +2838,61 @@ body.wow-embed #floatContact,body.wow-embed #cmpBar,body.wow-embed #tip,body.wow
   const ease=(p)=>{const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(p-1,3)+c1*Math.pow(p-1,2);}; // BackEase out: a slight overshoot
   const smooth=(p)=>p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2;
 
-  /* ── Меши здания: этаж по нижней отметке; сквозные (выше двух этажей) растут вместе со зданием ── */
-  const parts=(typeof BUILDING_MESHES!=='undefined'?BUILDING_MESHES:[]).filter(m=>!m.parent&&m.getBoundingInfo).map(m=>{
-    m.computeWorldMatrix(true);
-    const bb=m.getBoundingInfo().boundingBox, minY=bb.minimumWorld.y, maxY=bb.maximumWorld.y;
-    const fl=minY<LH-.5?0:Math.max(1,Math.min(FL+1,Math.floor((minY-LH)/FH)+1));
-    return {m,minY,h:Math.max(.001,maxY-minY),fl,tall:(maxY-minY)>FH*2.2&&fl<=1,y0:m.position.y,s0:m.scaling.y};
+  /* ── Скорость: ~2600 статичных частей здания сливаются по «материал + этаж» в несколько сотен мешей ──
+     Без этого каждый кадр — около 3300 вызовов отрисовки (на ноутбуке с Intel ~11 кадров в секунду).
+     Окна (wmeshes) не трогаются: по ним выбирают квартиру, их подсвечивают и прячут фильтром этажа. */
+  const floorOf=(minY,h)=>{const fl=minY<LH-.5?0:Math.max(1,Math.min(FL+1,Math.floor((minY-LH)/FH)+1));return {fl,tall:h>FH*2.2&&fl<=1};};
+  const box=(m)=>{m.computeWorldMatrix(true);const bb=m.getBoundingInfo().boundingBox;return {minY:bb.minimumWorld.y,h:bb.maximumWorld.y-bb.minimumWorld.y,c:bb.centerWorld};};
+  const windowsSet=new Set(typeof wmeshes!=='undefined'?wmeshes:[]);
+  const shadowList=shad.getShadowMap().renderList||[];
+  const casters=new Set(shadowList);
+  const groups=new Map(),singles=[];
+  BUILDING_MESHES.forEach(m=>{
+    // Прозрачные (стёкла) не сливаются: один большой прозрачный меш сортируется целиком и закрывает окна за собой.
+    const transparent=!!m.material&&(m.material.alpha<1||(m.material.needAlphaBlending&&m.material.needAlphaBlending()));
+    if(m.isDisposed()||m.parent||windowsSet.has(m)||!m.material||transparent||m.getChildren().length){singles.push(m);return;}
+    const b=box(m),f=floorOf(b.minY,b.h),k=m.material.uniqueId+'|'+(f.tall?'T':f.fl);
+    if(!groups.has(k))groups.set(k,[]);groups.get(k).push(m);
   });
-  // Высота k (0…1) от нижней отметки: меш «вырастает» снизу, а не из центра.
-  const grow=(p,k)=>{const kk=Math.max(.001,k);p.m.scaling.y=p.s0*kk;p.m.position.y=p.y0-(p.h/2)*(1-kk);};
+  const merged=[];
+  groups.forEach(list=>{
+    if(list.length<2){singles.push(...list);return;}
+    const cast=list.some(m=>casters.has(m)),recv=list.some(m=>m.receiveShadows);
+    const mm=BABYLON.Mesh.MergeMeshes(list,true,true);
+    if(!mm){singles.push(...list);return;}
+    mm.receiveShadows=recv;mm.isPickable=false;if(cast)shad.addShadowCaster(mm);
+    // Опорная точка — низ слитого меша: «Стройка» растит его вверх от его этажа, а не от земли.
+    const b=box(mm);mm.setPivotPoint(new BABYLON.Vector3(b.c.x,b.minY,b.c.z));
+    merged.push(mm);
+  });
+  const sm=shad.getShadowMap();if(sm.renderList)sm.renderList=sm.renderList.filter(m=>!m.isDisposed());
+
+  /* ── Части здания: этаж по нижней отметке; сквозные (выше двух этажей) растут вместе со зданием ── */
+  const parts=singles.filter(m=>!m.isDisposed()&&!m.parent).map(m=>{
+    const b=box(m),f=floorOf(b.minY,b.h);
+    return {m,h:Math.max(.001,b.h),fl:f.fl,tall:f.tall,y0:m.position.y,s0:m.scaling.y,pivot:false};
+  }).concat(merged.map(m=>{const b=box(m),f=floorOf(b.minY,b.h);return {m,h:Math.max(.001,b.h),fl:f.fl,tall:f.tall,y0:0,s0:1,pivot:true};}));
+  // Высота k (0…1) от нижней отметки: меш «вырастает» снизу, а не из центра (у слитых — масштаб вокруг опорной точки внизу).
+  // k = 0 — часть выключена (не рисуется и не даёт тень); рост начинается с 0,05: почти нулевой масштаб даёт вырожденные
+  // матрицы, а такие меши всё равно отрисовываются и попадают в тени.
+  const grow=(p,k)=>{
+    if(k<=0){if(p.m.isEnabled())p.m.setEnabled(false);return;}
+    if(!p.m.isEnabled())p.m.setEnabled(true);
+    const kk=Math.max(.05,k);p.m.scaling.y=p.s0*kk;if(!p.pivot)p.m.position.y=p.y0-(p.h/2)*(1-kk);
+  };
 
   /* ── 🏗️ Стройка: этажи поднимаются по одному (150 мс), с искрами наверху ── */
   let building=false;
+  // Один материал на все искры; гаснут они через visibility, без новых материалов и шейдеров.
+  let sparkMat=null;
   function spawnSpark(x,y,z){
+    if(!sparkMat){sparkMat=new BABYLON.StandardMaterial('sparkM',scene);sparkMat.emissiveColor=new BABYLON.Color3(1,.85,.2);sparkMat.disableLighting=true;}
     const s=BABYLON.MeshBuilder.CreateSphere('spark',{diameter:.18,segments:4},scene);
-    s.position.set(x+(Math.random()-.5)*2,y,z+(Math.random()-.5)*2);s.isPickable=false;
-    const mat=new BABYLON.StandardMaterial('sparkM',scene);mat.emissiveColor=new BABYLON.Color3(1,.85,.2);mat.disableLighting=true;s.material=mat;
+    s.position.set(x+(Math.random()-.5)*2,y,z+(Math.random()-.5)*2);s.isPickable=false;s.material=sparkMat;
     let vy=.08+Math.random()*.06,vx=(Math.random()-.5)*.05,vz=(Math.random()-.5)*.05,life=1;
     const obs=scene.onBeforeRenderObservable.add(()=>{
-      s.position.y+=vy;s.position.x+=vx;s.position.z+=vz;vy-=.004;life-=.03;mat.alpha=Math.max(0,life);
-      if(life<=0){scene.onBeforeRenderObservable.remove(obs);s.dispose();mat.dispose();}
+      s.position.y+=vy;s.position.x+=vx;s.position.z+=vz;vy-=.004;life-=.03;s.visibility=Math.max(0,life);
+      if(life<=0){scene.onBeforeRenderObservable.remove(obs);s.dispose();}
     });
   }
   function construct(){
@@ -2971,6 +3009,10 @@ body.wow-embed #floatContact,body.wow-embed #cmpBar,body.wow-embed #tip,body.wow
     cam.inputs.removeByType('ArcRotateCameraMouseWheelInput');
     autoRotate(true);
   }
+  // Первый кадр со сценой (после заставки) — сигнал странице-родителю. Сообщение без данных, только тип.
+  // Ждём и заставку #ld: пока она видна, родитель показывает свою картинку, а не экран загрузки.
+  const whenLoaded=()=>{const ld=document.getElementById('ld');if(!ld||ld.hidden)tell('nekruz3d:ready');else setTimeout(whenLoaded,250);};
+  scene.onAfterRenderObservable.addOnce(()=>setTimeout(whenLoaded,300));
 })();
 </script>
 </body>

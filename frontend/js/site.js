@@ -97,9 +97,11 @@
   function revealIn(root, onShow) {
     const els = S.$$('.reveal', root);
     const show = (el) => { el.classList.add('in'); if (onShow) onShow(el); setTimeout(() => { el.style.transitionDelay = ''; }, 900); };
-    if (!('IntersectionObserver' in window)) { els.forEach(show); return () => {}; }
-    const io = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { show(e.target); io.unobserve(e.target); } }), { threshold: 0.12 });
-    els.forEach((el) => io.observe(el));
+    // Same rule as page.js (S.motionOk): no observer, a robot or less motion — everything at once.
+    if (!('IntersectionObserver' in window) || S.motionOk === false) { els.forEach(show); return () => {}; }
+    const io = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { show(e.target); io.unobserve(e.target); } }), { threshold: 0.05, rootMargin: '0px 0px -40px 0px' });
+    // What is already on screen comes in right away (after the first frame, so the transition still plays).
+    requestAnimationFrame(() => els.forEach((el) => { if (el.classList.contains('in')) return; if (el.getBoundingClientRect().top < window.innerHeight) show(el); else io.observe(el); }));
     return () => io.disconnect();
   }
 
@@ -200,6 +202,10 @@
       } catch (e) {
         if (!alive) return;
         loading.replaceChildren(h('div', { class: 'card', style: { maxWidth: '460px', background: 'rgba(255,255,255,.08)', color: '#fff' } }, h('h3', null, t('err.loadTitle')), h('p', { style: { margin: '8px 0 14px' } }, e.message), h('button', { class: 'btn', onclick: () => { loading.replaceChildren(t('hero.loading')); load(); } }, t('common.retry')), h('button', { class: 'btn ghost', style: { marginLeft: '8px', color: '#fff' }, onclick: () => S.openSettings() }, t('settings.title'))));
+        // The list below the 3D model says the same instead of staying empty.
+        aptSection.replaceChildren(h('div', { class: 'wrap' }, h('div', { class: 'card stack', style: { alignItems: 'flex-start' } },
+          h('h3', null, t('err.loadTitle')), h('p', { class: 'muted' }, e.message),
+          h('button', { class: 'btn gold', type: 'button', onclick: () => { aptSection.replaceChildren(); loading.replaceChildren(t('hero.loading')); load(); } }, t('common.retry')))));
         return;
       }
       if (!alive) return;
@@ -490,7 +496,7 @@
     const heroCounters = [['floors', (v) => S.fmt.n(v)], ['apts', (v) => S.fmt.n(v)], ['zero', (v) => v + '%']]
       .map(([k, fmt]) => ({ k, fmt, el: h('b', { class: 'wow-stat-num' }, '0') }));
     const countHero = () => heroCounters.forEach((x) => countUp(x.el, valueOf(x.k), x.fmt));
-    const frame = h('div', { class: 'hero-3d-frame' }, h('iframe', { src: '/nekruz3d.html?embed=1', title: t('wow.3d.title'), loading: 'lazy', allow: 'fullscreen' }));
+    const frame = heroModel();
     const hero = h('section', { class: 'lux-hero wow-hero', id: 'top' },
       h('div', { class: 'hero-mesh', 'aria-hidden': 'true' }),
       h('div', { class: 'wrap wow-hero-in' },
@@ -616,7 +622,11 @@
     function layoutCard(x) {
       const beds = Math.max(1, Math.min(3, x.rooms || 1));
       const area = x.areaFrom === x.areaTo ? S.fmt.n(x.areaFrom) : S.fmt.n(x.areaFrom) + '–' + S.fmt.n(x.areaTo);
+      // Preview: the floor plan of this type, drawn like the plans in the catalog.
+      const plan = h('canvas', { class: 'layout-plan', width: 260, height: 160, 'aria-hidden': 'true' });
+      drawFloorPlan(plan, Math.min(3, x.rooms || 0));
       return h('a', { class: 'layout-card', href: '/apartments' },
+        plan,
         h('span', { class: 'layout-ic', 'aria-hidden': 'true' }, Array.from({ length: beds }, () => landIcon('bed'))),
         h('b', { class: 'layout-type' }, t('layouts.type' + Math.min(3, x.rooms))),
         h('span', { class: 'layout-area' }, area + ' ' + t('u.m2')),
@@ -970,6 +980,85 @@
     });
     g.strokeStyle = '#c9a227'; g.lineWidth = 4; g.strokeRect(x0, y0, w, ht);
     g.strokeStyle = '#8fb3ff'; g.beginPath(); g.moveTo(x0 + w * 0.12, y0); g.lineTo(x0 + w * 0.3, y0); g.stroke();
+  }
+
+  /* ---------- hero picture: a drawn building at once, the live 3D model over it when it is really there ---------- */
+  // The canvas building is always visible (no WebGL, a robot, a slow phone). The 3D model (nekruz3d.html?embed=1) is
+  // loaded only where WebGL exists, and shows up only when the model says it has drawn its first frame —
+  // never a black square while it loads or when it cannot start.
+  function heroModel() {
+    const poster = h('canvas', { class: 'hero-poster', role: 'img', 'aria-label': t('wow.3d.title') });
+    const box = h('div', { class: 'hero-3d-frame' }, poster);
+    const stopPoster = drawHeroBuilding(poster, () => box.classList.contains('is-3d') || !box.isConnected);
+    let gl = false;
+    try { const c = document.createElement('canvas'); gl = !!(c.getContext('webgl2') || c.getContext('webgl')); } catch (e) { gl = false; }
+    if (!gl || navigator.webdriver) return box;
+    const frame = h('iframe', { class: 'hero-3d-live', src: '/nekruz3d.html?embed=1', title: t('wow.3d.title'), loading: 'lazy', allow: 'fullscreen', tabindex: '-1' });
+    const onMessage = (e) => {
+      if (e.source !== frame.contentWindow || !e.data) return;
+      if (e.data.type === 'nekruz3d:ready') { box.classList.add('is-3d'); frame.removeAttribute('tabindex'); stopPoster(); }
+      if (e.data.type === 'nekruz3d:ready' || e.data.type === 'nekruz3d:unavailable') window.removeEventListener('message', onMessage);
+      if (e.data.type === 'nekruz3d:unavailable') frame.remove();
+    };
+    window.addEventListener('message', onMessage);
+    box.appendChild(frame);
+    return box;
+  }
+
+  // 20 floors of a gold-lined tower; the windows change every 1.5 s, the antenna light blinks. Sharp on dense screens.
+  // done() — stop when it returns true (the 3D model took over, or the hero is gone). Returns a stop function.
+  function drawHeroBuilding(canvas, done) {
+    let timer = null, raf = 0, lit = [];
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const FLOORS = 20, COLS = 6;
+    const shuffle = () => { lit = Array.from({ length: FLOORS * COLS }, () => (Math.random() > 0.3 ? 0.4 + Math.random() * 0.45 : 0)); };
+    const size = () => {
+      const r = canvas.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const W = Math.max(240, Math.round(r.width || 400)), H = Math.max(260, Math.round(r.height || 500));
+      if (canvas.width !== W * dpr || canvas.height !== H * dpr) { canvas.width = W * dpr; canvas.height = H * dpr; }
+      return { W, H, dpr };
+    };
+    const draw = () => {
+      if (done()) return stop();
+      const { W, H, dpr } = size(), g = canvas.getContext('2d');
+      if (!g) return;
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#060d1f'); bg.addColorStop(1, '#0a1628');
+      g.fillStyle = bg; g.fillRect(0, 0, W, H);
+      // A few stars and a soft gold glow behind the tower.
+      const glow = g.createRadialGradient(W / 2, H * 0.55, 10, W / 2, H * 0.55, W * 0.7); glow.addColorStop(0, 'rgba(201,162,39,0.14)'); glow.addColorStop(1, 'rgba(201,162,39,0)');
+      g.fillStyle = glow; g.fillRect(0, 0, W, H);
+      const ground = H * 0.86, bW = Math.min(W * 0.46, 220), bH = ground - H * 0.14, bX = (W - bW) / 2, bY = ground - bH, fH = bH / FLOORS;
+      g.fillStyle = '#0d1f3c'; g.fillRect(bX, bY, bW, bH);
+      g.fillStyle = 'rgba(255,255,255,0.03)'; g.fillRect(bX, bY, bW * 0.18, bH);
+      for (let i = 0; i <= FLOORS; i++) {
+        g.strokeStyle = 'rgba(201,162,39,' + (i === 0 || i % 5 === 0 ? 0.6 : 0.18) + ')'; g.lineWidth = i % 5 === 0 ? 2 : 1;
+        g.beginPath(); g.moveTo(bX, bY + i * fH); g.lineTo(bX + bW, bY + i * fH); g.stroke();
+      }
+      const cw = (bW - 20) / COLS, wW = cw - 5, wH = Math.max(2, fH - 6);
+      for (let r = 0; r < FLOORS; r++) for (let c = 0; c < COLS; c++) {
+        const a = lit[r * COLS + c];
+        g.fillStyle = a ? 'rgba(242,196,106,' + a.toFixed(2) + ')' : 'rgba(255,255,255,0.04)';
+        g.fillRect(bX + 10 + c * cw, bY + r * fH + 3, wW, wH);
+      }
+      // Antenna with a blinking red light.
+      g.strokeStyle = 'rgba(201,162,39,0.7)'; g.lineWidth = 2; g.beginPath(); g.moveTo(W / 2, bY); g.lineTo(W / 2, bY - 30); g.stroke();
+      g.fillStyle = 'rgba(255,80,80,' + (reduce ? 0.8 : (0.5 + Math.sin(performance.now() / 400) * 0.5)).toFixed(2) + ')';
+      g.beginPath(); g.arc(W / 2, bY - 32, 3, 0, Math.PI * 2); g.fill();
+      // Ground line and a faint reflection of the lit windows.
+      g.fillStyle = 'rgba(201,162,39,0.35)'; g.fillRect(W * 0.08, ground, W * 0.84, 1.5);
+      g.save(); g.globalAlpha = 0.12; g.translate(0, ground * 2); g.scale(1, -1);
+      for (let r = FLOORS - 4; r < FLOORS; r++) for (let c = 0; c < COLS; c++) { const a = lit[r * COLS + c]; if (a) { g.fillStyle = 'rgba(242,196,106,' + a + ')'; g.fillRect(bX + 10 + c * cw, bY + r * fH + 3, wW, wH); } }
+      g.restore();
+    };
+    // The light blinks smoothly at about 10 redraws a second; a full 60 would only burn the battery.
+    let last = 0;
+    const loop = (now) => { if (done()) return stop(); if (now - last > 90) { last = now; draw(); } raf = requestAnimationFrame(loop); };
+    const stop = () => { clearInterval(timer); cancelAnimationFrame(raf); timer = null; };
+    shuffle();
+    requestAnimationFrame(draw);
+    if (!reduce) { timer = setInterval(shuffle, 1500); raf = requestAnimationFrame(loop); }
+    return stop;
   }
 
   // For the other public pages (about.js, gallery.js): the same footer, reveal on scroll, icons and headings.

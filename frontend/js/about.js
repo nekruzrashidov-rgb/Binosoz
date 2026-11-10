@@ -21,11 +21,21 @@
     const page = h('div', { class: 'page-in lux about-page' });
     root.appendChild(page);
 
+    // Floors and apartments count up from 0 (1.2 s, ease-out); with less motion or for a robot they are shown at once.
     const chips = h('div', { class: 'about-chips' });
-    const drawChips = () => chips.replaceChildren(
-      h('span', { class: 'about-chip' }, t('aboutpg.chip.floors', { n: d.floors })),
-      h('span', { class: 'about-chip' }, t('aboutpg.chip.apts', { n: d.apts })),
-      h('span', { class: 'about-chip' }, t('aboutpg.chip.delivery', { y: d.delivery })));
+    const floorsChip = h('span', { class: 'about-chip' }), aptsChip = h('span', { class: 'about-chip' }), deliveryChip = h('span', { class: 'about-chip' });
+    chips.append(floorsChip, aptsChip, deliveryChip);
+    let counting = 0;
+    const drawChips = () => {
+      deliveryChip.textContent = t('aboutpg.chip.delivery', { y: d.delivery });
+      const set = (k) => { floorsChip.textContent = t('aboutpg.chip.floors', { n: Math.round(d.floors * k) }); aptsChip.textContent = t('aboutpg.chip.apts', { n: Math.round(d.apts * k) }); };
+      if (!S.motionOk) { set(1); return; }
+      const token = ++counting, t0 = performance.now();
+      const step = (now) => { if (token !== counting) return; const p = Math.min(1, (now - t0) / 1200); set(1 - Math.pow(1 - p, 3)); if (p < 1) requestAnimationFrame(step); };
+      set(0); requestAnimationFrame(step);
+      // Without frames (a background tab) the final numbers still appear.
+      setTimeout(() => { if (token === counting) { counting++; set(1); } }, 1400);
+    };
     drawChips();
 
     const hero = h('section', { class: 'about-hero' }, h('div', { class: 'wrap' },

@@ -822,8 +822,11 @@
         if (spark) drawSparkline(spark, o.series, getComputedStyle(document.documentElement).getPropertyValue('--gold').trim() || '#c9a227');
         if (reduce) { num.textContent = fmt(n); return; }
         const t0 = performance.now();
-        const step = (now) => { const p = Math.min(1, (now - t0) / 800); num.textContent = fmt(Math.round(n * (1 - Math.pow(1 - p, 3)))); if (p < 1) requestAnimationFrame(step); };
+        let finished = false;
+        const step = (now) => { if (finished) return; const p = Math.min(1, (now - t0) / 800); num.textContent = fmt(Math.round(n * (1 - Math.pow(1 - p, 3)))); if (p < 1) requestAnimationFrame(step); else finished = true; };
         requestAnimationFrame(step);
+        // Without frames (a background tab) the final number still appears.
+        setTimeout(() => { finished = true; num.textContent = fmt(n); }, 1100);
       };
       if ('IntersectionObserver' in window) {
         const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); run(); } }, { threshold: 0.3 });
