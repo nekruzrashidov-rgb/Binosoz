@@ -126,7 +126,12 @@ public static class SecuritySetup
         services.Configure<ForwardedHeadersOptions>(options =>
         {
             options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            // Берётся только последнее значение каждого заголовка — от ближайшего прокси.
             options.ForwardLimit = 1;
+            // Хостинги вроде Render ставят перед приложением цепочку прокси: в X-Forwarded-For несколько адресов,
+            // а в X-Forwarded-Proto одно значение. С проверкой симметрии (по умолчанию) оба заголовка тогда
+            // игнорируются, приложение считает запрос HTTP и бесконечно перенаправляет его на тот же https-адрес.
+            options.RequireHeaderSymmetry = false;
             options.KnownIPNetworks.Clear();
             options.KnownProxies.Clear();
         });
