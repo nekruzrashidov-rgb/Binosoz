@@ -27,20 +27,23 @@
   };
 
   const PRESETS = {
+    // Dushanbe midday: strong Central Asian sun, pale blue sky, cream facade looks brilliant white
     day: {
-      top: 0x2f78d4, horizon: 0xcfe4f6, bottom: 0x8aa08a, fog: 0xbfd7ea,
-      sunColor: 0xffefd0, sunI: 1.75, sunPos: [70, 85, 80], hemiSky: 0xbcd6f2, hemiGround: 0x6f7a60, hemiI: 0.5,
-      glow: 0.3, lamp: 0, stars: 0, cloud: 0.9, exposure: 0.88, env: 1.0,
+      top: 0x3a8ae0, horizon: 0xd8ecf8, bottom: 0x8aaa7a, fog: 0xc8dff0,
+      sunColor: 0xfff5e0, sunI: 2.4, sunPos: [80, 100, 70], hemiSky: 0xc8e0f4, hemiGround: 0x788868, hemiI: 0.65,
+      glow: 0.18, lamp: 0, stars: 0, cloud: 0.85, exposure: 0.92, env: 1.1,
     },
+    // Golden hour Dushanbe — warm orange sky, building glows
     dusk: {
       top: 0x1a2c6e, horizon: 0xf2a066, bottom: 0x3b3f55, fog: 0x8b86a4,
       sunColor: 0xffa860, sunI: 2.1, sunPos: [-120, 26, 70], hemiSky: 0x6f86c9, hemiGround: 0x4a4a55, hemiI: 0.6,
       glow: 0.85, lamp: 1.0, stars: 0.35, cloud: 0.55, exposure: 1.05, env: 1.0,
     },
+    // Dushanbe night: deep navy sky, windows glow warmly, street lamps orange
     night: {
-      top: 0x040919, horizon: 0x1b2d5a, bottom: 0x0a1020, fog: 0x0b1530,
-      sunColor: 0x8fb0ff, sunI: 0.55, sunPos: [60, 70, 40], hemiSky: 0x2a3f7a, hemiGround: 0x0b1020, hemiI: 0.38,
-      glow: 1.25, lamp: 1.7, stars: 1, cloud: 0.12, exposure: 1.0, env: 0.7,
+      top: 0x030810, horizon: 0x142040, bottom: 0x08100e, fog: 0x081220,
+      sunColor: 0x7090d0, sunI: 0.3, sunPos: [60, 70, 40], hemiSky: 0x1a2a60, hemiGround: 0x060a08, hemiI: 0.25,
+      glow: 1.4, lamp: 1.9, stars: 1, cloud: 0.08, exposure: 1.05, env: 0.6,
     },
   };
 
@@ -64,21 +67,26 @@
   }
 
   function plasterTexture(r) {
+    // Warm cream stucco — Dushanbe apartment standard (similar to Ayni, Somoni districts)
     return canvasTex(512, 512, (g, w, h) => {
-      g.fillStyle = '#cfc8ba'; g.fillRect(0, 0, w, h);
-      for (let i = 0; i < 9000; i++) {
-        const v = 200 + (r() * 40 | 0);
-        g.fillStyle = `rgba(${v},${v - 4},${v - 12},${0.06 + r() * 0.1})`;
+      g.fillStyle = '#ece6d8'; g.fillRect(0, 0, w, h); // base: warm cream
+      // Subtle grain / texture noise
+      for (let i = 0; i < 8000; i++) {
+        const v = 210 + (r() * 35 | 0);
+        g.fillStyle = `rgba(${v},${v - 3},${v - 10},${0.05 + r() * 0.09})`;
         g.fillRect(r() * w, r() * h, 1 + r() * 2, 1 + r() * 2);
       }
-      for (let i = 0; i < 40; i++) { // faint vertical streaks
-        g.fillStyle = `rgba(90,80,70,${0.015 + r() * 0.02})`;
+      // Faint weathering / runoff streaks
+      for (let i = 0; i < 30; i++) {
+        g.fillStyle = `rgba(100,88,70,${0.01 + r() * 0.015})`;
         g.fillRect(r() * w, 0, 1 + r() * 3, h);
       }
-      g.fillStyle = 'rgba(70,64,56,0.22)'; // panel joints: 2 m wide, floor line at bottom
-      g.fillRect(0, h - 3, w, 3);
-      g.fillRect(0, 0, 2, h);
-      g.fillRect(w / 2, 0, 2, h);
+      // Panel joint lines (precast panel seams, every 2 m)
+      g.fillStyle = 'rgba(60,55,48,0.18)';
+      g.fillRect(0, h - 3, w, 3);       // bottom slab line
+      g.fillRect(0, 0, 2, h);            // left panel joint
+      g.fillRect(w / 2, 0, 2, h);        // center panel joint
+      g.fillRect(w - 2, 0, 2, h);        // right edge
     });
   }
 
@@ -328,12 +336,18 @@
 
     const mats = {
       plaster: null,
-      stone: new T.MeshStandardMaterial({ color: lin(0x565b66), roughness: 0.55, metalness: 0.05 }),
-      concrete: new T.MeshStandardMaterial({ color: lin(0xc9c5bb), roughness: 0.85 }),
-      frame: new T.MeshStandardMaterial({ color: lin(0x1d222b), roughness: 0.4, metalness: 0.7 }),
-      glassWall: new T.MeshStandardMaterial({ color: lin(0x6a8fae), roughness: 0.06, metalness: 0.95, transparent: true, opacity: 0.55 }),
-      railGlass: new T.MeshStandardMaterial({ color: lin(0xa5c4d8), roughness: 0.05, metalness: 0.6, transparent: true, opacity: 0.28 }),
-      roof: new T.MeshStandardMaterial({ color: lin(0x6e6a63), roughness: 0.95 }),
+      // Gold accent — Dushanbe landmark color (Ayni Opera, Ismoili Somoni monument)
+      stone: new T.MeshStandardMaterial({ color: lin(0xc9a227), roughness: 0.45, metalness: 0.15 }),
+      // Upper-body concrete/stucco — warm cream/beige Dushanbe apartment style
+      concrete: new T.MeshStandardMaterial({ color: lin(0xd8d2c4), roughness: 0.82 }),
+      // Window frames: anthracite aluminum
+      frame: new T.MeshStandardMaterial({ color: lin(0x232830), roughness: 0.3, metalness: 0.78 }),
+      // Lobby / entrance glass: dark blue architectural
+      glassWall: new T.MeshStandardMaterial({ color: lin(0x1a3558), roughness: 0.03, metalness: 0.98, transparent: true, opacity: 0.72 }),
+      // Balcony railings: tinted blue glass
+      railGlass: new T.MeshStandardMaterial({ color: lin(0x3a6a98), roughness: 0.04, metalness: 0.6, transparent: true, opacity: 0.28 }),
+      // Roof membrane: dark charcoal
+      roof: new T.MeshStandardMaterial({ color: lin(0x484440), roughness: 0.96 }),
     };
 
     function floorY(n) { return n === 0 ? 0 : GROUND_H + (n - 1) * FLOOR_H; }
@@ -357,87 +371,190 @@
         const t = plaster.clone(); t.needsUpdate = true; t.repeat.set(w / 4, floorsCount);
         return new T.MeshStandardMaterial({ map: t, roughness: 0.88 });
       };
-      // upper body
+
+      // ============================================================
+      // DUSHANBE-STYLE BUILDING (Nekruz Residence look)
+      // ============================================================
+
+      // --- Main body (floors 2+) ---
       const bodyH = floorsCount * FLOOR_H;
       const body = new T.Mesh(new T.BoxGeometry(W, bodyH, D), [faceMat(D), faceMat(D), mats.roof, mats.roof, faceMat(W), faceMat(W)]);
       body.position.y = GROUND_H + bodyH / 2; body.castShadow = true; body.receiveShadow = true;
       tower.add(body);
-      // ground floor
-      const gf = new T.Mesh(new T.BoxGeometry(W + 0.2, GROUND_H, D + 0.2), mats.glassWall);
-      gf.position.y = GROUND_H / 2; gf.castShadow = true; tower.add(gf);
-      const core = new T.Mesh(new T.BoxGeometry(W - 1.2, GROUND_H - 0.1, D - 1.2), new T.MeshStandardMaterial({ color: lin(0x2b3140), roughness: 0.9, emissive: lin(0xffc27a), emissiveIntensity: 0.0 }));
-      core.position.y = GROUND_H / 2; tower.add(core);
+
+      // --- Ground floor: granite-clad base (Dushanbe style: dark stone lower 2 floors) ---
+      const graniteM = new T.MeshStandardMaterial({ color: lin(0x2e2b28), roughness: 0.75, metalness: 0.05 }); // dark granite
+      const gf = new T.Mesh(new T.BoxGeometry(W + 0.4, GROUND_H, D + 0.4), graniteM);
+      gf.position.y = GROUND_H / 2; gf.castShadow = true; gf.receiveShadow = true; tower.add(gf);
+
+      // Lobby glass interior behind granite shell
+      const core = new T.Mesh(new T.BoxGeometry(W - 1.0, GROUND_H - 0.6, D - 1.0), new T.MeshStandardMaterial({ color: lin(0x1e3050), roughness: 0.1, metalness: 0.9, transparent: true, opacity: 0.72, emissive: lin(0xffc27a), emissiveIntensity: 0.0 }));
+      core.position.y = GROUND_H / 2 + 0.2; tower.add(core);
       window.__coreMat = core.material;
-      // ground-floor mullions + base plinth
-      const gm = new T.InstancedMesh(new T.BoxGeometry(0.18, GROUND_H, 0.28), mats.frame, 64);
-      {
-        const m = new T.Matrix4(), q = new T.Quaternion(), s = new T.Vector3(1, 1, 1), e = new T.Euler();
-        let k = 0;
-        const put = (x, z, ry) => { e.set(0, ry, 0); q.setFromEuler(e); m.compose(new T.Vector3(x, GROUND_H / 2, z), q, s); gm.setMatrixAt(k++, m); };
-        for (let i = 0; i <= 8; i++) { put(-W / 2 + (W * i) / 8, D / 2 + 0.12, 0); put(-W / 2 + (W * i) / 8, -D / 2 - 0.12, 0); }
-        for (let i = 1; i < 6; i++) { put(W / 2 + 0.12, -D / 2 + (D * i) / 6, Math.PI / 2); put(-W / 2 - 0.12, -D / 2 + (D * i) / 6, Math.PI / 2); }
-        gm.count = k; gm.frustumCulled = false;
-      }
-      tower.add(gm);
-      const plinth = new T.Mesh(new T.BoxGeometry(W + 3, 0.5, D + 3), mats.concrete);
-      plinth.position.y = 0.25; plinth.receiveShadow = true; tower.add(plinth);
-      const band = new T.Mesh(new T.BoxGeometry(W + 0.9, 0.5, D + 0.9), mats.concrete);
-      band.position.y = GROUND_H + 0.25; band.castShadow = true; tower.add(band);
-      // floor edge bands and center fins
-      {
-        const nb = floorsCount * 4;
-        const bands = new T.InstancedMesh(new T.BoxGeometry(1, 0.3, 0.32), new T.MeshStandardMaterial({ color: lin(0xb9b3a7), roughness: 0.85 }), nb);
-        const o2 = new T.Object3D(); let k = 0;
-        for (let f = 1; f <= floorsCount; f++) {
-          const y = floorY(f) + 0.05;
-          [[0, D / 2 + 0.1, 0, W], [0, -D / 2 - 0.1, 0, W], [W / 2 + 0.1, 0, Math.PI / 2, D], [-W / 2 - 0.1, 0, Math.PI / 2, D]].forEach(([x, z, ry, len]) => {
-            o2.position.set(x, y, z); o2.rotation.set(0, ry, 0); o2.scale.set(len, 1, 1); o2.updateMatrix(); bands.setMatrixAt(k++, o2.matrix);
-          });
-        }
-        bands.frustumCulled = false; bands.castShadow = true; tower.add(bands);
-        [[0, D / 2, W * 0 + 1.3, 0.5, 0], [0, -D / 2, 1.3, 0.5, 0], [W / 2, 0, 0.5, 1.3, 0], [-W / 2, 0, 0.5, 1.3, 0]].forEach(([x, z, w, d]) => {
-          const fin = new T.Mesh(new T.BoxGeometry(w, bodyH, d), mats.stone);
-          fin.position.set(x + (x ? Math.sign(x) * 0.12 : 0), GROUND_H + bodyH / 2, z + (z ? Math.sign(z) * 0.12 : 0)); fin.castShadow = true; tower.add(fin);
+
+      // Granite horizontal rustication joints (3 rows on base)
+      const rusticM = new T.MeshStandardMaterial({ color: lin(0x1e1c1a), roughness: 0.9 });
+      for (let ri = 1; ri <= 3; ri++) {
+        [[0, D / 2 + 0.22, 0, W + 0.9], [0, -D / 2 - 0.22, 0, W + 0.9], [W / 2 + 0.22, 0, Math.PI / 2, D + 0.9], [-W / 2 - 0.22, 0, Math.PI / 2, D + 0.9]].forEach(([x, z, ry, len]) => {
+          const slot = new T.Mesh(new T.BoxGeometry(len, 0.08, 0.1), rusticM);
+          slot.position.set(x, (GROUND_H / 4) * ri, z); slot.rotation.y = ry; tower.add(slot);
         });
       }
-      // corner columns
-      [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([sx, sz]) => {
-        const c = new T.Mesh(new T.BoxGeometry(1.5, H + 0.6, 1.5), mats.stone);
-        c.position.set(sx * (W / 2), (H + 0.6) / 2, sz * (D / 2)); c.castShadow = true; c.receiveShadow = true; tower.add(c);
-      });
-      // entrance canopy + sign
-      const canopy = new T.Mesh(new T.BoxGeometry(11, 0.35, 5.2), mats.stone);
-      canopy.position.set(0, GROUND_H - 0.6, D / 2 + 2.5); canopy.castShadow = true; tower.add(canopy);
-      [-5.1, 5.1].forEach((x) => {
-        const p = new T.Mesh(new T.CylinderGeometry(0.16, 0.16, GROUND_H - 0.8, 12), mats.frame);
-        p.position.set(x, (GROUND_H - 0.8) / 2, D / 2 + 4.8); p.castShadow = true; tower.add(p);
-      });
-      signMat = new T.MeshBasicMaterial({ map: signTexture('SITORA'), toneMapped: false });
-      const sign = new T.Mesh(new T.PlaneGeometry(9.6, 1.8), signMat);
-      sign.position.set(0, GROUND_H + 1.5, D / 2 + 0.6); tower.add(sign);
-      const signBack = new T.Mesh(new T.BoxGeometry(10, 2.1, 0.5), mats.frame);
-      signBack.position.set(0, GROUND_H + 1.5, D / 2 + 0.3); tower.add(signBack);
 
-      // roof
-      const roofY = H + 0.6;
-      [[0, D / 2, W + 1, 1], [0, -D / 2, W + 1, 1], [W / 2, 0, 1, D + 1], [-W / 2, 0, 1, D + 1]].forEach(([x, z, w, d]) => {
-        const p = new T.Mesh(new T.BoxGeometry(w, 1.1, d), mats.concrete);
-        p.position.set(x, H + 0.55, z); p.castShadow = true; tower.add(p);
+      // Vertical granite pilasters on ground floor (Dushanbe decorative piers)
+      const pilasterM = new T.MeshStandardMaterial({ color: lin(0x3a3733), roughness: 0.7 });
+      const pilasterPositions = [];
+      for (let i = -3; i <= 3; i++) pilasterPositions.push([i * (W / 7), D / 2 + 0.22, 0]);
+      for (let i = -1; i <= 1; i++) { pilasterPositions.push([W / 2 + 0.22, i * (D / 3), Math.PI / 2]); pilasterPositions.push([-W / 2 - 0.22, i * (D / 3), Math.PI / 2]); }
+      pilasterPositions.forEach(([x, z, ry]) => {
+        const pil = new T.Mesh(new T.BoxGeometry(0.5, GROUND_H, 0.4), pilasterM);
+        pil.position.set(x, GROUND_H / 2, z); pil.rotation.y = ry; pil.castShadow = true; tower.add(pil);
       });
-      const pent = new T.Mesh(new T.BoxGeometry(11, 3.4, 8), mats.stone);
-      pent.position.set(-6, roofY + 1.7, -2); pent.castShadow = true; tower.add(pent);
-      const tank = new T.Mesh(new T.CylinderGeometry(2.1, 2.1, 2.4, 20), mats.frame);
-      tank.position.set(8, roofY + 1.2, 3); tank.castShadow = true; tower.add(tank);
-      const ant = new T.Mesh(new T.CylinderGeometry(0.1, 0.18, 12, 8), mats.frame);
-      ant.position.set(-6, roofY + 3.4 + 6, -2); ant.castShadow = true; tower.add(ant);
-      roofLight = new T.Mesh(new T.SphereGeometry(0.35, 12, 8), new T.MeshBasicMaterial({ color: 0xff3b30, toneMapped: false }));
-      roofLight.position.set(-6, roofY + 3.4 + 12, -2); tower.add(roofLight);
+
+      // --- Base plinth (extra-wide stone step) ---
+      const plinth = new T.Mesh(new T.BoxGeometry(W + 4.0, 0.7, D + 4.0), new T.MeshStandardMaterial({ color: lin(0x2a2826), roughness: 0.8 }));
+      plinth.position.y = 0.35; plinth.receiveShadow = true; tower.add(plinth);
+      const plinth2 = new T.Mesh(new T.BoxGeometry(W + 2.2, 0.45, D + 2.2), new T.MeshStandardMaterial({ color: lin(0x322f2c), roughness: 0.75 }));
+      plinth2.position.y = 0.9; tower.add(plinth2);
+
+      // --- Transition cornice at top of ground floor (stone crown molding) ---
+      const corniceM = new T.MeshStandardMaterial({ color: lin(0xd0c8b8), roughness: 0.6 });
+      [[0, D / 2 + 0.12, 0, W + 1.2], [0, -D / 2 - 0.12, 0, W + 1.2], [W / 2 + 0.12, 0, Math.PI / 2, D + 1.2], [-W / 2 - 0.12, 0, Math.PI / 2, D + 1.2]].forEach(([x, z, ry, len]) => {
+        const cr = new T.Mesh(new T.BoxGeometry(len, 0.6, 0.55), corniceM);
+        cr.position.set(x, GROUND_H + 0.3, z); cr.rotation.y = ry; cr.castShadow = true; tower.add(cr);
+        const cr2 = new T.Mesh(new T.BoxGeometry(len + 0.2, 0.22, 0.38), corniceM);
+        cr2.position.set(x, GROUND_H + 0.72, z); cr2.rotation.y = ry; tower.add(cr2);
+      });
+
+      // --- Floor-level cornice bands (every 3 floors — Dushanbe belt courses) ---
+      {
+        const bandM = new T.MeshStandardMaterial({ color: lin(0xc8c0b0), roughness: 0.65 });
+        const beltFloors = [];
+        for (let f = 3; f <= floorsCount; f += 3) beltFloors.push(f);
+        beltFloors.forEach((f) => {
+          const y = floorY(f);
+          [[0, D / 2 + 0.1, 0, W + 0.5], [0, -D / 2 - 0.1, 0, W + 0.5], [W / 2 + 0.1, 0, Math.PI / 2, D + 0.5], [-W / 2 - 0.1, 0, Math.PI / 2, D + 0.5]].forEach(([x, z, ry, len]) => {
+            const b = new T.Mesh(new T.BoxGeometry(len, 0.42, 0.44), bandM);
+            b.position.set(x, y + 0.21, z); b.rotation.y = ry; b.castShadow = true; tower.add(b);
+          });
+        });
+      }
+
+      // --- Thin floor slab lines (every floor — standard Dushanbe precast appearance) ---
+      {
+        const slabM = new T.MeshStandardMaterial({ color: lin(0xb8b2a8), roughness: 0.85 });
+        const o2 = new T.Object3D();
+        const slabBands = new T.InstancedMesh(new T.BoxGeometry(1, 0.18, 0.28), slabM, floorsCount * 4);
+        let k = 0;
+        for (let f = 1; f <= floorsCount; f++) {
+          const y = floorY(f) + 0.04;
+          [[0, D / 2 + 0.08, 0, W + 0.1], [0, -D / 2 - 0.08, 0, W + 0.1], [W / 2 + 0.08, 0, Math.PI / 2, D + 0.1], [-W / 2 - 0.08, 0, Math.PI / 2, D + 0.1]].forEach(([x, z, ry, len]) => {
+            o2.position.set(x, y, z); o2.rotation.set(0, ry, 0); o2.scale.set(len, 1, 1); o2.updateMatrix(); slabBands.setMatrixAt(k++, o2.matrix);
+          });
+        }
+        slabBands.frustumCulled = false; slabBands.castShadow = true; tower.add(slabBands);
+      }
+
+      // --- Vertical fins / pilasters on upper body (classical vertical articulation) ---
+      const finM = new T.MeshStandardMaterial({ color: lin(0xc9a227), roughness: 0.4, metalness: 0.2 }); // gold accent fins
+      [[0, D / 2, 1.1, 0.42], [0, -D / 2, 1.1, 0.42], [W / 2, 0, 0.42, 1.1], [-W / 2, 0, 0.42, 1.1]].forEach(([x, z, fw, fd]) => {
+        const fin = new T.Mesh(new T.BoxGeometry(fw, bodyH, fd), finM);
+        fin.position.set(x + (x ? Math.sign(x) * 0.1 : 0), GROUND_H + bodyH / 2, z + (z ? Math.sign(z) * 0.1 : 0));
+        fin.castShadow = true; tower.add(fin);
+      });
+
+      // Corner columns (massive, full-height — Dushanbe landmark style)
+      [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([sx, sz]) => {
+        const c = new T.Mesh(new T.BoxGeometry(2.0, H + 1.0, 2.0), mats.stone);
+        c.position.set(sx * (W / 2 + 0.25), (H + 1.0) / 2, sz * (D / 2 + 0.25));
+        c.castShadow = true; c.receiveShadow = true; tower.add(c);
+        // Column capital at top
+        const cap = new T.Mesh(new T.BoxGeometry(2.6, 0.5, 2.6), corniceM);
+        cap.position.set(sx * (W / 2 + 0.25), H + 1.3, sz * (D / 2 + 0.25)); tower.add(cap);
+      });
+
+      // --- ENTRANCE: Dushanbe grand portal with arch ---
+      const entW = 13, entH = GROUND_H + 1.0;
+      // Entrance canopy slab
+      const canopy = new T.Mesh(new T.BoxGeometry(entW + 0.6, 0.55, 5.8), mats.stone);
+      canopy.position.set(0, GROUND_H + 0.2, D / 2 + 2.8); canopy.castShadow = true; tower.add(canopy);
+      // Canopy soffit (underside — warm)
+      const canSoffit = new T.Mesh(new T.BoxGeometry(entW - 0.2, 0.08, 5.6), new T.MeshStandardMaterial({ color: lin(0xd4b87a), roughness: 0.6, emissive: lin(0xffa040), emissiveIntensity: 0.0 }));
+      canSoffit.position.set(0, GROUND_H - 0.04, D / 2 + 2.8); tower.add(canSoffit);
+      window.__canSoffit = canSoffit.material;
+      // Entrance columns (round — classical Tajik architecture)
+      [-5.8, -2.9, 2.9, 5.8].forEach((x) => {
+        const col = new T.Mesh(new T.CylinderGeometry(0.38, 0.44, GROUND_H + 0.3, 16), mats.stone);
+        col.position.set(x, (GROUND_H + 0.3) / 2, D / 2 + 5.0); col.castShadow = true; tower.add(col);
+        // Column base
+        const base = new T.Mesh(new T.BoxGeometry(1.1, 0.4, 1.1), corniceM);
+        base.position.set(x, 0.2, D / 2 + 5.0); tower.add(base);
+        // Column capital
+        const cap = new T.Mesh(new T.BoxGeometry(1.0, 0.45, 1.0), corniceM);
+        cap.position.set(x, GROUND_H + 0.26, D / 2 + 5.0); tower.add(cap);
+      });
+      // Entrance arch frieze above canopy
+      const frieze = new T.Mesh(new T.BoxGeometry(entW + 0.6, 1.4, 0.55), corniceM);
+      frieze.position.set(0, GROUND_H + 1.0, D / 2 + 0.4); frieze.castShadow = true; tower.add(frieze);
+      // Sign plate
+      signMat = new T.MeshBasicMaterial({ map: signTexture('НЕКРУЗ'), toneMapped: false });
+      const sign = new T.Mesh(new T.PlaneGeometry(10.4, 1.1), signMat);
+      sign.position.set(0, GROUND_H + 1.0, D / 2 + 0.72); tower.add(sign);
+      // Entrance steps
+      [[3.2, 0.28], [2.0, 0.18], [1.0, 0.1]].forEach(([ext, h], i) => {
+        const step = new T.Mesh(new T.BoxGeometry(entW + ext, h, ext), new T.MeshStandardMaterial({ color: lin(0x2e2b28), roughness: 0.7 }));
+        step.position.set(0, h / 2 + i * 0.1, D / 2 + 5.3 + (3.2 - ext) / 2 + ext / 2); step.receiveShadow = true; tower.add(step);
+      });
+      // Entrance door glass
+      const door = new T.Mesh(new T.BoxGeometry(5.5, GROUND_H - 0.5, 0.12), mats.glassWall);
+      door.position.set(0, (GROUND_H - 0.5) / 2 + 0.25, D / 2 + 0.1); tower.add(door);
+
+      // --- ATTIC / PENTHOUSE floor (top 2 floors set back — Dushanbe tower crown) ---
+      if (floorsCount >= 6) {
+        const attH = FLOOR_H * 2;
+        const attSetback = 1.5;
+        const att = new T.Mesh(new T.BoxGeometry(W - attSetback * 2, attH, D - attSetback * 2), faceMat(W - attSetback * 2));
+        att.position.y = H - attH / 2; att.castShadow = true; tower.add(att);
+        // Attic base cornice (crown molding)
+        [[0, (D - attSetback * 2) / 2 + 0.1, 0, W - attSetback * 2 + 0.5], [0, -(D - attSetback * 2) / 2 - 0.1, 0, W - attSetback * 2 + 0.5], [(W - attSetback * 2) / 2 + 0.1, 0, Math.PI / 2, D - attSetback * 2 + 0.5], [-(W - attSetback * 2) / 2 - 0.1, 0, Math.PI / 2, D - attSetback * 2 + 0.5]].forEach(([x, z, ry, len]) => {
+          const cr = new T.Mesh(new T.BoxGeometry(len, 0.55, 0.65), corniceM);
+          cr.position.set(x, H - attH - 0.08, z); cr.rotation.y = ry; cr.castShadow = true; tower.add(cr);
+        });
+      }
+
+      // --- ROOF: Parapet with decorative crown ---
+      const roofY = H + 0.5;
+      // Main parapet walls
+      [[0, D / 2 + 0.1, 0, W + 1.0], [0, -D / 2 - 0.1, 0, W + 1.0], [W / 2 + 0.1, 0, Math.PI / 2, D + 1.0], [-W / 2 - 0.1, 0, Math.PI / 2, D + 1.0]].forEach(([x, z, ry, len]) => {
+        const p = new T.Mesh(new T.BoxGeometry(len, 1.4, 0.4), mats.concrete);
+        p.position.set(x, H + 0.7, z); p.rotation.y = ry; p.castShadow = true; tower.add(p);
+        // Parapet cap
+        const cap = new T.Mesh(new T.BoxGeometry(len + 0.1, 0.22, 0.6), corniceM);
+        cap.position.set(x, H + 1.52, z); cap.rotation.y = ry; tower.add(cap);
+      });
+      // Parapet corner posts
+      [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([sx, sz]) => {
+        const post = new T.Mesh(new T.BoxGeometry(0.6, 1.8, 0.6), mats.stone);
+        post.position.set(sx * (W / 2 + 0.1), H + 0.9, sz * (D / 2 + 0.1)); tower.add(post);
+      });
+      // Decorative pediment / triangular feature on front
+      const pedBase = new T.Mesh(new T.BoxGeometry(16, 0.3, 0.5), mats.stone);
+      pedBase.position.set(0, roofY + 0.5, D / 2 + 0.1); tower.add(pedBase);
+      // Penthouse + utilities
+      const pent = new T.Mesh(new T.BoxGeometry(10, 3.2, 7), mats.stone);
+      pent.position.set(-5, roofY + 1.6, -3); pent.castShadow = true; tower.add(pent);
+      const tank = new T.Mesh(new T.CylinderGeometry(1.9, 1.9, 2.2, 16), mats.frame);
+      tank.position.set(7.5, roofY + 1.1, 3); tank.castShadow = true; tower.add(tank);
+      const ant = new T.Mesh(new T.CylinderGeometry(0.08, 0.14, 11, 8), mats.frame);
+      ant.position.set(-5, roofY + 3.2 + 5.5, -3); ant.castShadow = true; tower.add(ant);
+      roofLight = new T.Mesh(new T.SphereGeometry(0.3, 12, 8), new T.MeshBasicMaterial({ color: 0xff3b30, toneMapped: false }));
+      roofLight.position.set(-5, roofY + 3.2 + 11, -3); tower.add(roofLight);
 
       // apartments: windows, frames, balconies
       apartmentInst = [];
       aptMap = {}; keyMap = {};
       const count = floorsCount * 8;
-      glass = new T.InstancedMesh(new T.BoxGeometry(1, 1, 0.06), new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.04, metalness: 0.92, transparent: true, opacity: 0.42, envMapIntensity: 1.6 }), count);
+      glass = new T.InstancedMesh(new T.BoxGeometry(1, 1, 0.06), new T.MeshStandardMaterial({ color: lin(0x3a6ea8), roughness: 0.03, metalness: 0.95, transparent: true, opacity: 0.55, envMapIntensity: 2.0 }), count);
       glow = new T.InstancedMesh(new T.PlaneGeometry(1, 1), new T.MeshBasicMaterial({ color: 0xffffff, toneMapped: true }), count);
       frames = new T.InstancedMesh(new T.BoxGeometry(1, 1, 0.3), mats.frame, count);
       mullions = new T.InstancedMesh(new T.BoxGeometry(0.1, 1, 0.12), mats.frame, count * 2);
@@ -648,6 +765,7 @@
       lampBulbs.forEach((b) => { b.material.color.setRGB(1, 0.85, 0.6).multiplyScalar(Math.max(0.05, cur.n.lamp)); b.visible = cur.n.lamp > 0.05; });
       if (neighbourMat) neighbourMat.forEach((m) => { m.emissiveIntensity = 0.04 + cur.n.lamp * 0.85; });
       if (window.__coreMat) window.__coreMat.emissiveIntensity = cur.n.lamp * 0.55;
+      if (window.__canSoffit) window.__canSoffit.emissiveIntensity = cur.n.lamp * 0.7;
       sky.material.uniforms.sunColor.value.copy(cur.sunColor).multiplyScalar(presetName === 'night' ? 0.55 : 1);
     }
     function rebuildEnv() {

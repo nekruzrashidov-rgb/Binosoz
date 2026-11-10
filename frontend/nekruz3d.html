@@ -483,8 +483,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
   </div>
   <div class="tg">
     <div class="tl">РЕЖИМ</div>
-    <button class="tbtn" id="vXR">👁</button>
-    <button class="tbtn" id="vNT">🌙</button>
+    <button class="tbtn" id="vXR" title="Рентген (сквозной вид)">👁</button>
+    <button class="tbtn" id="vNT" title="Переключить на ночь">🌙</button>
   </div>
   <div class="tg">
     <div class="tl">ЭТАЖ</div>
@@ -931,10 +931,10 @@ const canvas=document.getElementById('c');
 const engine=new BABYLON.Engine(canvas,true,{antialias:true,stencil:true});
 engine.setHardwareScalingLevel(1/Math.min(devicePixelRatio,2));
 const scene=new BABYLON.Scene(engine);
-scene.clearColor=new BABYLON.Color4(.012,.026,.056,1);
+scene.clearColor=new BABYLON.Color4(.55,.68,.82,1);
 scene.fogMode=BABYLON.Scene.FOGMODE_EXP2;
-scene.fogColor=new BABYLON.Color3(.008,.02,.045);
-scene.fogDensity=.0038;
+scene.fogColor=new BABYLON.Color3(.55,.65,.8);
+scene.fogDensity=.0025;
 
 const cam=new BABYLON.ArcRotateCamera('cam',-.42,1.08,96,new BABYLON.Vector3(0,32,0),scene);
 cam.lowerRadiusLimit=14;cam.upperRadiusLimit=180;
@@ -942,20 +942,20 @@ cam.lowerBetaLimit=.05;cam.upperBetaLimit=1.5;
 cam.wheelDeltaPercentage=.016;cam.pinchDeltaPercentage=.016;
 cam.attachControl(canvas,true);
 
-// LIGHTS
+// LIGHTS — DAY preset (bright architectural daylight)
 const sky=new BABYLON.HemisphericLight('sky',new BABYLON.Vector3(0,1,0),scene);
-sky.intensity=.28;sky.diffuse=new BABYLON.Color3(.08,.16,.36);
-sky.groundColor=new BABYLON.Color3(.018,.05,.1);
+sky.intensity=1.1;sky.diffuse=new BABYLON.Color3(.55,.65,.8);
+sky.groundColor=new BABYLON.Color3(.3,.28,.22);
 
 const sun=new BABYLON.DirectionalLight('sun',new BABYLON.Vector3(-.65,-1.0,-.6),scene);
-sun.intensity=3.4;sun.diffuse=new BABYLON.Color3(1,.97,.92);
+sun.intensity=4.8;sun.diffuse=new BABYLON.Color3(1,.97,.88);
 sun.position=new BABYLON.Vector3(80,160,70);
 
 const fill=new BABYLON.DirectionalLight('fill',new BABYLON.Vector3(.5,-.15,.65),scene);
-fill.intensity=.44;fill.diffuse=new BABYLON.Color3(.16,.28,.54);
+fill.intensity=0.9;fill.diffuse=new BABYLON.Color3(.6,.65,.8);
 
 const goldPt=new BABYLON.PointLight('gpt',new BABYLON.Vector3(0,5,16),scene);
-goldPt.intensity=3.0;goldPt.diffuse=new BABYLON.Color3(.8,.64,.14);goldPt.range=140;
+goldPt.intensity=1.5;goldPt.diffuse=new BABYLON.Color3(.8,.64,.14);goldPt.range=80;
 
 const shad=new BABYLON.ShadowGenerator(2048,sun);
 shad.useBlurExponentialShadowMap=true;shad.blurScale=2;
@@ -984,10 +984,15 @@ function glassM(r,g,b,a,ei){
   return m;
 }
 
-/* Window material */
+/* Window material — day: glass-blue reflective, status visible via emissive tint */
 const WMAT={};
-const WDEF={free:{a:'#082010',e:'#0a3814',ei:1.6},res:{a:'#201800',e:'#3d2a00',ei:1.1},
-            sold:{a:'#1e0808',e:'#380808',ei:.85},none:{a:'#06090e',e:'#000000',ei:.03}};
+// Day albedo: dark blue glass (architectural); emissive: status glow
+const WDEF={
+  free: {a:'#1a3050',e:'#1a4a28',ei:.45},   // blue-green tint — free
+  res:  {a:'#2a2010',e:'#4a3800',ei:.35},   // warm amber — reserved
+  sold: {a:'#200a0a',e:'#3a0808',ei:.25},   // dark red — sold
+  none: {a:'#141820',e:'#000000',ei:.05},   // neutral dark — unavailable
+};
 function getWM(st){
   if(!WMAT[st]){const d=WDEF[st];const m=new BABYLON.PBRMaterial('wm'+st,scene);
     m.albedoColor=C3.FromHexString(d.a);m.emissiveColor=C3.FromHexString(d.e);
@@ -1013,19 +1018,31 @@ function cy(n,rt,rb,h,t,mat,pos,sh){
 /* ═══════════════════════════════════════
    МАТЕРИАЛҲО
 ═══════════════════════════════════════ */
+// DAY materials (architectural concrete + beige plaster)
 const M={
-  base: pbr('#070e1c',0,.97),
-  conc: pbr('#0c1826',0,.92),
-  face: pbr('#12223a',0,.86),
-  col:  pbr('#192d44',0,.82),
-  dark: pbr('#050810',0,.99),
-  gold: pbr('#c8a84b',.88,.2,'#7a6020',.7),
-  gld2: pbr('#a08030',.72,.3,'#4a3010',.45),
-  gld3: pbr('#e0c060',.92,.18,'#9a7828',.8),
-  rail: pbr('#182840',.36,.7),
-  gnd:  pbr('#03060e',0,1),
-  asph: pbr('#020408',0,1),
-  grass:pbr('#060e08',0,.98),
+  base: pbr('#c8c0b0',0,.92),   // светлый бетон — Душанбе стиль
+  conc: pbr('#b8b0a4',0,.88),   // бетонный фасад
+  face: pbr('#d0c8bc',0,.82),   // штукатурка фасадная
+  col:  pbr('#bfb8ae',0,.78),   // колонны — светло-серый бетон
+  dark: pbr('#3a3830',0,.96),   // тёмные откосы/ниши
+  gold: pbr('#c9a227',.88,.2,'#7a5a10',.7), // золотые детали
+  gld2: pbr('#b8921e',.72,.3,'#5a3808',.45),
+  gld3: pbr('#d4b040',.92,.18,'#9a7020',.8),
+  rail: pbr('#8090a4',.36,.7),  // стеклянные перила — голубоватые
+  gnd:  pbr('#4a4840',0,.96),   // земля/асфальт
+  asph: pbr('#363432',0,.98),   // дорога
+  grass:pbr('#4a6040',0,.92),   // газон
+};
+// NIGHT overrides stored here for toggle
+const M_NIGHT={
+  base: '#070e1c', conc: '#0c1826', face: '#12223a',
+  col:  '#192d44', dark: '#050810',
+  gnd:  '#03060e', asph: '#020408', grass: '#060e08',
+};
+const M_DAY={
+  base: '#c8c0b0', conc: '#b8b0a4', face: '#d0c8bc',
+  col:  '#bfb8ae', dark: '#3a3830',
+  gnd:  '#4a4840', asph: '#363432', grass: '#4a6040',
 };
 
 /* ═══════════════════════════════════════
@@ -1069,11 +1086,11 @@ function buildBuilding(){
     bx(`lcb${i}`,.62,.22,.62,M.gld2,[cx,1.22,BD/2+.42]);
   });
 
-  // ШИШАИ ЛОББӢ байни колоннаҳо
+  // ШИШАИ ЛОББӢ байни колоннаҳо — architectural blue glass
   for(let i=0;i<5;i++){
     const cx=(colXS[i]+colXS[i+1])/2;
     const gw=Math.abs(colXS[i+1]-colXS[i])-.7;
-    const gm=glassM(.04,.18,.38,.75,.35);
+    const gm=glassM(.12,.30,.55,.78,.28);  // deeper blue architectural glass
     bx(`lbg${i}`,gw,LH*.82,.07,gm,[cx,LH*.4,BD/2+.36]);
   }
 
@@ -1421,23 +1438,55 @@ document.getElementById('vXR').onclick=()=>{
 };
 
 let nightOn=false;
-document.getElementById('vNT').onclick=()=>{
-  nightOn=!nightOn;const btn=document.getElementById('vNT');
-  btn.classList.toggle('on',nightOn);btn.textContent=nightOn?'☀️':'🌙';
-  if(nightOn){
+
+// Keep references to all PBR materials by key for day/night toggle
+const MAT_KEYS=['base','conc','face','col','dark','gnd','asph','grass'];
+
+function applyDayNight(toNight){
+  const btn=document.getElementById('vNT');
+  btn.classList.toggle('on',toNight);
+  btn.textContent=toNight?'☀️':'🌙';
+  btn.title=toNight?'Переключить на день':'Переключить на ночь';
+
+  if(toNight){
+    // NIGHT — тёмное небо, яркие окна
     scene.clearColor=new BABYLON.Color4(.002,.016,.038,1);
-    scene.fogColor=new C3(.002,.016,.038);
-    sun.intensity=.015;sky.intensity=.06;fill.intensity=.015;
-    goldPt.intensity=8;goldPt.range=360;
-    wmeshes.forEach(m=>{if(m.material) m.material.emissiveIntensity=WDEF[m.userData.apt.status].ei*2.4;});
+    scene.fogColor=new C3(.004,.018,.040);
+    scene.fogDensity=.004;
+    sun.intensity=.08;sun.diffuse=new C3(.3,.35,.6);
+    sky.intensity=.09;sky.diffuse=new C3(.1,.15,.4);sky.groundColor=new C3(.01,.02,.04);
+    fill.intensity=.04;fill.diffuse=new C3(.1,.15,.35);
+    goldPt.intensity=12;goldPt.range=400;
+    // Материалы фасада — тёмные
+    MAT_KEYS.forEach(k=>{if(M[k]&&M_NIGHT[k]){M[k].albedoColor=C3.FromHexString(M_NIGHT[k]);}});
+    // Яркие светящиеся окна
+    wmeshes.forEach(m=>{if(m.material&&m.userData?.apt) m.material.emissiveIntensity=WDEF[m.userData.apt.status].ei*2.6;});
+    // Уличные фонари ярче
+    scene.lights.forEach(l=>{if(l.name.startsWith('ll'))l.intensity=3.2;});
   } else {
-    scene.clearColor=new BABYLON.Color4(.012,.026,.056,1);
-    scene.fogColor=new C3(.008,.02,.045);
-    sun.intensity=3.4;sky.intensity=.28;fill.intensity=.44;
-    goldPt.intensity=3.0;goldPt.range=140;
+    // DAY — дневное небо, реальные материалы
+    scene.clearColor=new BABYLON.Color4(.55,.68,.82,1);
+    scene.fogColor=new C3(.55,.65,.8);
+    scene.fogDensity=.0025;
+    sun.intensity=4.8;sun.diffuse=new C3(1,.97,.88);
+    sky.intensity=1.1;sky.diffuse=new C3(.55,.65,.8);sky.groundColor=new C3(.3,.28,.22);
+    fill.intensity=.9;fill.diffuse=new C3(.6,.65,.8);
+    goldPt.intensity=1.5;goldPt.range=80;
+    // Материалы фасада — светлые
+    MAT_KEYS.forEach(k=>{if(M[k]&&M_DAY[k]){M[k].albedoColor=C3.FromHexString(M_DAY[k]);}});
+    // Нормальный свет окон
     wmeshes.forEach(m=>{if(m.material&&m.userData?.apt) m.material.emissiveIntensity=WDEF[m.userData.apt.status].ei;});
+    // Уличные фонари тусклее
+    scene.lights.forEach(l=>{if(l.name.startsWith('ll'))l.intensity=1.4;});
   }
+}
+
+document.getElementById('vNT').onclick=()=>{
+  nightOn=!nightOn;
+  applyDayNight(nightOn);
 };
+// Запуск в дневном режиме
+applyDayNight(false);
 
 let activeFloor='all';
 document.querySelectorAll('[data-fl]').forEach(btn=>{

@@ -36,7 +36,12 @@
   };
 
   function applyTheme() {
-    if (isPublic || page === 'login') { document.documentElement.dataset.theme = 'dark'; return; }
+    // Public pages: default dark (showroom), but allow manual light toggle saved in localStorage
+    if (isPublic || page === 'login') {
+      const v = S.store.get('sitora.theme');
+      document.documentElement.dataset.theme = (v === 'light') ? 'light' : 'dark';
+      return;
+    }
     const v = S.store.get('sitora.theme'); if (v === 'dark' || v === 'light') document.documentElement.dataset.theme = v; else delete document.documentElement.dataset.theme;
   }
   function isDark() { const v = document.documentElement.dataset.theme; return v ? v === 'dark' : window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches; }
@@ -143,9 +148,22 @@
       ['/about', t('nav.project'), page === 'about'],
       ['/contact', t('nav.contact'), page === 'contact'],
     ]);
+    const themeToggle = h('button', {
+      class: 'icon-btn theme-toggle',
+      title: isDark() ? t('nav.theme') : t('nav.theme'),
+      'aria-label': isDark() ? 'Дневной режим' : 'Ночной режим',
+      onclick: () => {
+        S.store.set('sitora.theme', isDark() ? 'light' : 'dark');
+        applyTheme();
+        drawPublicHeader();
+        S.bus && S.bus.emit('theme');
+      }
+    }, isDark()
+      ? h('span', { style: { fontSize: '18px', lineHeight: 1 } }, '☀️')
+      : h('span', { style: { fontSize: '18px', lineHeight: 1 } }, '🌙'));
     header.className = 'top lux-top' + (S.api.isAuthed ? ' authed' : '');
     header.replaceChildren(h('div', { class: 'wrap top-in' }, h('a', { class: 'brand', href: '/', 'aria-label': 'Binosoz' }, S.logo(), h('span', null, 'BINOSOZ')), menu, h('span', { class: 'spacer' }),
-      phone, lang, accountLink(), menuBtn));
+      phone, lang, themeToggle, accountLink(), menuBtn));
   }
 
   // Signed in: the gold button leads to the person's own workspace instead of the login page.
