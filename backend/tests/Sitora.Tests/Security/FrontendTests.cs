@@ -31,7 +31,7 @@ public class FrontendTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFa
     }
 
     [Theory]
-    [InlineData("/js/page.js")]
+    [InlineData("/js/routing-va-navigatsiya.js")]
     [InlineData("/css/styles.css")]
     [InlineData("/favicon.svg")]
     public async Task Asset_IsServed(string path)

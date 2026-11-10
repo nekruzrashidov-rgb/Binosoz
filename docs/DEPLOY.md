@@ -183,3 +183,15 @@ WEBAPI_IMAGE=ghcr.io/nekruzrashidov-rgb/binosoz-api:<полный sha преды
 - Логи API — JSON. Они идут в stdout (`docker compose -f docker-compose.prod.yml logs --since 1h webapi`) и в файлы `/app/logs/sitora-ГГГГММДД.log` на томе `logs`: новый файл каждый день или при 100 МБ, хранятся 14 файлов. Посмотреть: `docker compose -f docker-compose.prod.yml exec webapi ls /app/logs`. В каждой записи о запросе есть `ClientIp` и `UserId`; запросы к `/health` в обычный лог не пишутся. Ротацию логов stdout настраивают в `/etc/docker/daemon.json` (`"log-opts": {"max-size": "50m", "max-file": "5"}`).
 - Подключиться к базе: `docker compose -f docker-compose.prod.yml exec db psql -U sitora -d sitora`.
 - Статус фоновых задач: в логах API (снятие броней каждые 5 минут, курс — раз в день в 10:00 по Душанбе).
+
+## Демо-данные в пустой базе (Render)
+
+Сидер каталога работает только в Development, поэтому продакшен-база на Render после миграций пустая.
+Заполнить её домом «Некруз Резиденс» (20 этажей + коммерческий, 160 квартир: 6 продано, 5 в брони, остальные свободны):
+
+```bash
+psql "postgresql://USER:PASSWORD@HOST/DB?sslmode=require" -f scripts/seed.sql
+```
+
+Строка подключения — External Database URL в панели Render (её не коммитить). Скрипт повторно ничего не добавляет:
+если дом уже есть, он только пишет сообщение. Брони — настоящие (с демо-заявками, на 30 дней), сам запуск — в AuditLog.
