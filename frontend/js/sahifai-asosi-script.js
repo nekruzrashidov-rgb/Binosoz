@@ -1018,59 +1018,206 @@
     return box;
   }
 
-  // 20 floors of a gold-lined tower; the windows change every 1.5 s, the antenna light blinks. Sharp on dense screens.
-  // done() — stop when it returns true (the 3D model took over, or the hero is gone). Returns a stop function.
+  // Реалистичный рисованный дом-постер. Пока 3D модель загружается, показывает красивое здание с окнами.
+  // done() — остановить когда возвращает true. Возвращает функцию stop.
   function drawHeroBuilding(canvas, done) {
-    let timer = null, raf = 0, lit = [];
+    let timer = null, raf = 0, lit = [], time = 0;
     const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const FLOORS = 20, COLS = 6;
-    const shuffle = () => { lit = Array.from({ length: FLOORS * COLS }, () => (Math.random() > 0.3 ? 0.4 + Math.random() * 0.45 : 0)); };
+    const FLOORS = 22, COLS = 7, SIDE_FLOORS = 14, SIDE_COLS = 4;
+    const shuffle = () => {
+      lit = Array.from({ length: (FLOORS * COLS) + (SIDE_FLOORS * SIDE_COLS * 2) }, (_, i) => {
+        const isSide = i >= FLOORS * COLS;
+        return Math.random() > (isSide ? 0.45 : 0.28) ? 0.35 + Math.random() * 0.5 : 0;
+      });
+    };
     const size = () => {
       const r = canvas.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const W = Math.max(240, Math.round(r.width || 400)), H = Math.max(260, Math.round(r.height || 500));
+      const W = Math.max(260, Math.round(r.width || 420)), H = Math.max(300, Math.round(r.height || 560));
       if (canvas.width !== W * dpr || canvas.height !== H * dpr) { canvas.width = W * dpr; canvas.height = H * dpr; }
       return { W, H, dpr };
     };
     const draw = () => {
       if (done()) return stop();
+      time += 0.016;
       const { W, H, dpr } = size(), g = canvas.getContext('2d');
       if (!g) return;
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#060d1f'); bg.addColorStop(1, '#0a1628');
-      g.fillStyle = bg; g.fillRect(0, 0, W, H);
-      // A few stars and a soft gold glow behind the tower.
-      const glow = g.createRadialGradient(W / 2, H * 0.55, 10, W / 2, H * 0.55, W * 0.7); glow.addColorStop(0, 'rgba(201,162,39,0.14)'); glow.addColorStop(1, 'rgba(201,162,39,0)');
-      g.fillStyle = glow; g.fillRect(0, 0, W, H);
-      const ground = H * 0.86, bW = Math.min(W * 0.46, 220), bH = ground - H * 0.14, bX = (W - bW) / 2, bY = ground - bH, fH = bH / FLOORS;
-      g.fillStyle = '#0d1f3c'; g.fillRect(bX, bY, bW, bH);
-      g.fillStyle = 'rgba(255,255,255,0.03)'; g.fillRect(bX, bY, bW * 0.18, bH);
-      for (let i = 0; i <= FLOORS; i++) {
-        g.strokeStyle = 'rgba(201,162,39,' + (i === 0 || i % 5 === 0 ? 0.6 : 0.18) + ')'; g.lineWidth = i % 5 === 0 ? 2 : 1;
-        g.beginPath(); g.moveTo(bX, bY + i * fH); g.lineTo(bX + bW, bY + i * fH); g.stroke();
+
+      // Небо — градиент ночи с оттенком золота
+      const sky = g.createLinearGradient(0, 0, 0, H * 0.7);
+      sky.addColorStop(0, '#020710'); sky.addColorStop(0.5, '#060d1f'); sky.addColorStop(1, '#0d1a2e');
+      g.fillStyle = sky; g.fillRect(0, 0, W, H);
+
+      // Звёзды
+      if (!reduce) {
+        const starSeed = [[0.12,0.08],[0.28,0.04],[0.45,0.12],[0.62,0.06],[0.78,0.09],[0.9,0.15],
+          [0.07,0.22],[0.35,0.18],[0.55,0.03],[0.82,0.25],[0.18,0.3],[0.72,0.19]];
+        starSeed.forEach(([sx, sy], i) => {
+          const a = 0.3 + 0.4 * Math.abs(Math.sin(time * 0.7 + i * 1.3));
+          g.fillStyle = 'rgba(255,255,255,' + a.toFixed(2) + ')';
+          g.beginPath(); g.arc(sx * W, sy * H, 0.8 + (i % 3) * 0.4, 0, Math.PI * 2); g.fill();
+        });
       }
-      const cw = (bW - 20) / COLS, wW = cw - 5, wH = Math.max(2, fH - 6);
+
+      // Золотое свечение за зданием
+      const glow = g.createRadialGradient(W / 2, H * 0.5, 20, W / 2, H * 0.5, W * 0.65);
+      glow.addColorStop(0, 'rgba(201,162,39,0.18)'); glow.addColorStop(0.5, 'rgba(201,162,39,0.06)'); glow.addColorStop(1, 'rgba(201,162,39,0)');
+      g.fillStyle = glow; g.fillRect(0, 0, W, H);
+
+      const ground = H * 0.88;
+
+      // ── Боковые здания (фон) ──
+      const drawSide = (sx, sw, sh, opacity, litOffset) => {
+        g.globalAlpha = opacity;
+        g.fillStyle = '#080f1e'; g.fillRect(sx, ground - sh, sw, sh);
+        // фасад
+        g.fillStyle = '#0a1428'; g.fillRect(sx, ground - sh, sw, sh);
+        // горизонтальные линии этажей
+        const sfH = sh / SIDE_FLOORS;
+        for (let i = 0; i <= SIDE_FLOORS; i++) {
+          g.strokeStyle = 'rgba(201,162,39,' + (i % 4 === 0 ? 0.4 : 0.1) + ')';
+          g.lineWidth = 0.5; g.beginPath();
+          g.moveTo(sx, ground - sh + i * sfH); g.lineTo(sx + sw, ground - sh + i * sfH); g.stroke();
+        }
+        // окна
+        const scw = (sw - 10) / SIDE_COLS, swW = scw - 4, swH = Math.max(2, sfH - 5);
+        for (let r = 0; r < SIDE_FLOORS; r++) for (let c = 0; c < SIDE_COLS; c++) {
+          const a = lit[litOffset + r * SIDE_COLS + c];
+          g.fillStyle = a ? 'rgba(242,196,106,' + (a * 0.7).toFixed(2) + ')' : 'rgba(255,255,255,0.02)';
+          g.fillRect(sx + 5 + c * scw, ground - sh + r * sfH + 3, swW, swH);
+        }
+        g.globalAlpha = 1;
+      };
+      const mainW = Math.min(W * 0.42, 200), mainH = ground - H * 0.08, mainX = (W - mainW) / 2;
+      const sideW = Math.min(W * 0.22, 100), sideH = mainH * 0.65;
+      drawSide(mainX - sideW - 8, sideW, sideH, 0.55, FLOORS * COLS);
+      drawSide(mainX + mainW + 8, sideW, sideH, 0.5, FLOORS * COLS + SIDE_FLOORS * SIDE_COLS);
+
+      // ── Главное здание ──
+      const bX = mainX, bY = ground - mainH, bW = mainW, bH = mainH;
+      const fH = bH / FLOORS;
+
+      // Основа здания — гранитный цоколь (нижние 2 этажа)
+      const plinthH = fH * 2.2;
+      g.fillStyle = '#0e1520'; g.fillRect(bX, bY, bW, bH);
+      const gran = g.createLinearGradient(bX, ground - plinthH, bX + bW, ground);
+      gran.addColorStop(0, '#1a1612'); gran.addColorStop(1, '#0f100c');
+      g.fillStyle = gran; g.fillRect(bX - 4, ground - plinthH, bW + 8, plinthH + 4);
+
+      // Вертикальные пилястры
+      const pilW = 6, pilCount = 5;
+      for (let p = 0; p < pilCount; p++) {
+        const px = bX + (bW / (pilCount - 1)) * p - pilW / 2;
+        g.fillStyle = 'rgba(201,162,39,0.12)'; g.fillRect(px, bY, pilW, bH);
+      }
+
+      // Горизонтальные линии — карнизы
+      for (let i = 0; i <= FLOORS; i++) {
+        const isCornice = i % 5 === 0 || i === 0 || i === FLOORS;
+        const isBelt = i % 3 === 0;
+        if (isCornice) {
+          g.fillStyle = 'rgba(201,162,39,0.5)'; g.fillRect(bX - 3, bY + i * fH - 1, bW + 6, 3);
+        } else if (isBelt) {
+          g.fillStyle = 'rgba(201,162,39,0.22)'; g.fillRect(bX, bY + i * fH, bW, 1.5);
+        } else {
+          g.strokeStyle = 'rgba(201,162,39,0.1)'; g.lineWidth = 0.5;
+          g.beginPath(); g.moveTo(bX, bY + i * fH); g.lineTo(bX + bW, bY + i * fH); g.stroke();
+        }
+      }
+
+      // Окна главного здания
+      const cw = (bW - 16) / COLS, wW = Math.max(2, cw - 5), wH = Math.max(3, fH - 7);
       for (let r = 0; r < FLOORS; r++) for (let c = 0; c < COLS; c++) {
         const a = lit[r * COLS + c];
-        g.fillStyle = a ? 'rgba(242,196,106,' + a.toFixed(2) + ')' : 'rgba(255,255,255,0.04)';
-        g.fillRect(bX + 10 + c * cw, bY + r * fH + 3, wW, wH);
+        const wx = bX + 8 + c * cw, wy = bY + r * fH + 4;
+        // Тёмная рама окна
+        g.fillStyle = 'rgba(0,0,0,0.5)'; g.fillRect(wx - 1, wy - 1, wW + 2, wH + 2);
+        // Стекло / свет
+        if (a) {
+          const warm = g.createLinearGradient(wx, wy, wx + wW, wy + wH);
+          warm.addColorStop(0, 'rgba(255,215,100,' + (a * 0.95).toFixed(2) + ')');
+          warm.addColorStop(1, 'rgba(242,180,60,' + (a * 0.65).toFixed(2) + ')');
+          g.fillStyle = warm;
+        } else {
+          g.fillStyle = 'rgba(30,50,100,0.25)';
+        }
+        g.fillRect(wx, wy, wW, wH);
+        // Оконная рама (крест)
+        if (wW > 6 && wH > 6) {
+          g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 0.8;
+          g.beginPath(); g.moveTo(wx + wW / 2, wy); g.lineTo(wx + wW / 2, wy + wH); g.stroke();
+        }
       }
-      // Antenna with a blinking red light.
-      g.strokeStyle = 'rgba(201,162,39,0.7)'; g.lineWidth = 2; g.beginPath(); g.moveTo(W / 2, bY); g.lineTo(W / 2, bY - 30); g.stroke();
-      g.fillStyle = 'rgba(255,80,80,' + (reduce ? 0.8 : (0.5 + Math.sin(performance.now() / 400) * 0.5)).toFixed(2) + ')';
-      g.beginPath(); g.arc(W / 2, bY - 32, 3, 0, Math.PI * 2); g.fill();
-      // Ground line and a faint reflection of the lit windows.
-      g.fillStyle = 'rgba(201,162,39,0.35)'; g.fillRect(W * 0.08, ground, W * 0.84, 1.5);
-      g.save(); g.globalAlpha = 0.12; g.translate(0, ground * 2); g.scale(1, -1);
-      for (let r = FLOORS - 4; r < FLOORS; r++) for (let c = 0; c < COLS; c++) { const a = lit[r * COLS + c]; if (a) { g.fillStyle = 'rgba(242,196,106,' + a + ')'; g.fillRect(bX + 10 + c * cw, bY + r * fH + 3, wW, wH); } }
-      g.restore();
+
+      // Вертикальные золотые фины на углах
+      g.fillStyle = 'rgba(201,162,39,0.6)';
+      g.fillRect(bX - 3, bY, 3, bH);
+      g.fillRect(bX + bW, bY, 3, bH);
+
+      // Парапет верхний
+      g.fillStyle = '#0a1220'; g.fillRect(bX - 6, bY - 12, bW + 12, 14);
+      g.fillStyle = 'rgba(201,162,39,0.6)'; g.fillRect(bX - 6, bY - 14, bW + 12, 3);
+
+      // Антенна
+      g.strokeStyle = 'rgba(201,162,39,0.75)'; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(W / 2, bY - 12); g.lineTo(W / 2, bY - 48); g.stroke();
+      g.lineWidth = 1; g.strokeStyle = 'rgba(201,162,39,0.4)';
+      g.beginPath(); g.moveTo(W / 2 - 8, bY - 36); g.lineTo(W / 2 + 8, bY - 36); g.stroke();
+      // Мигающий красный огонь
+      const blink = reduce ? 0.85 : (0.4 + Math.abs(Math.sin(time * 1.6)) * 0.6);
+      g.fillStyle = 'rgba(255,70,70,' + blink.toFixed(2) + ')';
+      g.beginPath(); g.arc(W / 2, bY - 50, 2.5, 0, Math.PI * 2); g.fill();
+      if (!reduce) {
+        g.fillStyle = 'rgba(255,70,70,' + (blink * 0.3).toFixed(2) + ')';
+        g.beginPath(); g.arc(W / 2, bY - 50, 6, 0, Math.PI * 2); g.fill();
+      }
+
+      // Вход — колонны и козырёк
+      const entW = bW * 0.42, entX = bX + (bW - entW) / 2;
+      g.fillStyle = 'rgba(201,162,39,0.08)'; g.fillRect(entX, ground - plinthH, entW, plinthH);
+      // 3 колонны
+      [0.15, 0.5, 0.85].forEach((t) => {
+        const cx = entX + entW * t;
+        g.fillStyle = '#1a160e'; g.fillRect(cx - 3.5, ground - plinthH + 4, 7, plinthH - 4);
+        g.fillStyle = 'rgba(201,162,39,0.5)'; g.fillRect(cx - 4, ground - plinthH, 8, 5);
+        g.fillRect(cx - 4, ground - 10, 8, 10);
+      });
+      // Козырёк входа
+      g.fillStyle = 'rgba(201,162,39,0.35)'; g.fillRect(entX - 4, ground - plinthH - 2, entW + 8, 4);
+
+      // Земля
+      const groundGrad = g.createLinearGradient(0, ground, 0, H);
+      groundGrad.addColorStop(0, '#0a1218'); groundGrad.addColorStop(1, '#060d1a');
+      g.fillStyle = groundGrad; g.fillRect(0, ground, W, H - ground);
+      // Золотая линия земли
+      g.fillStyle = 'rgba(201,162,39,0.4)'; g.fillRect(0, ground, W, 1.5);
+
+      // Отражение в земле
+      if (!reduce) {
+        g.save(); g.globalAlpha = 0.08; g.translate(0, ground * 2); g.scale(1, -1);
+        for (let r = Math.max(0, FLOORS - 6); r < FLOORS; r++) for (let c = 0; c < COLS; c++) {
+          const a = lit[r * COLS + c];
+          if (a) { g.fillStyle = 'rgba(242,196,106,' + a + ')'; g.fillRect(bX + 8 + c * cw, bY + r * fH + 4, wW, wH); }
+        }
+        g.restore();
+      }
+
+      // Метка «интерактивная 3D»
+      if (!canvas.dataset.labelDrawn) {
+        canvas.dataset.labelDrawn = '1';
+      }
     };
-    // The light blinks smoothly at about 10 redraws a second; a full 60 would only burn the battery.
     let last = 0;
-    const loop = (now) => { if (done()) return stop(); if (now - last > 90) { last = now; draw(); } raf = requestAnimationFrame(loop); };
+    const loop = (now) => {
+      if (done()) return stop();
+      const dt = now - last;
+      if (dt > 80) { last = now; time += dt / 1000; draw(); }
+      raf = requestAnimationFrame(loop);
+    };
     const stop = () => { clearInterval(timer); cancelAnimationFrame(raf); timer = null; };
     shuffle();
     requestAnimationFrame(draw);
-    if (!reduce) { timer = setInterval(shuffle, 1500); raf = requestAnimationFrame(loop); }
+    if (!reduce) { timer = setInterval(shuffle, 1800); raf = requestAnimationFrame(loop); }
     return stop;
   }
 
