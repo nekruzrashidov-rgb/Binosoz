@@ -102,7 +102,10 @@ if (!string.IsNullOrWhiteSpace(builder.Configuration[$"{RedisOptions.SectionName
 
 builder.Services.AddSitoraRateLimiting();
 builder.Services.AddSitoraCors();
-var forwardedHeadersEnabled = builder.Configuration.GetValue("ForwardedHeaders:Enabled", false);
+// Заголовкам прокси доверяем, когда API доступен только через свой прокси: Caddy (ForwardedHeaders__Enabled=true)
+// или хостинг Render — он сам выставляет RENDER=true, и снаружи до приложения можно дойти только через него.
+var forwardedHeadersEnabled = builder.Configuration.GetValue("ForwardedHeaders:Enabled", false)
+    || SecuritySetup.IsRender(builder.Configuration);
 if (forwardedHeadersEnabled)
     builder.Services.AddSitoraForwardedHeaders();
 if (builder.Environment.IsProduction())
@@ -179,7 +182,10 @@ if (app.Environment.IsProduction())
     app.UseWhen(http => !http.Request.Path.StartsWithSegments("/health"), branch =>
     {
         branch.UseHsts();
-        branch.UseHttpsRedirection();
+        // Прокси уже принял запрос по HTTPS (X-Forwarded-Proto: https в любом месте цепочки) — перенаправлять некуда:
+        // иначе при необычной цепочке прокси приложение бесконечно шлёт 307 на тот же https-адрес.
+        branch.UseWhen(http => !(forwardedHeadersEnabled && SecuritySetup.ProxySaysHttps(http.Request)),
+            redirect => redirect.UseHttpsRedirection());
     });
 }
 

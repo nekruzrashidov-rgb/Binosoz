@@ -120,6 +120,15 @@ public static class SecuritySetup
         return services;
     }
 
+    // Render выставляет RENDER=true каждому сервису; приложение там доступно только через прокси Render.
+    public static bool IsRender(IConfiguration configuration) =>
+        string.Equals(configuration["RENDER"], "true", StringComparison.OrdinalIgnoreCase);
+
+    // Запрос пришёл к прокси по HTTPS: уже обработан как HTTPS или в X-Forwarded-Proto есть «https» в любом звене цепочки.
+    public static bool ProxySaysHttps(HttpRequest request) =>
+        request.IsHttps || request.Headers["X-Forwarded-Proto"].Any(value => value is not null
+            && value.Split(',').Any(part => part.Trim().Equals("https", StringComparison.OrdinalIgnoreCase)));
+
     // Включать только когда API доступен лишь через свой обратный прокси (Caddy в docker-compose.prod.yml):
     // иначе любой клиент сможет подставить себе IP и обойти лимиты.
     public static IServiceCollection AddSitoraForwardedHeaders(this IServiceCollection services) =>

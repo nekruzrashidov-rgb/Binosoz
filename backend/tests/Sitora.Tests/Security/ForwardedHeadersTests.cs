@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -31,6 +32,37 @@ public class ForwardedHeadersTests
 
         Assert.Equal("https", context.Request.Scheme);
         Assert.Equal(IPAddress.Parse("198.51.100.20"), context.Connection.RemoteIpAddress);
+    }
+
+    // Перенаправление на HTTPS не нужно, если прокси сообщил https в любом звене (например «https,http»).
+    [Theory]
+    [InlineData("https", true)]
+    [InlineData("https,http", true)]
+    [InlineData("http, https", true)]
+    [InlineData("http", false)]
+    [InlineData(null, false)]
+    public void ProxySaysHttps_FindsHttpsAnywhereInTheChain(string? proto, bool expected)
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Scheme = "http";
+        if (proto is not null)
+            context.Request.Headers["X-Forwarded-Proto"] = proto;
+
+        Assert.Equal(expected, SecuritySetup.ProxySaysHttps(context.Request));
+    }
+
+    [Theory]
+    [InlineData("true", true)]
+    [InlineData("TRUE", true)]
+    [InlineData(null, false)]
+    [InlineData("false", false)]
+    public void IsRender_ReadsTheVariableRenderSets(string? value, bool expected)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(value is null ? [] : [new KeyValuePair<string, string?>("RENDER", value)])
+            .Build();
+
+        Assert.Equal(expected, SecuritySetup.IsRender(configuration));
     }
 
     private static async Task<HttpContext> RunAsync(string forwardedFor, string forwardedProto)
