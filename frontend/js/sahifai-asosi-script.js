@@ -36,7 +36,16 @@
     image: '<rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-8 8.5"/>',
     users: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 20a6 6 0 0 0-3-5.2"/>',
   };
-  const GALLERY = ['facade', 'living', 'playground', 'view'];
+  const GALLERY = [
+  { key: 'facade',     img: 'https://images.unsplash.com/photo-1486325212027-8081e485255e?w=800&q=80', wide: true },
+  { key: 'living',     img: 'https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&q=80', wide: false },
+  { key: 'view',       img: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&q=80', wide: false },
+  { key: 'lobby',      img: 'https://images.unsplash.com/photo-1555636222-cae831e670b3?w=800&q=80', wide: false },
+  { key: 'playground', img: 'https://images.unsplash.com/photo-1575783970733-1aaedde1db74?w=800&q=80', wide: false },
+  { key: 'parking',    img: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?w=800&q=80', wide: false },
+  { key: 'kitchen',    img: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&q=80', wide: false },
+  { key: 'rooftop',    img: 'https://images.unsplash.com/photo-1534430480872-3498386e7856?w=800&q=80', wide: false },
+];
   // Example reviews (key, stars): the section says they are examples until real buyers write theirs.
   const REVIEWS = [['r1', 5], ['r2', 5], ['r3', 4]];
   const FAQ = ['visit', 'down', 'delivery', 'booking', 'fees'];
@@ -551,8 +560,12 @@
     // Gallery: places for the renders and photos, honest about not having them yet.
     const gallery = h('section', { class: 'section lux-sec', id: 'gallery' }, h('div', { class: 'wrap' },
       h('div', { class: 'lux-head reveal' }, h('h2', null, accentFirst(t('gal.title'))), h('p', null, t('gal.sub'))),
-      h('div', { class: 'gal-grid' }, GALLERY.map((k, i) => h('figure', { class: 'gal-card reveal', style: { transitionDelay: (i % 2) * 90 + 'ms' } },
-        h('span', { class: 'gal-ic' }, landIcon('image')), h('figcaption', null, t('gal.' + k))))),
+      h('div', { class: 'gal-grid gal-grid--real' }, GALLERY.map((item, i) => h('figure', {
+          class: 'gal-card gal-card--photo reveal' + (item.wide ? ' gal-card--wide' : ''),
+          style: { transitionDelay: (i % 3) * 80 + 'ms' }
+        },
+        h('img', { src: item.img, alt: t('gal.' + item.key), loading: 'lazy', decoding: 'async' }),
+        h('figcaption', null, t('gal.' + item.key))))),
       h('p', { class: 'gal-note' }, t('gal.note')),
       h('div', { class: 'teaser-more' }, h('a', { class: 'btn ghost lg', href: '/apartments' }, t('gal.cta')))));
 

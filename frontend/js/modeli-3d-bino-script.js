@@ -4,7 +4,7 @@
   const S = (window.S = window.S || {});
   const T = window.THREE;
 
-  const FLOOR_H = 3.2, GROUND_H = 4.8, W = 32, D = 22;
+  const FLOOR_H = 3.4, GROUND_H = 5.5, W = 38, D = 26;
   const BAY = { 0: [-W / 4, D / 2, 0], 1: [W / 4, D / 2, 0] }; // placeholder, rebuilt below
 
   // apartment slot -> face placement: [x, z, rotationY, bayWidth]
