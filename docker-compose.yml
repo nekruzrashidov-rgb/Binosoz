@@ -29,20 +29,23 @@ services:
       timeout: 3s
       retries: 10
 
-  # S3-совместимое хранилище для разработки: консоль http://localhost:9001, API http://localhost:9000.
-  # API пользуется им при STORAGE_PROVIDER=S3; бакет (по умолчанию sitora) создайте в консоли.
-  minio:
-    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+  # S3-совместимое хранилище для разработки (RustFS: образы MinIO больше не публикуются): консоль http://localhost:9001,
+  # API http://localhost:9000. API пользуется им при STORAGE_PROVIDER=S3; бакет (по умолчанию sitora) создайте в консоли.
+  s3:
+    image: rustfs/rustfs:1.0.5
     restart: unless-stopped
-    command: ["server", "/data", "--console-address", ":9001"]
     environment:
-      MINIO_ROOT_USER: ${STORAGE_S3_ACCESS_KEY:-sitora-dev}
-      MINIO_ROOT_PASSWORD: ${STORAGE_S3_SECRET_KEY:?Задайте STORAGE_S3_SECRET_KEY (пароль MinIO, от 8 символов) в файле .env}
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_ACCESS_KEY: ${STORAGE_S3_ACCESS_KEY:-sitora-dev}
+      RUSTFS_SECRET_KEY: ${STORAGE_S3_SECRET_KEY:?Задайте STORAGE_S3_SECRET_KEY (ключ S3-хранилища, от 8 символов) в файле .env}
     ports:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - miniodata:/data
+      - s3data:/data
 
   webapi:
     build:
@@ -61,10 +64,10 @@ services:
       SEED_CONTENT_PASSWORD: ${SEED_CONTENT_PASSWORD:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-      # Хранилище файлов: Local — том files ниже; S3 — MinIO / Cloudflare R2 / Backblaze B2 / AWS (docs/DEPLOY.md, «Файлы»).
+      # Хранилище файлов: Local — том files ниже; S3 — RustFS / MinIO / Cloudflare R2 / Backblaze B2 / AWS (docs/DEPLOY.md, «Файлы»).
       Storage__Provider: ${STORAGE_PROVIDER:-Local}
       Storage__RootPath: /app/storage
-      Storage__S3__Endpoint: ${STORAGE_S3_ENDPOINT:-http://minio:9000}
+      Storage__S3__Endpoint: ${STORAGE_S3_ENDPOINT:-http://s3:9000}
       Storage__S3__Bucket: ${STORAGE_S3_BUCKET:-sitora}
       Storage__S3__AccessKey: ${STORAGE_S3_ACCESS_KEY:-}
       Storage__S3__SecretKey: ${STORAGE_S3_SECRET_KEY:-}
@@ -82,4 +85,4 @@ services:
 volumes:
   pgdata:
   files:
-  miniodata:
+  s3data:

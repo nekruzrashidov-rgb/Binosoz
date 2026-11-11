@@ -8,27 +8,28 @@ using Sitora.Infrastructure.Integrations;
 
 namespace Sitora.Tests.Infrastructure;
 
-// S3FileStorage на настоящем MinIO (Testcontainers, образ quay.io/minio/minio): запись, чтение, отказ перезаписать, удаление.
+// S3FileStorage на настоящем MinIO (Testcontainers, образ RustFS: образы MinIO больше не публикуются): запись, чтение, отказ перезаписать, удаление.
 // Без Docker (локальный прогон через SITORA_TEST_DB) тест помечается пропущенным, в CI Docker есть.
 public class S3FileStorageTests : IAsyncLifetime
 {
     private const string User = "sitora-test";
     private readonly string _password = Guid.NewGuid().ToString("N");
-    private IContainer? _minio;
+    private IContainer? _s3;
     private string? _skipReason;
 
     public async Task InitializeAsync()
     {
         try
         {
-            _minio = new ContainerBuilder("quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z")
-                .WithCommand("server", "/data")
-                .WithEnvironment("MINIO_ROOT_USER", User)
-                .WithEnvironment("MINIO_ROOT_PASSWORD", _password)
+            _s3 = new ContainerBuilder("rustfs/rustfs:1.0.5")
+                .WithEnvironment("RUSTFS_VOLUMES", "/data")
+                .WithEnvironment("RUSTFS_ADDRESS", "0.0.0.0:9000")
+                .WithEnvironment("RUSTFS_ACCESS_KEY", User)
+                .WithEnvironment("RUSTFS_SECRET_KEY", _password)
                 .WithPortBinding(9000, true)
-                .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(r => r.ForPort(9000).ForPath("/minio/health/live")))
+                .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(r => r.ForPort(9000).ForPath("/health")))
                 .Build();
-            await _minio.StartAsync();
+            await _s3.StartAsync();
         }
         catch (Exception e) when (Environment.GetEnvironmentVariable("CI") is null)
         {
@@ -38,15 +39,15 @@ public class S3FileStorageTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        if (_minio is not null)
-            await _minio.DisposeAsync();
+        if (_s3 is not null)
+            await _s3.DisposeAsync();
     }
 
     [SkippableFact]
-    public async Task SaveReadDelete_WorkOnMinio()
+    public async Task SaveReadDelete_WorkOnS3Server()
     {
         Skip.If(_skipReason is not null, _skipReason);
-        var endpoint = $"http://{_minio!.Hostname}:{_minio.GetMappedPublicPort(9000)}";
+        var endpoint = $"http://{_s3!.Hostname}:{_s3.GetMappedPublicPort(9000)}";
         const string bucket = "sitora-files";
         using (var admin = new AmazonS3Client(new BasicAWSCredentials(User, _password), new AmazonS3Config { ServiceURL = endpoint, ForcePathStyle = true, AuthenticationRegion = "us-east-1" }))
             await admin.PutBucketAsync(bucket);

@@ -87,7 +87,7 @@ services:
       Sentry__Dsn: ${SENTRY_DSN:-}
       Health__Key: ${HEALTH_KEY:-}
       Auth__RefreshCookie__Mode: ${AUTH_REFRESH_COOKIE_MODE:-Dual}
-      # Хранилище файлов: Local — том files ниже; S3 — MinIO / Cloudflare R2 / Backblaze B2 / AWS (docs/DEPLOY.md, «Файлы»).
+      # Хранилище файлов: Local — том files ниже; S3 — RustFS / MinIO / Cloudflare R2 / Backblaze B2 / AWS (docs/DEPLOY.md, «Файлы»).
       Storage__Provider: ${STORAGE_PROVIDER:-Local}
       Storage__RootPath: /app/storage
       Storage__S3__Endpoint: ${STORAGE_S3_ENDPOINT:-}
@@ -114,18 +114,21 @@ services:
       migrate:
         condition: service_completed_successfully
 
-  # Своё S3-хранилище на том же сервере (необязательно): docker compose -f docker-compose.prod.yml --profile minio up -d,
-  # затем STORAGE_PROVIDER=S3, STORAGE_S3_ENDPOINT=http://minio:9000 и ключи MinIO в .env. Бакет создаётся в консоли MinIO.
-  minio:
-    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
-    profiles: ["minio"]
+  # Своё S3-хранилище на том же сервере (необязательно, RustFS): docker compose -f docker-compose.prod.yml --profile s3 up -d,
+  # затем STORAGE_PROVIDER=S3, STORAGE_S3_ENDPOINT=http://s3:9000 и ключи в .env. Бакет создаётся в консоли (порт 9001
+  # наружу не открыт: ssh -L 9001:localhost:9001 и docker compose port).
+  s3:
+    image: rustfs/rustfs:1.0.5
+    profiles: ["s3"]
     restart: unless-stopped
-    command: ["server", "/data", "--console-address", ":9001"]
     environment:
-      MINIO_ROOT_USER: ${STORAGE_S3_ACCESS_KEY:?Задайте STORAGE_S3_ACCESS_KEY в файле .env}
-      MINIO_ROOT_PASSWORD: ${STORAGE_S3_SECRET_KEY:?Задайте STORAGE_S3_SECRET_KEY в файле .env}
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+      RUSTFS_ACCESS_KEY: ${STORAGE_S3_ACCESS_KEY:?Задайте STORAGE_S3_ACCESS_KEY в файле .env}
+      RUSTFS_SECRET_KEY: ${STORAGE_S3_SECRET_KEY:?Задайте STORAGE_S3_SECRET_KEY в файле .env}
     volumes:
-      - miniodata:/data
+      - s3data:/data
 
   caddy:
     image: caddy:2
@@ -149,6 +152,6 @@ volumes:
   files:
   logs:
   redisdata:
-  miniodata:
+  s3data:
   caddy_data:
   caddy_config:
