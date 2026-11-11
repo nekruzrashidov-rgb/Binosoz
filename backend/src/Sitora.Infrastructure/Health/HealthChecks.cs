@@ -1,7 +1,10 @@
 using Hangfire;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Sitora.Domain.Interfaces;
+using Sitora.Infrastructure.Integrations;
 
 namespace Sitora.Infrastructure.Health;
 
@@ -11,23 +14,46 @@ public static class HealthTags
     public const string Ready = "ready";
 }
 
-// Хранилище документов и фото доступно на запись: пробный файл создаётся и удаляется.
-public class StorageHealthCheck(IFileStorage storage) : IHealthCheck
+// Хранилище документов и фото работает по-настоящему: пробный объект записывается, читается обратно, сверяется и удаляется.
+// В Production файлы на диске без явного Storage__RootPath (папка внутри контейнера, на Render — временный диск)
+// пропадут при перезапуске: тогда Degraded с объяснением, хотя запись и проходит.
+public class StorageHealthCheck(IFileStorage storage, IOptions<StorageOptions> options, IHostEnvironment environment) : IHealthCheck
 {
+    public const string EphemeralWarning =
+        "Файлы хранятся на временном диске контейнера и пропадут при перезапуске: задайте Storage__Provider=S3 или Storage__RootPath на постоянном томе";
+
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct = default)
     {
         var key = $"health/probe-{Guid.NewGuid():N}.tmp";
+        var probe = System.Security.Cryptography.RandomNumberGenerator.GetBytes(16);
         try
         {
-            await storage.SaveAsync(key, new MemoryStream([1]), ct);
-            await storage.DeleteAsync(key, ct);
-            return HealthCheckResult.Healthy();
+            await storage.SaveAsync(key, new MemoryStream(probe), ct);
+            try
+            {
+                await using var read = await storage.OpenReadAsync(key, ct);
+                using var copy = new MemoryStream();
+                await read.CopyToAsync(copy, ct);
+                if (!copy.ToArray().AsSpan().SequenceEqual(probe))
+                    return HealthCheckResult.Unhealthy("Хранилище файлов вернуло не то, что было записано");
+            }
+            finally
+            {
+                await storage.DeleteAsync(key, ct);
+            }
         }
         catch (Exception e)
         {
-            return HealthCheckResult.Unhealthy("Хранилище файлов недоступно на запись", e);
+            return HealthCheckResult.Unhealthy("Хранилище файлов недоступно", e);
         }
+
+        return IsEphemeral(options.Value, environment)
+            ? HealthCheckResult.Degraded(EphemeralWarning)
+            : HealthCheckResult.Healthy();
     }
+
+    public static bool IsEphemeral(StorageOptions o, IHostEnvironment environment) =>
+        environment.IsProduction() && !o.IsS3 && string.IsNullOrWhiteSpace(o.RootPath);
 }
 
 // Сервер фоновых задач (снятие броней, курс) жив: недавний heartbeat в хранилище Hangfire.

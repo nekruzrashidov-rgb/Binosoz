@@ -16,7 +16,6 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 ENV ASPNETCORE_HTTP_PORTS=8080
 ENV ASPNETCORE_ENVIRONMENT=Production
-ENV Storage__RootPath=/app/storage
 EXPOSE 8080
 COPY --from=build /app/publish .
 # Сайт: страницы, скрипты и стили отдаёт сам API.

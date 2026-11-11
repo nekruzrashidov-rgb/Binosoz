@@ -50,6 +50,8 @@ public class SeedScriptTests(SitoraApiFactory factory) : IClassFixture<SitoraApi
         Assert.Equal([318_800m, 476_000m, 625_600m, 770_300m], result.Prices.Order());
     }
 
+    // Текст — файл scripts/seed.sql из репозитория, не ввод пользователя.
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "CA2100", Justification = "SQL из файла репозитория")]
     private async Task RunAsync(string sql)
     {
         await using var connection = new NpgsqlConnection(factory.ConnectionString);

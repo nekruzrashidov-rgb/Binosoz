@@ -128,7 +128,11 @@ public static class DependencyInjection
         AddEmailSender(services);
         services.AddHttpClient(NbtRateProvider.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(20));
         services.AddSingleton<IRateProvider, NbtRateProvider>();
-        services.AddSingleton<IFileStorage, LocalFileStorage>();
+        // Хранилище файлов выбирается настройкой Storage__Provider: Local (по умолчанию) или S3.
+        services.AddOptions<StorageOptions>().BindConfiguration(StorageOptions.SectionName);
+        services.AddSingleton<IFileStorage>(sp => sp.GetRequiredService<IOptions<StorageOptions>>().Value.IsS3
+            ? ActivatorUtilities.CreateInstance<S3FileStorage>(sp)
+            : ActivatorUtilities.CreateInstance<LocalFileStorage>(sp));
         services.AddSingleton<IPdfGenerator, QuestPdfGenerator>();
 
         services.AddHangfire((sp, config) => config
