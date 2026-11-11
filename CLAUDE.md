@@ -84,24 +84,41 @@ Binosoz/
 │   └── tests/
 │       └── Sitora.Tests/           ← 163 теста, Testcontainers, покрывают:
 │                                      auth, catalog, chat, payments, sales, security
-└── frontend/
-    ├── index.html             ← точка входа (сейчас SPA, будет multi-page)
-    ├── css/styles.css         ← 36 КБ, design tokens, компоненты
+└── frontend/                   ← vanilla JS без сборщика; сайт отдаёт сам API (wwwroot) и копия на Vercel
+    ├── index.html, apartments.html, about.html, gallery.html, contact.html   ← публичные страницы ЖК
+    ├── login.html, register.html, accept-invite.html, cabinet.html, crm.html, platform.html, payment.html,
+    │   404.html, offline.html     ← вход, кабинет, CRM, платформа, тестовый банк, ошибки
+    ├── manifest.json, sw.js       ← PWA (Service Worker «сначала сеть»), robots.txt, sitemap.xml
+    ├── css/styles.css             ← 171 КБ: токены (:root и [data-theme='dark']), все компоненты
     └── js/
-        ├── config.js          ← API_BASE, ORG_SLUG, контакты
-        ├── i18n.js            ← переводы RU/TJ (62 КБ)
-        ├── ui.js              ← h() DOM-builder, иконки, модалки, тосты
-        ├── api.js             ← все вызовы API, токены в localStorage
-        ├── app.js             ← шапка, роутинг (#hash), тема, язык
-        ├── site.js            ← публичный сайт: каталог, калькулятор, контакты
-        ├── house3d.js         ← 3D-модель дома (Three.js, 45 КБ)
-        ├── cabinet.js         ← кабинет покупателя + login (все шаги OTP/SMS)
-        ├── crm.js             ← CRM: лиды, сделки, пайплайн, отчёты (55 КБ)
-        ├── platform.js        ← раздел PlatformOwner
-        ├── panels.js          ← боковые панели (детали квартиры, бронь)
-        ├── mock.js            ← demo-режим без backend (57 КБ)
-        └── ai.js              ← AI-ассистент (3.5 КБ)
+        ├── tanzimot-api-url.js        ← config: API_BASE ('/api/v1'; Vercel → Render), ORG_SLUG, CONTACT, INSTALLMENT
+        ├── i18n/ru.js, tg.js, en.js   ← тексты (по 1550 ключей); ru — на каждой странице и запасной
+        ├── tarjumaho-ru-tg-en.js      ← S.t(), S.initLang()/S.setLang() (грузит tg/en по требованию), S.bus
+        ├── komponentho-modal-toast-tabs.js ← h() DOM-builder, иконки, модалки, тосты
+        ├── zaprosho-ba-backend.js     ← все вызовы API, токены (localStorage sitora.auth)
+        ├── routing-va-navigatsiya.js  ← запуск страницы: шапка, тема, язык, мобильное меню, reveal
+        ├── sahifai-asosi-script.js    ← публичный сайт: главная, каталог, калькулятор, контакты, футер
+        ├── modeli-3d-bino-script.js   ← 3D-дом каталога (Three.js r128, грузится лениво; единственный 3D-движок)
+        ├── galereya-script.js, dar-borai-mo-script.js ← /gallery (иллюстрации canvas), /about
+        ├── kabineti-xaridor-script.js ← вход и кабинет покупателя
+        ├── crm-script.js, panelho-crm-script.js ← CRM и её боковые панели
+        ├── superadmin-platform-script.js ← раздел PlatformOwner
+        ├── pardoxt-script.js          ← payment.html (тестовый банк)
+        ├── ai-assistent.js, pwa-sabt.js ← AI-ассистент, регистрация Service Worker
+        └── namunavi-malumot-mock.js   ← demo-бэкенд; сейчас ни одна страница его не подключает
 ```
+
+## Frontend: правила
+- **CSP** `script-src 'self' https://cdnjs.cloudflare.com`: никаких inline-скриптов и `onclick=` в HTML; все `<script src>` с `defer` (тест `FrontendTests`).
+- **Цвета — только токены**: `--ink/--ink-2/--muted` (текст), `--bg/--surface/--surface-2` (фоны), `--accent` (фон кнопок),
+  `--accent-text` (медный текст и ссылки), `--accent-2` (градиенты), статусы `--good/--warn/--bad/--info` и их `-soft`.
+  Полупрозрачность — `color-mix(in srgb, var(--accent) 20%, transparent)`. Хардкод цвета текста ломает тёмную тему.
+- **Тёмные секции** на светлом сайте (hero главной, рассрочка, «Остались вопросы?», футер, 3D-сцена, итог калькулятора)
+  переопределяют `--ink/--ink-2/--muted` локально — компоненты внутри сами светлые. Новую тёмную секцию добавлять в этот список.
+- **Тёмная тема**: `[data-theme='dark']` меняет токены; проверка — `scripts/check-contrast.js` (0 текстов ниже AA в обеих темах).
+- **Честные данные**: цифры, цены, свободные квартиры — только из API; `DEFAULT_*` в config — только для demo; пустой API —
+  карточка «Продажи скоро откроются». Ничего не выдумывать (даты, отзывы, фото).
+- **Переводы**: новый ключ — во все три файла `js/i18n/*.js`.
 
 ## Роли
 | Роль | Доступ |
@@ -163,8 +180,6 @@ Storage__RootPath=/app/files
 - Подробно: `docs/DEPLOY.md`
 
 ## Что планируется (следующие шаги)
-- Мультистраничный frontend: `login.html`, `cabinet.html`, `crm.html`, `platform.html`
-- Backend отдаёт frontend из `wwwroot/` (без Vercel)
 - Реальный SMS-провайдер (Tcell/Megafon Таджикистан)
 - Реальный курс НБТ
 - Хранение файлов в MinIO
