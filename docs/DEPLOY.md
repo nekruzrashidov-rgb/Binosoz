@@ -176,13 +176,26 @@ WEBAPI_IMAGE=ghcr.io/nekruzrashidov-rgb/binosoz-api:<полный sha преды
 - `GET /health/live` — процесс отвечает. По нему docker проверяет контейнер (`docker compose ps` показывает `healthy`), и Caddy ждёт его перед стартом.
 - `GET /health/ready` (и `/health`) — база, запись в хранилище файлов, сервер фоновых задач и Redis (если задан `Redis__ConnectionString`). Ответ: JSON со статусом каждой проверки; при проблеме с базой или файлами — 503, при остановленных фоновых задачах или недоступном Redis — `Degraded` с кодом 200.
 - Раз в 5 минут API сам проверяет `ready` и при смене состояния («не работает» / «снова работает») шлёт уведомление в канал менеджеров через `INotificationSender`. Пока Telegram — заглушка, сообщения видны только в логе и в таблице `Notifications`.
-- Если API упал целиком, он сам ни о чём не сообщит. Поэтому нужна внешняя проверка `https://api.sitora.tj/health/ready` раз в 1–5 минут — сервисом мониторинга доступности или cron-задачей на другом сервере.
+- Если API упал целиком, он сам ни о чём не сообщит. Поэтому нужна внешняя проверка `/health/live` раз в 1–5 минут — сервисом мониторинга доступности (UptimeRobot, Better Stack и т. п., с оповещением в Telegram) или cron-задачей на другом сервере.
+- `/health/ready` и `/health` подробно отвечают только из внутренней сети (localhost, docker, частные адреса) или с заголовком `X-Health-Key: <Health__Key>`. Снаружи без ключа — 404. `/health/live` открыт всегда.
+- Workflow **Smoke** (`.github/workflows/smoke.yml`) раз в час и вручную (Actions → Smoke → Run workflow) проверяет `/health/live` и что в каталоге организации есть дом (`scripts/smoke.sh`, только GET). Адрес и организация — переменные репозитория `SMOKE_API_URL`, `SMOKE_ORG`. Падение — письмо от GitHub.
+- Ошибки уровня Error уходят в Sentry/GlitchTip, если задан `Sentry__Dsn` (`SENTRY_DSN` в `.env`): без почт, телефонов, токенов и cookie. В каждом ответе-ошибке есть `traceId` — по нему запись ищется в логе и в Sentry.
+- Почта: `Email__Provider` должен быть `Smtp` или `Resend` — с `Dev` вне Development письма с кодами никуда не уходят и сотрудники не войдут.
 
 ## Полезное
 
 - Логи API — JSON. Они идут в stdout (`docker compose -f docker-compose.prod.yml logs --since 1h webapi`) и в файлы `/app/logs/sitora-ГГГГММДД.log` на томе `logs`: новый файл каждый день или при 100 МБ, хранятся 14 файлов. Посмотреть: `docker compose -f docker-compose.prod.yml exec webapi ls /app/logs`. В каждой записи о запросе есть `ClientIp` и `UserId`; запросы к `/health` в обычный лог не пишутся. Ротацию логов stdout настраивают в `/etc/docker/daemon.json` (`"log-opts": {"max-size": "50m", "max-file": "5"}`).
 - Подключиться к базе: `docker compose -f docker-compose.prod.yml exec db psql -U sitora -d sitora`.
 - Статус фоновых задач: в логах API (снятие броней каждые 5 минут, курс — раз в день в 10:00 по Душанбе).
+
+## Файлы на Render
+
+Диск Render временный: после каждого деплоя загруженные договоры и фото пропадают. API при старте в Production с `Storage__Provider=Local` без `Storage__RootPath` пишет в лог ошибку уровня Critical, а `/health/ready` отвечает `Degraded`. Варианты:
+
+1. **S3-совместимое хранилище** (Cloudflare R2, Backblaze B2, AWS S3, свой MinIO). Создать бакет и ключ доступа только к нему, затем в панели Render: `Storage__Provider=S3`, `Storage__S3__Endpoint` (для R2 — `https://<account>.r2.cloudflarestorage.com`, для AWS — пусто), `Storage__S3__Bucket`, `Storage__S3__AccessKey`, `Storage__S3__SecretKey`, `Storage__S3__Region` (R2 — `auto`).
+2. **Render Disk** (платный тариф): подключить диск, например, в `/var/data` и задать `Storage__RootPath=/var/data/storage`.
+
+После смены — `/health/ready` (с `X-Health-Key`) показывает `Healthy` у проверки `storage`: она пишет, читает и удаляет пробный файл.
 
 ## Демо-данные в пустой базе (Render)
 

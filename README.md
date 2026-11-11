@@ -49,6 +49,8 @@ dotnet user-secrets set "ConnectionStrings:Default" "Host=localhost;Port=5432;Da
 dotnet user-secrets set "Jwt:Key" "<не короче 32 символов>" --project backend/src/Sitora.WebApi
 dotnet user-secrets set "Encryption:Key" "<32 байта в base64>" --project backend/src/Sitora.WebApi
 dotnet user-secrets set "SEED_ADMIN_PASSWORD" "<пароль админа>" --project backend/src/Sitora.WebApi
+# Почта, для которой в Development подходит код 123456 (своя, в репозиторий не попадает):
+dotnet user-secrets set "Auth:DevFixedCodeEmails:0" "<ваша почта>" --project backend/src/Sitora.WebApi
 dotnet run --project backend/src/Sitora.WebApi
 ```
 

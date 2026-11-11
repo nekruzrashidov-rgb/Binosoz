@@ -57,7 +57,7 @@ Binosoz/
 │   │   │   ├── Data/
 │   │   │   │   ├── AppDbContext.cs
 │   │   │   │   ├── Configurations/ ← EF конфигурации сущностей
-│   │   │   │   ├── Migrations/     ← 7 миграций EF Core
+│   │   │   │   ├── Migrations/     ← миграции EF Core (24)
 │   │   │   │   └── Seed/           ← сидер (Development-данные)
 │   │   │   ├── Services/           ← вся бизнес-логика:
 │   │   │   │   AuthService.cs      (675 строк: email OTP, SMS, JWT, refresh, lockout)
@@ -75,14 +75,14 @@ Binosoz/
 │   │   │   ├── Jobs/               ← ExpireBookingsJob, UpdateRatesJob (Hangfire)
 │   │   │   └── Security/           ← JwtTokenService, EncryptionService (AES-256-GCM)
 │   │   └── Sitora.WebApi/          ← HTTP-слой
-│   │       ├── Controllers/        ← 22 тонких контроллера (принял DTO → сервис → ответ)
+│   │       ├── Controllers/        ← 37 тонких контроллеров (принял DTO → сервис → ответ)
 │   │       ├── Hubs/ChatHub.cs     ← SignalR: JoinDeal, SendMessage, messageReceived
 │   │       ├── Middleware/         ← DomainExceptionHandler, SecurityHeadersMiddleware,
 │   │       │                          ImpersonationAuditMiddleware
 │   │       ├── Validators/         ← FluentValidation
 │   │       └── Program.cs          ← точка входа, DI, пайплайн
 │   └── tests/
-│       └── Sitora.Tests/           ← 163 теста, Testcontainers, покрывают:
+│       └── Sitora.Tests/           ← 380 тестов, Testcontainers, покрывают:
 │                                      auth, catalog, chat, payments, sales, security
 └── frontend/                   ← vanilla JS без сборщика; сайт отдаёт сам API (wwwroot) и копия на Vercel
     ├── index.html, apartments.html, about.html, gallery.html, contact.html   ← публичные страницы ЖК
@@ -144,16 +144,20 @@ Binosoz/
 
 ## API
 - Префикс: `/api/v1`
-- Формат ошибок: Problem Details (RFC 7807)
-- Язык ответов: по заголовку `Accept-Language` (ru, tg)
-- Пагинация: `page` (от 1), `pageSize` (по умолчанию 20, макс 100)
+- Формат ошибок: Problem Details (RFC 9457) с `code` (snake_case) и `traceId`; тексты и коды — `Sitora.WebApi/Errors/ErrorCatalog.cs`.
+  Новая ошибка домена — строка в каталоге (ru, code, tg).
+- Язык ответов и ошибок: по заголовку `Accept-Language` (ru, tg)
+- Пагинация: `page` (от 1), `pageSize` (по умолчанию 20, макс 100); вне границ — тихо исправляется
+- Публичный каталог кэшируется (Output Cache, 15–30 с); изменения каталога сбрасывают тег `catalog`
 - Все эндпоинты: `docs/API_CONTRACT.md`
 
 ## Auth-флоу
 - **Сотрудники:** `POST /auth/email/send` → `POST /auth/email/verify` → (опционально) `POST /auth/second-factor`
 - **Покупатели:** `POST /auth/sms/send` → `POST /auth/sms/verify`
 - **Токены:** access (JWT, 15 мин) + refresh (64 байта, SHA-256 в БД, 30 дней, ротация)
-- **Dev-режим:** фиксированный код `123456` для тестирования (только `IsDevelopment()`)
+- **Refresh-cookie:** `sitora_rt` (HttpOnly, SameSite=Strict, `Path=/api/v1/auth`), режим `Auth__RefreshCookie__Mode` = Dual|Cookie|Body
+- **Dev-режим:** фиксированный код `123456` для тестирования (только `IsDevelopment()`); почты задаются в user-secrets:
+  `dotnet user-secrets set "Auth:DevFixedCodeEmails:0" "почта" --project src/Sitora.WebApi`
 
 ## Конфигурация (переменные окружения)
 ```
@@ -164,14 +168,19 @@ Telegram__BotToken=...
 Telegram__ChatId=...
 Auth__DevFixedCodeForAnyEmail=true   # только Development
 Hangfire__ServerEnabled=true
-Storage__RootPath=/app/files
+Storage__Provider=Local          # или S3 (MinIO, R2, B2, AWS): Storage__S3__Endpoint/Bucket/AccessKey/SecretKey/Region
+Storage__RootPath=/app/storage
+Sentry__Dsn=                     # пусто — ошибки никуда не отправляются
+Health__Key=                     # ключ X-Health-Key для /health/ready снаружи
+Auth__RefreshCookie__Mode=Dual
+Logging__File__Enabled=true      # файлы логов (только VPS; на Render — stdout)
 ```
 
 ## Что сейчас заглушки (нужно заменить перед продакшеном)
 - **SMS** — `SmsStubSender`: пишет код в лог. Заменить на реального провайдера.
 - **Telegram** — `TelegramStubSender`: пишет в лог. Заменить на `TelegramBotClient`.
 - **Курс НБТ** — `NbtRateStubProvider`: ничего не загружает. Заменить на парсинг nbt.tj.
-- **Файлы** — хранятся на диске (`/app/files`). Заменить на MinIO/S3 для продакшена.
+- **Файлы** — `Storage__Provider=Local` (диск) или `S3`. На Render диск временный — нужен S3/R2 или Render Disk (см. `docs/DEPLOY.md`).
 
 ## Деплой
 - Dev: `docker compose up -d` (PostgreSQL на порту 5433)
@@ -182,5 +191,4 @@ Storage__RootPath=/app/files
 ## Что планируется (следующие шаги)
 - Реальный SMS-провайдер (Tcell/Megafon Таджикистан)
 - Реальный курс НБТ
-- Хранение файлов в MinIO
 - Онлайн-оплата (Alif, Корти Миллӣ)

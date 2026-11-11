@@ -84,6 +84,9 @@ services:
       Claude__ApiKey: ${CLAUDE_API_KEY:-}
       # JSON-логи в файлы на томе logs (по дню, 14 дней); stdout пишется всегда.
       Logging__File__Enabled: "true"
+      Sentry__Dsn: ${SENTRY_DSN:-}
+      Health__Key: ${HEALTH_KEY:-}
+      Auth__RefreshCookie__Mode: ${AUTH_REFRESH_COOKIE_MODE:-Dual}
       # Хранилище файлов: Local — том files ниже; S3 — MinIO / Cloudflare R2 / Backblaze B2 / AWS (docs/DEPLOY.md, «Файлы»).
       Storage__Provider: ${STORAGE_PROVIDER:-Local}
       Storage__RootPath: /app/storage
@@ -114,7 +117,7 @@ services:
   # Своё S3-хранилище на том же сервере (необязательно): docker compose -f docker-compose.prod.yml --profile minio up -d,
   # затем STORAGE_PROVIDER=S3, STORAGE_S3_ENDPOINT=http://minio:9000 и ключи MinIO в .env. Бакет создаётся в консоли MinIO.
   minio:
-    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
     profiles: ["minio"]
     restart: unless-stopped
     command: ["server", "/data", "--console-address", ":9001"]
