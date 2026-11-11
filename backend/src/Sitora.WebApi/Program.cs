@@ -43,6 +43,7 @@ builder.Services.AddSerilog((services, logger) =>
         .Enrich.FromLogContext();
     // Файлы логов — только где есть постоянный диск (VPS с томом logs): Logging__File__Enabled=true.
     // На Render диск временный, там лог — только stdout (JSON), его собирает сам хостинг.
+    logger.WriteToSentryIfConfigured(builder.Configuration, builder.Environment);
     if (builder.Configuration.GetValue("Logging:File:Enabled", false))
         logger.WriteTo.File(
             new Serilog.Formatting.Compact.RenderedCompactJsonFormatter(),
@@ -179,6 +180,18 @@ if (migrateOnly)
     return 0;
 }
 
+// У каждого запроса — W3C Activity: её TraceId попадает в запись лога (Serilog) и в traceId ответа-ошибки.
+// ASP.NET Core создаёт её не всегда: например, если слушатель ActivitySource отказался от выборки запроса.
+app.Use(async (http, next) =>
+{
+    if (System.Diagnostics.Activity.Current is not null)
+    {
+        await next(http);
+        return;
+    }
+    using var activity = new System.Diagnostics.Activity("Sitora.Request").Start();
+    await next(http);
+});
 if (forwardedHeadersEnabled)
     app.UseForwardedHeaders();
 // Журнал запросов — снаружи обработчика исключений: так он видит итоговый код ответа.

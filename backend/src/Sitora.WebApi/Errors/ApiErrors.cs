@@ -98,7 +98,8 @@ public static partial class ApiErrors
 
         // Внутренности исключений наружу не отдаются (в Development ASP.NET добавил бы их в extensions).
         problem.Extensions.Remove("exception");
-        problem.Extensions[TraceIdKey] = Activity.Current?.Id ?? http.TraceIdentifier;
+        // Тот же идентификатор, что TraceId в записи лога о запросе (Serilog, поле @tr): по нему ошибку находят в логах.
+        problem.Extensions[TraceIdKey] = Activity.Current?.TraceId.ToString() ?? http.TraceIdentifier;
 
         if (IsTajik(http))
         {
