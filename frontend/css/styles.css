@@ -644,8 +644,9 @@ body:has(.lux) { background: #f5f0e8; }
 .scroll-hint svg { width: 20px; height: 20px; }
 @keyframes bounce { 0%, 100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, 8px); } }
 
-/* 2. numbers — dark strip */
+/* 2. numbers strip */
 .lux-numbers { background: #1a1510; border-block: 1px solid rgba(200,105,42,0.2); padding-block: 56px; }
+[data-theme='light'] .lux-numbers { background: #2c2016; }
 .nums-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; text-align: center; }
 .num-cell + .num-cell { border-left: 1px solid rgba(255,255,255,0.08); }
 .num-cell b {
@@ -986,15 +987,15 @@ a.float-card.tg:hover { border-color: rgba(34, 158, 217, 0.75); background: rgba
 .rev-card footer small { color: rgba(255, 255, 255, 0.5); }
 
 /* catalog hero */
-.cat-hero { padding-block: 34px 30px; background: radial-gradient(700px 300px at 90% 0%, rgba(201, 162, 39, 0.12), transparent 60%), var(--lux-navy, #060d1f); }
+.cat-hero { padding-block: 34px 30px; background: var(--bg); border-bottom: 1px solid var(--line); }
 .cat-hero-in { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
-.cat-hero-text { padding-left: 20px; border-left: 3px solid #c9a227; }
-.cat-hero-text h1 { font-family: var(--display); font-size: clamp(28px, 5vw, 52px); margin: 10px 0 8px; }
-.cat-hero-text p { color: var(--lux-mute, rgba(255, 255, 255, 0.62)); max-width: 56ch; }
-.crumbs { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.5); }
-.crumbs a { color: rgba(255, 255, 255, 0.65); }
-.crumbs a:hover { color: #f2d27a; text-decoration: none; }
-.crumbs [aria-current] { color: rgba(255, 255, 255, 0.85); }
+.cat-hero-text { padding-left: 20px; border-left: 3px solid var(--accent); }
+.cat-hero-text h1 { font-family: var(--display); font-size: clamp(28px, 5vw, 52px); margin: 10px 0 8px; color: var(--ink); }
+.cat-hero-text p { color: var(--muted); max-width: 56ch; }
+.crumbs { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.crumbs a { color: var(--ink-2); }
+.crumbs a:hover { color: var(--accent); text-decoration: none; }
+.crumbs [aria-current] { color: var(--ink); }
 .cat-hero-contact { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .cat-call { display: flex; align-items: center; gap: 12px; padding: 10px 18px 10px 10px; border-radius: 999px; color: #fff; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(201, 162, 39, 0.3); }
 .cat-call:hover { text-decoration: none; border-color: rgba(201, 162, 39, 0.6); }
@@ -1024,8 +1025,8 @@ a.float-card.tg:hover { border-color: rgba(34, 158, 217, 0.75); background: rgba
 }
 
 /* ---------- register: a developer's application ---------- */
-.reg-wrap { padding: clamp(28px, 6vw, 72px) 16px; background: radial-gradient(800px 420px at 50% 0%, rgba(201, 162, 39, 0.14), transparent 60%), radial-gradient(700px 500px at 0% 100%, rgba(91, 110, 249, 0.16), transparent 60%), var(--lux-navy, #060d1f); }
-.reg-card { width: 100%; max-width: 560px; margin: 0 auto; padding: clamp(24px, 5vw, 44px); border-radius: 24px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(201, 162, 39, 0.25); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35); }
+.reg-wrap { padding: clamp(28px, 6vw, 72px) 16px; background: var(--bg); }
+.reg-card { width: 100%; max-width: 560px; margin: 0 auto; padding: clamp(24px, 5vw, 44px); border-radius: 24px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); }
 .reg-brand { display: flex; align-items: center; gap: 10px; margin-top: 22px; }
 .reg-brand b { font-family: var(--display); letter-spacing: 0.06em; color: #fff; }
 .reg-card h1 { font-size: clamp(28px, 5vw, 40px); margin: 14px 0 10px; }
@@ -1504,7 +1505,7 @@ body.menu-open { overflow: hidden; }
 /* ───────── Block 3 ───────── */
 /* Floor plans on /apartments: four drawn plans with area and price badges. */
 .plan-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
-.plan-card { display: flex; flex-direction: column; border-radius: var(--r); overflow: hidden; background: var(--lux-navy-2, #0a1430); border: 1px solid rgba(201, 162, 39, 0.22); transition: transform 0.2s, border-color 0.2s; }
+.plan-card { display: flex; flex-direction: column; border-radius: var(--r); overflow: hidden; background: var(--surface); border: 1px solid var(--line); transition: transform 0.2s, border-color 0.2s; }
 .plan-card:hover { transform: translateY(-3px); border-color: rgba(201, 162, 39, 0.55); }
 .plan-canvas { display: block; width: 100%; height: auto; aspect-ratio: 32 / 22; }
 .plan-card-body { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px 16px; flex: 1; }
@@ -1517,9 +1518,9 @@ body.menu-open { overflow: hidden; }
 @media (max-width: 560px) { .plan-grid { grid-template-columns: minmax(0, 1fr); } }
 
 /* /about */
-.about-page { background: var(--lux-navy, #060d1f); color: #eef2ff; }
+.about-page { background: var(--bg); color: var(--ink); }
 .about-hero { min-height: 480px; display: flex; align-items: center; padding-block: 56px; color: #fff;
-  background: radial-gradient(800px 420px at 85% 10%, rgba(201, 162, 39, 0.18), transparent 60%), radial-gradient(700px 400px at 5% 100%, rgba(64, 92, 190, 0.3), transparent 60%), #060d1f; }
+  background: linear-gradient(135deg, #2c1a0e 0%, #1a1008 100%); }
 .about-title { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 7vw, 76px); line-height: 1.02; letter-spacing: -0.01em; margin: 18px 0 14px;
   background: linear-gradient(120deg, #fff 30%, #f2d48a 60%, #c9a227); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .about-lead { font-size: clamp(16px, 2.2vw, 20px); color: rgba(238, 242, 255, 0.78); max-width: 52ch; }
@@ -1553,9 +1554,9 @@ body.menu-open { overflow: hidden; }
 @media (max-width: 420px) { .about-feats { grid-template-columns: minmax(0, 1fr); } .about-hero { min-height: 380px; } }
 
 /* /gallery: filters, grid of drawings, lightbox */
-.gallery-page { background: var(--lux-navy, #060d1f); color: #eef2ff; }
+.gallery-page { background: var(--bg); color: var(--ink); }
 .gal-filters { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 22px; -webkit-overflow-scrolling: touch; }
-.gal-filter { flex: none; min-height: 40px; padding: 8px 16px; border-radius: 999px; font-weight: 700; font-size: 14px; cursor: pointer; color: rgba(255, 255, 255, 0.75); background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(201, 162, 39, 0.25); }
+.gal-filter { flex: none; min-height: 40px; padding: 8px 16px; border-radius: 999px; font-weight: 700; font-size: 14px; cursor: pointer; color: var(--ink-2); background: var(--surface); border: 1px solid var(--line); }
 .gal-filter:hover { color: #fff; border-color: rgba(201, 162, 39, 0.6); }
 .gal-filter.on { background: #c9a227; color: #1b1405; border-color: #c9a227; }
 .galpg-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }

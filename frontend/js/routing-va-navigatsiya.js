@@ -36,10 +36,10 @@
   };
 
   function applyTheme() {
-    // Public pages: default dark (showroom), but allow manual light toggle saved in localStorage
+    // Public pages: default light (warm showroom), but allow manual dark toggle saved in localStorage
     if (isPublic || page === 'login') {
       const v = S.store.get('sitora.theme');
-      document.documentElement.dataset.theme = (v === 'light') ? 'light' : 'dark';
+      document.documentElement.dataset.theme = (v === 'dark') ? 'dark' : 'light';
       return;
     }
     const v = S.store.get('sitora.theme'); if (v === 'dark' || v === 'light') document.documentElement.dataset.theme = v; else delete document.documentElement.dataset.theme;
