@@ -32,6 +32,22 @@
 - [ ] Заменить `Email__InviteUrl` на `…/login#invite=` (старые ссылки тоже работают).
 - [ ] После проверки удалить `frontend/spa.html`, `app.js`, `mock.js` и `vercel.json`, если демо-режим без сервера больше не нужен.
 
+## Проверка «листа минусов» (11.11.2026)
+
+Каждый пункт сверен с кодом. Уже было сделано (пункт из листа неверен): rate limiting на auth по IP (`Extensions/SecuritySetup.cs`, политики `login` и `sms`), бэкапы `pg_dump` (`scripts/backup.sh`, `restore.sh`, cron в `docs/DEPLOY.md`), сжатие `encode zstd gzip` в `deploy/Caddyfile`, отдельный слой `dotnet restore` в Dockerfile, мобильная CRM (меню-ящик, `css/styles.css` блок `max-width: 768px`), фильтр дат в отчётах, загрузка курса НБТ (`NbtRateProvider` + `UpdateRatesJob`), настоящий AI-ассистент на Claude, отсутствие inline-скриптов на страницах (кроме `nekruz3d.html` в CSP-песочнице).
+
+**Сделано ✅**
+- [x] Шаблон Excel для импорта квартир: `GET /apartments/import/template` и кнопка «Скачать шаблон» в CRM; тест: заполненный шаблон импортируется.
+- [x] PWA: `manifest.json`, `sw.js` (сначала сеть, кеш — только без сети; API, `/hubs`, `/files` не трогает), `offline.html`, регистрация в `js/pwa-sabt.js` на всех страницах. Проверено в браузере: Service Worker активен, в кеше только страницы, скрипты и стили.
+- [x] Процедура ротации секретов — `docs/SECURITY.md`, раздел «Ротация секретов».
+
+**Ждёт вас 📋**
+- [ ] SMS-провайдер: аккаунт, ключ, документация API (интерфейс `ISmsSender` готов).
+- [ ] Alif Pay: мерчант-аккаунт, ключи, документация (интерфейс `IPaymentGateway` готов, сейчас Mock).
+- [ ] Telegram: `Telegram__BotToken` (код бота есть).
+- [ ] Ротация `ENCRYPTION_KEY` невозможна без доработки: один ключ, без идентификатора.
+- [ ] Нет капчи, Web Push, окраски этажей 3D по % продаж, курса в калькуляторе рассрочки, refresh-токена в httpOnly cookie.
+
 ## Preview 🌐
 
 **https://binosoz-preview.vercel.app** — превью мультистраничного фронтенда (29.10.2026, проект Vercel `binosoz-preview`).
@@ -1120,7 +1136,7 @@ Admin входит во все наборы ролей, кроме кабине�
 - **Docker не запускался.** На машине разработки нет WSL. Docker-образ ни разу не собирался, `docker compose up` (и сервис `migrate`) не запускался, Caddy и выпуск HTTPS-сертификата не проверены. Скрипты `backup.sh` и `restore.sh` целиком не выполнялись — проверены только их команды. Инструкция `docs/DEPLOY.md` на VPS не проходилась.
 - **CI ни разу не запускался.** У репозитория нет удалённого репозитория на GitHub; синтаксис workflow проверен разбором YAML.
 - **Testcontainers** в тестах не выполнялись: все прогоны шли через `SITORA_TEST_DB` на локальном PostgreSQL под Windows. Поведение под Linux (культура `tg`, PDF) не проверено.
-- **Заглушки:** SMS (`SmsSender`), Telegram (`TelegramNotificationSender`), курс НБТ (`NbtRateProvider`). Они пишут в лог (Telegram — ещё и в таблицу `Notifications`). Вне Development вход покупателей по SMS не работает, курс USD вводится вручную.
+- **Заглушки:** SMS (`SmsSender`) пишет в лог — вне Development вход покупателей по SMS не работает; онлайн-оплата — `MockPaymentGateway`. Telegram-бот (`TelegramNotifier`) работает, если задан `Telegram__BotToken`; «колокольчик» (`TelegramNotificationSender`) пишет в таблицу `Notifications`. Курс НБТ (`NbtRateProvider`) скачивается с nbt.tj по расписанию, но на живом сайте НБТ не проверялся.
 - **Не сделаны пункты плана:**
   - 14 — тексты ошибок на таджикском (все ошибки только на русском);
   - 17 — настройки для Admin;
