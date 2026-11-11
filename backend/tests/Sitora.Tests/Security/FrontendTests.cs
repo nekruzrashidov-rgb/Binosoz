@@ -34,11 +34,29 @@ public class FrontendTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFa
     [InlineData("/js/routing-va-navigatsiya.js")]
     [InlineData("/css/styles.css")]
     [InlineData("/favicon.svg")]
+    [InlineData("/sw.js")]
+    [InlineData("/js/pwa-sabt.js")]
+    [InlineData("/offline.html")]
     public async Task Asset_IsServed(string path)
     {
         var response = await factory.CreateClient().GetAsync(path);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    // PWA: манифест отдаётся как JSON, страницы ссылаются на него и регистрируют Service Worker своим скриптом (без inline).
+    [Fact]
+    public async Task Pwa_ManifestServed_AndLinkedFromPages()
+    {
+        var client = factory.CreateClient();
+        var manifest = await client.GetAsync("/manifest.json");
+        Assert.Equal(HttpStatusCode.OK, manifest.StatusCode);
+        Assert.Equal("application/json", manifest.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("\"start_url\": \"/\"", await manifest.Content.ReadAsStringAsync());
+
+        var page = await (await client.GetAsync("/crm")).Content.ReadAsStringAsync();
+        Assert.Contains("<link rel=\"manifest\" href=\"/manifest.json\">", page);
+        Assert.Contains("<script src=\"/js/pwa-sabt.js\"></script>", page);
     }
 
     [Fact]

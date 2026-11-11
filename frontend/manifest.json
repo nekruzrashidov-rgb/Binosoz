@@ -1,0 +1,20 @@
+{
+  "name": "Binosoz — квартиры в новостройках",
+  "short_name": "Binosoz",
+  "description": "Каталог квартир, рассрочка, личный кабинет покупателя и CRM застройщика.",
+  "lang": "ru",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a1430",
+  "theme_color": "#0a1430",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Квартиры", "url": "/apartments" },
+    { "name": "Личный кабинет", "url": "/cabinet" },
+    { "name": "CRM", "url": "/crm" }
+  ]
+}
