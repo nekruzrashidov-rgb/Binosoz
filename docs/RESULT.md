@@ -34,7 +34,7 @@
 
 ## Проверка «листа минусов» (11.11.2026)
 
-Каждый пункт сверен с кодом. Уже было сделано (пункт из листа неверен): rate limiting на auth по IP (`Extensions/SecuritySetup.cs`, политики `login` и `sms`), бэкапы `pg_dump` (`scripts/backup.sh`, `restore.sh`, cron в `docs/DEPLOY.md`), сжатие `encode zstd gzip` в `deploy/Caddyfile`, отдельный слой `dotnet restore` в Dockerfile, мобильная CRM (меню-ящик, `css/styles.css` блок `max-width: 768px`), фильтр дат в отчётах, загрузка курса НБТ (`NbtRateProvider` + `UpdateRatesJob`), настоящий AI-ассистент на Claude, отсутствие inline-скриптов на страницах (кроме `nekruz3d.html` в CSP-песочнице).
+Каждый пункт сверен с кодом. Уже было сделано (пункт из листа неверен): rate limiting на auth по IP (`Extensions/SecuritySetup.cs`, политики `login` и `sms`), бэкапы `pg_dump` (`scripts/backup.sh`, `restore.sh`, cron в `docs/DEPLOY.md`), сжатие `encode zstd gzip` в `deploy/Caddyfile`, отдельный слой `dotnet restore` в Dockerfile, мобильная CRM (меню-ящик, `css/styles.css` блок `max-width: 768px`), фильтр дат в отчётах, загрузка курса НБТ (`NbtRateProvider` + `UpdateRatesJob`), настоящий AI-ассистент на Claude, отсутствие inline-скриптов на страницах на момент проверки (кроме `nekruz3d.html` в CSP-песочнице). **Внимание:** коммит 9468b19 («perf: оптимизация скорости загрузки») добавил в `frontend/index.html` inline-скрипт ленивой загрузки 3D — CSP `script-src 'self'` его блокирует, когда сайт отдаёт API; его нужно вынести в отдельный .js-файл.
 
 **Сделано ✅**
 - [x] Шаблон Excel для импорта квартир: `GET /apartments/import/template` и кнопка «Скачать шаблон» в CRM; тест: заполненный шаблон импортируется.
