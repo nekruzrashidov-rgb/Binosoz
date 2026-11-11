@@ -149,7 +149,7 @@
       drawPublicHeader();
       S.bus && S.bus.emit('theme');
     };
-    const themeLabel = isDark() ? 'Дневной режим' : 'Ночной режим'; // TODO: i18n
+    const themeLabel = t(isDark() ? 'nav.themeLight' : 'nav.themeDark');
     const themeRow = h('div', { class: 'mob-lang' }, h('button', { class: 'mob-lang-btn', type: 'button', 'aria-label': themeLabel, onclick: toggleTheme }, (isDark() ? '☀️ ' : '🌙 ') + t('nav.theme')));
     const { btn: menuBtn } = buildMobileOverlay([
       ['/', t('nav.home'), page === 'home'],
@@ -167,8 +167,10 @@
     }, isDark()
       ? h('span', { style: { fontSize: '18px', lineHeight: 1 } }, '☀️')
       : h('span', { style: { fontSize: '18px', lineHeight: 1 } }, '🌙'));
+    // The buyer sees the complex's name; Binosoz (the platform) only on the developers' page (/register) and in the footer.
+    const siteBrand = page === 'register' ? 'BINOSOZ' : t('login.heroName');
     header.className = 'top lux-top' + (S.api.isAuthed ? ' authed' : '');
-    header.replaceChildren(h('div', { class: 'wrap top-in' }, h('a', { class: 'brand', href: '/', 'aria-label': 'Binosoz' }, S.logo(), h('span', null, 'BINOSOZ')), menu, h('span', { class: 'spacer' }),
+    header.replaceChildren(h('div', { class: 'wrap top-in' }, h('a', { class: 'brand', href: '/', 'aria-label': siteBrand }, S.logo(), h('span', null, siteBrand)), menu, h('span', { class: 'spacer' }),
       phone, lang, themeToggle, accountLink(), menuBtn));
   }
 

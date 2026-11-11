@@ -176,6 +176,9 @@
     g.fillStyle = GOLD2; g.font = '600 10px Inter, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(t('galpg.illustration'), W - 48, H - 13);
   }
 
+  // The landing's gallery block draws the same illustrations (no stock photos of other cities).
+  S.paintGalleryScene = paint;
+
   S.views.gallery = function (root) {
     const site = S.site;
     let filter = 'all', lightbox = null;

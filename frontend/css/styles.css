@@ -593,7 +593,7 @@ body:has(.lux) { background: var(--bg); }
 .lux-hero {
   position: relative; isolation: isolate; overflow: hidden; display: flex; align-items: center; color: #fff;
   min-height: calc(100svh - var(--top-h)); padding-block: 56px 120px;
-  background: #12100e url('https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1600&q=80&auto=format') center 30% / cover no-repeat;
+  background: radial-gradient(ellipse 100% 80% at 70% 45%, #2e2014 0%, #120e0a 62%);
 }
 .lux-hero::before {
   content: ''; position: absolute; inset: 0; z-index: 0;
@@ -999,9 +999,9 @@ a.float-card.tg:hover { border-color: rgba(34, 158, 217, 0.75); background: rgba
 .crumbs a:hover { color: var(--accent); text-decoration: none; }
 .crumbs [aria-current] { color: var(--ink); }
 .cat-hero-contact { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.cat-call { display: flex; align-items: center; gap: 12px; padding: 10px 18px 10px 10px; border-radius: 999px; color: #fff; background: rgba(255, 255, 255, 0.05); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+.cat-call { display: flex; align-items: center; gap: 12px; padding: 10px 18px 10px 10px; border-radius: 999px; color: var(--ink); background: var(--surface); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
 .cat-call:hover { text-decoration: none; border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
-.cat-call small { display: block; color: rgba(255, 255, 255, 0.55); font-size: 12px; font-weight: 600; }
+.cat-call small { display: block; color: var(--muted); font-size: 12px; font-weight: 600; }
 .cat-call b { font-family: var(--display); font-weight: 600; }
 
 /* FAQ */
@@ -1521,11 +1521,11 @@ body.menu-open { overflow: hidden; }
 
 /* /about */
 .about-page { background: var(--bg); color: var(--ink); }
-.about-hero { min-height: 480px; display: flex; align-items: center; padding-block: 56px; color: #fff;
-  background: linear-gradient(135deg, #2c1a0e 0%, #1a1008 100%); }
+.about-hero { min-height: 360px; display: flex; align-items: center; padding-block: 56px; color: var(--ink);
+  background: radial-gradient(900px 420px at 90% 0%, var(--accent-soft), transparent 60%), var(--surface-2); border-bottom: 1px solid var(--line); }
 .about-title { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 7vw, 76px); line-height: 1.02; letter-spacing: -0.01em; margin: 18px 0 14px;
-  background: linear-gradient(120deg, #fff 30%, var(--accent-2) 60%, var(--accent)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.about-lead { font-size: clamp(16px, 2.2vw, 20px); color: rgba(238, 242, 255, 0.78); max-width: 52ch; }
+  color: var(--ink); }
+.about-lead { font-size: clamp(16px, 2.2vw, 20px); color: var(--ink-2); max-width: 52ch; }
 .about-chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
 .about-chip { padding: 9px 16px; border-radius: 999px; font-weight: 700; font-size: 14px; color: var(--accent-text); background: color-mix(in srgb, var(--accent) 12%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
 .about-cols { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 40px; align-items: start; }
@@ -1709,10 +1709,9 @@ body.menu-open { overflow: hidden; }
 
 .wow-hero {
   position: relative; overflow: hidden;
-  min-height: calc(100svh - var(--top-h));
+  min-height: min(calc(100svh - var(--top-h)), 860px);
   display: flex; align-items: stretch;
-  /* Real building photo — dark exterior shot as on reference design */
-  background: #12100e url('https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1600&q=80&auto=format') center 30% / cover no-repeat;
+  background: radial-gradient(ellipse 100% 80% at 70% 45%, #2e2014 0%, #120e0a 62%);
 }
 /* Dark gradient overlay — left dark, right shows photo */
 .hero-mesh {
@@ -1791,7 +1790,7 @@ body.menu-open { overflow: hidden; }
 .lux-sec.alt-band { background: var(--surface); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .lux-head { margin-bottom: 40px; }
 .lux-head h2 { font-size: clamp(26px, 3.5vw, 42px); color: var(--ink); }
-.lux-head p { color: var(--muted); margin-top: 10px; max-width: 50ch; }
+.lux-head p { color: var(--muted); margin-top: 10px; max-width: 50ch; margin-inline: auto; }
 .lux-kicker { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent-text); margin-bottom: 12px; }
 .gold-text { color: var(--accent-text); }
 
@@ -1849,16 +1848,14 @@ body.menu-open { overflow: hidden; }
 @keyframes btnRipple { from { transform: scale(0); opacity: 0.5; } to { transform: scale(4); opacity: 0; } }
 
 /* ── Catalog ── */
-.apts-hero { min-height: 280px; display: flex; align-items: center; position: relative; overflow: hidden;
-  background: #12100e url('https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1200&q=70&auto=format') center 40% / cover no-repeat; }
-.apts-hero::before { content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(100deg, rgba(10,8,6,0.85) 0%, rgba(10,8,6,0.65) 60%, rgba(10,8,6,0.3) 100%); }
-.apts-hero > .wrap { position: relative; width: 100%; color: #fff; }
-.apts-hero-title { font-family: var(--display); font-size: clamp(28px, 5vw, 54px) !important; font-weight: 700; color: #fff; }
-.apts-hero-sub { font-size: 16px; margin-top: 8px; color: rgba(240,228,210,0.78); }
+.apts-hero { min-height: 240px; display: flex; align-items: center; position: relative; overflow: hidden; padding-block: 40px;
+  background: radial-gradient(900px 400px at 90% 0%, var(--accent-soft), transparent 60%), var(--surface-2); border-bottom: 1px solid var(--line); }
+.apts-hero > .wrap { position: relative; width: 100%; color: var(--ink); }
+.apts-hero .apts-hero-title { font-family: var(--display); font-size: clamp(28px, 5vw, 54px); font-weight: 700; color: var(--ink); }
+.apts-hero-sub { font-size: 16px; margin-top: 8px; color: var(--ink-2); }
 .apts-hero-stats { display: flex; gap: 32px; margin-top: 24px; flex-wrap: wrap; }
 .apts-hero-stat-num { display: block; font-family: var(--display); font-size: 32px; font-weight: 700; color: var(--accent-text); letter-spacing: -0.02em; }
-.apts-hero-stat-label { display: block; font-size: 12px; color: rgba(240,220,190,0.6); margin-top: 2px; }
+.apts-hero-stat-label { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
 #model3d-wrap { height: min(86vh, 860px); min-height: 520px; border-block: 1px solid var(--line); }
 @media (max-width: 768px) { #model3d-wrap { height: 70vh; min-height: 420px; } }
 /* Filters — светлые */
@@ -1875,10 +1872,10 @@ body.menu-open { overflow: hidden; }
 .apt-card.wow-apt:hover { transform: translateY(-5px); border-color: color-mix(in srgb, var(--accent) 50%, transparent); box-shadow: 0 16px 40px rgba(26,21,16,0.14); }
 .apt-card-top { height: 180px; position: relative; overflow: hidden; background: var(--surface-2); }
 .apt-status-badge { position: absolute; top: 12px; left: 12px; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; background: rgba(255,255,255,0.9); color: var(--ink); }
-.apt-status-badge.free { background: #e0f0e8; color: #2e7d55; }
-.apt-status-badge.booked { background: #faebd0; color: #a06020; }
-.apt-status-badge.sold { background: #f0e0de; color: #c0392b; }
-.apt-status-badge.onrequest { background: #e3eaf8; color: #3b6cb0; }
+.apt-status-badge.free { background: var(--good-soft); color: var(--good); }
+.apt-status-badge.booked { background: var(--warn-soft); color: var(--warn); }
+.apt-status-badge.sold { background: var(--bad-soft); color: var(--bad); }
+.apt-status-badge.onrequest { background: var(--info-soft); color: var(--info); }
 .apt-floor-badge { position: absolute; top: 12px; right: 12px; background: rgba(255,255,255,0.85); border: 1px solid var(--line); padding: 3px 8px; border-radius: 6px; font-size: 11px; color: var(--ink-2); }
 .wow-apt .apt-card-body { padding: 18px 20px; width: 100%; color: var(--ink); }
 .wow-apt .apt-card-price { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 20px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--accent-text); font-weight: 700; }
@@ -1972,12 +1969,12 @@ select.inp option { background: var(--surface); color: var(--ink); }
 
 /* Улучшенный фон hero — глубокий градиент с золотыми акцентами */
 .wow-hero {
-  background: radial-gradient(ellipse 100% 80% at 70% 50%, #0a1428 0%, #060d1f 60%);
+  background: radial-gradient(ellipse 100% 80% at 70% 45%, #2e2014 0%, #120e0a 62%);
 }
 .hero-mesh {
   background:
     radial-gradient(ellipse 55% 45% at 15% 55%, color-mix(in srgb, var(--accent) 18%, transparent) 0%, transparent 65%),
-    radial-gradient(ellipse 60% 50% at 85% 25%, rgba(29,74,208,0.12) 0%, transparent 65%),
+    radial-gradient(ellipse 60% 50% at 85% 25%, color-mix(in srgb, var(--accent-2) 10%, transparent) 0%, transparent 65%),
     radial-gradient(ellipse 40% 55% at 55% 85%, color-mix(in srgb, var(--accent) 10%, transparent) 0%, transparent 55%),
     radial-gradient(ellipse 30% 40% at 50% 10%, rgba(100,160,255,0.06) 0%, transparent 50%);
 }
@@ -2285,11 +2282,11 @@ a.float-card:hover {
 /* Dark islands on the light site (hero, numbers, installment, contact band, footer, contact page, calculator result):
    light text tokens inside them, so every component that uses var(--ink) / var(--ink-2) / var(--muted)
    — headings from ".lux h1, .lux h2, .lux h3" included — stays readable without its own white colour. */
-.wow-hero, .lux-hero, .about-hero, .apts-hero, .cat-hero, .hero, .lux-numbers, .lux-plan, .lux-contact, .lux-footer, .calc-out {
+.wow-hero, .lux-hero, .hero, .lux-plan, .lux-contact, .lux-footer, .calc-out {
   --ink: #f5ece0; --ink-2: #e2d3bf; --muted: #c9b8a2; --accent-text: #f0a56c;
 }
 /* The selected segment is a light pill even inside a dark island: dark text on it. */
-:is(.wow-hero, .lux-hero, .about-hero, .apts-hero, .cat-hero, .hero, .lux-numbers, .lux-plan, .lux-contact, .lux-footer, .calc-out) .seg button.on { color: #1a1510; }
+:is(.wow-hero, .lux-hero, .hero, .lux-plan, .lux-contact, .lux-footer, .calc-out) .seg button.on { color: #1a1510; }
 /* Phones: the public header keeps the logo, «Войти» and the menu button (44px touch targets);
    the languages and the theme switch are in the menu. */
 @media (max-width: 560px) {
@@ -2298,3 +2295,33 @@ a.float-card:hover {
   .lux-top .top-in .menu-btn { width: 44px; height: 44px; flex-shrink: 0; }
   .lux-top .top-in .brand { min-width: 0; }
 }
+
+/* Installment terms: always an even row of three (one column on a phone), not the floor plans' 2-column grid. */
+.lux-plan .plan-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 900px; margin: 0 auto; }
+@media (max-width: 560px) { .lux-plan .plan-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Landing gallery: six drawn illustrations, 3 × 2 on a desktop, 2 × 3 on a tablet, one column on a phone. */
+.gal-grid.gal-grid--real { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.gal-card--photo canvas { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; }
+@media (max-width: 900px) { .gal-grid.gal-grid--real { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 540px) { .gal-grid.gal-grid--real { grid-template-columns: minmax(0, 1fr); } }
+
+/* No apartments yet: one honest block instead of invented prices. */
+.soon-block { max-width: 640px; margin: 0 auto; padding: 28px; text-align: center; display: grid; gap: 12px; justify-items: center; }
+.soon-block .row { justify-content: center; flex-wrap: wrap; gap: 10px; }
+
+/* Gallery filters on a phone: a fade on the right edge shows that the row scrolls. */
+@media (max-width: 768px) {
+  .gal-filters { -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); padding-right: 32px; }
+}
+
+/* The landing hero fits the first screen on a laptop (it was 1227px tall on an 834px screen): smaller paddings and the
+   poster no taller than the screen allows, so the scroll hint stays in view. */
+@media (min-width: 901px) {
+  .lux-hero.wow-hero { padding-block: 0; }
+  .wow-hero-in { padding-block: 40px 72px; }
+  .hero-3d-frame { max-height: max(320px, calc(100svh - var(--top-h) - 230px)); }
+}
+
+/* Catalog: the veil over the 3D stage while the data and the engine load. */
+.hero-loading { position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; color: var(--ink-2); font-weight: 700; background: #120e0a; }
