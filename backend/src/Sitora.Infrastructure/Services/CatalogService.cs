@@ -18,7 +18,8 @@ public class CatalogService(
     IAuditService audit,
     ICurrentUser currentUser,
     ApartmentImporter importer,
-    ITariffService tariffs) : ICatalogService
+    ITariffService tariffs,
+    TimeProvider timeProvider) : ICatalogService
 {
     private const string BuildingNotFound = "Дом не найден";
     private const string FloorNotFound = "Этаж не найден";
@@ -53,7 +54,7 @@ public class CatalogService(
                 .Skip(p.Skip).Take(p.PageSize)
                 .Select(ToBuildingResponse(tg))
                 .ToListAsync(ct);
-            return new PagedResult<BuildingResponse>(items, p.Page, p.PageSize, total);
+            return new PagedResult<BuildingResponse>(await WithExpiredReleasedAsync(db, timeProvider, items, ct), p.Page, p.PageSize, total);
         });
     }
 
@@ -70,8 +71,9 @@ public class CatalogService(
     {
         var tg = IsTajik;
         return Cached($"building:{id}:{tg}", async () =>
-            await db.Buildings.AsNoTracking().Where(b => b.Id == id).Select(ToBuildingResponse(tg)).FirstOrDefaultAsync(ct)
-            ?? throw new NotFoundException(BuildingNotFound));
+            (await WithExpiredReleasedAsync(db, timeProvider, [
+                await db.Buildings.AsNoTracking().Where(b => b.Id == id).Select(ToBuildingResponse(tg)).FirstOrDefaultAsync(ct)
+                ?? throw new NotFoundException(BuildingNotFound)], ct))[0]);
     }
 
     public Task<PagedResult<FloorResponse>> GetFloorsAsync(Guid buildingId, int page, int pageSize, CancellationToken ct = default)
@@ -88,6 +90,10 @@ public class CatalogService(
                 .Skip(p.Skip).Take(p.PageSize)
                 .Select(ToFloorResponse)
                 .ToListAsync(ct);
+            var floorIds = items.Select(f => f.Id).ToList();
+            var stale = await ExpiredBookedAsync(db, timeProvider, db.Apartments.Where(a => floorIds.Contains(a.FloorId)), ct);
+            items = items.Select(f => stale.Count(x => x.FloorId == f.Id) is var n and > 0
+                ? f with { FreeApartments = f.FreeApartments + n } : f).ToList();
             return new PagedResult<FloorResponse>(items, p.Page, p.PageSize, total);
         });
     }
@@ -106,14 +112,64 @@ public class CatalogService(
                 .Skip(p.Skip).Take(p.PageSize)
                 .Select(ToApartmentResponse)
                 .ToListAsync(ct);
-            return new PagedResult<ApartmentResponse>(items, p.Page, p.PageSize, total);
+            return new PagedResult<ApartmentResponse>(await ReleaseExpiredAsync(items, ct), p.Page, p.PageSize, total);
         });
     }
 
     public Task<ApartmentResponse> GetApartmentAsync(Guid id, CancellationToken ct = default) =>
         Cached($"apartment:{id}", async () =>
-            await db.Apartments.AsNoTracking().Where(a => a.Id == id).Select(ToApartmentResponse).FirstOrDefaultAsync(ct)
-            ?? throw new NotFoundException(ApartmentNotFound));
+            (await ReleaseExpiredAsync([
+                await db.Apartments.AsNoTracking().Where(a => a.Id == id).Select(ToApartmentResponse).FirstOrDefaultAsync(ct)
+                ?? throw new NotFoundException(ApartmentNotFound)], ct))[0]);
+
+    // Бронь истекла, а фоновая задача (раз в 5 минут; на Render сервис засыпает, и задача не идёт) её ещё не сняла:
+    // для каталога квартира уже свободна. Брони читаются без фильтров организации: квартиры уже отобраны запросом
+    // с фильтрами, а гость брони видеть не может — иначе истёкшие брони для него не нашлись бы.
+    // Счётчики свободных квартир у этажей и домов считаются так же, чтобы не расходиться со списком квартир.
+    private async Task<List<ApartmentResponse>> ReleaseExpiredAsync(List<ApartmentResponse> items, CancellationToken ct)
+    {
+        var booked = items.Where(a => a.Status == ApartmentStatus.Booked).Select(a => a.Id).ToList();
+        if (booked.Count == 0)
+            return items;
+        var expired = await ExpiredAsync(db, timeProvider, booked, ct);
+        return items.Select(a => expired.Contains(a.Id) ? a with { Status = ApartmentStatus.Free } : a).ToList();
+    }
+
+    // Квартиры из scope в статусе Booked с истёкшей, но ещё не снятой бронью: этаж и дом каждой.
+    private static async Task<List<(Guid FloorId, Guid BuildingId)>> ExpiredBookedAsync(
+        AppDbContext db, TimeProvider timeProvider, IQueryable<Apartment> scope, CancellationToken ct)
+    {
+        var booked = await scope.AsNoTracking().Where(a => a.Status == ApartmentStatus.Booked)
+            .Select(a => new { a.Id, a.FloorId, a.Floor.BuildingId })
+            .ToListAsync(ct);
+        if (booked.Count == 0)
+            return [];
+        var expired = await ExpiredAsync(db, timeProvider, booked.Select(a => a.Id).ToList(), ct);
+        return booked.Where(a => expired.Contains(a.Id)).Select(a => (a.FloorId, a.BuildingId)).ToList();
+    }
+
+    // Booked бывает и без брони (сделку вернули на этап «Бронь») — такие квартиры не трогаются: свободной
+    // считается только квартира, у которой действующая по статусу бронь уже истекла.
+    private static async Task<HashSet<Guid>> ExpiredAsync(AppDbContext db, TimeProvider timeProvider, List<Guid> apartmentIds, CancellationToken ct)
+    {
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        return (await db.Bookings.IgnoreQueryFilters().AsNoTracking()
+            .Where(b => apartmentIds.Contains(b.ApartmentId) && b.Status == BookingStatus.Active && b.ExpiresAt <= now)
+            .Select(b => b.ApartmentId)
+            .ToListAsync(ct)).ToHashSet();
+    }
+
+    // Для списков домов (каталог и публичная страница бренда): FreeApartments с учётом истёкших броней.
+    internal static async Task<List<BuildingResponse>> WithExpiredReleasedAsync(
+        AppDbContext db, TimeProvider timeProvider, List<BuildingResponse> items, CancellationToken ct)
+    {
+        if (items.Count == 0)
+            return items;
+        var buildingIds = items.Select(b => b.Id).ToList();
+        var stale = await ExpiredBookedAsync(db, timeProvider, db.Apartments.Where(a => buildingIds.Contains(a.Floor.BuildingId)), ct);
+        return items.Select(b => stale.Count(x => x.BuildingId == b.Id) is var n and > 0
+            ? b with { FreeApartments = b.FreeApartments + n } : b).ToList();
+    }
 
     // Дом создаёт владелец в своей организации (создатель платформы — войдя как владелец).
     public async Task<BuildingResponse> CreateBuildingAsync(SaveBuildingRequest request, CancellationToken ct = default)

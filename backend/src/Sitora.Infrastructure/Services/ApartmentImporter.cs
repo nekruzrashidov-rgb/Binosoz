@@ -230,10 +230,22 @@ public class ApartmentImporter(AppDbContext db, IAuditService audit)
         return null;
     }
 
+    // Деньги и площадь — сразу decimal: число из ячейки переводится в decimal без промежуточной арифметики в double
+    // (345 678,10 остаётся 345 678,10), текст «345 678,10» или «345678.10» тоже принимается. Округление до 2 знаков
+    // по правилу проекта (от нуля).
     private static decimal? ReadDecimal(IXLCell cell, string column, List<string> errors)
     {
-        if (cell.TryGetValue(out double value))
-            return Math.Round((decimal)value, 2);
+        decimal? value = null;
+        if (cell.DataType == XLDataType.Number)
+            value = (decimal)cell.GetDouble();
+        else if (cell.DataType == XLDataType.Text)
+        {
+            var text = cell.GetString().Replace(" ", "").Replace(" ", "").Replace(",", ".");
+            if (decimal.TryParse(text, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var parsed))
+                value = parsed;
+        }
+        if (value is { } v)
+            return Math.Round(v, 2, MidpointRounding.AwayFromZero);
         errors.Add($"столбец «{column}» должен быть числом");
         return null;
     }

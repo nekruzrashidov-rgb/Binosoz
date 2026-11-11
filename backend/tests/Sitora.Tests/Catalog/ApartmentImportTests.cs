@@ -77,6 +77,27 @@ public class ApartmentImportTests(SitoraApiFactory factory) : IClassFixture<Sito
         Assert.Equal(HttpStatusCode.OK, move.StatusCode);
     }
 
+    // Деньги и площадь читаются из Excel как decimal: в базе ровно то, что в ячейке (decimal(18,2)).
+    [Fact]
+    public async Task Import_FractionalMoney_IsStoredExactly()
+    {
+        var client = await factory.CreateContentClientAsync();
+        var buildingId = await CreateBuildingAsync("Импорт копеек");
+
+        var response = await client.PostAsync($"/api/v1/apartments/import?buildingId={buildingId}", Excel(
+            [1, 101, 1, 40, 345678.10, 0],
+            [1, 102, 2, 60.5, 1234567.99, 1],
+            [2, 201, 0, 0.01, 9000, 0],
+            [2, 202, 1, "45,55", "7 500,25", 1]));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var rows = await factory.WithDbAsync(db => db.Apartments.Where(a => a.Floor.BuildingId == buildingId)
+            .OrderBy(a => a.Number).Select(a => new { a.Area, a.PricePerM2 }).ToListAsync());
+        Assert.Equal([40m, 60.5m, 0.01m, 45.55m], rows.Select(r => r.Area));
+        Assert.Equal([345678.10m, 1234567.99m, 9000m, 7500.25m], rows.Select(r => r.PricePerM2));
+    }
+
+
     [Fact]
     public async Task Import_WithErrors_Returns422AndSavesNothing()
     {

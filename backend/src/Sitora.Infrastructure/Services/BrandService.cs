@@ -45,6 +45,7 @@ public class BrandService(
             .OrderBy(b => b.NameRu).ThenBy(b => b.Id)
             .Select(CatalogService.ToBuildingResponse(tg))
             .ToListAsync(ct);
+        buildings = await CatalogService.WithExpiredReleasedAsync(db, timeProvider, buildings, ct);
 
         return new PublicBrandResponse(organization.Id, organization.Name, organization.Slug, organization.LogoUrl,
             organization.PrimaryColor, organization.Phone, organization.Telegram, organization.Address, buildings, organization.Email);

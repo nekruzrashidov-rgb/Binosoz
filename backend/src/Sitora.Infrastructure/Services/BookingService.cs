@@ -46,6 +46,10 @@ public class BookingService(
         await using (var transaction = await db.Database.BeginTransactionAsync(ct))
         {
             apartment = await db.LockApartmentAsync(apartmentId, ct);
+            // Прежняя бронь истекла, но фоновая задача её ещё не сняла (на Render сервис засыпает): снимаем здесь же,
+            // под той же блокировкой квартиры и с той же записью в аудит, что и задача.
+            if (apartment.Status == ApartmentStatus.Booked && await ExpireStaleBookingAsync(apartment, now, place.OrganizationId, ct))
+                await SaveAsync(ct);
             if (apartment.Status != ApartmentStatus.Free)
                 throw new ConflictException(AlreadyBooked);
 
@@ -163,6 +167,21 @@ public class BookingService(
 
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
+        return true;
+    }
+
+    private async Task<bool> ExpireStaleBookingAsync(Apartment apartment, DateTime now, Guid organizationId, CancellationToken ct)
+    {
+        var stale = await db.Bookings.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(b => b.ApartmentId == apartment.Id && b.Status == BookingStatus.Active, ct);
+        if (stale is null || stale.ExpiresAt > now)
+            return false;
+        var before = Snapshot(stale);
+        stale.Expire();
+        apartment.ReleaseBooking();
+        audit.Record(nameof(Booking), stale.Id, "Expired", before, Snapshot(stale), organizationId);
+        audit.Record(nameof(Apartment), apartment.Id, "StatusChanged",
+            new { Status = ApartmentStatus.Booked }, new { apartment.Status }, organizationId);
         return true;
     }
 
