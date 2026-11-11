@@ -38,7 +38,8 @@
     root.appendChild(document.body.dataset.page === 'login' ? loginShell(card) : h('div', { class: 'wrap page-in' }, loginBrand(), card));
     const tokenInHash = () => (location.hash.match(/reset=([A-Za-z0-9_-]+)/) || [])[1] || '';
     let resetToken = tokenInHash();
-    let who = resetToken || S.store.get('sitora.loginAs') !== 'buyer' ? 'staff' : 'buyer';
+    // Buyers sign in far more often than staff: their tab is the default; the last choice is remembered.
+    let who = resetToken || S.store.get('sitora.loginAs') === 'staff' ? 'staff' : 'buyer';
     let step = resetToken ? 'reset' : who, emailVal = '', timer = 0, tick = null, challenge = null, notice = '';
     const isEmail = (v) => /^\S+@\S+\.\S+$/.test(v);
     const badEmail = (form) => S.showErrors(form, { message: t('val.email'), errors: { email: [t('val.email')] } });
@@ -171,7 +172,7 @@
       const lang = h('div', { class: 'seg lg-lang', role: 'group', 'aria-label': 'Language' }, S.LANGS.map(([k, l]) => h('button', { type: 'button', class: S.lang === k ? 'on' : '', 'aria-pressed': String(S.lang === k), onclick: () => { if (S.lang !== k) S.setLang(k); } }, l)));
       const facts = h('ul', { class: 'lg-facts' },
         cc.address ? h('li', null, S.icon('pin'), cc.address) : null,
-        cc.phone ? h('li', null, S.icon('phone'), h('a', { href: 'tel:' + cc.phone.replace(/[^d+]/g, '') }, cc.phone)) : null);
+        cc.phone ? h('li', null, S.icon('phone'), h('a', { href: 'tel:' + cc.phone.replace(/[^\d+]/g, '') }, cc.phone)) : null);
       const hero = h('aside', { class: 'lg-hero' }, sky,
         h('div', { class: 'lg-hero-top' }, h('a', { class: 'lg-brand', href: '/', 'aria-label': t('login.toSite') }, S.logo(), h('span', null, 'BINOSOZ')), lang),
         h('div', { class: 'lg-hero-text' }, h('p', { class: 'lg-eyebrow' }, t('login.heroEyebrow')), h('h1', { class: 'lg-name' }, t('login.heroName')), h('p', { class: 'lg-sub' }, t('login.heroSub')), facts));

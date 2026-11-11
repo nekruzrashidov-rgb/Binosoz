@@ -268,7 +268,9 @@
     S.initLang();
     applyTheme();
     startProgress();
-    app.replaceChildren(header, main);
+    // Login and invitation pages draw no top bar (drawHeader skips them): an empty <header> left a blank 68px strip.
+    if (page === 'login' || page === 'accept-invite') app.replaceChildren(main);
+    else app.replaceChildren(header, main);
     // The real height of the top bar (taller with the "as owner" banner): sticky bars under it (CRM tabs) start there.
     if ('ResizeObserver' in window) new ResizeObserver(() => document.documentElement.style.setProperty('--hdr-h', header.offsetHeight + 'px')).observe(header);
     await S.api.restore();
