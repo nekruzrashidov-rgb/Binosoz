@@ -24,7 +24,10 @@ public class FrontendTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFa
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
-        Assert.Contains($"data-page=\"{page}\"", await response.Content.ReadAsStringAsync());
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains($"data-page=\"{page}\"", html);
+        // CSP script-src 'self' блокирует встроенный код: каждый <script> — только с src.
+        Assert.DoesNotMatch(@"<script(?![^>]*\ssrc=)[^>]*>", html);
         var policy = response.Headers.GetValues("Content-Security-Policy").Single();
         Assert.Contains("script-src 'self' https://cdnjs.cloudflare.com;", policy);
         Assert.Contains("connect-src 'self'", policy);
