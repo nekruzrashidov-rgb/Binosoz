@@ -76,9 +76,13 @@ public class RateLimitTests(LowRateLimitFactory factory) : IClassFixture<LowRate
     {
         var guest = factory.CreateClientWithIp("10.0.3.1");
         for (var i = 0; i < 20; i++)
-            Assert.Equal(HttpStatusCode.OK, (await guest.GetAsync("/api/v1/buildings")).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await guest.GetAsync("/api/v1/buildings?organization=nekruz")).StatusCode);
 
-        Assert.Equal(HttpStatusCode.TooManyRequests, (await guest.GetAsync("/api/v1/buildings")).StatusCode);
+        // Ответы каталога кэшируются, но лимит по IP стоит раньше кэша: 21-й запрос гостя — 429 с Retry-After.
+        var limited = await guest.GetAsync("/api/v1/buildings?organization=nekruz");
+        Assert.Equal(HttpStatusCode.TooManyRequests, limited.StatusCode);
+        Assert.NotNull(limited.Headers.RetryAfter);
+        Assert.Contains("Слишком много запросов", await limited.Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.OK, (await guest.GetAsync("/health/ready")).StatusCode);
 
         // Сотрудник с того же IP считается по своей учётной записи, а не по IP.
@@ -87,7 +91,7 @@ public class RateLimitTests(LowRateLimitFactory factory) : IClassFixture<LowRate
         var token = (await login.Content.ReadFromJsonAsync<AuthResponse>())!.AccessToken;
         var manager = factory.CreateClientWithIp("10.0.3.1");
         manager.DefaultRequestHeaders.Authorization = new("Bearer", token);
-        Assert.Equal(HttpStatusCode.OK, (await manager.GetAsync("/api/v1/buildings")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await manager.GetAsync("/api/v1/buildings?organization=nekruz")).StatusCode);
     }
 
     [Fact]

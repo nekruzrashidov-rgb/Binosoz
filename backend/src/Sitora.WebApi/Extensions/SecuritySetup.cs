@@ -20,8 +20,9 @@ public class RateLimitSettings
     // AI-помощник: каждое сообщение — платный запрос к Claude, поэтому лимит на пользователя.
     public int AiPerHour { get; set; } = 60;
 
-    // Общий лимит на все запросы: гости — на IP, вошедшие — на пользователя
-    // (сотрудники за одним офисным IP не мешают друг другу).
+    // Общий лимит на все запросы: гости — на IP (до входа и до кэша), вошедшие — на пользователя
+    // (сотрудники за одним офисным IP не мешают друг другу). 300 в минуту на IP, а не 120: каталог дома на сайте
+    // загружает этажи и квартиры десятками запросов, и семья или офис за одним NAT упирались бы в лимит.
     public int AnonymousPerMinute { get; set; } = 300;
     public int UserPerMinute { get; set; } = 600;
 }
@@ -46,24 +47,7 @@ public static class SecuritySetup
 
         services.AddRateLimiter(options =>
         {
-            options.OnRejected = async (context, _) =>
-            {
-                var response = context.HttpContext.Response;
-                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
-                    response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
-
-                response.StatusCode = StatusCodes.Status429TooManyRequests;
-                await context.HttpContext.RequestServices.GetRequiredService<IProblemDetailsService>().WriteAsync(new ProblemDetailsContext
-                {
-                    HttpContext = context.HttpContext,
-                    ProblemDetails =
-                    {
-                        Status = StatusCodes.Status429TooManyRequests,
-                        Title = "Слишком много запросов",
-                        Detail = "Слишком много запросов. Попробуйте позже"
-                    }
-                });
-            };
+            options.OnRejected = RejectAsync;
 
             options.AddPolicy(RateLimitPolicies.Login, context =>
                 PerIp(context, s => s.LoginPerMinute, TimeSpan.FromMinutes(1)));
@@ -84,7 +68,8 @@ public static class SecuritySetup
                 return FixedWindow("ai:" + (userId ?? ClientIp(context)), settings.AiPerHour, TimeSpan.FromHours(1));
             });
 
-            // Общий лимит действует вместе с политиками выше; проверки здоровья не ограничиваем.
+            // Общий лимит после входа — на пользователя (сотрудники за одним офисным IP не мешают друг другу).
+            // Запрос с непрошедшим токеном считается по IP. Гостей без токена уже ограничил ранний лимит по IP.
             options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
             {
                 if (context.Request.Path.StartsWithSegments("/health"))
@@ -92,13 +77,61 @@ public static class SecuritySetup
 
                 var settings = context.RequestServices.GetRequiredService<IOptions<RateLimitSettings>>().Value;
                 var userId = context.User.FindFirst(Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames.Sub)?.Value;
-                return userId is not null
-                    ? FixedWindow("user:" + userId, settings.UserPerMinute, TimeSpan.FromMinutes(1))
-                    : FixedWindow("ip:" + ClientIp(context), settings.AnonymousPerMinute, TimeSpan.FromMinutes(1));
+                if (userId is not null)
+                    return FixedWindow("user:" + userId, settings.UserPerMinute, TimeSpan.FromMinutes(1));
+                return context.Request.Headers.Authorization.Count > 0
+                    ? FixedWindow("ip:" + ClientIp(context), settings.AnonymousPerMinute, TimeSpan.FromMinutes(1))
+                    : RateLimitPartition.GetNoLimiter("guest-limited-earlier");
             });
         });
 
         return services;
+    }
+
+    // Ранний лимит по IP для запросов без токена: стоит до кэша ответов и до аутентификации, поэтому поток запросов
+    // от одного адреса отсекается раньше всякой работы (и кэшированный каталог не обходит лимит).
+    // Запросы с Authorization проходят дальше: их считает лимит на пользователя после входа.
+    // IP берётся после UseForwardedHeaders (за Caddy или Render — адрес клиента, а не прокси).
+    // Своим middleware, а не вторым UseRateLimiter: встроенный читает политики эндпоинта ([EnableRateLimiting("login")]),
+    // которые живут в основном лимитере после входа.
+    public static IApplicationBuilder UseSitoraIpRateLimiter(this IApplicationBuilder app)
+    {
+        var settings = app.ApplicationServices.GetRequiredService<IOptions<RateLimitSettings>>().Value;
+        var limiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+            context.Request.Path.StartsWithSegments("/health") || context.Request.Headers.Authorization.Count > 0
+                ? RateLimitPartition.GetNoLimiter("not-a-guest")
+                : FixedWindow("ip:" + ClientIp(context), settings.AnonymousPerMinute, TimeSpan.FromMinutes(1)));
+
+        return app.Use(async (context, next) =>
+        {
+            using var lease = await limiter.AcquireAsync(context, 1, context.RequestAborted);
+            if (lease.IsAcquired)
+            {
+                await next(context);
+                return;
+            }
+            await RejectAsync(new OnRejectedContext { HttpContext = context, Lease = lease }, context.RequestAborted);
+        });
+    }
+
+    // 429 с русским текстом и Retry-After — общий ответ всех лимитов.
+    private static async ValueTask RejectAsync(OnRejectedContext context, CancellationToken _)
+    {
+        var response = context.HttpContext.Response;
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+            response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        response.StatusCode = StatusCodes.Status429TooManyRequests;
+        await context.HttpContext.RequestServices.GetRequiredService<IProblemDetailsService>().WriteAsync(new ProblemDetailsContext
+        {
+            HttpContext = context.HttpContext,
+            ProblemDetails =
+            {
+                Status = StatusCodes.Status429TooManyRequests,
+                Title = "Слишком много запросов",
+                Detail = "Слишком много запросов. Попробуйте позже"
+            }
+        });
     }
 
     // Список доменов фронтенда задаётся в Cors:AllowedOrigins; пустой список — CORS выключен.

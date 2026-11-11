@@ -50,11 +50,20 @@ public class PaymentGatewayController(IOnlinePaymentService online, IHostEnviron
     public async Task<IActionResult> Simulate(SimulatePaymentRequest request, CancellationToken ct) =>
         environment.IsDevelopment() ? Ok(await online.SimulateAsync(request, ct)) : NotFound();
 
-    /// <summary>Заготовка для уведомлений банка (Alif, Корти Миллӣ): пока не подключено — 501.</summary>
+    // Банки, уведомления которых будут приниматься. Остальные адреса — 404: строка из URL в ответ не попадает.
+    private static readonly Dictionary<string, string> WebhookProviders = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["alif"] = "Alif",
+        ["korti-milli"] = "Корти Миллӣ"
+    };
+
+    /// <summary>Заготовка для уведомлений банка: alif, korti-milli — пока 501; другие провайдеры — 404.</summary>
     [HttpPost("payment/webhook/{provider}")]
     [AllowAnonymous]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status501NotImplemented)]
-    public IActionResult Webhook(string provider) =>
-        Problem(statusCode: StatusCodes.Status501NotImplemented, title: "Не реализовано",
-            detail: $"Уведомления платёжного шлюза «{provider}» ещё не подключены");
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public IActionResult Webhook(string provider) => WebhookProviders.TryGetValue(provider, out var name)
+        ? Problem(statusCode: StatusCodes.Status501NotImplemented, title: "Не реализовано",
+            detail: $"Уведомления платёжного шлюза «{name}» ещё не подключены")
+        : throw new Sitora.Domain.Exceptions.NotFoundException("Платёжный шлюз не найден");
 }

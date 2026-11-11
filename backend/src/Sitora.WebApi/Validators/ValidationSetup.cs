@@ -45,6 +45,9 @@ public static class ValidationSetup
         ["Text"] = "Сообщение",
     };
 
+    // Русское название поля для сообщений об ошибках; null — поле не описано.
+    public static string? DisplayName(string member) => FieldNames.TryGetValue(member, out var name) ? name : null;
+
     public static void Configure()
     {
         ValidatorOptions.Global.LanguageManager.Culture = CultureInfo.GetCultureInfo("ru");

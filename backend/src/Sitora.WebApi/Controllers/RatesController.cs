@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 using Sitora.Domain.DTOs.Payments;
 using Sitora.Domain.Enums;
 using Sitora.Domain.Exceptions;
 using Sitora.Domain.Interfaces;
+using Sitora.WebApi.Extensions;
 
 namespace Sitora.WebApi.Controllers;
 
@@ -17,6 +19,7 @@ public class RatesController(IExchangeRateService rates, ICatalogService catalog
     /// публичный сайт застройщика передаёт organizationId или slug организации (organization).
     /// </summary>
     [HttpGet("current")]
+    [OutputCache(PolicyName = CachingSetup.PublicShort)]
     [AllowAnonymous]
     [ProducesResponseType<RateResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]

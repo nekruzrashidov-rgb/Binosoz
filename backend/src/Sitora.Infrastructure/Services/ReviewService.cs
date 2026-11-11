@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.OutputCaching;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -22,8 +24,18 @@ public class ReviewService(
     IOptions<ClaudeOptions> claude,
     IAuditService audit,
     TimeProvider timeProvider,
-    ILogger<ReviewService> logger) : IReviewService
+    ILogger<ReviewService> logger,
+    IServiceProvider? services = null) : IReviewService
 {
+    // Тег кэша ответов публичного списка отзывов (Output Caching в API): сбрасывается при ответе, публикации, удалении.
+    public const string OutputCacheTag = "reviews";
+
+    private async Task EvictPublicAsync(CancellationToken ct)
+    {
+        if (services?.GetService<IOutputCacheStore>() is { } store)
+            await store.EvictByTagAsync(OutputCacheTag, ct);
+    }
+
     private const string BuildingNotFound = "Дом не найден";
     private const string ReviewNotFound = "Отзыв не найден";
     private const string AiNotConfigured = "AI-ответ недоступен: не задан ключ Claude (Claude:ApiKey)";
@@ -102,6 +114,7 @@ public class ReviewService(
         review.RepliedAt = timeProvider.GetUtcNow().UtcDateTime;
         audit.Record(nameof(Review), review.Id, "Replied", null, new { review.OwnerReply }, await OrganizationOfAsync(buildingId, ct));
         await db.SaveChangesAsync(ct);
+        await EvictPublicAsync(ct);
         return await GetForStaffAsync(review.Id, ct);
     }
 
@@ -122,6 +135,7 @@ public class ReviewService(
         review.AiReply = reply.Length > 2000 ? reply[..2000] : reply;
         audit.Record(nameof(Review), review.Id, "AiReplyGenerated", null, null, await OrganizationOfAsync(buildingId, ct));
         await db.SaveChangesAsync(ct);
+        await EvictPublicAsync(ct);
         logger.LogInformation("AI-ответ на отзыв {ReviewId} готов", review.Id);
         return await GetForStaffAsync(review.Id, ct);
     }
@@ -135,6 +149,7 @@ public class ReviewService(
             audit.Record(nameof(Review), review.Id, published ? "Published" : "Hidden", new { IsPublished = !published }, new { IsPublished = published },
                 await OrganizationOfAsync(buildingId, ct));
             await db.SaveChangesAsync(ct);
+            await EvictPublicAsync(ct);
         }
         return await GetForStaffAsync(review.Id, ct);
     }
@@ -156,6 +171,7 @@ public class ReviewService(
         audit.Record(nameof(Review), review.Id, "Deleted",
             new { review.BuildingId, review.CustomerId, review.Rating, review.Text, review.OwnerReply, review.IsPublished }, null, review.Building.OrganizationId);
         await db.SaveChangesAsync(ct);
+        await EvictPublicAsync(ct);
     }
 
     private IQueryable<ReviewResponse> StaffQuery(IQueryable<Review> reviews) =>

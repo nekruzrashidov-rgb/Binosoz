@@ -9,8 +9,19 @@
 
 	reverse_proxy webapi:8080
 
+	# В журнале доступа нет токенов: SignalR передаёт access-токен в строке запроса (?access_token=…),
+	# остальные запросы — в заголовке Authorization. Оба маскируются, остальное пишется в JSON как раньше.
 	log {
 		output stdout
-		format json
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					replace access_token REDACTED
+				}
+				request>headers>Authorization delete
+				request>headers>Cookie delete
+			}
+		}
 	}
 }

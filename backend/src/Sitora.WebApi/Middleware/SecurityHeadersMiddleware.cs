@@ -18,6 +18,8 @@ public class SecurityHeadersMiddleware(RequestDelegate next)
         var headers = context.Response.Headers;
         headers.XContentTypeOptions = "nosniff";
         headers["Referrer-Policy"] = "no-referrer";
+        // Камера, микрофон, геолокация и Payment Request сайту не нужны: запрещаем их и встроенным страницам.
+        headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()";
 
         var path = context.Request.Path;
         headers.XFrameOptions = "DENY";

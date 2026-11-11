@@ -18,6 +18,7 @@ using Sitora.Infrastructure.Integrations;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Serilog.Events;
 using Sitora.Infrastructure.Security;
+using Sitora.WebApi.Errors;
 using Sitora.WebApi.Extensions;
 using Sitora.WebApi.Hubs;
 using Sitora.WebApi.Middleware;
@@ -34,10 +35,23 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 });
 builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
 
-builder.Services.AddSerilog((services, logger) => logger
-    .ReadFrom.Configuration(builder.Configuration)
-    .ReadFrom.Services(services)
-    .Enrich.FromLogContext());
+builder.Services.AddSerilog((services, logger) =>
+{
+    logger
+        .ReadFrom.Configuration(builder.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext();
+    // Файлы логов — только где есть постоянный диск (VPS с томом logs): Logging__File__Enabled=true.
+    // На Render диск временный, там лог — только stdout (JSON), его собирает сам хостинг.
+    if (builder.Configuration.GetValue("Logging:File:Enabled", false))
+        logger.WriteTo.File(
+            new Serilog.Formatting.Compact.RenderedCompactJsonFormatter(),
+            builder.Configuration["Logging:File:Path"] ?? "logs/sitora-.log",
+            rollingInterval: RollingInterval.Day,
+            retainedFileCountLimit: 14,
+            fileSizeLimitBytes: 100 * 1024 * 1024,
+            rollOnFileSizeLimit: true);
+});
 
 builder.Services.AddInfrastructure();
 builder.Services.AddHttpContextAccessor();
@@ -47,13 +61,16 @@ builder.Services.AddSignalR();
 builder.Services.AddScoped<IChatNotifier, SignalRChatNotifier>();
 
 builder.Services.AddControllers()
-    .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+    .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
+    // Ошибки модели (обязательные поля, битый JSON) — русский ответ с code, без текстов парсера: ApiErrors.ValidationResult.
+    .ConfigureApiBehaviorOptions(o => o.InvalidModelStateResponseFactory = ApiErrors.ValidationResult);
 
 ValidationSetup.Configure();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
-builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddFluentValidationAutoValidation(o => o.OverrideDefaultResultFactoryWith<SitoraValidationResultFactory>());
 
-builder.Services.AddProblemDetails();
+// Все ответы с ошибкой: русский title/detail (tg по Accept-Language), code и traceId — ApiErrors.Customize.
+builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ApiErrors.Customize);
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
@@ -101,6 +118,8 @@ if (!string.IsNullOrWhiteSpace(builder.Configuration[$"{RedisOptions.SectionName
     healthChecks.AddCheck<CacheHealthCheck>("redis", HealthStatus.Degraded, [HealthTags.Ready]);
 
 builder.Services.AddSitoraRateLimiting();
+builder.Services.AddOptions<RefreshCookieOptions>().BindConfiguration(RefreshCookieOptions.SectionName);
+builder.Services.AddSitoraOutputCache(builder.Configuration);
 builder.Services.AddSitoraCors();
 // Заголовкам прокси доверяем, когда API доступен только через свой прокси: Caddy (ForwardedHeaders__Enabled=true)
 // или хостинг Render — он сам выставляет RENDER=true, и снаружи до приложения можно дойти только через него.
@@ -123,7 +142,7 @@ builder.Services.AddSwaggerGen(c =>
         Type = SecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT",
-        Description = "Access-токен из POST /api/v1/auth/login"
+        Description = "Access-токен (JWT, 15 минут). Получить: покупатель — POST /api/v1/auth/email/send → /auth/email/verify (код из почты); сотрудник — POST /api/v1/auth/login (почта и пароль, затем /auth/2fa/verify, если включена 2FA). Обновить — POST /api/v1/auth/refresh"
     });
     c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
     {
@@ -135,6 +154,14 @@ var app = builder.Build();
 
 // Какой почтовый сервис выбран: без этого не понять, почему коды входа не приходят (Dev пишет их только в лог).
 app.Logger.LogInformation("Почтовый сервис: {Provider}", app.Configuration["Email:Provider"] ?? "Dev");
+
+// Файлы на временном диске (Production, Local, путь не задан — Render без S3 и без диска) пропадут при перезапуске.
+// API всё равно стартует: отказ уронил бы весь сайт, а не только загрузку файлов. Предупреждают лог (Critical)
+// и /health/ready (storage: Degraded).
+var storageOptions = app.Services.GetRequiredService<IOptions<StorageOptions>>().Value;
+app.Logger.LogInformation("Хранилище файлов: {Provider}", storageOptions.IsS3 ? StorageOptions.S3Provider : StorageOptions.LocalProvider);
+if (StorageHealthCheck.IsEphemeral(storageOptions, app.Environment))
+    app.Logger.LogCritical("{Warning}", StorageHealthCheck.EphemeralWarning);
 
 var migrateOnly = args.Contains(DatabaseInitializer.MigrateCommand);
 var missingSettings = RequiredSettings.Missing(app.Configuration, migrateOnly, app.Environment.IsDevelopment());
@@ -206,6 +233,10 @@ if (!app.Environment.IsProduction())
 }
 
 app.UseCors(SecuritySetup.CorsPolicy);
+// Гости ограничиваются по IP до кэша ответов и до аутентификации; вошедшие — по учётной записи (UseRateLimiter ниже).
+app.UseSitoraIpRateLimiter();
+app.UseSitoraCacheHeaders();
+app.UseOutputCache();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<ImpersonationAuditMiddleware>();

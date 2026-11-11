@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 using Sitora.Domain.DTOs.Catalog;
 using Sitora.Domain.Exceptions;
 using Sitora.Domain.Interfaces;
+using Sitora.WebApi.Extensions;
 
 namespace Sitora.WebApi.Controllers;
 
@@ -14,6 +16,7 @@ public class ApartmentsController(ICatalogService catalog) : ControllerBase
     private const long MaxImportFileSize = 5 * 1024 * 1024;
 
     [HttpGet("{id:guid}")]
+    [OutputCache(PolicyName = CachingSetup.Catalog)]
     [AllowAnonymous]
     [ProducesResponseType<ApartmentResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]

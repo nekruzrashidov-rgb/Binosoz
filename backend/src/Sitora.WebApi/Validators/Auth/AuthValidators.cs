@@ -19,7 +19,8 @@ public class RefreshRequestValidator : AbstractValidator<RefreshRequest>
 {
     public RefreshRequestValidator()
     {
-        RuleFor(x => x.RefreshToken).NotEmpty().WithMessage("Укажите refresh-токен").MaximumLength(200);
+        // Токен может прийти и в cookie: обязательность проверяет контроллер.
+        RuleFor(x => x.RefreshToken).MaximumLength(200);
     }
 }
 
@@ -27,6 +28,7 @@ public class LogoutRequestValidator : AbstractValidator<LogoutRequest>
 {
     public LogoutRequestValidator()
     {
-        RuleFor(x => x.RefreshToken).NotEmpty().WithMessage("Укажите refresh-токен").MaximumLength(200);
+        // Токен может прийти и в cookie: обязательность проверяет контроллер.
+        RuleFor(x => x.RefreshToken).MaximumLength(200);
     }
 }

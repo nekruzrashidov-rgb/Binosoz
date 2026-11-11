@@ -287,7 +287,7 @@ public class CatalogTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
 
     private async Task<BuildingResponse> GetSeededBuildingAsync()
     {
-        var buildings = await GetAsync<PagedResult<BuildingResponse>>("/api/v1/buildings?pageSize=100");
+        var buildings = await GetAsync<PagedResult<BuildingResponse>>("/api/v1/buildings?organization=nekruz&pageSize=100");
         return buildings.Items.Single(b => b.NameRu == CatalogSeeder.BuildingName);
     }
 

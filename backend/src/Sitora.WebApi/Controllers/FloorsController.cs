@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 using Sitora.Domain.DTOs.Catalog;
 using Sitora.Domain.DTOs.Common;
 using Sitora.Domain.Interfaces;
+using Sitora.WebApi.Extensions;
 
 namespace Sitora.WebApi.Controllers;
 
@@ -12,6 +14,7 @@ namespace Sitora.WebApi.Controllers;
 public class FloorsController(ICatalogService catalog) : ControllerBase
 {
     [HttpGet("{id:guid}/apartments")]
+    [OutputCache(PolicyName = CachingSetup.Catalog)]
     [AllowAnonymous]
     [ProducesResponseType<PagedResult<ApartmentResponse>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]

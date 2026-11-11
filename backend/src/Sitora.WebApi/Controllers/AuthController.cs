@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using Sitora.Domain.DTOs.Auth;
+using Sitora.Domain.Exceptions;
 using Sitora.Domain.Interfaces;
 using Sitora.Infrastructure.Security;
 using Sitora.WebApi.Extensions;
@@ -12,7 +14,9 @@ namespace Sitora.WebApi.Controllers;
 [ApiController]
 [Route("api/v1/auth")]
 [Produces("application/json")]
-public class AuthController(IAuthService auth, IOptions<AuthOptions> options) : ControllerBase
+// Ответы входа и обновления ставят cookie с refresh-токеном (RefreshCookieFilter, режим Auth:RefreshCookie:Mode).
+[TypeFilter(typeof(RefreshCookieFilter))]
+public class AuthController(IAuthService auth, IOptions<AuthOptions> options, IHostEnvironment environment) : ControllerBase
 {
     /// <summary>Код для входа на почту — только покупателям (сотрудники входят по паролю). Ответ одинаковый, есть ли такая учётная запись.</summary>
     /// <remarks>Не чаще одного кода в минуту и пяти в час на почту и на IP. Код живёт 10 минут, 5 попыток ввода.</remarks>
@@ -157,15 +161,20 @@ public class AuthController(IAuthService auth, IOptions<AuthOptions> options) : 
     [EnableRateLimiting(RateLimitPolicies.Login)]
     [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
-    public Task<AuthResponse> Refresh(RefreshRequest request, CancellationToken ct) =>
-        auth.RefreshAsync(request, ct);
+    // Токен — из тела (как раньше) или из HttpOnly-cookie sitora_rt; тело можно не присылать.
+    public Task<AuthResponse> Refresh([FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] RefreshRequest? request, CancellationToken ct) =>
+        auth.RefreshAsync(new RefreshRequest(RefreshCookieFilter.Token(Request, request?.RefreshToken)
+            ?? throw new BadRequestException("Укажите refresh-токен")), ct);
 
     [HttpPost("logout")]
     [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public async Task<IActionResult> Logout(LogoutRequest request, CancellationToken ct)
+    public async Task<IActionResult> Logout([FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] LogoutRequest? request, CancellationToken ct)
     {
-        await auth.LogoutAsync(request, ct);
+        var token = RefreshCookieFilter.Token(Request, request?.RefreshToken);
+        if (token is not null)
+            await auth.LogoutAsync(new LogoutRequest(token), ct);
+        Response.Cookies.Delete(RefreshCookieOptions.Name, RefreshCookieFilter.Cookie(HttpContext, environment, null));
         return NoContent();
     }
 

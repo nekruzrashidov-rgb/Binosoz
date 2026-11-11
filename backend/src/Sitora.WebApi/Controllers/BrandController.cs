@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 using Sitora.Domain.DTOs.Brand;
 using Sitora.Domain.Interfaces;
+using Sitora.WebApi.Extensions;
 
 namespace Sitora.WebApi.Controllers;
 
@@ -17,6 +19,7 @@ public class PublicController(IBrandService brands) : ControllerBase
     /// Хост важнее slug. Неизвестный хост — 404; дома другого застройщика сюда не попадают.
     /// </summary>
     [HttpGet("brand")]
+    [OutputCache(PolicyName = CachingSetup.PublicShort)]
     [ProducesResponseType<PublicBrandResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public Task<PublicBrandResponse> Brand(string? host, string? slug, CancellationToken ct) =>

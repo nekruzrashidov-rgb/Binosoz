@@ -188,6 +188,6 @@ public class UnreachableRedisTests(UnreachableRedisFactory factory) : IClassFixt
         Assert.Equal("Degraded", ready.Checks.Single(c => c.Name == "redis").Status);
 
         // Кэш каталога недоступен — данные берутся из базы.
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/buildings")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/buildings?organization=nekruz")).StatusCode);
     }
 }

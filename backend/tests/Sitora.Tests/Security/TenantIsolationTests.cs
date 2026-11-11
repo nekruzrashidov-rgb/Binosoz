@@ -256,6 +256,32 @@ public class TenantIsolationTests(SitoraApiFactory factory) : IClassFixture<Sito
             i => i.Id == invitation.Id);
     }
 
+    // Бронь берётся под блокировку квартиры (FOR UPDATE без фильтров организации): доступ проверяется до блокировки,
+    // и чужая бронь по id для B выглядит как несуществующая — строго 404, бронь A не меняется.
+    [Fact]
+    public async Task OwnerB_CannotExtendOrCancelBookingOfA_404()
+    {
+        var apartmentId = await factory.FindFreeApartmentAsync();
+        var created = await factory.CreateClient().PostAsJsonAsync($"/api/v1/apartments/{apartmentId}/bookings",
+            new CreateBookingRequest("Покупатель A", SitoraApiFactory.RandomPhone(), null, null));
+        created.EnsureSuccessStatusCode();
+        var booking = (await created.Content.ReadFromJsonAsync<BookingResponse>(TestJson.Options))!;
+        var (ownerB, _, _) = await CreateOrganizationBAsync();
+
+        Assert.Equal(HttpStatusCode.NotFound, (await ownerB.PostAsync($"/api/v1/bookings/{booking.Id}/extend", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await ownerB.PostAsJsonAsync($"/api/v1/bookings/{booking.Id}/cancel", new CancelBookingRequest("захват"))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await ownerB.PostAsJsonAsync($"/api/v1/apartments/{apartmentId}/bookings",
+            new CreateBookingRequest(null, null, Guid.NewGuid(), null))).StatusCode);
+
+        await factory.WithDbAsync(async db =>
+        {
+            var row = await db.Bookings.SingleAsync(b => b.Id == booking.Id);
+            Assert.Equal(BookingStatus.Active, row.Status);
+            Assert.Equal(booking.ExpiresAt, row.ExpiresAt, TimeSpan.FromSeconds(1));
+        });
+        (await (await factory.CreateManagerClientAsync()).PostAsJsonAsync($"/api/v1/bookings/{booking.Id}/cancel", new CancelBookingRequest("тест"))).EnsureSuccessStatusCode();
+    }
+
     private static void AssertHidden(HttpResponseMessage response, string what) =>
         Assert.True(response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Forbidden,
             $"{what}: {(int)response.StatusCode} {response.Content.ReadAsStringAsync().Result}");

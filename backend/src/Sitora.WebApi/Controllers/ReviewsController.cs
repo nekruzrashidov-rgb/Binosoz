@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.AspNetCore.RateLimiting;
 using Sitora.Domain.DTOs.Common;
 using Sitora.Domain.DTOs.Reviews;
@@ -16,6 +17,7 @@ public class ReviewsController(IReviewService reviews) : ControllerBase
 {
     /// <summary>Опубликованные отзывы о доме — для сайта, без входа. Автор — только имя.</summary>
     [HttpGet]
+    [OutputCache(PolicyName = CachingSetup.Reviews)]
     [AllowAnonymous]
     [ProducesResponseType<IReadOnlyList<ReviewResponse>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]

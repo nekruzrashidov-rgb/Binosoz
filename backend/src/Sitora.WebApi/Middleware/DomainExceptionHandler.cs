@@ -33,7 +33,7 @@ public class DomainExceptionHandler(IProblemDetailsService problemDetails, ILogg
     {
         NotFoundException => (StatusCodes.Status404NotFound, "Не найдено"),
         ConflictException => (StatusCodes.Status409Conflict, "Конфликт"),
-        ForbiddenException => (StatusCodes.Status403Forbidden, "Доступ запрещён"),
+        ForbiddenException => (StatusCodes.Status403Forbidden, "Недостаточно прав"),
         BusinessRuleException => (StatusCodes.Status422UnprocessableEntity, "Нарушено бизнес-правило"),
         BadRequestException => (StatusCodes.Status400BadRequest, "Неверный запрос"),
         PaymentRequiredException => (StatusCodes.Status402PaymentRequired, "Нужен тариф выше"),

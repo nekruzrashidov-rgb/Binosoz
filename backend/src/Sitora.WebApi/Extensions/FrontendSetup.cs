@@ -43,7 +43,10 @@ public static class FrontendSetup
                 return Task.CompletedTask;
             context.Response.ContentType = Html;
             return context.Response.SendFileAsync(app.Environment.WebRootFileProvider.GetFileInfo("404.html"));
-        });
+        })
+        // Только GET и HEAD: иначе запасной маршрут перехватывал бы DELETE на существующий адрес API, и вместо 405
+        // «метод не поддерживается» был бы 404. Другие методы на неизвестный адрес по-прежнему получают 404.
+        .WithMetadata(new HttpMethodMetadata([HttpMethods.Get, HttpMethods.Head]));
     }
 
     // Адреса API, а не сайта: им остаётся строгая политика безопасности без скриптов.

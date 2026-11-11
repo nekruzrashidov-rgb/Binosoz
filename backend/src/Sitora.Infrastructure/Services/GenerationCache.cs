@@ -46,7 +46,7 @@ public abstract class GenerationCache(IDistributedCache cache, ILogger logger, s
         return value;
     }
 
-    public async Task InvalidateAsync(CancellationToken ct = default)
+    public virtual async Task InvalidateAsync(CancellationToken ct = default)
     {
         try
         {

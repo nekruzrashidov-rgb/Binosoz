@@ -13,7 +13,7 @@ public class SecurityTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFa
     [Fact]
     public async Task Responses_HaveSecurityHeaders_AndNoServerHeader()
     {
-        var response = await factory.CreateClient().GetAsync("/api/v1/buildings");
+        var response = await factory.CreateClient().GetAsync("/api/v1/buildings?organization=nekruz");
 
         Assert.Equal("nosniff", response.Headers.GetValues("X-Content-Type-Options").Single());
         Assert.Equal("DENY", response.Headers.GetValues("X-Frame-Options").Single());
@@ -108,11 +108,11 @@ public class ProductionTests(ProductionFactory factory) : IClassFixture<Producti
             AllowAutoRedirect = false
         });
 
-        var redirect = await http.GetAsync("/api/v1/buildings");
+        var redirect = await http.GetAsync("/api/v1/buildings?organization=nekruz");
         Assert.Equal(HttpStatusCode.TemporaryRedirect, redirect.StatusCode);
         Assert.Equal("https", redirect.Headers.Location?.Scheme);
 
-        var secure = await https.GetAsync("/api/v1/buildings");
+        var secure = await https.GetAsync("/api/v1/buildings?organization=nekruz");
         Assert.Equal(HttpStatusCode.OK, secure.StatusCode);
         Assert.Contains("max-age=31536000", secure.Headers.GetValues("Strict-Transport-Security").Single());
 
@@ -146,7 +146,7 @@ public class StagingTests(StagingFactory factory) : IClassFixture<StagingFactory
     {
         var client = factory.CreateClient();
 
-        var buildings = await client.GetFromJsonAsync<PagedResult<BuildingResponse>>("/api/v1/buildings", TestJson.Options);
+        var buildings = await client.GetFromJsonAsync<PagedResult<BuildingResponse>>("/api/v1/buildings?organization=nekruz", TestJson.Options);
         Assert.Equal(0, buildings!.TotalCount);
 
         var seededAdmin = await client.PostAsJsonAsync("/api/v1/auth/login", new LoginRequest(SitoraApiFactory.AdminEmail, factory.AdminPassword));
