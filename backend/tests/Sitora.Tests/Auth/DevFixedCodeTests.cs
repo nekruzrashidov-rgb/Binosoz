@@ -9,10 +9,22 @@ using Sitora.Tests.Security;
 
 namespace Sitora.Tests.Auth;
 
-// Development: для почт из Auth:DevFixedCodeEmails (appsettings.Development.json) подходит код 123456.
-public class DevFixedCodeTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFactory>
+// Development: для почт из Auth:DevFixedCodeEmails подходит код 123456. Список задаётся в user-secrets разработчика
+// (личная почта в репозиторий не попадает); тест задаёт свою тестовую почту.
+public class DevFixedCodeEmailFactory : SitoraApiFactory
 {
-    private const string DevEmail = "nekrashidov@gmail.com";
+    public const string DevEmail = "dev-fixed-code@mail.test";
+
+    protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.UseSetting("Auth:DevFixedCodeEmails:0", DevEmail);
+    }
+}
+
+public class DevFixedCodeTests(DevFixedCodeEmailFactory factory) : IClassFixture<DevFixedCodeEmailFactory>
+{
+    private const string DevEmail = DevFixedCodeEmailFactory.DevEmail;
 
     [Fact]
     public async Task ConfiguredEmail_SignsInWith123456_OtherEmailsDoNot()

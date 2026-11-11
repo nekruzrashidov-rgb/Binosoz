@@ -1,0 +1,33 @@
+# Smoke-проверка прода: API отвечает (/health/live = 200) и в каталоге организации есть хотя бы один дом.
+# Render деплоит сам и не сообщает GitHub, когда закончил, поэтому проверка идёт по расписанию (раз в час)
+# и вручную после деплоя (Actions → Smoke → Run workflow). Только чтение (GET), на проде ничего не создаёт.
+# Падение = письмо от GitHub владельцу репозитория: это и простой uptime-мониторинг.
+name: Smoke
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: Адрес API
+        default: https://binosoz-1.onrender.com
+      organization:
+        description: Короткое имя организации (slug)
+        default: nekruz
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: API живой, каталог не пустой
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Проверка
+        env:
+          API_URL: ${{ inputs.api_url || vars.SMOKE_API_URL || 'https://binosoz-1.onrender.com' }}
+          ORG: ${{ inputs.organization || vars.SMOKE_ORG || 'nekruz' }}
+        run: bash scripts/smoke.sh

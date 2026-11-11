@@ -8,7 +8,7 @@ using Sitora.Infrastructure.Integrations;
 
 namespace Sitora.Tests.Infrastructure;
 
-// S3FileStorage на настоящем MinIO (Testcontainers, образ minio/minio): запись, чтение, отказ перезаписать, удаление.
+// S3FileStorage на настоящем MinIO (Testcontainers, образ quay.io/minio/minio): запись, чтение, отказ перезаписать, удаление.
 // Без Docker (локальный прогон через SITORA_TEST_DB) тест помечается пропущенным, в CI Docker есть.
 public class S3FileStorageTests : IAsyncLifetime
 {
@@ -21,7 +21,7 @@ public class S3FileStorageTests : IAsyncLifetime
     {
         try
         {
-            _minio = new ContainerBuilder("minio/minio:RELEASE.2025-04-22T22-12-26Z")
+            _minio = new ContainerBuilder("quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z")
                 .WithCommand("server", "/data")
                 .WithEnvironment("MINIO_ROOT_USER", User)
                 .WithEnvironment("MINIO_ROOT_PASSWORD", _password)

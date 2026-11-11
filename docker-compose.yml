@@ -32,7 +32,7 @@ services:
   # S3-совместимое хранилище для разработки: консоль http://localhost:9001, API http://localhost:9000.
   # API пользуется им при STORAGE_PROVIDER=S3; бакет (по умолчанию sitora) создайте в консоли.
   minio:
-    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
     restart: unless-stopped
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
