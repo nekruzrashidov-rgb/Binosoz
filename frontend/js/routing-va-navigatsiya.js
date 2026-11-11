@@ -82,7 +82,8 @@
 
   // Phone and tablet menu: a dark full-screen layer with large links, the languages and the phone. Closes on ×, Escape or a link.
   let overlay = null;
-  function buildMobileOverlay(navItems) {
+  // extra: an optional row under the languages (the public site puts the theme switch there: on phones it leaves the header).
+  function buildMobileOverlay(navItems, extra) {
     if (overlay) overlay.remove();
     const close = () => {
       overlay.classList.remove('open');
@@ -96,6 +97,7 @@
       h('button', { class: 'mob-close', type: 'button', 'aria-label': t('common.close'), onclick: close }, '×'),
       h('nav', { class: 'mob-nav', 'aria-label': t('nav.main') }, ...navEls),
       langRow,
+      extra || null,
       h('div', { class: 'mob-contact' }, h('a', { href: PHONE_HREF, class: 'mob-phone' }, PHONE)));
     el.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
     overlay = el;
@@ -141,23 +143,27 @@
       link('/about', t('nav.project'), 'about'), link('/contact', t('nav.contact'), 'contact'));
     const lang = langSwitch();
     const phone = h('a', { class: 'top-phone desk-only', href: PHONE_HREF }, PHONE);
+    const toggleTheme = () => {
+      S.store.set('sitora.theme', isDark() ? 'light' : 'dark');
+      applyTheme();
+      drawPublicHeader();
+      S.bus && S.bus.emit('theme');
+    };
+    const themeLabel = isDark() ? 'Дневной режим' : 'Ночной режим'; // TODO: i18n
+    const themeRow = h('div', { class: 'mob-lang' }, h('button', { class: 'mob-lang-btn', type: 'button', 'aria-label': themeLabel, onclick: toggleTheme }, (isDark() ? '☀️ ' : '🌙 ') + t('nav.theme')));
     const { btn: menuBtn } = buildMobileOverlay([
       ['/', t('nav.home'), page === 'home'],
       ['/apartments', t('nav.apartments'), page === 'apartments'],
       ['/gallery', t('nav.gallery'), page === 'gallery'],
       ['/about', t('nav.project'), page === 'about'],
       ['/contact', t('nav.contact'), page === 'contact'],
-    ]);
+    ], themeRow);
+    lang.classList.add('top-lang');
     const themeToggle = h('button', {
-      class: 'icon-btn theme-toggle',
-      title: isDark() ? t('nav.theme') : t('nav.theme'),
-      'aria-label': isDark() ? 'Дневной режим' : 'Ночной режим',
-      onclick: () => {
-        S.store.set('sitora.theme', isDark() ? 'light' : 'dark');
-        applyTheme();
-        drawPublicHeader();
-        S.bus && S.bus.emit('theme');
-      }
+      class: 'icon-btn theme-toggle top-theme',
+      title: t('nav.theme'),
+      'aria-label': themeLabel,
+      onclick: toggleTheme
     }, isDark()
       ? h('span', { style: { fontSize: '18px', lineHeight: 1 } }, '☀️')
       : h('span', { style: { fontSize: '18px', lineHeight: 1 } }, '🌙'));
