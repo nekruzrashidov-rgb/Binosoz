@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Public pages. One address per page; the language is chosen with ?lang=ru|tg|en (the site remembers it). -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://binosoz.vercel.app/</loc>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://binosoz.vercel.app/?lang=ru"/>
+    <xhtml:link rel="alternate" hreflang="tg" href="https://binosoz.vercel.app/?lang=tg"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://binosoz.vercel.app/?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://binosoz.vercel.app/"/>
+  </url>
+  <url>
+    <loc>https://binosoz.vercel.app/apartments</loc>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://binosoz.vercel.app/apartments?lang=ru"/>
+    <xhtml:link rel="alternate" hreflang="tg" href="https://binosoz.vercel.app/apartments?lang=tg"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://binosoz.vercel.app/apartments?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://binosoz.vercel.app/apartments"/>
+  </url>
+  <url>
+    <loc>https://binosoz.vercel.app/about</loc>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://binosoz.vercel.app/about?lang=ru"/>
+    <xhtml:link rel="alternate" hreflang="tg" href="https://binosoz.vercel.app/about?lang=tg"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://binosoz.vercel.app/about?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://binosoz.vercel.app/about"/>
+  </url>
+  <url>
+    <loc>https://binosoz.vercel.app/gallery</loc>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://binosoz.vercel.app/gallery?lang=ru"/>
+    <xhtml:link rel="alternate" hreflang="tg" href="https://binosoz.vercel.app/gallery?lang=tg"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://binosoz.vercel.app/gallery?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://binosoz.vercel.app/gallery"/>
+  </url>
+  <url>
+    <loc>https://binosoz.vercel.app/contact</loc>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://binosoz.vercel.app/contact?lang=ru"/>
+    <xhtml:link rel="alternate" hreflang="tg" href="https://binosoz.vercel.app/contact?lang=tg"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://binosoz.vercel.app/contact?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://binosoz.vercel.app/contact"/>
+  </url>
+  <url>
+    <loc>https://binosoz.vercel.app/register</loc>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://binosoz.vercel.app/register?lang=ru"/>
+    <xhtml:link rel="alternate" hreflang="tg" href="https://binosoz.vercel.app/register?lang=tg"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://binosoz.vercel.app/register?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://binosoz.vercel.app/register"/>
+  </url>
+</urlset>

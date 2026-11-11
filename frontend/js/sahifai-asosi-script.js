@@ -260,7 +260,7 @@
         },
       });
       } catch (e) {
-        console.error(e); house = null;
+        S.logError(e); house = null;
         houseBox.replaceChildren(h('div', { class: 'empty', style: { padding: '60px 16px', textAlign: 'center' } }, t('house.no3d')));
         return;
       }
@@ -1251,5 +1251,20 @@
   }
 
   // For the other public pages (about.js, gallery.js): the same footer, reveal on scroll, icons and headings.
+  // Search engines: Schema.org data about the complex, from the config.js contacts (one source with the contact page).
+  // A JSON data block, not code: the Content-Security-Policy does not apply to it, and nothing runs it.
+  (function structuredData() {
+    const page = document.body && document.body.dataset.page;
+    if (!['home', 'apartments', 'about', 'gallery', 'contact'].includes(page) || document.querySelector('script[type="application/ld+json"]')) return;
+    const c = contacts();
+    const name = 'Некруз Резиденс';
+    const address = c.address ? { '@type': 'PostalAddress', streetAddress: c.address, addressLocality: 'Душанбе', addressCountry: 'TJ' } : undefined;
+    const data = { '@context': 'https://schema.org', '@graph': [
+      { '@type': 'Organization', '@id': location.origin + '/#org', name, url: location.origin + '/', logo: location.origin + '/favicon.svg', telephone: c.phone || undefined, address },
+      { '@type': 'ApartmentComplex', name, url: location.origin + '/', telephone: c.phone || undefined, address, containedInPlace: { '@type': 'City', name: 'Душанбе' } },
+    ] };
+    const el = document.createElement('script'); el.type = 'application/ld+json'; el.textContent = JSON.stringify(data);
+    document.head.appendChild(el);
+  })();
   S.site = { footer: siteFooter, reveal: revealIn, icon: landIcon, accentFirst, contacts, drawFloorPlan, building: siteBuilding };
 })();

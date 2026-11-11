@@ -1,0 +1,12 @@
+# Public pages are open to search engines; the personal account, CRM, platform and payment pages are not.
+User-agent: *
+Allow: /
+Disallow: /cabinet
+Disallow: /crm
+Disallow: /platform
+Disallow: /login
+Disallow: /payment
+Disallow: /accept-invite
+Disallow: /api/
+
+Sitemap: https://binosoz.vercel.app/sitemap.xml

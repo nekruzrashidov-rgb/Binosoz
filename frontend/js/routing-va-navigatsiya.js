@@ -1,4 +1,4 @@
-/* Page boot for the multi-page site (index, apartments, contact, login, cabinet, crm, platform .html); spa.html still uses app.js.
+/* Page boot for the multi-page site (index, apartments, about, gallery, contact, register, login, cabinet, crm, platform .html).
    The page names itself in <body data-page="...">. Views keep calling S.go('crm') as in the SPA:
    here that is an ordinary link to /crm. */
 (function () {
@@ -150,7 +150,7 @@
       S.bus && S.bus.emit('theme');
     };
     const themeLabel = t(isDark() ? 'nav.themeLight' : 'nav.themeDark');
-    const themeRow = h('div', { class: 'mob-lang' }, h('button', { class: 'mob-lang-btn', type: 'button', 'aria-label': themeLabel, onclick: toggleTheme }, (isDark() ? '☀️ ' : '🌙 ') + t('nav.theme')));
+    const themeRow = h('div', { class: 'mob-lang' }, h('button', { class: 'mob-lang-btn', type: 'button', 'aria-label': themeLabel, onclick: toggleTheme }, S.icon(isDark() ? 'sun' : 'moon'), ' ' + t('nav.theme')));
     const { btn: menuBtn } = buildMobileOverlay([
       ['/', t('nav.home'), page === 'home'],
       ['/apartments', t('nav.apartments'), page === 'apartments'],
@@ -164,9 +164,7 @@
       title: t('nav.theme'),
       'aria-label': themeLabel,
       onclick: toggleTheme
-    }, isDark()
-      ? h('span', { style: { fontSize: '18px', lineHeight: 1 } }, '☀️')
-      : h('span', { style: { fontSize: '18px', lineHeight: 1 } }, '🌙'));
+    }, S.icon(isDark() ? 'sun' : 'moon'));
     // The buyer sees the complex's name; Binosoz (the platform) only on the developers' page (/register) and in the footer.
     const siteBrand = page === 'register' ? 'BINOSOZ' : t('login.heroName');
     header.className = 'top lux-top' + (S.api.isAuthed ? ' authed' : '');
@@ -239,10 +237,10 @@
 
   function render() {
     setTitle();
-    if (cleanup) { try { cleanup(); } catch (e) { console.error(e); } cleanup = null; }
+    if (cleanup) { try { cleanup(); } catch (e) { S.logError(e); } cleanup = null; }
     S.clear(main); drawHeader();
     window.scrollTo(0, 0);
-    try { const c = view()(main); cleanup = typeof c === 'function' ? c : null; } catch (e) { console.error(e); main.replaceChildren(S.errorCard(e)); }
+    try { const c = view()(main); cleanup = typeof c === 'function' ? c : null; } catch (e) { S.logError(e); main.replaceChildren(S.errorCard(e)); }
     S.revealSections(main);
   }
 
@@ -267,7 +265,7 @@
 
   async function boot() {
     if (page === 'home' && oldLink()) { location.replace(oldLink()); return; }
-    S.initLang();
+    await S.initLang();
     applyTheme();
     startProgress();
     // Login and invitation pages draw no top bar (drawHeader skips them): an empty <header> left a blank 68px strip.

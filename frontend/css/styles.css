@@ -928,7 +928,7 @@ a.float-card.tg:hover { border-color: rgba(34, 158, 217, 0.75); background: rgba
 }
 
 /* ---------- public site, part 3: proof line, gallery, reviews, catalog hero, FAQ ---------- */
-@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+/* No global smooth scrolling (it slowed programmatic scrolls); the page scrolls smoothly where the code asks for it. */
 #gallery, #reviews, #faq, #layouts, #about, #installment { scroll-margin-top: var(--top-h); }
 .hero-proof { display: flex; align-items: center; gap: 10px; margin-top: 16px; color: rgba(240,228,210,0.72); font-size: 14px; font-weight: 600; }
 .hero-proof[hidden] { display: none; }
@@ -2325,3 +2325,5 @@ a.float-card:hover {
 
 /* Catalog: the veil over the 3D stage while the data and the engine load. */
 .hero-loading { position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; color: var(--ink-2); font-weight: 700; background: #120e0a; }
+
+.mob-lang-btn svg { width: 18px; height: 18px; vertical-align: -3px; }

@@ -40,6 +40,12 @@ public class FrontendTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFa
     [InlineData("/sw.js")]
     [InlineData("/js/pwa-sabt.js")]
     [InlineData("/offline.html")]
+    [InlineData("/robots.txt")]
+    [InlineData("/sitemap.xml")]
+    [InlineData("/js/i18n/ru.js")]
+    [InlineData("/js/i18n/tg.js")]
+    [InlineData("/js/i18n/en.js")]
+    [InlineData("/js/tanzimot-api-url.js")]
     public async Task Asset_IsServed(string path)
     {
         var response = await factory.CreateClient().GetAsync(path);
@@ -59,7 +65,9 @@ public class FrontendTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFa
 
         var page = await (await client.GetAsync("/crm")).Content.ReadAsStringAsync();
         Assert.Contains("<link rel=\"manifest\" href=\"/manifest.json\">", page);
-        Assert.Contains("<script src=\"/js/pwa-sabt.js\"></script>", page);
+        Assert.Contains("<script src=\"/js/pwa-sabt.js\" defer></script>", page);
+        // Every script of the page is deferred: nothing blocks the first paint.
+        Assert.DoesNotMatch(@"<script src=""[^""]+""></script>", page);
     }
 
     [Fact]
@@ -73,24 +81,17 @@ public class FrontendTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFa
         Assert.Contains("script-src 'self' https://cdnjs.cloudflare.com;", response.Headers.GetValues("Content-Security-Policy").Single());
     }
 
-    // 3D-модель встраивается только страницами сайта и работает в песочнице без доступа к origin сайта;
-    // остальные страницы по-прежнему нельзя встроить никуда.
+    // Страницы сайта нельзя встроить никуда; отдельной 3D-модели в песочнице (nekruz3d.html, Babylon.js) больше нет.
     [Fact]
-    public async Task Model3dPage_IsSandboxed_AndFramedOnlyBySite()
+    public async Task SitePages_CannotBeFramed_AndOld3dModelIsGone()
     {
         var client = factory.CreateClient();
-        var model = await client.GetAsync("/nekruz3d.html");
-        Assert.Equal(HttpStatusCode.OK, model.StatusCode);
-        Assert.Equal("SAMEORIGIN", model.Headers.GetValues("X-Frame-Options").Single());
-        var policy = model.Headers.GetValues("Content-Security-Policy").Single();
-        Assert.StartsWith("sandbox allow-scripts ", policy);
-        Assert.DoesNotContain("allow-same-origin", policy);
-        Assert.Contains("connect-src 'none'", policy);
-        Assert.Contains("frame-ancestors 'self'", policy);
-
         var site = await client.GetAsync("/apartments");
         Assert.Equal("DENY", site.Headers.GetValues("X-Frame-Options").Single());
         Assert.Contains("frame-ancestors 'none'", site.Headers.GetValues("Content-Security-Policy").Single());
+
+        var model = await client.GetAsync("/nekruz3d.html");
+        Assert.Equal(HttpStatusCode.NotFound, model.StatusCode);
     }
 
     [Fact]

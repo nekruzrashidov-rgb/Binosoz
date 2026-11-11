@@ -132,8 +132,8 @@
       h('p', { class: 'muted' }, message || t('pay.failText')), h('a', { class: 'btn gold', href: back.replace(/([?&])success=1/, '$1payment=failed') }, t('pay.back'))));
   }
 
-  function boot() {
-    S.initLang();
+  async function boot() {
+    await S.initLang();
     document.documentElement.dataset.theme = S.store.get('sitora.theme') === 'dark' ? 'dark' : 'light';
     if (!id || !(amount > 0)) { shell(h('div', { class: 'pay-state bad', role: 'alert' }, h('div', { class: 'pay-mark', 'aria-hidden': 'true' }, '!'), h('h2', null, t('pay.title')), h('p', { class: 'muted' }, t('pay.err.link')), h('a', { class: 'btn gold', href: '/cabinet' }, t('pay.back')))); return; }
     form();

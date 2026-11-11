@@ -192,8 +192,8 @@
     if (!used || !e.errors) { box.textContent = e.message; box.hidden = false; }
   };
   S.busy = async (btn, fn) => {
-    if (btn.disabled) return; const old = btn.innerHTML; btn.disabled = true; btn.prepend(h('span', { class: 'spin' }));
-    try { return await fn(); } finally { btn.disabled = false; btn.innerHTML = old; }
+    if (btn.disabled) return; const old = [...btn.childNodes]; btn.disabled = true; btn.prepend(h('span', { class: 'spin' }));
+    try { return await fn(); } finally { btn.disabled = false; btn.replaceChildren(...old); }
   };
   S.formData = (form) => { const o = {}; S.$$('[name]', form).forEach((el) => { o[el.name] = el.type === 'checkbox' ? el.checked : el.value; }); return o; };
 
