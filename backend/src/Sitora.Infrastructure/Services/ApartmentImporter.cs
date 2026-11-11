@@ -18,6 +18,53 @@ public class ApartmentImporter(AppDbContext db, IAuditService audit)
     private const int MaxRooms = 10;
     private const decimal MaxArea = 1000m;
 
+    // Заголовки первого листа — в том же порядке, в каком ReadRows читает столбцы A–G.
+    public static readonly string[] TemplateHeaders =
+        ["Этаж", "Номер квартиры", "Комнат", "Площадь, м²", "Цена за м²", "Позиция на плане", "ID в 3D-модели"];
+
+    // Шаблон для импорта: первый лист — только заголовки (примеров там нет, чтобы они не попали в базу),
+    // второй — описание столбцов и пример заполнения. Импорт читает только первый лист.
+    public static byte[] BuildTemplate()
+    {
+        using var workbook = new XLWorkbook();
+        var sheet = workbook.Worksheets.Add("Квартиры");
+        for (var i = 0; i < TemplateHeaders.Length; i++)
+            sheet.Cell(1, i + 1).Value = TemplateHeaders[i];
+        var header = sheet.Range(1, 1, 1, TemplateHeaders.Length);
+        header.Style.Font.Bold = true;
+        header.Style.Fill.BackgroundColor = XLColor.FromHtml("#F2E6C2");
+        sheet.SheetView.FreezeRows(1);
+        sheet.Columns(1, TemplateHeaders.Length).Width = 20;
+        sheet.Column(4).Style.NumberFormat.Format = "0.00";
+        sheet.Column(5).Style.NumberFormat.Format = "0.00";
+
+        var help = workbook.Worksheets.Add("Инструкция");
+        string[][] lines =
+        [
+            ["Столбец", "Что писать"],
+            ["A — Этаж", "Целое число от 0 до числа этажей дома"],
+            ["B — Номер квартиры", "Целое число больше нуля; пара «этаж + номер» не повторяется"],
+            ["C — Комнат", $"От 0 до {MaxRooms}; 0 — студия"],
+            ["D — Площадь, м²", $"Больше 0 и не больше {MaxArea}"],
+            ["E — Цена за м²", "Больше нуля, в валюте дома; цена квартиры = площадь × цена за м²"],
+            ["F — Позиция на плане", $"От 0 до {Apartment.MaxPlanSlot}; на одном этаже не повторяется"],
+            ["G — ID в 3D-модели", $"Необязательно, до {Apartment.Model3dIdMaxLength} символов; пустая ячейка не стирает уже заданный"],
+            ["", ""],
+            ["Пример строки", "1 | 101 | 2 | 60,5 | 9000 | 0 | SR-101"],
+            ["Правила", "Квартира с тем же этажом и номером обновляется, новая — создаётся. Если в файле есть ошибка, не сохраняется ничего."],
+        ];
+        for (var r = 0; r < lines.Length; r++)
+        for (var c = 0; c < 2; c++)
+            help.Cell(r + 1, c + 1).Value = lines[r][c];
+        help.Row(1).Style.Font.Bold = true;
+        help.Column(1).Width = 24;
+        help.Column(2).Width = 90;
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return stream.ToArray();
+    }
+
     private record Row(int RowNumber, int Floor, int Number, int Rooms, decimal Area, decimal PricePerM2, int PlanSlot, string? Model3dId);
 
     public async Task<ImportResult> ImportAsync(Guid buildingId, Stream file, CancellationToken ct)

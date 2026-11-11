@@ -917,7 +917,7 @@ Admin входит во все наборы ролей, кроме кабине�
 **Content (контент):**
 - дома, этажи, квартиры: `POST`/`PUT /buildings`, `/floors`, `/apartments`;
 - «под запрос» `PATCH /apartments/{id}/on-request`;
-- импорт `POST /apartments/import`;
+- импорт `POST /apartments/import`, шаблон файла `GET /apartments/import/template` (кнопка «Скачать шаблон» рядом с «Импорт из Excel» в CRM);
 - этапы стройки: `POST /buildings/{id}/stages`, `PUT /stages/{id}`, фото `POST /stages/{id}/photos`, просмотр хода стройки.
 
 **Admin:**
@@ -1046,6 +1046,7 @@ Admin входит во все наборы ролей, кроме кабине�
 | PUT | `/apartments/{id}` | Content, Admin | изменить квартиру |
 | PATCH | `/apartments/{id}/on-request` | Content, Admin | «под запрос» и обратно |
 | POST | `/apartments/import?buildingId=…` | Content, Admin | импорт квартир из `.xlsx` |
+| GET | `/apartments/import/template` | Content, Admin | шаблон `.xlsx` для импорта |
 | POST | `/leads` | гость | заявка с сайта |
 | GET | `/leads` | Manager, Admin | список заявок |
 | PATCH | `/leads/{id}` | Manager, Admin | статус, ответственный, комментарий |

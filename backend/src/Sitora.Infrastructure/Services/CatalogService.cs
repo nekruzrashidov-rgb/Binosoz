@@ -225,6 +225,8 @@ public class CatalogService(
         return result;
     }
 
+    public byte[] BuildImportTemplate() => ApartmentImporter.BuildTemplate();
+
     private Task<FloorResponse> GetFloorAsync(Guid id, CancellationToken ct) =>
         db.Floors.AsNoTracking().Where(f => f.Id == id).Select(ToFloorResponse).FirstAsync(ct);
 

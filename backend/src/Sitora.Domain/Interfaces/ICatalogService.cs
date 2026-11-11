@@ -24,4 +24,6 @@ public interface ICatalogService
     Task<ApartmentResponse> SetOnRequestAsync(Guid id, bool onRequest, CancellationToken ct = default);
 
     Task<ImportResult> ImportApartmentsAsync(Guid buildingId, Stream excelFile, CancellationToken ct = default);
+    // Пустой файл .xlsx с заголовками столбцов для импорта и листом-инструкцией.
+    byte[] BuildImportTemplate();
 }

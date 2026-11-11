@@ -329,6 +329,7 @@ Telegram (в дополнение к колокольчику, только те
 | PUT | `/apartments/{id}`, POST `/apartments` | Content, руководители | `{ number, rooms, area, pricePerM2, planSlot, model3dId }` (+ `floorId` при создании) |
 | PATCH | `/apartments/{id}/on-request` | Content, руководители | `{ onRequest }` |
 | POST | `/apartments/import?buildingId=` | Content, руководители | form-data `file` (.xlsx) |
+| GET | `/apartments/import/template` | Content, руководители | файл `shablon-kvartiry.xlsx`: первый лист — заголовки столбцов A–G без строк, второй — инструкция. Заполненный шаблон принимается `/apartments/import` как есть |
 
 ## Фронтенд frontend/: вход по почте и организации (сделано)
 

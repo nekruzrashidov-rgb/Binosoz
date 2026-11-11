@@ -43,6 +43,13 @@ public class ApartmentsController(ICatalogService catalog) : ControllerBase
     public Task<ApartmentResponse> SetOnRequest(Guid id, SetOnRequestRequest request, CancellationToken ct) =>
         catalog.SetOnRequestAsync(id, request.OnRequest, ct);
 
+    /// <summary>Шаблон .xlsx для импорта квартир: заголовки столбцов и лист с инструкцией.</summary>
+    [HttpGet("import/template")]
+    [Authorize(Roles = Roles.CatalogEditors)]
+    [ProducesResponseType<FileContentResult>(StatusCodes.Status200OK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]
+    public IActionResult ImportTemplate() =>
+        File(catalog.BuildImportTemplate(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "shablon-kvartiry.xlsx");
+
     /// <summary>Импорт квартир из .xlsx: столбцы этаж, номер, комнат, площадь, цена за м².</summary>
     [HttpPost("import")]
     [Authorize(Roles = Roles.CatalogEditors)]

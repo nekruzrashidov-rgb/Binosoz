@@ -124,6 +124,50 @@ public class ApartmentImportTests(SitoraApiFactory factory) : IClassFixture<Sito
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Template_HasHeaders_AndFilledTemplateImports()
+    {
+        var client = await factory.CreateContentClientAsync();
+        var buildingId = await CreateBuildingAsync("Импорт по шаблону");
+
+        var response = await client.GetAsync("/api/v1/apartments/import/template");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", response.Content.Headers.ContentType?.MediaType);
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        using var workbook = new XLWorkbook(new MemoryStream(bytes));
+        var sheet = workbook.Worksheets.First();
+        Assert.Equal("Этаж", sheet.Cell(1, 1).GetString());
+        Assert.Equal("ID в 3D-модели", sheet.Cell(1, 7).GetString());
+        Assert.Single(sheet.RowsUsed());
+
+        // Заполненный шаблон принимается импортом как есть.
+        sheet.Cell(2, 1).Value = 1; sheet.Cell(2, 2).Value = 101; sheet.Cell(2, 3).Value = 2;
+        sheet.Cell(2, 4).Value = 60.5; sheet.Cell(2, 5).Value = 9000; sheet.Cell(2, 6).Value = 0;
+        var filled = new MemoryStream();
+        workbook.SaveAs(filled);
+        filled.Position = 0;
+        var file = new StreamContent(filled);
+        file.Headers.ContentType = new MediaTypeHeaderValue("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+
+        var import = await client.PostAsync($"/api/v1/apartments/import?buildingId={buildingId}",
+            new MultipartFormDataContent { { file, "file", "shablon.xlsx" } });
+
+        Assert.Equal(HttpStatusCode.OK, import.StatusCode);
+        var result = await import.Content.ReadFromJsonAsync<ImportResult>(TestJson.Options);
+        Assert.Equal((1, 0), (result!.Created, result.Updated));
+    }
+
+    [Fact]
+    public async Task Template_ForbiddenForManager()
+    {
+        var manager = await factory.CreateManagerClientAsync();
+
+        var response = await manager.GetAsync("/api/v1/apartments/import/template");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     // Дома создаёт владелец; импорт квартир — контент-менеджер.
     private async Task<Guid> CreateBuildingAsync(string name)
     {
