@@ -47,8 +47,6 @@
     { key: 'kitchen',    img: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&q=80', wide: false },
     { key: 'rooftop',    img: 'https://images.unsplash.com/photo-1534430480872-3498386e7856?w=800&q=80', wide: false },
   ];
-  // Example reviews (key, stars): the section says they are examples until real buyers write theirs.
-  const REVIEWS = [['r1', 5], ['r2', 5], ['r3', 4]];
   const FAQ = ['visit', 'down', 'delivery', 'booking', 'fees'];
   const AMENITIES = [['car', 'about.parking'], ['play', 'about.playground'], ['shield', 'about.guard'], ['leaf', 'about.green']];
   function landIcon(name) {
@@ -579,14 +577,7 @@
         h('figcaption', null, t('gal.' + item.key))))),
       h('div', { class: 'teaser-more' }, h('a', { class: 'btn ghost lg', href: '/apartments' }, t('gal.cta')))));
 
-    // Reviews: example texts, marked as examples.
-    const reviews = h('section', { class: 'section lux-sec alt-band', id: 'reviews' }, h('div', { class: 'wrap' },
-      h('div', { class: 'lux-head reveal' }, h('h2', null, accentFirst(t('rev.title'))), h('p', null, t('rev.sub'))),
-      h('div', { class: 'rev-grid' }, REVIEWS.map(([k, stars], i) => h('article', { class: 'rev-card reveal', style: { transitionDelay: i * 90 + 'ms' } },
-        h('span', { class: 'rev-badge' }, t('rev.example')),
-        h('div', { class: 'rev-stars', 'aria-label': t('rev.stars', { n: stars }) }, '★'.repeat(stars) + '☆'.repeat(5 - stars)),
-        h('p', { class: 'rev-text' }, t('rev.' + k)),
-        h('footer', null, h('b', null, t('rev.' + k + '.who')), h('small', null, t('rev.' + k + '.when'))))))));
+    // No reviews section: invented example reviews undermine trust; it comes back with real buyers' reviews.
 
     const planBand = h('section', { class: 'lux-plan', id: 'installment' }, h('div', { class: 'wrap' },
       h('div', { class: 'lux-head reveal' }, h('h2', null, accentFirst(t('plan.title'))), h('p', null, t('plan.sub'))),
@@ -615,7 +606,7 @@
         c.telegram ? h('a', { class: 'btn gold lg', href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, landIcon('send'), t('cta.tg')) : null),
       callBox));
 
-    page.append(hero, numbers, why, steps, about, layouts, gallery, planBand, reviews, teaser, contactBand, siteFooter());
+    page.append(hero, numbers, why, steps, about, layouts, gallery, planBand, teaser, contactBand, siteFooter());
     S.$$('section', page).forEach((sec) => { if (sec !== hero) sec.classList.add('section-reveal'); });
     renderData(); renderCall();
     const stopReveal = revealIn(page, (el) => { if (el.closest('#numbers')) count(); });
