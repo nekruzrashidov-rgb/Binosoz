@@ -186,7 +186,9 @@
     const rand = rnd(7);
 
     const renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    // Phones and tablets draw at most 1.5 device pixels per CSS pixel: sharp enough, and much lighter for a budget GPU.
+    const smallScreen = (window.matchMedia && window.matchMedia('(max-width: 1024px), (pointer: coarse)').matches);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, smallScreen ? 1.5 : 2));
     renderer.outputEncoding = T.sRGBEncoding;
     renderer.toneMapping = T.ACESFilmicToneMapping;
     renderer.shadowMap.enabled = true;
@@ -796,7 +798,9 @@
     // ---------- camera / controls ----------
     const view = { az: 0.62, pol: 1.32, dist: 118, ty: 24, tx: 0, tz: 0 };
     const goal = Object.assign({}, view);
-    let autoRotate = opts.autoRotate !== false, lastInput = 0;
+    // No slow turntable for people who asked for less motion.
+    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let autoRotate = opts.autoRotate !== false && !reduceMotion, lastInput = 0;
     function placeCamera() {
       const sp = Math.sin(view.pol), cp = Math.cos(view.pol);
       camera.position.set(view.tx + view.dist * sp * Math.sin(view.az), view.ty + view.dist * cp, view.tz + view.dist * sp * Math.cos(view.az));
@@ -913,13 +917,16 @@
     function clearSelection() { selectedIdx = -1; selBand.visible = selEdges.visible = false; defaultGoal(); }
 
     // ---------- loop ----------
-    let running = true, last = performance.now(), visible = true;
+    // The loop runs only while the stage is on screen and the tab is visible; otherwise no frame is even scheduled.
+    let running = true, last = performance.now(), visible = true, raf = 0;
     const tmpC = new T.Color();
+    const resume = () => { if (running && !raf && visible && !document.hidden) { last = performance.now(); raf = requestAnimationFrame(frame); } };
+    document.addEventListener('visibilitychange', resume);
     function frame(now) {
-      if (!running) return;
-      requestAnimationFrame(frame);
+      raf = 0;
+      if (!running || !visible || document.hidden) return;
+      raf = requestAnimationFrame(frame);
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
-      if (!visible || document.hidden) return;
       if (autoRotate && now - lastInput > 4500 && pointers.size === 0 && selBand && !selBand.visible) goal.az += dt * 0.045;
       const k = 1 - Math.exp(-dt * 6);
       view.az += (goal.az - view.az) * k; view.pol += (goal.pol - view.pol) * k; view.dist += (goal.dist - view.dist) * k;
@@ -961,14 +968,14 @@
     }
     const ro = new ResizeObserver(() => { resize(); if (!selBand || !selBand.visible) defaultGoal(); });
     ro.observe(container);
-    const io = new IntersectionObserver((en) => { visible = en[0].isIntersecting; }, { threshold: 0.01 });
+    const io = new IntersectionObserver((en) => { visible = en[en.length - 1].isIntersecting; resume(); }, { threshold: 0.01 });
     io.observe(container);
 
     build(opts.floors || 16);
     setTime(opts.time || 'dusk', true);
     resize(); defaultGoal(); Object.assign(view, goal); view.dist *= 1.25; view.az = goal.az - 0.8;
     placeCamera();
-    requestAnimationFrame(frame);
+    resume();
 
     return {
       setData, selectFloor: (n) => selectFloor(n, true), selectApartment, clearSelection, resetView, setTime,
@@ -980,7 +987,7 @@
       get preset() { return presetName; },
       get floors() { return floorsCount; },
       get renderer() { return renderer; },
-      destroy() { running = false; ro.disconnect(); io.disconnect(); renderer.dispose(); if (el.parentNode) el.parentNode.removeChild(el); },
+      destroy() { running = false; cancelAnimationFrame(raf); document.removeEventListener('visibilitychange', resume); ro.disconnect(); io.disconnect(); renderer.dispose(); if (el.parentNode) el.parentNode.removeChild(el); },
     };
   }
 
