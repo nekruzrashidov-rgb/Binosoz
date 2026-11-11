@@ -4,6 +4,7 @@
      await checkSite()                       // all public pages, light theme, 1280px wide
      await checkSite({ theme: 'dark' })      // the same in the dark theme
      await checkSite({ width: 375 })         // phone width
+     checkContrastDocument(document, window) // only the page that is open (works on any site, iframes or not)
    Each page is loaded in a hidden iframe of the same origin; the result is a table: page, texts checked,
    texts below AA (4.5:1, or 3:1 for large text) and the worst ones. Text over a photo or gradient is not measured
    by colour; dark text over such a background is reported separately ("dark on image"). */
@@ -59,6 +60,11 @@
         document.body.appendChild(f);
         await new Promise((r) => { f.onload = r; });
         await new Promise((r) => setTimeout(r, 1500));
+        if (!f.contentDocument) {
+          f.remove();
+          throw new Error('Страницу нельзя открыть во фрейме (сайт, который отдаёт API, шлёт frame-ancestors \'none\'). ' +
+            'Запустите проверку на статическом сервере (node scripts/serve-web.mjs) или на каждой странице: checkContrastDocument(document, window)');
+        }
         // Reveal animations: show everything as if scrolled to.
         f.contentDocument.querySelectorAll('.reveal, .section-reveal').forEach((e) => e.classList.add('visible', 'in'));
         const res = checkDocument(f.contentDocument, f.contentWindow);

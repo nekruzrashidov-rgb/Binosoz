@@ -5,7 +5,9 @@
    ORG_SLUG: short name of the developer whose buildings and USD rate the public site shows
    ('nekruz' is the default organization, «Некруз Резиденс»). Empty — buildings of all developers on the platform. */
 window.SITORA_CONFIG = {
-  API_BASE: 'https://binosoz-1.onrender.com/api/v1',
+  // The site served by the API itself (Render, Docker, dotnet run) talks to its own /api/v1: its CSP (connect-src 'self')
+  // allows nothing else. The static copy on Vercel has no API of its own — see API_BASE_BY_HOST below.
+  API_BASE: '/api/v1',
   ORG_SLUG: 'nekruz',
   DEFAULT_BUILDING_ID: null,
   // Numbers for the landing's stats bar when the API is unavailable; with the API the real ones are shown.
@@ -15,7 +17,6 @@ window.SITORA_CONFIG = {
     phone: '+992 98 363 70 70',
     telegram: '@nekru01',
     address: 'г. Душанбе, пр. Борбад, 15',
-    hours: 'Пн–Сб 9:00–19:00',
     // Contact page: the manager who answers, and the office hours day by day (day keys: monFri, sat, sun; null — day off).
     manager: 'Некруз',
     schedule: [['monFri', '9:00–19:00'], ['sat', '10:00–17:00'], ['sun', null]],

@@ -3,11 +3,11 @@
    after a deploy); the copy in the cache is used only when the network fails. Offline and never opened before —
    the page /offline.html.
    Never touched: the API (/api, /hubs, /health), files by signed links (/files), Swagger, other hosts (the API on
-   Render, fonts, cdnjs), non-GET requests and the sandboxed 3D model. Tokens and API answers never reach the cache. */
+   Render, fonts, cdnjs) and non-GET requests. Tokens and API answers never reach the cache. */
 const CACHE = 'sitora-v1';
 const OFFLINE = '/offline.html';
 const PRECACHE = [OFFLINE, '/css/styles.css', '/favicon.svg', '/manifest.json'];
-const SKIP = ['/api/', '/hubs/', '/health', '/files/', '/swagger', '/nekruz3d.html'];
+const SKIP = ['/api/', '/hubs/', '/health', '/files/', '/swagger'];
 const ASSETS = ['script', 'style', 'image', 'font', 'manifest'];
 
 self.addEventListener('install', (event) => {
