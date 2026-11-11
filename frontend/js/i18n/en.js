@@ -1313,7 +1313,6 @@
     "home.soon.error": "Could not load the apartments",
     "home.soon.text": "Apartments will appear on the site as soon as sales open. Call us or leave your number — a manager will tell you about the layouts and prices.",
     "home.soon.lead": "Leave a request",
-    "about.downFrom": "down payment from",
     "nav.themeLight": "Light mode",
     "nav.themeDark": "Dark mode",
     "home.freeNow": "Available now",

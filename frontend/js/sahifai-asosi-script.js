@@ -651,10 +651,10 @@
       // The hero already shows floors and apartments: here the installment terms (config.js INSTALLMENT, set by the
       // developer) and, when the API has them, the number of apartment types and the delivery year.
       aboutStats.replaceChildren(...[
-        big(plan.downFrom + '%', t('about.downFrom')),
-        big(String(plan.years), plural(plan.years, 'plan.years')),
+        big(t('plan.downV', { n: plan.downFrom }), t('plan.down')),
+        big(t('plan.termV', { n: counted(plan.years, 'plan.years') }), t('plan.term')),
+        big('0%', t('plan.over')),
         d.types.length ? big(String(d.types.length), plural(d.types.length, 'about.types')) : null,
-        d.year ? big(String(d.year), t('about.year')) : null,
       ].filter(Boolean));
       layoutGrid.replaceChildren(...d.types.map(layoutCard));
     }
@@ -1063,7 +1063,7 @@
 
       // Небо — градиент ночи с оттенком золота
       const sky = g.createLinearGradient(0, 0, 0, H * 0.7);
-      sky.addColorStop(0, '#020710'); sky.addColorStop(0.5, '#060d1f'); sky.addColorStop(1, '#0d1a2e');
+      sky.addColorStop(0, '#0b0806'); sky.addColorStop(0.5, '#130e0a'); sky.addColorStop(1, '#24190f');
       g.fillStyle = sky; g.fillRect(0, 0, W, H);
 
       // Звёзды
@@ -1079,7 +1079,7 @@
 
       // Золотое свечение за зданием
       const glow = g.createRadialGradient(W / 2, H * 0.5, 20, W / 2, H * 0.5, W * 0.65);
-      glow.addColorStop(0, 'rgba(201,162,39,0.18)'); glow.addColorStop(0.5, 'rgba(201,162,39,0.06)'); glow.addColorStop(1, 'rgba(201,162,39,0)');
+      glow.addColorStop(0, 'rgba(176,90,32,0.18)'); glow.addColorStop(0.5, 'rgba(176,90,32,0.06)'); glow.addColorStop(1, 'rgba(176,90,32,0)');
       g.fillStyle = glow; g.fillRect(0, 0, W, H);
 
       const ground = H * 0.88;
@@ -1087,13 +1087,13 @@
       // ── Боковые здания (фон) ──
       const drawSide = (sx, sw, sh, opacity, litOffset) => {
         g.globalAlpha = opacity;
-        g.fillStyle = '#080f1e'; g.fillRect(sx, ground - sh, sw, sh);
+        g.fillStyle = '#120d09'; g.fillRect(sx, ground - sh, sw, sh);
         // фасад
-        g.fillStyle = '#0a1428'; g.fillRect(sx, ground - sh, sw, sh);
+        g.fillStyle = '#1a120b'; g.fillRect(sx, ground - sh, sw, sh);
         // горизонтальные линии этажей
         const sfH = sh / SIDE_FLOORS;
         for (let i = 0; i <= SIDE_FLOORS; i++) {
-          g.strokeStyle = 'rgba(201,162,39,' + (i % 4 === 0 ? 0.4 : 0.1) + ')';
+          g.strokeStyle = 'rgba(176,90,32,' + (i % 4 === 0 ? 0.4 : 0.1) + ')';
           g.lineWidth = 0.5; g.beginPath();
           g.moveTo(sx, ground - sh + i * sfH); g.lineTo(sx + sw, ground - sh + i * sfH); g.stroke();
         }
@@ -1117,7 +1117,7 @@
 
       // Основа здания — гранитный цоколь (нижние 2 этажа)
       const plinthH = fH * 2.2;
-      g.fillStyle = '#0e1520'; g.fillRect(bX, bY, bW, bH);
+      g.fillStyle = '#16100b'; g.fillRect(bX, bY, bW, bH);
       const gran = g.createLinearGradient(bX, ground - plinthH, bX + bW, ground);
       gran.addColorStop(0, '#1a1612'); gran.addColorStop(1, '#0f100c');
       g.fillStyle = gran; g.fillRect(bX - 4, ground - plinthH, bW + 8, plinthH + 4);
@@ -1126,7 +1126,7 @@
       const pilW = 6, pilCount = 5;
       for (let p = 0; p < pilCount; p++) {
         const px = bX + (bW / (pilCount - 1)) * p - pilW / 2;
-        g.fillStyle = 'rgba(201,162,39,0.12)'; g.fillRect(px, bY, pilW, bH);
+        g.fillStyle = 'rgba(176,90,32,0.12)'; g.fillRect(px, bY, pilW, bH);
       }
 
       // Горизонтальные линии — карнизы
@@ -1134,11 +1134,11 @@
         const isCornice = i % 5 === 0 || i === 0 || i === FLOORS;
         const isBelt = i % 3 === 0;
         if (isCornice) {
-          g.fillStyle = 'rgba(201,162,39,0.5)'; g.fillRect(bX - 3, bY + i * fH - 1, bW + 6, 3);
+          g.fillStyle = 'rgba(176,90,32,0.5)'; g.fillRect(bX - 3, bY + i * fH - 1, bW + 6, 3);
         } else if (isBelt) {
-          g.fillStyle = 'rgba(201,162,39,0.22)'; g.fillRect(bX, bY + i * fH, bW, 1.5);
+          g.fillStyle = 'rgba(176,90,32,0.22)'; g.fillRect(bX, bY + i * fH, bW, 1.5);
         } else {
-          g.strokeStyle = 'rgba(201,162,39,0.1)'; g.lineWidth = 0.5;
+          g.strokeStyle = 'rgba(176,90,32,0.1)'; g.lineWidth = 0.5;
           g.beginPath(); g.moveTo(bX, bY + i * fH); g.lineTo(bX + bW, bY + i * fH); g.stroke();
         }
       }
@@ -1157,7 +1157,7 @@
           warm.addColorStop(1, 'rgba(242,180,60,' + (a * 0.65).toFixed(2) + ')');
           g.fillStyle = warm;
         } else {
-          g.fillStyle = 'rgba(30,50,100,0.25)';
+          g.fillStyle = 'rgba(90,50,25,0.25)';
         }
         g.fillRect(wx, wy, wW, wH);
         // Оконная рама (крест)
@@ -1168,18 +1168,18 @@
       }
 
       // Вертикальные золотые фины на углах
-      g.fillStyle = 'rgba(201,162,39,0.6)';
+      g.fillStyle = 'rgba(176,90,32,0.6)';
       g.fillRect(bX - 3, bY, 3, bH);
       g.fillRect(bX + bW, bY, 3, bH);
 
       // Парапет верхний
-      g.fillStyle = '#0a1220'; g.fillRect(bX - 6, bY - 12, bW + 12, 14);
-      g.fillStyle = 'rgba(201,162,39,0.6)'; g.fillRect(bX - 6, bY - 14, bW + 12, 3);
+      g.fillStyle = '#120d09'; g.fillRect(bX - 6, bY - 12, bW + 12, 14);
+      g.fillStyle = 'rgba(176,90,32,0.6)'; g.fillRect(bX - 6, bY - 14, bW + 12, 3);
 
       // Антенна
-      g.strokeStyle = 'rgba(201,162,39,0.75)'; g.lineWidth = 2;
+      g.strokeStyle = 'rgba(176,90,32,0.75)'; g.lineWidth = 2;
       g.beginPath(); g.moveTo(W / 2, bY - 12); g.lineTo(W / 2, bY - 48); g.stroke();
-      g.lineWidth = 1; g.strokeStyle = 'rgba(201,162,39,0.4)';
+      g.lineWidth = 1; g.strokeStyle = 'rgba(176,90,32,0.4)';
       g.beginPath(); g.moveTo(W / 2 - 8, bY - 36); g.lineTo(W / 2 + 8, bY - 36); g.stroke();
       // Мигающий красный огонь
       const blink = reduce ? 0.85 : (0.4 + Math.abs(Math.sin(time * 1.6)) * 0.6);
@@ -1192,23 +1192,23 @@
 
       // Вход — колонны и козырёк
       const entW = bW * 0.42, entX = bX + (bW - entW) / 2;
-      g.fillStyle = 'rgba(201,162,39,0.08)'; g.fillRect(entX, ground - plinthH, entW, plinthH);
+      g.fillStyle = 'rgba(176,90,32,0.08)'; g.fillRect(entX, ground - plinthH, entW, plinthH);
       // 3 колонны
       [0.15, 0.5, 0.85].forEach((t) => {
         const cx = entX + entW * t;
         g.fillStyle = '#1a160e'; g.fillRect(cx - 3.5, ground - plinthH + 4, 7, plinthH - 4);
-        g.fillStyle = 'rgba(201,162,39,0.5)'; g.fillRect(cx - 4, ground - plinthH, 8, 5);
+        g.fillStyle = 'rgba(176,90,32,0.5)'; g.fillRect(cx - 4, ground - plinthH, 8, 5);
         g.fillRect(cx - 4, ground - 10, 8, 10);
       });
       // Козырёк входа
-      g.fillStyle = 'rgba(201,162,39,0.35)'; g.fillRect(entX - 4, ground - plinthH - 2, entW + 8, 4);
+      g.fillStyle = 'rgba(176,90,32,0.35)'; g.fillRect(entX - 4, ground - plinthH - 2, entW + 8, 4);
 
       // Земля
       const groundGrad = g.createLinearGradient(0, ground, 0, H);
-      groundGrad.addColorStop(0, '#0a1218'); groundGrad.addColorStop(1, '#060d1a');
+      groundGrad.addColorStop(0, '#100b08'); groundGrad.addColorStop(1, '#0b0806');
       g.fillStyle = groundGrad; g.fillRect(0, ground, W, H - ground);
       // Золотая линия земли
-      g.fillStyle = 'rgba(201,162,39,0.4)'; g.fillRect(0, ground, W, 1.5);
+      g.fillStyle = 'rgba(176,90,32,0.4)'; g.fillRect(0, ground, W, 1.5);
 
       // Отражение в земле
       if (!reduce) {

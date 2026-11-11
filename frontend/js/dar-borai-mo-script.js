@@ -14,8 +14,10 @@
     const cfg = window.SITORA_CONFIG || {};
     const site = S.site;
     const accent = (text) => site.accentFirst(text);
-    // config.js numbers until the building loads (and when the API is unavailable).
-    const d = { floors: cfg.DEFAULT_FLOORS || 20, apts: cfg.DEFAULT_APTS || 160, delivery: cfg.DEFAULT_DELIVERY || 'Q1 2026' };
+    // Floors and apartments only from the API (config.js DEFAULT_* numbers only in the demo mode); a chip without its
+    // number is not shown. The delivery text stays as the developer set it until the API has a completion year.
+    const demo = S.isDemo();
+    const d = { floors: demo ? cfg.DEFAULT_FLOORS || 20 : null, apts: demo ? cfg.DEFAULT_APTS || 160 : null, delivery: cfg.DEFAULT_DELIVERY || 'Q1 2026' };
     let alive = true;
 
     const page = h('div', { class: 'page-in lux about-page' });
@@ -28,7 +30,8 @@
     let counting = 0;
     const drawChips = () => {
       deliveryChip.textContent = t('aboutpg.chip.delivery', { y: d.delivery });
-      const set = (k) => { floorsChip.textContent = t('aboutpg.chip.floors', { n: Math.round(d.floors * k) }); aptsChip.textContent = t('aboutpg.chip.apts', { n: Math.round(d.apts * k) }); };
+      floorsChip.hidden = !d.floors; aptsChip.hidden = !d.apts;
+      const set = (k) => { floorsChip.textContent = t('aboutpg.chip.floors', { n: Math.round((d.floors || 0) * k) }); aptsChip.textContent = t('aboutpg.chip.apts', { n: Math.round((d.apts || 0) * k) }); };
       if (!S.motionOk) { set(1); return; }
       const token = ++counting, t0 = performance.now();
       const step = (now) => { if (token !== counting) return; const p = Math.min(1, (now - t0) / 1200); set(1 - Math.pow(1 - p, 3)); if (p < 1) requestAnimationFrame(step); };
@@ -83,7 +86,7 @@
         if (b.plannedApartments) d.apts = b.plannedApartments;
         if (b.completionYear) d.delivery = String(b.completionYear);
         drawChips();
-      } catch (e) { /* the page stays with the config numbers */ }
+      } catch (e) { /* no numbers: the floors and apartments chips stay hidden */ }
     })();
 
     return () => { alive = false; stopReveal(); };
