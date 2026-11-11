@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru" data-theme="dark">
+<html lang="ru" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -11,18 +11,44 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Unbounded:wght@500;600;700;800;900&display=swap">
+<link rel="preconnect" href="https://images.unsplash.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Unbounded:wght@600;700;800&display=swap">
 <link rel="stylesheet" href="/css/styles.css">
+<!-- Preload hero image for faster LCP -->
+<link rel="preload" as="image" href="https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1600&q=80&auto=format">
 </head>
 <body data-page="home">
 <div id="app"></div>
-<script src="/js/tanzimoт-api-url.js"></script>
-<script src="/js/tarjumaho-ru-tg-en.js"></script>
-<script src="/js/komponentho-modal-toast-tabs.js"></script>
-<script src="/js/zaprosho-ba-backend.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="/js/modeli-3d-bino-script.js"></script>
-<script src="/js/sahifai-asosi-script.js"></script>
-<script src="/js/routing-va-navigatsiya.js"></script>
+<script src="/js/tanzimoт-api-url.js" defer></script>
+<script src="/js/tarjumaho-ru-tg-en.js" defer></script>
+<script src="/js/komponentho-modal-toast-tabs.js" defer></script>
+<script src="/js/zaprosho-ba-backend.js" defer></script>
+<script src="/js/sahifai-asosi-script.js" defer></script>
+<script src="/js/routing-va-navigatsiya.js" defer></script>
+<script>
+/* Загружаем Three.js + 3D-модель только когда секция #model3d видна на экране */
+(function() {
+  var loaded = false;
+  function load3D() {
+    if (loaded) return; loaded = true;
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+    s.onload = function() {
+      var s2 = document.createElement('script');
+      s2.src = '/js/modeli-3d-bino-script.js';
+      document.head.appendChild(s2);
+    };
+    document.head.appendChild(s);
+  }
+  /* Загружаем при скролле к 3D-секции */
+  var ob = window.IntersectionObserver && new IntersectionObserver(function(entries) {
+    if (entries[0].isIntersecting) { load3D(); ob.disconnect(); }
+  }, { rootMargin: '300px' });
+  document.addEventListener('DOMContentLoaded', function() {
+    var el = document.getElementById('model3d-wrap') || document.querySelector('.wow-3d');
+    if (el && ob) ob.observe(el); else setTimeout(load3D, 3000);
+  });
+})();
+</script>
 </body>
 </html>

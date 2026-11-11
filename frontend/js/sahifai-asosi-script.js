@@ -228,6 +228,16 @@
 
     function initHouse() {
       const floors = st.floors.filter((f) => !f.commercial).map((f) => f.number);
+      /* Если 3D-библиотека ещё не загружена — ждём её (lazy load) */
+      if (!window.S.House3D) {
+        var attempts = 0;
+        var wait3D = setInterval(function() {
+          attempts++;
+          if (window.S.House3D) { clearInterval(wait3D); initHouse(); }
+          else if (attempts > 60) { clearInterval(wait3D); /* таймаут 6с — показываем canvas-заглушку */ }
+        }, 100);
+        return;
+      }
       try {
       house = S.House3D.create(houseBox, {
         floors: Math.max(...st.floors.map((f) => f.number), 1), time: st.time,
