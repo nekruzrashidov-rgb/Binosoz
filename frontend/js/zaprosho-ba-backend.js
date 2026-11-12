@@ -162,7 +162,11 @@
     try {
       for (;;) {
         let res = null;
-        try { res = await fetch(url, { method, headers, body }); } catch (e) { res = null; }
+        // Until the API has answered once, a GET attempt waits at most 45 s: a sleeping gateway sometimes holds the
+        // connection with no answer, and «Загрузка…» must not hang forever (then a retry, or the error card).
+        const ctl = retry && typeof AbortController === 'function' ? new AbortController() : null;
+        const stop = ctl ? setTimeout(() => ctl.abort(), 45000) : 0;
+        try { res = await fetch(url, ctl ? { method, headers, body, signal: ctl.signal } : { method, headers, body }); } catch (e) { res = null; } finally { clearTimeout(stop); }
         if (res && !sleepyGateway(res)) { awake = true; return res; }
         if (!retry || Date.now() > until) {
           if (res) return res;

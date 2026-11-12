@@ -134,8 +134,10 @@
 
   async function boot() {
     await S.initLang();
+    // The tab title in the page language (the HTML holds the Russian one).
+    if (S.lang !== 'ru') document.title = t('pay.title') + ' — ' + t('brand.name');
     document.documentElement.dataset.theme = S.store.get('sitora.theme') === 'dark' ? 'dark' : 'light';
-    if (!id || !(amount > 0)) { shell(h('div', { class: 'pay-state bad', role: 'alert' }, h('div', { class: 'pay-mark', 'aria-hidden': 'true' }, '!'), h('h2', null, t('pay.title')), h('p', { class: 'muted' }, t('pay.err.link')), h('a', { class: 'btn gold', href: '/cabinet' }, t('pay.back')))); return; }
+    if (!id || !(amount > 0)) { shell(h('div', { class: 'pay-state bad', role: 'alert' }, h('div', { class: 'pay-mark', 'aria-hidden': 'true' }, '!'), h('h1', null, t('pay.title')), h('p', { class: 'muted' }, t('pay.err.link')), h('a', { class: 'btn gold', href: '/cabinet' }, t('pay.back')))); return; }
     form();
   }
   if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', boot); else boot();

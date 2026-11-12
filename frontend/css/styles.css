@@ -1560,7 +1560,7 @@ body.menu-open { overflow: hidden; }
 /* /gallery: filters, grid of drawings, lightbox */
 .gallery-page { background: var(--bg); color: var(--ink); }
 .gal-filters { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 22px; -webkit-overflow-scrolling: touch; }
-.gal-filter { flex: none; min-height: 40px; padding: 8px 16px; border-radius: 999px; font-weight: 700; font-size: 14px; cursor: pointer; color: var(--ink-2); background: var(--surface); border: 1px solid var(--line); }
+.gal-filter { flex: none; min-height: 44px; padding: 8px 16px; border-radius: 999px; font-weight: 700; font-size: 14px; cursor: pointer; color: var(--ink-2); background: var(--surface); border: 1px solid var(--line); }
 .gal-filter:hover { color: #fff; border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
 .gal-filter.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .galpg-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
@@ -2364,6 +2364,11 @@ a.float-card:hover {
 /* Buyer sign-in: «По почте / По телефону». */
 .login-by { align-self: flex-start; }
 .login-by button { font-size: 13.5px; padding: 6px 14px; }
-.login-off { margin: 0; padding: 10px 14px; border-radius: 12px; border-left: 3px solid var(--warn); background: color-mix(in srgb, var(--warn) 12%, var(--surface)); color: var(--ink); font-size: 14px; line-height: 1.45; }
 /* Footer: the site version (short commit SHA from version.txt). */
 .foot-ver { white-space: nowrap; }
+/* Touch targets ≥ 44 px on phones: the «Фото: автор, лицензия» links (taller by padding, the text stays small)
+   and the items of the mobile menu. */
+@media (pointer: coarse), (max-width: 768px) {
+  .photo-credit { display: inline-flex; align-items: center; min-height: 44px; padding-block: 12px; box-sizing: border-box; }
+  .mob-nav a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
+}

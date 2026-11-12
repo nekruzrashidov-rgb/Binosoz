@@ -166,7 +166,7 @@
       onclick: toggleTheme
     }, S.icon(isDark() ? 'sun' : 'moon'));
     // The buyer sees the complex's name; Binosoz (the platform) only on the developers' page (/register) and in the footer.
-    const siteBrand = page === 'register' ? 'BINOSOZ' : t('login.heroName');
+    const siteBrand = page === 'register' ? 'BINOSOZ' : t('brand.name');
     header.className = 'top lux-top' + (S.api.isAuthed ? ' authed' : '');
     header.replaceChildren(h('div', { class: 'wrap top-in' }, h('a', { class: 'brand', href: '/', 'aria-label': siteBrand }, S.logo(), h('span', null, siteBrand)), menu, h('span', { class: 'spacer' }),
       phone, lang, themeToggle, accountLink(), menuBtn));
@@ -196,14 +196,20 @@
   }
 
   // The tab title in the chosen language: the page's name and the brand (the landing keeps the complex's name).
-  const TITLES = { apartments: 'nav.apartments', gallery: 'nav.gallery', about: 'nav.project', contact: 'nav.contact', login: 'nav.login', cabinet: 'nav.cabinet', crm: 'nav.crm', platform: 'nav.platform' };
+  const TITLES = { apartments: 'nav.apartments', gallery: 'nav.gallery', about: 'nav.project', contact: 'nav.contact', login: 'nav.login', cabinet: 'nav.cabinet', crm: 'nav.crm', platform: 'nav.platform', register: 'reg2.title', 'accept-invite': 'audit.ent.Invitation', notfound: 'errp.notFound' };
   const htmlTitle = document.title;
+  // meta description in the page language (search engines read the Russian one from the HTML; this is for sharing
+  // and the browser after a language switch).
+  const META = { home: 'meta.home', apartments: 'meta.apartments', about: 'meta.about', gallery: 'meta.gallery', contact: 'meta.contact', register: 'meta.register' };
+  const descTag = document.querySelector('meta[name="description"]');
+  const htmlDesc = descTag ? descTag.getAttribute('content') : '';
   function setTitle() {
+    if (descTag && META[page]) descTag.setAttribute('content', S.lang === 'ru' ? htmlDesc : t(META[page]));
     if (S.lang === 'ru') { document.title = htmlTitle; return; }
     // The complex's own name is translated too ("Nekruz Residence" in English); Binosoz stays as it is.
     const last = htmlTitle.split(' — ').pop();
-    const brand = last === 'Некруз Резиденс' ? t('login.heroName') : last;
-    document.title = page === 'home' ? t('login.heroName') + ' — ' + t('home.tagline') : TITLES[page] ? t(TITLES[page]) + ' — ' + brand : document.title;
+    const brand = last === 'Некруз Резиденс' ? t('brand.name') : last;
+    document.title = page === 'home' ? t('brand.name') + ' — ' + t('home.tagline') : TITLES[page] ? t(TITLES[page]) + ' — ' + brand : document.title;
   }
 
   // Sections marked .section-reveal (and the site's .reveal blocks) slide up once they come into view. They are hidden

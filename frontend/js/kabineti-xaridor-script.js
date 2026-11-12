@@ -11,7 +11,7 @@
   const enter = (r) => { S.toast(t('login.welcome'), 'ok'); S.go(S.homeFor(r.user)); };
 
   // The login pages have no site header: the logo above the card leads back to the site.
-  const loginBrand = () => h('a', { class: 'login-brand', href: '/', 'aria-label': 'Binosoz' }, S.logo(), h('span', null, 'BINOSOZ'));
+  const loginBrand = () => h('a', { class: 'login-brand', href: '/', 'aria-label': t('brand.name') }, S.logo(), h('span', null, t('brand.name')));
 
   // A password with a show/hide button (👁); the label still points at the input itself.
   function passwordField(label, name, autocomplete, hint) {
@@ -31,8 +31,8 @@
   }
 
   // Two tabs: staff sign in with e-mail and password (then a 2FA code if it is on), buyers with a code by e-mail or SMS.
-  // GET /auth/methods says which codes really reach people: without an SMS provider the phone option stays visible
-  // but disabled with «SMS пока недоступны», and e-mail is the default.
+  // GET /auth/methods says which codes really reach people: the «По почте / По телефону» switch appears only when SMS
+  // really work (sms: true); until the answer comes, and without an SMS provider, there is only e-mail — no flicker.
   // /login#reset=<token> from the "forgot password" letter opens the new-password form.
   S.views.login = function (root) {
     const card = h('div', { class: 'card login-card login' });
@@ -46,11 +46,10 @@
     const isEmail = (v) => /^\S+@\S+\.\S+$/.test(v);
     // How a buyer gets the code: 'email' or 'phone' (remembered); methods — { email, sms } from the server.
     let by = S.store.get('sitora.loginBy') === 'phone' ? 'phone' : 'email', phoneVal = '+992', methods = null;
-    const smsOff = () => !!methods && !methods.sms;
+    const smsOn = () => !!methods && !!methods.sms;
     S.api.authMethods().then((m) => {
       methods = m || null;
-      if (smsOff() && by === 'phone') by = 'email';
-      if (step === 'buyer') draw();
+      if (smsOn() && step === 'buyer') draw();
     }).catch(() => {});
     // Server codes for «the code cannot be delivered» → a clear text in the page language.
     const humanError = (er) => {
@@ -66,8 +65,8 @@
       } }, t(key))));
     const link = (label, onclick) => h('button', { class: 'btn ghost sm', type: 'button', onclick }, label);
     // «По почте» / «По телефону» on the buyer's tab; the phone option is marked when SMS cannot be sent.
-    const byToggle = () => h('div', { class: 'seg login-by', role: 'group', 'aria-label': t('login.howTo') }, [['email', 'login.byEmail'], ['phone', 'login.byPhone']].map(([k, key]) =>
-      h('button', { type: 'button', class: by === k ? 'on' : '', 'aria-pressed': String(by === k), title: k === 'phone' && smsOff() ? t('login.smsOff') : null, onclick: () => {
+    const byToggle = () => !smsOn() ? null : h('div', { class: 'seg login-by', role: 'group', 'aria-label': t('login.howTo') }, [['email', 'login.byEmail'], ['phone', 'login.byPhone']].map(([k, key]) =>
+      h('button', { type: 'button', class: by === k ? 'on' : '', 'aria-pressed': String(by === k), onclick: () => {
         if (by === k) return;
         by = k; S.store.set('sitora.loginBy', k); notice = ''; draw();
       } }, t(key))));
@@ -82,7 +81,8 @@
         if (!timer) clearInterval(tick);
       }, 1000);
     };
-    const send = async () => { await (by === 'phone' ? S.api.smsSend(phoneVal) : S.api.emailSend(emailVal)); startTick(); };
+    const byPhoneNow = () => by === 'phone' && smsOn();
+    const send = async () => { await (byPhoneNow() ? S.api.smsSend(phoneVal) : S.api.emailSend(emailVal)); startTick(); };
 
     const codeInput = (name) => S.input(name, { inputmode: 'numeric', maxlength: 6, placeholder: '••••••', autocomplete: 'one-time-code', style: { letterSpacing: '.4em', fontSize: '20px', textAlign: 'center', fontWeight: 800 } });
 
@@ -141,17 +141,15 @@
           notice = t('login.resetDone'); step = 'staff'; draw();
         };
         focus = pass.input;
-      } else if (step === 'buyer' && by === 'phone') {
+      } else if (step === 'buyer' && byPhoneNow()) {
         const phone = S.input('phone', { type: 'tel', value: phoneVal, autocomplete: 'tel', inputmode: 'tel' });
         btn.textContent = t('login.sendCode');
-        if (smsOff()) { phone.disabled = true; btn.disabled = true; }
-        const off = smsOff() ? h('p', { class: 'login-off', role: 'status' }, t('login.smsOff')) : null;
-        form.append(h('h2', null, t('login.buyerTitle')), byToggle(), h('p', { class: 'muted' }, t('login.hintPhone')), info, off, S.field(t('f.phone'), phone, t('f.phoneHint')), btn);
+        form.append(h('h2', null, t('login.buyerTitle')), byToggle(), h('p', { class: 'muted' }, t('login.hintPhone')), info, S.field(t('f.phone'), phone, t('f.phoneHint')), btn);
         submit = async () => {
           phoneVal = phone.value.replace(/[\s()-]/g, '');
           await send(); notice = ''; step = 'code'; draw();
         };
-        focus = smsOff() ? null : phone;
+        focus = phone;
       } else if (step === 'buyer') {
         const email = S.input('email', { type: 'email', value: emailVal, placeholder: 'name@mail.tj', autocomplete: 'email', inputmode: 'email' });
         btn.textContent = t('login.sendCode');
@@ -184,7 +182,7 @@
       } else {
         const code = codeInput('code');
         const resend = h('button', { class: 'btn ghost sm', type: 'button', 'data-resend': '', disabled: timer > 0, onclick: async () => { try { await send(); S.toast(t('login.sent'), 'ok'); } catch (er) { S.err(humanError(er)); } } }, timer > 0 ? t('login.resendIn', { s: timer }) : t('login.resend'));
-        const byPhone = by === 'phone';
+        const byPhone = byPhoneNow();
         form.append(h('h2', null, t('login.codeTitle')), h('p', { class: 'muted' }, byPhone ? t('login.codeSubPhone', { p: phoneVal }) : t('login.codeSub', { p: emailVal })), S.field(t('login.code'), code, t('login.codeHint')), btn,
           h('div', { class: 'row between' }, link(t(byPhone ? 'login.changePhone' : 'login.changeEmail'), () => { step = 'buyer'; clearInterval(tick); draw(); }), resend));
         submit = async () => {
@@ -208,11 +206,11 @@
       }));
       const lang = h('div', { class: 'seg lg-lang', role: 'group', 'aria-label': 'Language' }, S.LANGS.map(([k, l]) => h('button', { type: 'button', class: S.lang === k ? 'on' : '', 'aria-pressed': String(S.lang === k), onclick: () => { if (S.lang !== k) S.setLang(k); } }, l)));
       const facts = h('ul', { class: 'lg-facts' },
-        cc.address ? h('li', null, S.icon('pin'), cc.address) : null,
+        cc.address ? h('li', null, S.icon('pin'), S.brandAddress(cc.address)) : null,
         cc.phone ? h('li', null, S.icon('phone'), h('a', { href: 'tel:' + cc.phone.replace(/[^\d+]/g, '') }, cc.phone)) : null);
       const hero = h('aside', { class: 'lg-hero' }, sky,
-        h('div', { class: 'lg-hero-top' }, h('a', { class: 'lg-brand', href: '/', 'aria-label': t('login.toSite') }, S.logo(), h('span', null, 'BINOSOZ')), lang),
-        h('div', { class: 'lg-hero-text' }, h('p', { class: 'lg-eyebrow' }, t('login.heroEyebrow')), h('h1', { class: 'lg-name' }, t('login.heroName')), h('p', { class: 'lg-sub' }, t('login.heroSub')), facts));
+        h('div', { class: 'lg-hero-top' }, h('a', { class: 'lg-brand', href: '/', 'aria-label': t('login.toSite') }, S.logo(), h('small', { class: 'lg-platform' }, t('footer.platform'))), lang),
+        h('div', { class: 'lg-hero-text' }, h('p', { class: 'lg-eyebrow' }, t('login.heroEyebrow')), h('h1', { class: 'lg-name' }, t('brand.name')), h('p', { class: 'lg-sub' }, t('login.heroSub')), facts));
       return h('div', { class: 'lg-split' }, hero, h('main', { class: 'lg-side' }, h('div', { class: 'lg-frame' }, c), demoChips()));
     }
 
@@ -413,7 +411,7 @@
       const pdf = h('button', { class: 'ptrack-pdf', type: 'button', onclick: (e) => { e.stopPropagation(); S.busy(e.currentTarget, () => S.api.openDoc('/deals/' + deal.dealId + '/statement.pdf', { date: S.today() }, t('cab.pdfAct')).catch(S.err)); } }, '⬇ ' + t('pcard.pdf'));
       const front = h('div', { class: 'ptrack-front' },
         h('span', { class: 'ptrack-ornament', 'aria-hidden': 'true' }),
-        h('div', { class: 'ptrack-head' }, h('div', { class: 'ptrack-brand' }, '💎 ' + t('login.heroName').toUpperCase()), pdf),
+        h('div', { class: 'ptrack-head' }, h('div', { class: 'ptrack-brand' }, '💎 ' + t('brand.name').toUpperCase()), pdf),
         h('div', { class: 'ptrack-name' }, ov.customerName || ''),
         h('div', { class: 'ptrack-apt' }, t('cab.aptNo', { n: deal.apartmentNumber }) + ' · ' + t('pcard.floor', { n: deal.floor })),
         h('div', { class: 'ptrack-bar-track' }, bar),

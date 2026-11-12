@@ -72,7 +72,15 @@
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   };
   S.icon = (n, cls) => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('width', 18); s.setAttribute('height', 18); s.setAttribute('fill', 'none'); s.setAttribute('stroke', 'currentColor'); s.setAttribute('stroke-width', 1.8); s.setAttribute('stroke-linecap', 'round'); s.setAttribute('stroke-linejoin', 'round'); s.style.flex = 'none'; if (cls) s.setAttribute('class', cls); s.setAttribute('aria-hidden', 'true'); s.innerHTML = ICONS[n] || ''; return s; };
-  S.logo = () => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 32 32'); s.setAttribute('width', 28); s.setAttribute('height', 28); s.setAttribute('aria-hidden', 'true'); s.innerHTML = '<defs><linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e0874a"/><stop offset="1" stop-color="#9a4f1c"/></linearGradient></defs><path d="M16 1.5l4 9.3 10 1.2-7.4 6.9 2 10L16 23.7 7.4 28.9l2-10L2 12l10-1.2z" fill="url(#lg1)"/><path d="M16 1.5l4 9.3 10 1.2-7.4 6.9 2 10L16 23.7z" fill="#f0c89a" opacity=".92"/>'; return s; };
+  // Each copy of the logo gets its own gradient id (lg1, lg2…): the same id twice on a page is invalid HTML, and Safari
+  // drops the gradient when the first copy is hidden (the mobile menu, the footer off screen).
+  let logoN = 0;
+  S.logo = () => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); const id = 'lg' + (++logoN); s.setAttribute('viewBox', '0 0 32 32'); s.setAttribute('width', 28); s.setAttribute('height', 28); s.setAttribute('aria-hidden', 'true'); s.innerHTML = '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e0874a"/><stop offset="1" stop-color="#9a4f1c"/></linearGradient></defs><path d="M16 1.5l4 9.3 10 1.2-7.4 6.9 2 10L16 23.7 7.4 28.9l2-10L2 12l10-1.2z" fill="url(#' + id + ')"/><path d="M16 1.5l4 9.3 10 1.2-7.4 6.9 2 10L16 23.7z" fill="#f0c89a" opacity=".92"/>'; return s; };
+  // The complex's name and address in the page language. The API and config.js hold them in Russian; the default
+  // complex («Некруз Резиденс», пр. Борбад, 15) is shown from i18n (brand.name, contact.address), any other as it is.
+  const RU_NAME = /^Некр[уӯ]з\s+Резиденс$/i, RU_ADDRESS = 'г. Душанбе, пр. Борбад, 15';
+  S.brandName = (name) => { const v = String(name || '').trim(); return !v || RU_NAME.test(v) || v === 'Nekruz Residence' ? S.t('brand.name') : v; };
+  S.brandAddress = (address) => { const v = String(address || '').trim().replace(/\s+/g, ' '); return v === RU_ADDRESS ? S.t('contact.address') : v; };
 
   // ---------- formatting ----------
   const nf = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });

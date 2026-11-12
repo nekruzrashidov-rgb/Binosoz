@@ -43,7 +43,7 @@
 
     const hero = h('section', { class: 'about-hero' }, h('div', { class: 'wrap' },
       h('nav', { class: 'crumbs', 'aria-label': t('cat.crumbs') }, h('a', { href: '/' }, t('nav.home')), h('span', { 'aria-hidden': 'true' }, '/'), h('span', { 'aria-current': 'page' }, t('nav.project'))),
-      h('h1', { class: 'about-title' }, t('login.heroName')),
+      h('h1', { class: 'about-title' }, t('brand.name')),
       h('p', { class: 'about-lead' }, t('aboutpg.hero.sub')),
       chips));
 

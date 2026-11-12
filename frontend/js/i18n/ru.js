@@ -1,4 +1,4 @@
-/* Russian interface texts (1557 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* Russian interface texts (1565 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -1083,7 +1083,15 @@
     "cab.month.11": "декабря",
     "login.toSite": "На сайт",
     "login.heroEyebrow": "Жилой комплекс · Душанбе",
-    "login.heroName": "Некруз Резиденс",
+    "brand.name": "Некруз Резиденс",
+    "contact.address": "г. Душанбе, пр. Борбад, 15",
+    "contact.manager": "Некруз",
+    "meta.home": "Некруз Резиденс — жилой комплекс бизнес-класса в Душанбе. Рассрочка без процентов, 3D-модель дома, онлайн-бронь и личный кабинет покупателя.",
+    "meta.apartments": "Каталог квартир Некруз Резиденс в Душанбе: 3D-модель дома со свободными квартирами, фильтры, планировки и калькулятор рассрочки.",
+    "meta.about": "Некруз Резиденс — жилой комплекс бизнес-класса в Душанбе: инфраструктура, команда проекта и история строительства.",
+    "meta.gallery": "Виды Душанбе (фото с Wikimedia Commons, авторы указаны) и планировки квартир Некруз Резиденс.",
+    "meta.contact": "Контакты Некруз Резиденс. Менеджер Некруз: +992 98 363 70 70, Telegram @nekru01. г. Душанбе, пр. Борбад, 15.",
+    "meta.register": "Подключите вашу строительную компанию к платформе Binosoz: сайт с 3D-моделью дома, CRM продаж, рассрочка и кабинет покупателя.",
     "login.heroSub": "Ваш личный кабинет: сделка, график платежей, документы и чат с менеджером.",
     "login.demo": "Демо-доступ — только на этом компьютере",
     "login.demoAdmin": "Суперадмин",

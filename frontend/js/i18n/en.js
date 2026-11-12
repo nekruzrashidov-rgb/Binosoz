@@ -1,4 +1,4 @@
-/* English interface texts (1557 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* English interface texts (1565 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -1083,7 +1083,15 @@
     "cab.month.11": "December",
     "login.toSite": "To the website",
     "login.heroEyebrow": "Residential complex · Dushanbe",
-    "login.heroName": "Nekruz Residence",
+    "brand.name": "Nekruz Residence",
+    "contact.address": "15 Borbad Ave, Dushanbe",
+    "contact.manager": "Nekruz",
+    "meta.home": "Nekruz Residence is a business-class residential complex in Dushanbe: interest-free installments, a 3D model of the building, online booking and a buyer’s account.",
+    "meta.apartments": "Apartments at Nekruz Residence in Dushanbe: a 3D model of the building with available apartments, filters, floor plans and an installment calculator.",
+    "meta.about": "Nekruz Residence is a business-class residential complex in Dushanbe: amenities, the project team and the construction history.",
+    "meta.gallery": "Views of Dushanbe (photos from Wikimedia Commons, authors credited) and floor plans of Nekruz Residence.",
+    "meta.contact": "Contact Nekruz Residence. Manager Nekruz: +992 98 363 70 70, Telegram @nekru01. 15 Borbad Ave, Dushanbe.",
+    "meta.register": "Connect your construction company to the Binosoz platform: a site with a 3D model of the building, a sales CRM, installments and a buyer’s account.",
     "login.heroSub": "Your personal account: your deal, payment schedule, documents and chat with the manager.",
     "login.demo": "Demo access — on this computer only",
     "login.demoAdmin": "Super admin",
