@@ -174,6 +174,8 @@ Telegram__BotToken=...
 Telegram__ChatId=...
 Auth__DevFixedCodeForAnyEmail=true   # только Development
 Hangfire__ServerEnabled=true
+Email__Provider=Gmail             # Smtp | Resend | Gmail (Dev — коды только в лог разработки)
+Email__Gmail__ClientId=... / Email__Gmail__ClientSecret=... / Email__Gmail__RefreshToken=...   # docs/DEPLOY.md, «Почта через Gmail API»
 Storage__Provider=Local          # или S3 (MinIO, R2, B2, AWS): Storage__S3__Endpoint/Bucket/AccessKey/SecretKey/Region
 Storage__RootPath=/app/storage
 Sentry__Dsn=                     # пусто — ошибки никуда не отправляются

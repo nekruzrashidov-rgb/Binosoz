@@ -276,3 +276,44 @@ psql "postgresql://USER:PASSWORD@HOST/DB?sslmode=require" -f scripts/seed.sql
 5. **Проверка.** `https://binosoz-1.onrender.com/health/live` → `version` совпадает с последним коммитом `main`;
    на https://binosoz.vercel.app — каталог с квартирами, вход покупателя по коду из почты, CRM для сотрудника.
    За 10–15 минут до показа открыть сайт, чтобы Render проснулся (днём его держит Keepalive).
+
+## Почта через Gmail API
+
+Зачем: SMS-провайдера нет; Resend без своего домена доставляет письма только на адрес владельца аккаунта; бесплатный
+Render закрывает исходящий SMTP (порты 587/465), поэтому `Smtp` с Gmail там не работает. Gmail API идёт по HTTPS (443)
+и отправляет письма с binosoz27@gmail.com на любой адрес — покупателям и жюри. Отправитель — `GmailEmailSender`
+(`Sitora.Infrastructure/Integrations/GmailEmailSender.cs`): refresh token → access token (кэш в памяти) → письмо в MIME.
+
+Шаги владельца (названия пунктов в консоли Google могут немного отличаться — см.
+[Gmail API](https://developers.google.com/workspace/gmail/api/guides) и [OAuth для desktop-приложений](https://developers.google.com/identity/protocols/oauth2/native-app)):
+
+1. https://console.cloud.google.com → новый проект «Binosoz» → APIs & Services → Library → **Gmail API** → Enable.
+2. **OAuth consent screen**: тип External, имя приложения «Binosoz», почта поддержки binosoz27@gmail.com, scope
+   `https://www.googleapis.com/auth/gmail.send`, в Test users — binosoz27@gmail.com. Затем **Publish app**: в режиме
+   Testing refresh token живёт только 7 дней. Проверку Google проходить не нужно — входит только владелец, он один раз
+   увидит «приложение не проверено» → «Дополнительно» → «Перейти».
+3. **Credentials** → Create credentials → OAuth client ID → тип **Desktop app** → скопировать Client ID и Client Secret.
+4. На своём ПК (Node 18+): `node scripts/gmail-token.mjs` → ввести Client ID и Secret (секрет не отображается) →
+   открыть ссылку, войти как binosoz27@gmail.com → скрипт напечатает refresh token. Он ничего не сохраняет в файлы.
+5. Render → Environment:
+
+   | Переменная | Значение |
+   | --- | --- |
+   | `Email__Provider` | `Gmail` |
+   | `Email__From` | `binosoz27@gmail.com` |
+   | `Email__FromName` | `Некруз Резиденс` |
+   | `Email__Gmail__ClientId` | Client ID из шага 3 |
+   | `Email__Gmail__ClientSecret` | Client Secret из шага 3 |
+   | `Email__Gmail__RefreshToken` | refresh token из шага 4 |
+
+   Удалить `Smtp__*`, если они есть: короткие SMTP-переменные включают SMTP принудительно. Переменные Resend можно
+   оставить — работает тот провайдер, что указан в `Email__Provider`. Без любой из трёх `Email__Gmail__*` почта считается
+   ненастроенной: `/auth/methods` → `email: false`, `/auth/email/send` → 503 `email_not_configured`.
+6. Проверка: `/health/ready` (с `X-Health-Key`) → проверка `email`: «Почта: Gmail настроен». Затем `/login` → «Покупатель» →
+   почта **другого** адреса (не binosoz27) → код приходит → вход работает; то же в TJ.
+
+Ограничения:
+- у обычного Gmail суточный лимит отправки — несколько сотен писем; для конкурса достаточно;
+- письма с нового адреса могут попасть в «Спам» — проверить самому и попросить жюри заглянуть в «Спам»;
+- после смены пароля Google или отзыва доступа нужен новый refresh token (в логе API: «Refresh token Gmail отозван или
+  истёк — получите новый (scripts/gmail-token.mjs)»).

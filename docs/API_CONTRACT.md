@@ -33,7 +33,7 @@
 
 | Метод | Путь | Тело | Ответ |
 | --- | --- | --- | --- |
-| GET | `/auth/methods` | — | 200 `{ email, sms }` — какие способы входа по коду реально работают: `email` — письма уходят (Development или `Email__Provider` = Smtp/Resend), `sms` — вход по SMS включён (`Auth__SmsLoginEnabled`) и SMS-провайдер подключён. Публичный |
+| GET | `/auth/methods` | — | 200 `{ email, sms }` — какие способы входа по коду реально работают: `email` — письма уходят (Development или `Email__Provider` = Smtp/Resend, или Gmail со всеми тремя `Email__Gmail__*`), `sms` — вход по SMS включён (`Auth__SmsLoginEnabled`) и SMS-провайдер подключён. Публичный |
 | POST | `/auth/email/send` | `{ email }` | 200 `{ message, expiresInSeconds }` — всегда одинаковый, даже если почты нет. Код уходит только покупателю, сотруднику — нет (ответ тот же). Почтовый сервис не настроен (вне Development) — 503 `email_not_configured` для любой почты |
 | POST | `/auth/email/verify` | `{ email, code }` | 200 `AuthResponse` — только покупатель. Почта сотрудника — 401 «Сотрудники входят по паролю» |
 | POST | `/auth/register` | `{ email, firstName, lastName, phone, organization? }` | 200, как `/auth/email/send`. Пароля нет. Без почтового сервиса — 503 `email_not_configured` до создания карточки. Создаются карточка клиента у застройщика `organization` (slug; без него — единственный застройщик платформы) и учётная запись покупателя; уходят приветственное письмо и код для входа. Дальше — `/auth/email/verify`. Телефон обязателен. Без имени или фамилии и с неверным телефоном — 422; телефон из карточки с другой почтой — 409; почта сотрудника — 409; неизвестный застройщик — 404 |

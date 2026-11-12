@@ -72,8 +72,8 @@ services:
       Cors__AllowedOrigins__1: ${CRM_ORIGIN:-}
       # API доступен только через Caddy, поэтому заголовкам X-Forwarded-* можно доверять.
       ForwardedHeaders__Enabled: "true"
-      # Коды входа и приглашения уходят письмами: Smtp или Resend.
-      Email__Provider: ${EMAIL_PROVIDER:?Задайте EMAIL_PROVIDER (Smtp или Resend) в файле .env}
+      # Коды входа и приглашения уходят письмами: Smtp, Resend или Gmail.
+      Email__Provider: ${EMAIL_PROVIDER:?Задайте EMAIL_PROVIDER (Smtp, Resend или Gmail) в файле .env}
       Email__From: ${EMAIL_FROM:?Задайте EMAIL_FROM в файле .env}
       Email__InviteUrl: ${EMAIL_INVITE_URL:?Задайте EMAIL_INVITE_URL, например https://crm.sitora.tj/accept-invite#token=}
       Email__Smtp__Host: ${SMTP_HOST:-}
@@ -81,6 +81,9 @@ services:
       Email__Smtp__Username: ${SMTP_USERNAME:-}
       Email__Smtp__Password: ${SMTP_PASSWORD:-}
       Email__Resend__ApiKey: ${RESEND_API_KEY:-}
+      Email__Gmail__ClientId: ${GMAIL_CLIENT_ID:-}
+      Email__Gmail__ClientSecret: ${GMAIL_CLIENT_SECRET:-}
+      Email__Gmail__RefreshToken: ${GMAIL_REFRESH_TOKEN:-}
       Claude__ApiKey: ${CLAUDE_API_KEY:-}
       # JSON-логи в файлы на томе logs (по дню, 14 дней); stdout пишется всегда.
       Logging__File__Enabled: "true"
