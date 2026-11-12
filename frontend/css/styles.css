@@ -2357,6 +2357,10 @@ a.float-card:hover {
 .lb-cap .photo-credit { color: rgba(255, 255, 255, 0.85); }
 /* Footer: the demo-project note (small, on the dark footer). */
 .foot-demo { margin: 14px 0 0; font-size: 12px; line-height: 1.5; color: rgba(240, 220, 190, 0.72); }
+/* «Сервер просыпается…»: a bar while the sleeping API (free Render) answers its first request (zaprosho-ba-backend.js). */
+.wake-bar { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: var(--z-toast); width: max-content; max-width: calc(100% - 32px); padding: 10px 18px 10px 40px; border-radius: var(--r-pill); background: var(--surface); color: var(--ink); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); box-shadow: var(--shadow-lg); font-size: 14px; font-weight: 600; line-height: 1.4; }
+.wake-bar::before { content: ''; position: absolute; left: 16px; top: 50%; width: 14px; height: 14px; margin-top: -7px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--accent) 30%, transparent); border-top-color: var(--accent-text); animation: spin 0.9s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .wake-bar::before { animation: none; } }
 /* Buyer sign-in: «По почте / По телефону». */
 .login-by { align-self: flex-start; }
 .login-by button { font-size: 13.5px; padding: 6px 14px; }

@@ -1,0 +1,26 @@
+# Держит бесплатный Render проснувшимся днём: запрос к /health/live каждые 10 минут (сервис засыпает после 15 минут
+# простоя, первый посетитель после сна ждёт до минуты). Только с 03:00 до 18:00 UTC — 08:00–23:00 по Душанбе, чтобы не
+# тратить лимит часов бесплатного тарифа ночью. GitHub может задерживать или пропускать запуски по расписанию —
+# это не гарантия. Полностью убирает задержку только платный тариф Render или свой сервер (docs/DEPLOY.md).
+name: Keepalive
+
+on:
+  schedule:
+    - cron: "*/10 3-17 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    name: Разбудить API
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: /health/live
+        env:
+          API_URL: ${{ vars.SMOKE_API_URL || 'https://binosoz-1.onrender.com' }}
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "$API_URL/health/live" || true)
+          echo "$API_URL/health/live → $code"
+          # Ответ не 200 — не ошибка этого workflow (сервис мог просыпаться дольше минуты): за падениями следит Smoke.

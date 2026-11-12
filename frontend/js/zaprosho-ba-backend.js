@@ -128,13 +128,53 @@
   }
   S.fileHref = fileHref;
 
+  // ---------- the server is waking up ----------
+  // The free Render plan puts the API to sleep after 15 idle minutes; the first request then takes up to a minute.
+  // Until the API has answered once, a request slower than 3 s shows a bar «Сервер просыпается…» instead of an empty
+  // page, and GET requests that hit the sleeping gateway (no connection, 502/504, a 503 that is not the API's own
+  // problem+json) are repeated every 5 s for up to 90 s. After the first answer the bar is gone and nothing is retried.
+  let awake = false, pending = 0, wakeTimer = 0, wakeBar = null;
+  function wakeShow() {
+    if (wakeBar || !document.body) return;
+    wakeBar = document.createElement('div');
+    wakeBar.className = 'wake-bar';
+    wakeBar.setAttribute('role', 'status');
+    wakeBar.textContent = S.t ? S.t('wake.text') : 'Сервер просыпается, это займёт до минуты…';
+    document.body.appendChild(wakeBar);
+  }
+  function wakeHide() {
+    clearTimeout(wakeTimer); wakeTimer = 0;
+    if (wakeBar) { wakeBar.remove(); wakeBar = null; }
+  }
+  const sleepyGateway = (res) => res.status === 502 || res.status === 504
+    || (res.status === 503 && !(res.headers.get('content-type') || '').includes('json'));
+
   async function doFetch(method, path, o) {
     const base = apiBase(); const headers = { 'Accept-Language': langHeader() };
     if (o.auth !== false && auth && auth.accessToken) headers.Authorization = 'Bearer ' + auth.accessToken;
     let body;
     if (o.form) body = o.form; else if (o.body !== undefined) { headers['Content-Type'] = 'application/json'; body = JSON.stringify(o.body); }
     const url = (o.absolute ? origin() : base) + path + qs(o.query);
-    try { return await fetch(url, { method, headers, body }); } catch (e) { throw new ApiError(0, S.t ? S.t('err.network') : 'Нет связи с сервером'); } // TODO: i18n
+    const retry = !awake && method === 'GET';
+    const until = Date.now() + 90000;
+    pending++;
+    if (!awake && !wakeTimer && !wakeBar) wakeTimer = setTimeout(wakeShow, 3000);
+    try {
+      for (;;) {
+        let res = null;
+        try { res = await fetch(url, { method, headers, body }); } catch (e) { res = null; }
+        if (res && !sleepyGateway(res)) { awake = true; return res; }
+        if (!retry || Date.now() > until) {
+          if (res) return res;
+          throw new ApiError(0, S.t ? S.t('err.network') : 'Нет связи с сервером'); // TODO: i18n
+        }
+        wakeShow();
+        await new Promise((r) => setTimeout(r, 5000));
+      }
+    } finally {
+      pending--;
+      if (awake || !pending) wakeHide();
+    }
   }
 
   // Form field names that differ between the views and the API (validation errors come back with API names).
