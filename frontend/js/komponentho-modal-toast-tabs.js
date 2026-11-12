@@ -79,6 +79,8 @@
   // The complex's name and address in the page language. The API and config.js hold them in Russian; the default
   // complex («Некруз Резиденс», пр. Борбад, 15) is shown from i18n (brand.name, contact.address), any other as it is.
   const RU_NAME = /^Некр[уӯ]з\s+Резиденс$/i, RU_ADDRESS = 'г. Душанбе, пр. Борбад, 15';
+  // «Отправляя, вы соглашаетесь с политикой конфиденциальности» — под формами заявки и регистрации.
+  S.privacyNote = () => S.h('p', { class: 'consent-note' }, S.t('privacy.consent') + ' ', S.h('a', { href: '/privacy' }, S.t('privacy.consentLink')), '.');
   S.brandName = (name) => { const v = String(name || '').trim(); return !v || RU_NAME.test(v) || v === 'Nekruz Residence' ? S.t('brand.name') : v; };
   S.brandAddress = (address) => { const v = String(address || '').trim().replace(/\s+/g, ' '); return v === RU_ADDRESS ? S.t('contact.address') : v; };
 

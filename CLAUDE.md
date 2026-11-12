@@ -85,7 +85,7 @@ Binosoz/
 │       └── Sitora.Tests/           ← 380 тестов, Testcontainers, покрывают:
 │                                      auth, catalog, chat, payments, sales, security
 └── frontend/                   ← vanilla JS без сборщика; сайт отдаёт сам API (wwwroot) и копия на Vercel
-    ├── index.html, apartments.html, about.html, gallery.html, contact.html   ← публичные страницы ЖК
+    ├── index.html, apartments.html, about.html, gallery.html, contact.html, privacy.html ← публичные страницы ЖК
     ├── login.html, register.html, accept-invite.html, cabinet.html, crm.html, platform.html, payment.html,
     │   404.html, offline.html     ← вход, кабинет, CRM, платформа, тестовый банк, ошибки
     ├── manifest.json, sw.js       ← PWA (Service Worker «сначала сеть»), robots.txt, sitemap.xml
@@ -93,7 +93,7 @@ Binosoz/
     ├── css/styles.css             ← 171 КБ: токены (:root и [data-theme='dark']), все компоненты
     └── js/
         ├── tanzimot-api-url.js        ← config: API_BASE ('/api/v1'; Vercel → Render), ORG_SLUG, CONTACT, INSTALLMENT
-        ├── i18n/ru.js, tg.js, en.js   ← тексты (по 1557 ключей); ru — на каждой странице и запасной
+        ├── i18n/ru.js, tg.js, en.js   ← тексты (по 1622 ключа); ru — на каждой странице и запасной
         ├── tarjumaho-ru-tg-en.js      ← S.t(), S.initLang()/S.setLang() (грузит tg/en по требованию), S.bus
         ├── komponentho-modal-toast-tabs.js ← h() DOM-builder, иконки, модалки, тосты
         ├── zaprosho-ba-backend.js     ← все вызовы API, токены (localStorage sitora.auth)
@@ -101,6 +101,7 @@ Binosoz/
         ├── sahifai-asosi-script.js    ← публичный сайт: главная, каталог, калькулятор, контакты, футер
         ├── modeli-3d-bino-script.js   ← 3D-дом каталога (Three.js r128, грузится лениво; единственный 3D-движок)
         ├── galereya-script.js, dar-borai-mo-script.js ← /gallery (фото Душанбе + планировки), /about
+        ├── siyosati-mahfiyat-script.js ← /privacy: политика конфиденциальности (тексты privacy.*; сверять с кодом при изменениях)
         ├── kabineti-xaridor-script.js ← вход и кабинет покупателя
         ├── crm-script.js, panelho-crm-script.js ← CRM и её боковые панели
         ├── superadmin-platform-script.js ← раздел PlatformOwner

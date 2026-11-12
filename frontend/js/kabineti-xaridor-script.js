@@ -169,7 +169,7 @@
         const phone = S.input('phone', { type: 'tel', value: '+992', autocomplete: 'tel' });
         btn.textContent = t('login.sendCode');
         form.append(h('h2', null, t('reg.title')), h('p', { class: 'muted' }, t('reg.sub')), S.field(t('reg.firstName'), first), S.field(t('reg.lastName'), last),
-          S.field(t('login.email'), email), S.field(t('f.phone'), phone, t('f.phoneHint')), btn,
+          S.field(t('login.email'), email), S.field(t('f.phone'), phone, t('f.phoneHint')), btn, S.privacyNote(),
           link(t('reg.haveAccount'), () => { step = 'buyer'; draw(); }));
         submit = async () => {
           emailVal = email.value.trim();

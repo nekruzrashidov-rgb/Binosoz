@@ -9,7 +9,7 @@
   const page = document.body.dataset.page;
   const guarded = page === 'cabinet' || page === 'crm' || page === 'platform';
   // The buyer-facing pages are always dark: the design of the showroom is built for it.
-  const isPublic = page === 'home' || page === 'apartments' || page === 'gallery' || page === 'about' || page === 'contact' || page === 'register' || page === 'accept-invite' || page === 'notfound';
+  const isPublic = page === 'home' || page === 'apartments' || page === 'gallery' || page === 'about' || page === 'contact' || page === 'privacy' || page === 'register' || page === 'accept-invite' || page === 'notfound';
   const app = document.getElementById('app');
   const header = h('header', { class: 'top' });
   const main = h('div', { id: 'view' });
@@ -196,11 +196,11 @@
   }
 
   // The tab title in the chosen language: the page's name and the brand (the landing keeps the complex's name).
-  const TITLES = { apartments: 'nav.apartments', gallery: 'nav.gallery', about: 'nav.project', contact: 'nav.contact', login: 'nav.login', cabinet: 'nav.cabinet', crm: 'nav.crm', platform: 'nav.platform', register: 'reg2.title', 'accept-invite': 'audit.ent.Invitation', notfound: 'errp.notFound' };
+  const TITLES = { apartments: 'nav.apartments', gallery: 'nav.gallery', about: 'nav.project', contact: 'nav.contact', login: 'nav.login', cabinet: 'nav.cabinet', crm: 'nav.crm', platform: 'nav.platform', register: 'reg2.title', 'accept-invite': 'audit.ent.Invitation', notfound: 'errp.notFound', privacy: 'privacy.title' };
   const htmlTitle = document.title;
   // meta description in the page language (search engines read the Russian one from the HTML; this is for sharing
   // and the browser after a language switch).
-  const META = { home: 'meta.home', apartments: 'meta.apartments', about: 'meta.about', gallery: 'meta.gallery', contact: 'meta.contact', register: 'meta.register' };
+  const META = { home: 'meta.home', apartments: 'meta.apartments', about: 'meta.about', gallery: 'meta.gallery', contact: 'meta.contact', register: 'meta.register', privacy: 'meta.privacy' };
   const descTag = document.querySelector('meta[name="description"]');
   const htmlDesc = descTag ? descTag.getAttribute('content') : '';
   function setTitle() {

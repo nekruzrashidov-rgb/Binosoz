@@ -162,6 +162,7 @@
         col(t('foot.info'), h('a', { href: '/#why' }, t('foot.why')), h('a', { href: '/#steps' }, t('foot.steps')), h('a', { href: '/login' }, t('foot.cabinet'))),
         col(t('foot.contacts'), h('span', null, c.address || ''), c.phone ? h('a', { href: 'tel:+' + phoneDigits(c.phone) }, c.phone) : null, c.telegram ? h('a', { href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, c.telegram) : null, h('a', { href: '/contact' }, t('foot.write')))),
       h('div', { class: 'foot-bottom' }, h('span', null, '© ' + new Date().getFullYear() + ' ' + t('brand.name') + '. ' + t('footer.rights') + ' · ' + t('footer.platform')),
+        h('a', { class: 'foot-privacy', href: '/privacy' }, t('privacy.link')),
         h('span', { class: 'foot-dev' }, t('foot.dev') + ' ', h('a', { href: '/register' }, t('foot.devLink')))),
       h('p', { class: 'foot-demo' }, t('foot.demo'), frontendVersion())));
   }
@@ -442,7 +443,7 @@
       const name = S.input('name', { placeholder: t('f.namePh'), autocomplete: 'name' });
       const phone = S.input('phone', { type: 'tel', value: '+992', autocomplete: 'tel' });
       const cm = h('textarea', { class: 'inp', name: 'comment', id: 'lead-comment', maxlength: 400 }); cm.value = preset || '';
-      const form = h('form', { class: 'stack', id: 'leadform', novalidate: true }, S.field(t('f.name'), name), S.field(t('f.phone'), phone, t('f.phoneHint')), S.field(t('f.comment'), cm));
+      const form = h('form', { class: 'stack', id: 'leadform', novalidate: true }, S.field(t('f.name'), name), S.field(t('f.phone'), phone, t('f.phoneHint')), S.field(t('f.comment'), cm), S.privacyNote());
       const btn = h('button', { class: 'btn', type: 'submit', form: 'leadform' }, t('lead.send'));
       const md = S.modal({ title: t('lead.title'), body: form, actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
       form.addEventListener('submit', async (e) => {
@@ -739,7 +740,7 @@
     function renderCall() {
       const phone = S.input('phone', { type: 'tel', value: '+992', autocomplete: 'tel', 'aria-label': t('f.phone') });
       const btn = h('button', { class: 'btn gold lg block', type: 'submit' }, t('cta.call'));
-      const form = h('form', { class: 'stack', novalidate: true }, h('h3', null, t('cta.formTitle')), phone, btn, h('small', { class: 'micro' }, t('cta.micro')));
+      const form = h('form', { class: 'stack', novalidate: true }, h('h3', null, t('cta.formTitle')), phone, btn, h('small', { class: 'micro' }, t('cta.micro')), S.privacyNote());
       form.addEventListener('submit', async (e) => {
         e.preventDefault(); S.showErrors(form, null);
         await S.busy(btn, async () => {
@@ -868,7 +869,7 @@
         fl(name, t('f.name'), true), fl(phone, t('f.phone'), true),
         h('div', { class: 'fl-row' }, h('label', { class: 'fl fixed' }, kind, h('span', null, t('ct.kind'))), h('label', { class: 'fl fixed' }, when, h('span', null, t('ct.when')))),
         fl(cm, t('f.comment')),
-        h('label', { class: 'check ct-agree' }, agree, h('span', null, t('ct.agree')), h('em', { class: 'fl-err' })), btn);
+        h('label', { class: 'check ct-agree' }, agree, h('span', null, t('ct.agree')), h('em', { class: 'fl-err' })), btn, S.privacyNote());
       const fail = (el, msg) => { const box = el.closest('label'); box.classList.add('err'); box.querySelector('.fl-err').textContent = msg; };
       form.addEventListener('input', (e) => { const box = e.target.closest('label'); if (box) box.classList.remove('err'); });
       form.addEventListener('submit', async (e) => {
@@ -924,7 +925,7 @@
       fl(email, t('reg2.email'), true),
       fl(phone, t('reg2.phone'), true),
       fl(comment, t('reg2.comment')), h('small', { class: 'fl-hint' }, t('reg2.commentPh')),
-      btn);
+      btn, S.privacyNote());
 
     const fail = (el, msg) => { const box = el.closest('label'); box.classList.add('err'); box.querySelector('.fl-err').textContent = msg; };
     form.addEventListener('input', (e) => { const box = e.target.closest('label'); if (box) box.classList.remove('err'); });

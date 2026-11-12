@@ -43,4 +43,11 @@
     <xhtml:link rel="alternate" hreflang="en" href="https://binosoz.vercel.app/register?lang=en"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://binosoz.vercel.app/register"/>
   </url>
+  <url>
+    <loc>https://binosoz.vercel.app/privacy</loc>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://binosoz.vercel.app/privacy?lang=ru"/>
+    <xhtml:link rel="alternate" hreflang="tg" href="https://binosoz.vercel.app/privacy?lang=tg"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://binosoz.vercel.app/privacy?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://binosoz.vercel.app/privacy"/>
+  </url>
 </urlset>
