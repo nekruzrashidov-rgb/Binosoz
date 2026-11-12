@@ -52,7 +52,8 @@ public static class HealthEndpoints
     private static Task WriteLiveAsync(HttpContext context, HealthReport report) =>
         context.Response.WriteAsJsonAsync(new { status = report.Status.ToString(), version = BuildInfo.Version, builtAt = BuildInfo.BuiltAt });
 
-    // Только имена и статусы проверок: текст ошибок и исключения наружу не отдаются, они есть в логе.
+    // Имена, статусы и наши собственные пояснения проверок («Почта: Gmail настроен», «Файлы хранятся на временном
+    // диске…»); исключения и их текст наружу не отдаются, они есть в логе. Отвечает только изнутри или с X-Health-Key.
     private static Task WriteAsync(HttpContext context, HealthReport report) =>
         context.Response.WriteAsJsonAsync(new
         {
@@ -61,6 +62,7 @@ public static class HealthEndpoints
             {
                 name = e.Key,
                 status = e.Value.Status.ToString(),
+                description = e.Value.Description,
                 durationMs = (int)e.Value.Duration.TotalMilliseconds
             })
         });

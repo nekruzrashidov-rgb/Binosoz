@@ -57,6 +57,7 @@ public class EmailOptions
 
     public SmtpSettings Smtp { get; set; } = new();
     public ResendSettings Resend { get; set; } = new();
+    public GmailSettings Gmail { get; set; } = new();
 
     public class SmtpSettings
     {
@@ -71,6 +72,21 @@ public class EmailOptions
     {
         public string? ApiKey { get; set; }
         public string BaseUrl { get; set; } = "https://api.resend.com";
+    }
+
+    // Gmail API (HTTPS, порт 443 — работает и там, где исходящий SMTP закрыт, например на бесплатном Render).
+    // Email__Gmail__ClientId, Email__Gmail__ClientSecret, Email__Gmail__RefreshToken — OAuth-клиент типа Desktop app
+    // и refresh token владельца ящика со scope gmail.send (scripts/gmail-token.mjs). Значения — только из окружения.
+    public class GmailSettings
+    {
+        public string? ClientId { get; set; }
+        public string? ClientSecret { get; set; }
+        public string? RefreshToken { get; set; }
+        public string TokenUrl { get; set; } = "https://oauth2.googleapis.com/token";
+        public string ApiBaseUrl { get; set; } = "https://gmail.googleapis.com";
+
+        public bool IsConfigured =>
+            !string.IsNullOrWhiteSpace(ClientId) && !string.IsNullOrWhiteSpace(ClientSecret) && !string.IsNullOrWhiteSpace(RefreshToken);
     }
 }
 

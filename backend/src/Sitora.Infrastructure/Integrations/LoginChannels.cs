@@ -15,9 +15,10 @@ public class LoginChannels(IConfiguration configuration, IHostEnvironment enviro
 {
     public const string EmailNotConfigured = "Письма с кодами не отправляются: почтовый сервис не настроен";
     public const string SmsNotConfigured = "SMS с кодами пока не отправляются. Войдите по почте";
-    public const string EmailNotConfiguredLog = "Письма с кодами не отправляются: задайте Email__Provider (Smtp или Resend)";
+    public const string EmailNotConfiguredLog = "Письма с кодами не отправляются: задайте Email__Provider (Smtp, Resend или Gmail с Email__Gmail__*)";
 
-    // Почта: в Development коды видны в логе; в остальных окружениях нужен настоящий провайдер (Smtp или Resend).
+    // Почта: в Development коды видны в логе; в остальных окружениях нужен настоящий провайдер: Smtp, Resend или Gmail
+    // (у Gmail — все три Email__Gmail__ClientId/ClientSecret/RefreshToken).
     public bool EmailWorks => EmailWorksFor(configuration, environment);
 
     // SMS: пока подключена только заглушка — она «отправляет» лишь в Development (код в логе). Настоящий провайдер
@@ -31,7 +32,18 @@ public class LoginChannels(IConfiguration configuration, IHostEnvironment enviro
         if (environment.IsDevelopment())
             return true;
         var provider = EmailOptions.HasSmtpSection(configuration) ? "smtp" : configuration[$"{EmailOptions.SectionName}:Provider"];
-        return provider?.Trim().ToLowerInvariant() is "smtp" or "resend";
+        return provider?.Trim().ToLowerInvariant() switch
+        {
+            "smtp" or "resend" => true,
+            "gmail" => GmailConfigured(configuration),
+            _ => false
+        };
+    }
+
+    public static bool GmailConfigured(IConfiguration configuration)
+    {
+        var g = configuration.GetSection($"{EmailOptions.SectionName}:Gmail");
+        return !string.IsNullOrWhiteSpace(g["ClientId"]) && !string.IsNullOrWhiteSpace(g["ClientSecret"]) && !string.IsNullOrWhiteSpace(g["RefreshToken"]);
     }
 }
 
@@ -39,8 +51,17 @@ public class LoginChannels(IConfiguration configuration, IHostEnvironment enviro
 // но покупатели не получат коды входа, а сотрудники — приглашения и сброс пароля).
 public class EmailHealthCheck(IConfiguration configuration, IHostEnvironment environment) : IHealthCheck
 {
-    public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct = default) =>
-        Task.FromResult(LoginChannels.EmailWorksFor(configuration, environment)
+    // Без сетевого запроса: только по настройкам. Для Gmail — «настроен / не настроен» (все три Email__Gmail__*).
+    public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct = default)
+    {
+        var gmail = string.Equals(configuration[$"{EmailOptions.SectionName}:Provider"]?.Trim(), "gmail", StringComparison.OrdinalIgnoreCase)
+                    && !EmailOptions.HasSmtpSection(configuration);
+        if (gmail)
+            return Task.FromResult(LoginChannels.GmailConfigured(configuration)
+                ? HealthCheckResult.Healthy("Почта: Gmail настроен")
+                : HealthCheckResult.Degraded("Почта: Gmail не настроен — " + GmailEmailSender.NotConfigured));
+        return Task.FromResult(LoginChannels.EmailWorksFor(configuration, environment)
             ? HealthCheckResult.Healthy()
             : HealthCheckResult.Degraded(LoginChannels.EmailNotConfiguredLog));
+    }
 }

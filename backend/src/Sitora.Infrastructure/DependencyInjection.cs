@@ -169,6 +169,9 @@ public static class DependencyInjection
     private static void AddEmailSender(IServiceCollection services)
     {
         services.AddHttpClient<ResendEmailSender>();
+        // Gmail API: токен доступа кэшируется в синглтоне; HttpClient без журнала запросов (в адресах токенов нет, но тела форм — секреты).
+        services.AddSingleton<GmailTokenCache>();
+        services.AddHttpClient<GmailEmailSender>(c => c.Timeout = TimeSpan.FromSeconds(20)).RemoveAllLoggers();
         services.AddSingleton<DevEmailSender>();
         services.AddSingleton<SmtpEmailSender>();
         services.AddScoped<IEmailSender>(sp =>
@@ -179,6 +182,7 @@ public static class DependencyInjection
             {
                 "smtp" => sp.GetRequiredService<SmtpEmailSender>(),
                 "resend" => sp.GetRequiredService<ResendEmailSender>(),
+                "gmail" => sp.GetRequiredService<GmailEmailSender>(),
                 _ => (IEmailSender)sp.GetRequiredService<DevEmailSender>()
             };
         });
