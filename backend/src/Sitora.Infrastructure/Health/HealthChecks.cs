@@ -20,7 +20,7 @@ public static class HealthTags
 public class StorageHealthCheck(IFileStorage storage, IOptions<StorageOptions> options, IHostEnvironment environment) : IHealthCheck
 {
     public const string EphemeralWarning =
-        "Файлы хранятся на временном диске контейнера и пропадут при перезапуске: задайте Storage__Provider=S3 или Storage__RootPath на постоянном томе";
+        "Файлы хранятся локально на временном (эфемерном) диске контейнера и пропадут при перезапуске: подключите S3/R2 (Storage__Provider=S3 и Storage__S3__*) или задайте Storage__RootPath на постоянном томе";
 
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct = default)
     {

@@ -168,6 +168,10 @@ var storageOptions = app.Services.GetRequiredService<IOptions<StorageOptions>>()
 app.Logger.LogInformation("Хранилище файлов: {Provider}", storageOptions.IsS3 ? StorageOptions.S3Provider : StorageOptions.LocalProvider);
 if (StorageHealthCheck.IsEphemeral(storageOptions, app.Environment))
     app.Logger.LogCritical("{Warning}", StorageHealthCheck.EphemeralWarning);
+// Без Health__Key подробный /health/ready снаружи недоступен (404) — это безопасно, но мониторингу нечем его спросить.
+if (app.Environment.IsProduction() && string.IsNullOrWhiteSpace(app.Configuration["Health:Key"]))
+    app.Logger.LogWarning("Health__Key не задан: /health/ready и /health отвечают только из внутренней сети, снаружи — 404. " +
+                          "Для внешнего мониторинга задайте Health__Key и передавайте его в заголовке X-Health-Key");
 
 var migrateOnly = args.Contains(DatabaseInitializer.MigrateCommand);
 var missingSettings = RequiredSettings.Missing(app.Configuration, migrateOnly, app.Environment.IsDevelopment());

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Sitora.Domain.DTOs.Auth;
 using Sitora.Domain.DTOs.Sales;
 using Sitora.Tests.Infrastructure;
@@ -108,5 +109,38 @@ public class AnyEmailFixedCodeTests(AnyEmailFixedCodeFactory factory) : IClassFi
         // Неверный код по-прежнему не подходит.
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/v1/auth/email/verify",
             new EmailVerifyRequest($"x-{Guid.NewGuid():N}@mail.test", "654321"))).StatusCode);
+    }
+}
+
+// Production с Auth:DevFixedCodeForAnyEmail и Auth:DevFixedCodeEmails: оба флага игнорируются полностью.
+// Почта покупателя, а не сотрудника: в Development такая почта с 123456 вошла бы и стала покупателем.
+public class ProductionFixedCodeFactory : ProductionFactory
+{
+    public const string BuyerEmail = "prod-fixed-code@mail.test";
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.UseSetting("Auth:DevFixedCodeEmails:0", BuyerEmail);
+        builder.UseSetting("Auth:DevFixedCodeForAnyEmail", "true");
+    }
+}
+
+public class ProductionFixedCodeTests(ProductionFixedCodeFactory factory) : IClassFixture<ProductionFixedCodeFactory>
+{
+    [Theory]
+    [InlineData(ProductionFixedCodeFactory.BuyerEmail)]
+    [InlineData("any-other-buyer@mail.test")]
+    public async Task Production_FixedCodeIsIgnored(string email)
+    {
+        var client = factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://api.sitora.test") });
+
+        var response = await client.PostAsJsonAsync("/api/v1/auth/email/verify", new EmailVerifyRequest(email, "123456"));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        // Покупатель по коду разработки не создан.
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Sitora.Infrastructure.Data.AppDbContext>();
+        Assert.False(await db.Customers.IgnoreQueryFilters().AnyAsync(c => c.Email == email));
     }
 }
