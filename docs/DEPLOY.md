@@ -256,3 +256,23 @@ psql "postgresql://USER:PASSWORD@HOST/DB?sslmode=require" -f scripts/seed.sql
   минуты…»; GET-запросы, которые упёрлись в спящий шлюз (нет соединения, 502/504), повторяются каждые 5 секунд до
   90 секунд. После первого ответа плашка исчезает.
 - Убрать задержку полностью можно только платным тарифом Render (сервис не засыпает) или своим сервером (VPS, разделы 1–8).
+
+## Перед показом жюри
+
+Чек-лист владельца: всё делается в панелях GitHub и Render, агент этого не делает. Значения секретов никуда не
+копировать — ни в репозиторий, ни в чат.
+
+1. **Каталог.** GitHub → Settings → Secrets and variables → Actions → секрет `PROD_DATABASE_URL` (External Database URL
+   из Render). Затем Actions → **Seed prod** → Run workflow, в поле `confirm` — `nekruz`. После этого на сайте появятся
+   дом, 3D-модель, квартиры и цены (до этого каталог показывает карточку «Продажи скоро откроются»).
+2. **Ключ проверок.** Render → Environment → `Health__Key` = случайная строка (например, `openssl rand -hex 24`).
+   Без него `/health/ready` снаружи отвечает 404, а при старте в логе — предупреждение.
+3. **Файлы (по желанию).** Cloudflare R2 (бесплатный тариф) → бакет и ключ доступа → в Render `Storage__Provider=S3` и
+   `Storage__S3__Endpoint`, `Storage__S3__Bucket`, `Storage__S3__AccessKey`, `Storage__S3__SecretKey`,
+   `Storage__S3__Region=auto`. Без этого загруженные файлы пропадают при перезапуске (`/health/ready` → storage Degraded).
+4. **Почта.** Выпустить **новый** ключ Resend (старый был виден на скриншоте — отозвать его в панели Resend) и задать в
+   Render `Email__Provider=Resend`, `Email__Resend__ApiKey`. Без почты покупатели не получат коды входа: сайт честно
+   скажет, что почта не настроена (503 `email_not_configured`).
+5. **Проверка.** `https://binosoz-1.onrender.com/health/live` → `version` совпадает с последним коммитом `main`;
+   на https://binosoz.vercel.app — каталог с квартирами, вход покупателя по коду из почты, CRM для сотрудника.
+   За 10–15 минут до показа открыть сайт, чтобы Render проснулся (днём его держит Keepalive).
