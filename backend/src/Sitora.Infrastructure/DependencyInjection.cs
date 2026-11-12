@@ -125,6 +125,7 @@ public static class DependencyInjection
         services.AddSingleton<ITelegramNotifier, TelegramNotifier>();
         services.AddScoped<TelegramAlertService>();
         services.AddSingleton<ISmsSender, SmsSender>();
+        services.AddScoped<LoginChannels>();
         AddEmailSender(services);
         services.AddHttpClient(NbtRateProvider.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(20));
         services.AddSingleton<IRateProvider, NbtRateProvider>();

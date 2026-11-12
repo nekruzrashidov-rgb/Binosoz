@@ -30,7 +30,9 @@
     return { field, input };
   }
 
-  // Two tabs: staff sign in with e-mail and password (then a 2FA code if it is on), buyers with a code from e-mail.
+  // Two tabs: staff sign in with e-mail and password (then a 2FA code if it is on), buyers with a code by e-mail or SMS.
+  // GET /auth/methods says which codes really reach people: without an SMS provider the phone option stays visible
+  // but disabled with «SMS пока недоступны», and e-mail is the default.
   // /login#reset=<token> from the "forgot password" letter opens the new-password form.
   S.views.login = function (root) {
     const card = h('div', { class: 'card login-card login' });
@@ -42,6 +44,20 @@
     let who = resetToken || S.store.get('sitora.loginAs') === 'staff' ? 'staff' : 'buyer';
     let step = resetToken ? 'reset' : who, emailVal = '', timer = 0, tick = null, challenge = null, notice = '';
     const isEmail = (v) => /^\S+@\S+\.\S+$/.test(v);
+    // How a buyer gets the code: 'email' or 'phone' (remembered); methods — { email, sms } from the server.
+    let by = S.store.get('sitora.loginBy') === 'phone' ? 'phone' : 'email', phoneVal = '+992', methods = null;
+    const smsOff = () => !!methods && !methods.sms;
+    S.api.authMethods().then((m) => {
+      methods = m || null;
+      if (smsOff() && by === 'phone') by = 'email';
+      if (step === 'buyer') draw();
+    }).catch(() => {});
+    // Server codes for «the code cannot be delivered» → a clear text in the page language.
+    const humanError = (er) => {
+      if (er && er.code === 'email_not_configured') er.message = t('login.emailOff');
+      if (er && er.code === 'sms_not_configured') er.message = t('login.smsOff');
+      return er;
+    };
     const badEmail = (form) => S.showErrors(form, { message: t('val.email'), errors: { email: [t('val.email')] } });
     const tabs = () => h('div', { class: 'login-tabs', role: 'tablist', 'aria-label': t('login.as') }, [['buyer', 'login.buyer'], ['staff', 'login.staff']].map(([k, key]) =>
       h('button', { type: 'button', role: 'tab', class: who === k ? 'on' : '', 'aria-selected': String(who === k), onclick: () => {
@@ -49,6 +65,12 @@
         who = k; S.store.set('sitora.loginAs', k); step = k; notice = ''; clearInterval(tick); draw();
       } }, t(key))));
     const link = (label, onclick) => h('button', { class: 'btn ghost sm', type: 'button', onclick }, label);
+    // «По почте» / «По телефону» on the buyer's tab; the phone option is marked when SMS cannot be sent.
+    const byToggle = () => h('div', { class: 'seg login-by', role: 'group', 'aria-label': t('login.howTo') }, [['email', 'login.byEmail'], ['phone', 'login.byPhone']].map(([k, key]) =>
+      h('button', { type: 'button', class: by === k ? 'on' : '', 'aria-pressed': String(by === k), title: k === 'phone' && smsOff() ? t('login.smsOff') : null, onclick: () => {
+        if (by === k) return;
+        by = k; S.store.set('sitora.loginBy', k); notice = ''; draw();
+      } }, t(key))));
 
     const startTick = () => {
       clearInterval(tick); timer = 60;
@@ -60,7 +82,7 @@
         if (!timer) clearInterval(tick);
       }, 1000);
     };
-    const send = async () => { await S.api.emailSend(emailVal); startTick(); };
+    const send = async () => { await (by === 'phone' ? S.api.smsSend(phoneVal) : S.api.emailSend(emailVal)); startTick(); };
 
     const codeInput = (name) => S.input(name, { inputmode: 'numeric', maxlength: 6, placeholder: '••••••', autocomplete: 'one-time-code', style: { letterSpacing: '.4em', fontSize: '20px', textAlign: 'center', fontWeight: 800 } });
 
@@ -119,11 +141,22 @@
           notice = t('login.resetDone'); step = 'staff'; draw();
         };
         focus = pass.input;
+      } else if (step === 'buyer' && by === 'phone') {
+        const phone = S.input('phone', { type: 'tel', value: phoneVal, autocomplete: 'tel', inputmode: 'tel' });
+        btn.textContent = t('login.sendCode');
+        if (smsOff()) { phone.disabled = true; btn.disabled = true; }
+        const off = smsOff() ? h('p', { class: 'login-off', role: 'status' }, t('login.smsOff')) : null;
+        form.append(h('h2', null, t('login.buyerTitle')), byToggle(), h('p', { class: 'muted' }, t('login.hintPhone')), info, off, S.field(t('f.phone'), phone, t('f.phoneHint')), btn);
+        submit = async () => {
+          phoneVal = phone.value.replace(/[\s()-]/g, '');
+          await send(); notice = ''; step = 'code'; draw();
+        };
+        focus = smsOff() ? null : phone;
       } else if (step === 'buyer') {
         const email = S.input('email', { type: 'email', value: emailVal, placeholder: 'name@mail.tj', autocomplete: 'email', inputmode: 'email' });
         btn.textContent = t('login.sendCode');
         // The server answers the same for known and unknown addresses, so registration is offered as a link, not detected.
-        form.append(h('h2', null, t('login.buyerTitle')), h('p', { class: 'muted' }, t('login.hintBuyer')), info, S.field(t('login.email'), email), btn,
+        form.append(h('h2', null, t('login.buyerTitle')), byToggle(), h('p', { class: 'muted' }, t('login.hintBuyer')), info, S.field(t('login.email'), email), btn,
           h('p', { class: 'muted', style: { textAlign: 'center', margin: 0 } }, t('reg.ask'), ' ', link(t('reg.link'), () => { emailVal = email.value.trim(); notice = ''; step = 'register'; draw(); })));
         submit = async () => {
           emailVal = email.value.trim();
@@ -150,13 +183,17 @@
         focus = first;
       } else {
         const code = codeInput('code');
-        const resend = h('button', { class: 'btn ghost sm', type: 'button', 'data-resend': '', disabled: timer > 0, onclick: async () => { try { await send(); S.toast(t('login.sent'), 'ok'); } catch (er) { S.err(er); } } }, timer > 0 ? t('login.resendIn', { s: timer }) : t('login.resend'));
-        form.append(h('h2', null, t('login.codeTitle')), h('p', { class: 'muted' }, t('login.codeSub', { p: emailVal })), S.field(t('login.code'), code, t('login.codeHint')), btn,
-          h('div', { class: 'row between' }, link(t('login.changeEmail'), () => { step = 'buyer'; clearInterval(tick); draw(); }), resend));
-        submit = async () => enter(await S.api.emailVerify(emailVal, code.value.replace(/\s/g, '')));
+        const resend = h('button', { class: 'btn ghost sm', type: 'button', 'data-resend': '', disabled: timer > 0, onclick: async () => { try { await send(); S.toast(t('login.sent'), 'ok'); } catch (er) { S.err(humanError(er)); } } }, timer > 0 ? t('login.resendIn', { s: timer }) : t('login.resend'));
+        const byPhone = by === 'phone';
+        form.append(h('h2', null, t('login.codeTitle')), h('p', { class: 'muted' }, byPhone ? t('login.codeSubPhone', { p: phoneVal }) : t('login.codeSub', { p: emailVal })), S.field(t('login.code'), code, t('login.codeHint')), btn,
+          h('div', { class: 'row between' }, link(t(byPhone ? 'login.changePhone' : 'login.changeEmail'), () => { step = 'buyer'; clearInterval(tick); draw(); }), resend));
+        submit = async () => {
+          const value = code.value.replace(/\s/g, '');
+          enter(await (byPhone ? S.api.smsVerify(phoneVal, value) : S.api.emailVerify(emailVal, value)));
+        };
         focus = code;
       }
-      form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await submit(); } catch (er) { S.showErrors(form, er); } }); });
+      form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await submit(); } catch (er) { S.showErrors(form, humanError(er)); } }); });
       // Tabs only on the first screens; the code, 2FA and password-reset steps keep their own "back" link.
       card.replaceChildren(step === 'staff' || step === 'buyer' || step === 'register' ? tabs() : null, form);
       setTimeout(() => focus && focus.focus(), 30);

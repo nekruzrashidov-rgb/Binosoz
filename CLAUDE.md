@@ -93,7 +93,7 @@ Binosoz/
     ├── css/styles.css             ← 171 КБ: токены (:root и [data-theme='dark']), все компоненты
     └── js/
         ├── tanzimot-api-url.js        ← config: API_BASE ('/api/v1'; Vercel → Render), ORG_SLUG, CONTACT, INSTALLMENT
-        ├── i18n/ru.js, tg.js, en.js   ← тексты (по 1549 ключей); ru — на каждой странице и запасной
+        ├── i18n/ru.js, tg.js, en.js   ← тексты (по 1557 ключей); ru — на каждой странице и запасной
         ├── tarjumaho-ru-tg-en.js      ← S.t(), S.initLang()/S.setLang() (грузит tg/en по требованию), S.bus
         ├── komponentho-modal-toast-tabs.js ← h() DOM-builder, иконки, модалки, тосты
         ├── zaprosho-ba-backend.js     ← все вызовы API, токены (localStorage sitora.auth)
@@ -155,8 +155,11 @@ Binosoz/
 - Все эндпоинты: `docs/API_CONTRACT.md`
 
 ## Auth-флоу
-- **Сотрудники:** `POST /auth/email/send` → `POST /auth/email/verify` → (опционально) `POST /auth/second-factor`
-- **Покупатели:** `POST /auth/sms/send` → `POST /auth/sms/verify`
+- **Сотрудники:** `POST /auth/login` (почта + пароль) → (если включена 2FA) `POST /auth/2fa/verify`
+- **Покупатели:** `POST /auth/email/send` → `POST /auth/email/verify` (код из почты); по телефону — `/auth/sms/send` → `/auth/sms/verify`
+  (только при `Auth__SmsLoginEnabled=true` и подключённом SMS-провайдере)
+- **Какие способы работают:** `GET /auth/methods` → `{ email, sms }`; без почтового провайдера вне Development
+  `/auth/email/send` → 503 `email_not_configured`, без SMS-провайдера `/auth/sms/send` → 503 `sms_not_configured`
 - **Токены:** access (JWT, 15 мин) + refresh (64 байта, SHA-256 в БД, 30 дней, ротация)
 - **Refresh-cookie:** `sitora_rt` (HttpOnly, SameSite=Strict, `Path=/api/v1/auth`), режим `Auth__RefreshCookie__Mode` = Dual|Cookie|Body
 - **Dev-режим:** фиксированный код `123456` для тестирования (только `IsDevelopment()`); почты задаются в user-secrets:

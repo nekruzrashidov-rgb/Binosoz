@@ -1,4 +1,4 @@
-/* English interface texts (1549 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* English interface texts (1557 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -1440,6 +1440,14 @@
     "login.asBuyer": "Sign in as a buyer",
     "login.asStaff": "Sign in as staff",
     "login.hintBuyer": "Enter your email — we'll send you a sign-in code.",
+    "login.byEmail": "By email",
+    "login.byPhone": "By phone",
+    "login.howTo": "Sign-in method",
+    "login.hintPhone": "Enter the phone number from your contract — we’ll text you a code.",
+    "login.smsOff": "Text messages are not available yet — please sign in by email.",
+    "login.emailOff": "Sign-in emails can’t be sent yet: email isn’t set up on the server. Please contact the manager.",
+    "login.codeSubPhone": "If the number belongs to a buyer, a code has been texted to {p}. It is valid for 5 minutes.",
+    "wake.text": "The server is waking up, this can take up to a minute…",
     "login.hintStaff": "Enter your work email — we'll send a code. If you set a password when accepting the invitation, you can sign in with it.",
     "login.byPassword": "Sign in with a password",
     "login.byCode": "← Sign in with an email code",

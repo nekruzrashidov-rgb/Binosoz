@@ -36,7 +36,7 @@ public class HealthTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFact
             var ready = await client.GetFromJsonAsync<HealthBody>(url, TestJson.Options);
             Assert.Equal("Healthy", ready!.Status);
             // Сервер фоновых задач в тестах выключен, поэтому и его проверки нет.
-            Assert.Equal(["database", "storage"], ready.Checks.Select(c => c.Name).Order());
+            Assert.Equal(["database", "email", "storage"], ready.Checks.Select(c => c.Name).Order());
         }
     }
 }

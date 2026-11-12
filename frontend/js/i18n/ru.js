@@ -1,4 +1,4 @@
-/* Russian interface texts (1549 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* Russian interface texts (1557 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -1440,6 +1440,14 @@
     "login.asBuyer": "Войти как покупатель",
     "login.asStaff": "Войти как сотрудник",
     "login.hintBuyer": "Введите почту — пришлём код для входа.",
+    "login.byEmail": "По почте",
+    "login.byPhone": "По телефону",
+    "login.howTo": "Способ входа",
+    "login.hintPhone": "Введите номер из договора — пришлём SMS с кодом.",
+    "login.smsOff": "SMS пока недоступны — войдите по почте.",
+    "login.emailOff": "Письма с кодами пока не отправляются: почта на сервере не настроена. Обратитесь к менеджеру.",
+    "login.codeSubPhone": "Если номер есть среди покупателей, SMS с кодом отправлено на {p}. Код действует 5 минут.",
+    "wake.text": "Сервер просыпается, это займёт до минуты…",
     "login.hintStaff": "Введите рабочую почту — пришлём код. Если вы задали пароль, когда принимали приглашение, можно войти по нему.",
     "login.byPassword": "Войти по паролю",
     "login.byCode": "← Войти по коду из почты",

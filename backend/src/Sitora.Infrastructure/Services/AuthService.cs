@@ -34,6 +34,7 @@ public class AuthService(
     IOptions<EmailOptions> emailOptions,
     TimeProvider timeProvider,
     IHostEnvironment environment,
+    LoginChannels channels,
     ILogger<AuthService> logger) : IAuthService
 {
     private const string InvalidCredentials = "Неверная почта или пароль";
@@ -58,6 +59,9 @@ public class AuthService(
     {
         var address = EmailAddress.Normalize(request.Email)
             ?? throw new BusinessRuleException("Неверный адрес почты");
+        // Без почтового провайдера код не дойдёт: 503 вместо «код отправлен» (одинаково для любой почты).
+        if (!channels.EmailWorks)
+            throw new ServiceUnavailableException(LoginChannels.EmailNotConfigured);
         var now = Now;
         var limits = authOptions.Value;
 
@@ -210,6 +214,9 @@ public class AuthService(
     public async Task<EmailSendResponse> RegisterCustomerAsync(RegisterCustomerRequest request, string? requestIp, CancellationToken ct = default)
     {
         var address = EmailAddress.Normalize(request.Email) ?? throw new BusinessRuleException("Неверный адрес почты");
+        // Регистрация заканчивается письмом с кодом: без почты карточка появилась бы, а войти было бы нельзя.
+        if (!channels.EmailWorks)
+            throw new ServiceUnavailableException(LoginChannels.EmailNotConfigured);
         var phone = PhoneNumber.Normalize(request.Phone) ?? throw new BusinessRuleException("Неверный номер телефона");
         var fullName = $"{request.FirstName?.Trim()} {request.LastName?.Trim()}".Trim();
         if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName) || fullName.Length > 200)
@@ -586,6 +593,9 @@ public class AuthService(
     {
         var phone = PhoneNumber.Normalize(request.Phone)
             ?? throw new BusinessRuleException("Неверный номер телефона");
+        // SMS-провайдер не подключён (заглушка вне Development): код не дойдёт — 503 для любого номера.
+        if (!channels.SmsProviderConnected)
+            throw new ServiceUnavailableException(LoginChannels.SmsNotConfigured);
         var now = Now;
 
         var sentLastHour = await db.SmsCodes.CountAsync(c => c.Phone == phone && c.CreatedAt > now.AddHours(-1), ct);

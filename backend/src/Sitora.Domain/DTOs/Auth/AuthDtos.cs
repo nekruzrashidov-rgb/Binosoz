@@ -35,6 +35,9 @@ public record EmailSendRequest(string Email);
 
 public record EmailSendResponse(string Message, int ExpiresInSeconds);
 
+// GET /auth/methods: какие способы входа по коду сейчас доходят до людей.
+public record AuthMethodsResponse(bool Email, bool Sms);
+
 public record EmailVerifyRequest(string Email, string Code);
 
 // Регистрация покупателя на сайте застройщика (без пароля: дальше вход по коду из почты).

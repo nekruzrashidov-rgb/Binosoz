@@ -1,4 +1,4 @@
-/* Tajik interface texts (1549 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* Tajik interface texts (1557 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. Tajik strings should be proof-read by a native speaker before launch. */
 (function () {
   const S = (window.S = window.S || {});
@@ -1440,6 +1440,14 @@
     "login.asBuyer": "Ҳамчун харидор",
     "login.asStaff": "Ҳамчун корманд",
     "login.hintBuyer": "Почтаро нависед — рамзи воридшавӣ мефиристем.",
+    "login.byEmail": "Тавассути почта",
+    "login.byPhone": "Тавассути телефон",
+    "login.howTo": "Тарзи воридшавӣ",
+    "login.hintPhone": "Рақами телефонро аз шартнома нависед — SMS бо рамз мефиристем.",
+    "login.smsOff": "SMS ҳоло дастрас нест — тавассути почта ворид шавед.",
+    "login.emailOff": "Мактубҳо бо рамз ҳоло фиристода намешаванд: почта дар сервер танзим нашудааст. Ба менеҷер муроҷиат кунед.",
+    "login.codeSubPhone": "Агар рақам дар байни харидорон бошад, SMS бо рамз ба {p} фиристода шуд. Рамз 5 дақиқа амал мекунад.",
+    "wake.text": "Сервер бедор мешавад, то як дақиқа вақт мегирад…",
     "login.hintStaff": "Почтаи кориро нависед — рамз мефиристем. Агар ҳангоми қабули даъват рамзи убур гузошта бошед, бо он ҳам ворид шудан мумкин аст.",
     "login.byPassword": "Бо рамзи убур",
     "login.byCode": "← Бо рамз аз почта",

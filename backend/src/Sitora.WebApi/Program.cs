@@ -110,7 +110,9 @@ if (hangfireServerEnabled)
 
 var healthChecks = builder.Services.AddHealthChecks()
     .AddDbContextCheck<AppDbContext>("database", tags: [HealthTags.Ready])
-    .AddCheck<StorageHealthCheck>("storage", tags: [HealthTags.Ready]);
+    .AddCheck<StorageHealthCheck>("storage", tags: [HealthTags.Ready])
+    // Письма с кодами уходят: без провайдера вне Development — Degraded.
+    .AddCheck<EmailHealthCheck>("email", HealthStatus.Degraded, [HealthTags.Ready]);
 // Сервер фоновых задач проверяем там, где он запущен; его отказ не мешает отвечать на запросы — Degraded.
 if (hangfireServerEnabled)
     healthChecks.AddCheck<BackgroundJobsHealthCheck>("background-jobs", HealthStatus.Degraded, [HealthTags.Ready]);
@@ -155,6 +157,9 @@ var app = builder.Build();
 
 // Какой почтовый сервис выбран: без этого не понять, почему коды входа не приходят (Dev пишет их только в лог).
 app.Logger.LogInformation("Почтовый сервис: {Provider}", app.Configuration["Email:Provider"] ?? "Dev");
+// Вне Development с Dev письма никуда не уходят: покупатели не войдут, /auth/email/send отвечает 503.
+if (!LoginChannels.EmailWorksFor(app.Configuration, app.Environment))
+    app.Logger.LogCritical("{Warning}", LoginChannels.EmailNotConfiguredLog);
 
 // Файлы на временном диске (Production, Local, путь не задан — Render без S3 и без диска) пропадут при перезапуске.
 // API всё равно стартует: отказ уронил бы весь сайт, а не только загрузку файлов. Предупреждают лог (Critical)

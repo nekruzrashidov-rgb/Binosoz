@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Sitora.Domain.DTOs.Auth;
 using Sitora.Domain.Exceptions;
 using Sitora.Domain.Interfaces;
+using Sitora.Infrastructure.Integrations;
 using Sitora.Infrastructure.Security;
 using Sitora.WebApi.Extensions;
 
@@ -16,8 +17,15 @@ namespace Sitora.WebApi.Controllers;
 [Produces("application/json")]
 // Ответы входа и обновления ставят cookie с refresh-токеном (RefreshCookieFilter, режим Auth:RefreshCookie:Mode).
 [TypeFilter(typeof(RefreshCookieFilter))]
-public class AuthController(IAuthService auth, IOptions<AuthOptions> options, IHostEnvironment environment) : ControllerBase
+public class AuthController(IAuthService auth, IOptions<AuthOptions> options, IHostEnvironment environment, LoginChannels channels) : ControllerBase
 {
+    /// <summary>Какие способы входа по коду сейчас работают: email — письма с кодами уходят (настроен почтовый сервис),
+    /// sms — вход по SMS включён и SMS-провайдер подключён. Сайт по нему выбирает, что предложить покупателю.</summary>
+    [HttpGet("methods")]
+    [AllowAnonymous]
+    [ProducesResponseType<AuthMethodsResponse>(StatusCodes.Status200OK)]
+    public AuthMethodsResponse Methods() => new(channels.EmailWorks, channels.SmsWorks);
+
     /// <summary>Код для входа на почту — только покупателям (сотрудники входят по паролю). Ответ одинаковый, есть ли такая учётная запись.</summary>
     /// <remarks>Не чаще одного кода в минуту и пяти в час на почту и на IP. Код живёт 10 минут, 5 попыток ввода.</remarks>
     [HttpPost("email/send")]

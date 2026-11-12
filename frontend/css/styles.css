@@ -2357,3 +2357,9 @@ a.float-card:hover {
 .lb-cap .photo-credit { color: rgba(255, 255, 255, 0.85); }
 /* Footer: the demo-project note (small, on the dark footer). */
 .foot-demo { margin: 14px 0 0; font-size: 12px; line-height: 1.5; color: rgba(240, 220, 190, 0.72); }
+/* Buyer sign-in: «По почте / По телефону». */
+.login-by { align-self: flex-start; }
+.login-by button { font-size: 13.5px; padding: 6px 14px; }
+.login-off { margin: 0; padding: 10px 14px; border-radius: 12px; border-left: 3px solid var(--warn); background: color-mix(in srgb, var(--warn) 12%, var(--surface)); color: var(--ink); font-size: 14px; line-height: 1.45; }
+/* Footer: the site version (short commit SHA from version.txt). */
+.foot-ver { white-space: nowrap; }
