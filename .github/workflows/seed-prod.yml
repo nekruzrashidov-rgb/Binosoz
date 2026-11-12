@@ -1,0 +1,73 @@
+# Заполнение пустой продакшен-базы демо-каталогом (scripts/seed.sql) без psql на своём компьютере.
+# Только вручную: Actions → «Seed prod» → Run workflow, в поле confirm — nekruz.
+# Строка подключения — секрет PROD_DATABASE_URL (External Database URL из Render); в лог она не попадает:
+# GitHub маскирует секреты, а скрипт её не печатает. Повторный запуск ничего не дублирует: если дом уже есть,
+# seed.sql только пишет сообщение. После заполнения — smoke-проверка каталога.
+name: Seed prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Подтверждение: введите nekruz"
+        required: true
+      api_url:
+        description: Адрес API для проверки после заполнения
+        default: https://binosoz-1.onrender.com
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seed-prod
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    name: Демо-каталог в базе прода
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Подтверждение
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != "nekruz" ]; then
+            echo "::error::Подтверждение не совпало: в поле confirm нужно ввести nekruz. База не тронута."
+            exit 1
+          fi
+
+      - name: Секрет
+        env:
+          PROD_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: |
+          if [ -z "$PROD_DATABASE_URL" ]; then
+            echo "::error::Секрет PROD_DATABASE_URL не задан: Settings → Secrets and variables → Actions → New repository secret (External Database URL из Render). Подробно — docs/DEPLOY.md, «Демо-данные в пустой базе»."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v5
+
+      - name: psql
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client > /dev/null
+          psql --version
+
+      # ON_ERROR_STOP: при ошибке — код выхода 1; seed.sql — один DO-блок, при ошибке в базе ничего не остаётся.
+      # PGSSLMODE=require — если в строке подключения нет sslmode (Render принимает внешние подключения только по TLS).
+      - name: seed.sql
+        env:
+          PROD_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          PGSSLMODE: require
+          PGCONNECT_TIMEOUT: "30"
+        run: psql "$PROD_DATABASE_URL" -v ON_ERROR_STOP=1 -q -f scripts/seed.sql
+
+      # Каталог кэшируется до 30 секунд: ждём, чтобы smoke увидел новые дома.
+      - name: Проверка каталога
+        env:
+          API_URL: ${{ inputs.api_url || vars.SMOKE_API_URL || 'https://binosoz-1.onrender.com' }}
+          ORG: ${{ vars.SMOKE_ORG || 'nekruz' }}
+        run: |
+          sleep 35
+          bash scripts/smoke.sh

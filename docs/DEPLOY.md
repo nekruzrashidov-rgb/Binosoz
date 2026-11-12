@@ -208,3 +208,39 @@ psql "postgresql://USER:PASSWORD@HOST/DB?sslmode=require" -f scripts/seed.sql
 
 Строка подключения — External Database URL в панели Render (её не коммитить). Скрипт повторно ничего не добавляет:
 если дом уже есть, он только пишет сообщение. Брони — настоящие (с демо-заявками, на 30 дней), сам запуск — в AuditLog.
+**Без psql на своём компьютере — через GitHub Actions** (`.github/workflows/seed-prod.yml`):
+
+1. Settings → Secrets and variables → Actions → New repository secret: имя `PROD_DATABASE_URL`, значение — External Database URL из Render.
+2. Actions → **Seed prod** → Run workflow, в поле `confirm` ввести `nekruz` (защита от случайного запуска).
+3. Workflow ставит `postgresql-client`, выполняет `scripts/seed.sql` (с `ON_ERROR_STOP`, по TLS) и затем `scripts/smoke.sh`.
+   Строка подключения в лог не выводится. Без секрета или с неверным подтверждением workflow сразу останавливается, база не тронута.
+
+## Render: деплой
+
+Как понять, что прод отстаёт: `GET https://binosoz-1.onrender.com/health/live` отвечает
+`{"status":"Healthy","version":"<короткий SHA>","builtAt":"…"}` — `version` должен совпадать с последним коммитом `main`
+(`git log -1 --format=%h`). Старая сборка без этого поля — значит, Render не выкатывал новые коммиты. Smoke раз в час
+сверяет версию сам и падает с кодом 3 («Прод отстаёт от main»), если последнему коммиту в `backend/` или `frontend/`
+больше 30 минут, а на проде другая версия. Версию сайта видно мелко в футере (`v <SHA>`) и в консоли браузера —
+так можно сравнить, что отдают Render и Vercel.
+
+Шаги для владельца (названия пунктов в панели Render могут отличаться — см. [документацию Render](https://render.com/docs/deploys)):
+
+1. **Проверить, почему не было деплоя.** Панель Render → сервис `binosoz-1` → список событий (Events) и логи сборки.
+   Частые причины: выключен автодеплой из `main`, сборка .NET упала по памяти на бесплатном тарифе, сервис привязан
+   к другой ветке. Включить автодеплой или вручную запустить деплой последнего коммита.
+2. **Надёжнее — готовый образ вместо сборки на Render.** CI на каждый push в `main` собирает Docker-образ, проверяет тесты
+   и публикует его в GHCR: `ghcr.io/nekruzrashidov-rgb/binosoz-api:<SHA коммита>` (и `:latest`). Пакет публичный —
+   Render скачивает его без логина. Если пакет станет приватным: в Render добавить учётные данные реестра
+   `ghcr.io` — логин GitHub и Personal Access Token с правом `read:packages`.
+   В Render создать сервис из существующего образа ([Deploy a prebuilt image](https://render.com/docs/deploying-an-image))
+   с теми же переменными окружения, что у текущего, или переключить текущий сервис на образ, если панель это позволяет.
+3. **Deploy Hook.** В настройках сервиса Render скопировать Deploy Hook URL ([Deploy Hooks](https://render.com/docs/deploy-hooks))
+   и положить его в GitHub: Settings → Secrets and variables → Actions → секрет `RENDER_DEPLOY_HOOK_URL`.
+   Для сервиса из образа ещё переменная репозитория (вкладка Variables) `RENDER_DEPLOY_MODE=image`: тогда CI передаёт
+   в hook образ именно этого коммита (`?imgURL=…`). Без переменной hook просто запускает сборку последнего коммита.
+   Hook вызывается в job «Деплой» только после зелёных тестов. Нет секрета — шаг пишет сообщение и CI остаётся зелёным.
+4. После деплоя открыть `/health/live` и сверить `version` с последним коммитом `main`.
+
+Сборка на Render из репозитория тоже показывает версию: Render передаёт `RENDER_GIT_COMMIT`, и API берёт его, если
+образ собран без `GIT_SHA`.
