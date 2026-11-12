@@ -89,17 +89,18 @@ Binosoz/
     ├── login.html, register.html, accept-invite.html, cabinet.html, crm.html, platform.html, payment.html,
     │   404.html, offline.html     ← вход, кабинет, CRM, платформа, тестовый банк, ошибки
     ├── manifest.json, sw.js       ← PWA (Service Worker «сначала сеть»), robots.txt, sitemap.xml
+    ├── img/gallery/               ← виды Душанбе с Wikimedia Commons (WebP 400/800/1200), авторы — CREDITS.md
     ├── css/styles.css             ← 171 КБ: токены (:root и [data-theme='dark']), все компоненты
     └── js/
         ├── tanzimot-api-url.js        ← config: API_BASE ('/api/v1'; Vercel → Render), ORG_SLUG, CONTACT, INSTALLMENT
-        ├── i18n/ru.js, tg.js, en.js   ← тексты (по 1550 ключей); ru — на каждой странице и запасной
+        ├── i18n/ru.js, tg.js, en.js   ← тексты (по 1549 ключей); ru — на каждой странице и запасной
         ├── tarjumaho-ru-tg-en.js      ← S.t(), S.initLang()/S.setLang() (грузит tg/en по требованию), S.bus
         ├── komponentho-modal-toast-tabs.js ← h() DOM-builder, иконки, модалки, тосты
         ├── zaprosho-ba-backend.js     ← все вызовы API, токены (localStorage sitora.auth)
         ├── routing-va-navigatsiya.js  ← запуск страницы: шапка, тема, язык, мобильное меню, reveal
         ├── sahifai-asosi-script.js    ← публичный сайт: главная, каталог, калькулятор, контакты, футер
         ├── modeli-3d-bino-script.js   ← 3D-дом каталога (Three.js r128, грузится лениво; единственный 3D-движок)
-        ├── galereya-script.js, dar-borai-mo-script.js ← /gallery (иллюстрации canvas), /about
+        ├── galereya-script.js, dar-borai-mo-script.js ← /gallery (фото Душанбе + планировки), /about
         ├── kabineti-xaridor-script.js ← вход и кабинет покупателя
         ├── crm-script.js, panelho-crm-script.js ← CRM и её боковые панели
         ├── superadmin-platform-script.js ← раздел PlatformOwner
@@ -119,6 +120,8 @@ Binosoz/
 - **Честные данные**: цифры, цены, свободные квартиры — только из API; `DEFAULT_*` в config — только для demo; пустой API —
   карточка «Продажи скоро откроются». Ничего не выдумывать (даты, отзывы, фото).
 - **Переводы**: новый ключ — во все три файла `js/i18n/*.js`.
+- **Фото галереи** — только CC0 / общественное достояние / CC BY / CC BY-SA (без NC и ND), под каждым «Фото: автор, лицензия»
+  со ссылкой на страницу файла, запись в `img/gallery/CREDITS.md`. Подписи честные: это виды города, не здания комплекса.
 
 ## Роли
 | Роль | Доступ |

@@ -36,9 +36,30 @@
     image: '<rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-8 8.5"/>',
     users: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 20a6 6 0 0 0-3-5.2"/>',
   };
-  // The landing's gallery: the same drawn illustrations as /gallery (marked «иллюстрация»), until there are real renders.
-  // Six of them: an even 3×2 grid on a desktop, 2×3 on a tablet, one column on a phone.
-  const GALLERY = [['facade', 'galpg.s.facade'], ['lobby', 'galpg.s.lobby'], ['apartment', 'galpg.s.apartment'], ['roof', 'galpg.s.roof'], ['playground', 'galpg.s.playground'], ['parking', 'galpg.s.parking']];
+  // Gallery photos: views of Dushanbe from Wikimedia Commons, not the complex (a demo project; there are no photos of it).
+  // Files: /img/gallery/<file>-400|800|1200.webp, cropped to 3:2. Author, licence and the file page — under every photo
+  // and in img/gallery/CREDITS.md. Licences allowed: CC0, public domain, CC BY, CC BY-SA (no NC, no ND).
+  const COMMONS = 'https://commons.wikimedia.org/wiki/File:';
+  const SAADIEV = 'Шухрат Саъдиев';
+  const GALLERY_PHOTOS = [
+    { id: 'panorama', file: 'dushanbe-panorama', author: 'VargaA', license: 'CC BY-SA 4.0', page: 'Dushanbe_panorama_07.jpg' },
+    { id: 'highrise', file: 'dushanbe-highrise', author: SAADIEV, license: 'CC BY-SA 4.0', page: 'Buildings_in_Dushanbe_03.jpg' },
+    { id: 'towers', file: 'dushanbe-towers', author: SAADIEV, license: 'CC BY-SA 4.0', page: 'Buildings_in_the_city_of_Dushanbe_04.jpg' },
+    { id: 'avenue', file: 'dushanbe-avenue', author: 'Prince Roy', license: 'CC BY 2.0', page: 'Downtown_Dushanbe_2.jpg' },
+    { id: 'fountain', file: 'dushanbe-fountain', author: 'Prince Roy', license: 'CC BY 2.0', page: 'Dushanbe_Fountain.jpg' },
+    { id: 'flagpole', file: 'dushanbe-flagpole', author: 'Y. Weeks (VOA)', license: null, page: 'View_from_the_Dushanbe_flagpole.jpg', max: 977 },
+    { id: 'center', file: 'dushanbe-center', author: SAADIEV, license: 'CC BY-SA 4.0', page: 'Buildings_in_Dushanbe_22.jpg' },
+    { id: 'street', file: 'dushanbe-street', author: SAADIEV, license: 'CC BY-SA 4.0', page: 'Buildings_in_Dushanbe_23.jpg' },
+  ];
+  // The source of the flagpole photo is under 1200 px wide: its largest file is 977 px (not upscaled).
+  function galleryImg(p, sizes, cls) {
+    const src = (w) => '/img/gallery/' + p.file + '-' + w + '.webp';
+    return h('img', { class: cls, src: src(800), srcset: [400, 800, 1200].map((w) => src(w) + ' ' + (w === 1200 && p.max ? p.max : w) + 'w').join(', '),
+      sizes, width: 1200, height: 800, alt: t('galpg.p.' + p.id), loading: 'lazy', decoding: 'async' });
+  }
+  // «Фото: автор, лицензия» — a link to the file page on Commons (attribution required by CC BY / CC BY-SA).
+  const galleryCredit = (p) => h('a', { class: 'photo-credit', href: COMMONS + p.page, target: '_blank', rel: 'noopener' },
+    t('galpg.photo') + ': ' + p.author + ', ' + (p.license || t('galpg.pd')));
   const FAQ = ['visit', 'down', 'delivery', 'booking', 'fees'];
   const AMENITIES = [['car', 'about.parking'], ['play', 'about.playground'], ['shield', 'about.guard'], ['leaf', 'about.green']];
   function landIcon(name) {
@@ -140,7 +161,8 @@
         col(t('foot.info'), h('a', { href: '/#why' }, t('foot.why')), h('a', { href: '/#steps' }, t('foot.steps')), h('a', { href: '/login' }, t('foot.cabinet'))),
         col(t('foot.contacts'), h('span', null, c.address || ''), c.phone ? h('a', { href: 'tel:+' + phoneDigits(c.phone) }, c.phone) : null, c.telegram ? h('a', { href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, c.telegram) : null, h('a', { href: '/contact' }, t('foot.write')))),
       h('div', { class: 'foot-bottom' }, h('span', null, '© ' + new Date().getFullYear() + ' ' + t('login.heroName') + '. ' + t('footer.rights') + ' · ' + t('footer.platform')),
-        h('span', { class: 'foot-dev' }, t('foot.dev') + ' ', h('a', { href: '/register' }, t('foot.devLink'))))));
+        h('span', { class: 'foot-dev' }, t('foot.dev') + ' ', h('a', { href: '/register' }, t('foot.devLink')))),
+      h('p', { class: 'foot-demo' }, t('foot.demo'))));
   }
 
   // Page head of the inner pages: a way back to the landing and the title.
@@ -580,14 +602,14 @@
 
     // Installment terms.
     const term = (ic, label, value) => h('div', { class: 'plan-cell' }, h('span', { class: 'plan-ic' }, landIcon(ic)), h('small', null, label), h('b', null, value));
-    // Gallery: the drawn illustrations of /gallery (each one is marked «иллюстрация»), not stock photos.
+    // Gallery: six views of Dushanbe from Wikimedia Commons, each with its author and licence (not the complex).
+    // An even 3×2 grid on a desktop, 2×3 on a tablet, one column on a phone.
     const gallery = h('section', { class: 'section lux-sec', id: 'gallery' }, h('div', { class: 'wrap' },
       h('div', { class: 'lux-head reveal' }, h('h2', null, t('gal.title')), h('p', null, t('gal.sub'))),
-      h('div', { class: 'gal-grid gal-grid--real' }, GALLERY.map(([id, cap], i) => {
-        const canvas = h('canvas', { role: 'img', 'aria-label': t(cap), width: 400, height: 267 });
-        if (S.paintGalleryScene) S.paintGalleryScene(canvas, id, 400, 267);
-        return h('figure', { class: 'gal-card gal-card--photo reveal', style: { transitionDelay: (i % 3) * 80 + 'ms' } }, canvas, h('figcaption', null, t(cap)));
-      })),
+      h('div', { class: 'gal-grid gal-grid--real' }, GALLERY_PHOTOS.slice(0, 6).map((p, i) =>
+        h('figure', { class: 'gal-card gal-card--photo reveal', style: { transitionDelay: (i % 3) * 80 + 'ms' } },
+          galleryImg(p, '(max-width: 540px) 100vw, (max-width: 900px) 50vw, 400px'),
+          h('figcaption', null, h('span', null, t('galpg.p.' + p.id)), galleryCredit(p))))),
       h('div', { class: 'teaser-more' }, h('a', { class: 'btn ghost lg', href: '/gallery' }, t('nav.gallery') + ' →'))));
 
     // No reviews section: invented example reviews undermine trust; it comes back with real buyers' reviews.
@@ -1266,5 +1288,5 @@
     const el = document.createElement('script'); el.type = 'application/ld+json'; el.textContent = JSON.stringify(data);
     document.head.appendChild(el);
   })();
-  S.site = { footer: siteFooter, reveal: revealIn, icon: landIcon, accentFirst, contacts, drawFloorPlan, building: siteBuilding };
+  S.site = { footer: siteFooter, reveal: revealIn, icon: landIcon, accentFirst, contacts, drawFloorPlan, building: siteBuilding, galleryPhotos: GALLERY_PHOTOS, galleryImg, galleryCredit };
 })();

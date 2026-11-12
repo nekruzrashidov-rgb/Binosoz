@@ -2338,3 +2338,22 @@ a.float-card:hover {
 .ct-card > div { min-width: 0; }
 .ct-val { overflow-wrap: anywhere; }
 @media (max-width: 480px) { .ct-left { padding-inline: 16px; } .ct-card { padding: 14px; } }
+
+/* Gallery photos (views of Dushanbe from Wikimedia Commons): 3:2 picture, title and the author credit.
+   On the landing the caption lies on the photo over a dark gradient (always dark, in both themes). */
+.gal-card.gal-card--photo { aspect-ratio: 3 / 2; }
+.gal-card--photo img { height: 100%; }
+.gal-card--photo figcaption { display: flex; flex-direction: column; gap: 4px; padding-top: 44px;
+  background: linear-gradient(to top, rgba(6, 13, 31, 0.92) 0%, rgba(6, 13, 31, 0.8) 55%, rgba(6, 13, 31, 0) 100%); }
+.photo-credit { font-family: var(--font); font-size: 12px; font-weight: 400; letter-spacing: 0; text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+.gal-card--photo .photo-credit { position: relative; color: #fff; }
+.galpg-shot img { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; }
+.galpg-card figcaption { display: flex; flex-direction: column; gap: 2px; }
+.galpg-card .photo-credit { color: var(--muted); font-size: 13px; }
+.galpg-card .photo-credit:hover { color: var(--accent-text); }
+.lb-pic { display: flex; justify-content: center; width: 100%; }
+.lb-img { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 14px; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5); }
+.lb-cap { display: flex; flex-direction: column; gap: 4px; margin: 0; min-width: 0; }
+.lb-cap .photo-credit { color: rgba(255, 255, 255, 0.85); }
+/* Footer: the demo-project note (small, on the dark footer). */
+.foot-demo { margin: 14px 0 0; font-size: 12px; line-height: 1.5; color: rgba(240, 220, 190, 0.72); }
