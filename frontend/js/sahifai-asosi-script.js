@@ -42,19 +42,19 @@
   const COMMONS = 'https://commons.wikimedia.org/wiki/File:';
   const SAADIEV = 'Шухрат Саъдиев';
   const GALLERY_PHOTOS = [
-    { id: 'panorama', file: 'dushanbe-panorama', author: 'VargaA', license: 'CC BY-SA 4.0', page: 'Dushanbe_panorama_07.jpg' },
+    // First — the most striking one: it also opens the landing's gallery.
+    { id: 'plaza', file: 'dushanbe-plaza', author: SAADIEV, license: 'CC BY-SA 3.0', page: 'Dushanbe-Plaza.JPG' },
     { id: 'highrise', file: 'dushanbe-highrise', author: SAADIEV, license: 'CC BY-SA 4.0', page: 'Buildings_in_Dushanbe_03.jpg' },
     { id: 'towers', file: 'dushanbe-towers', author: SAADIEV, license: 'CC BY-SA 4.0', page: 'Buildings_in_the_city_of_Dushanbe_04.jpg' },
-    { id: 'avenue', file: 'dushanbe-avenue', author: 'Prince Roy', license: 'CC BY 2.0', page: 'Downtown_Dushanbe_2.jpg' },
-    { id: 'fountain', file: 'dushanbe-fountain', author: 'Prince Roy', license: 'CC BY 2.0', page: 'Dushanbe_Fountain.jpg' },
-    { id: 'flagpole', file: 'dushanbe-flagpole', author: 'Y. Weeks (VOA)', license: null, page: 'View_from_the_Dushanbe_flagpole.jpg', max: 977 },
+    { id: 'newstreet', file: 'dushanbe-newstreet', author: SAADIEV, license: 'CC BY-SA 4.0', page: 'Buildings_in_Dushanbe_25.jpg' },
+    { id: 'tower', file: 'dushanbe-tower', author: SAADIEV, license: 'CC BY-SA 4.0', page: 'Buildings_in_Dushanbe_31.jpg' },
     { id: 'center', file: 'dushanbe-center', author: SAADIEV, license: 'CC BY-SA 4.0', page: 'Buildings_in_Dushanbe_22.jpg' },
+    { id: 'newbuilds', file: 'dushanbe-newbuilds', author: SAADIEV, license: 'CC BY 4.0', page: 'Buildings_in_Dushanbe_06.jpg' },
     { id: 'street', file: 'dushanbe-street', author: SAADIEV, license: 'CC BY-SA 4.0', page: 'Buildings_in_Dushanbe_23.jpg' },
   ];
-  // The source of the flagpole photo is under 1200 px wide: its largest file is 977 px (not upscaled).
   function galleryImg(p, sizes, cls) {
     const src = (w) => '/img/gallery/' + p.file + '-' + w + '.webp';
-    return h('img', { class: cls, src: src(800), srcset: [400, 800, 1200].map((w) => src(w) + ' ' + (w === 1200 && p.max ? p.max : w) + 'w').join(', '),
+    return h('img', { class: cls, src: src(800), srcset: [400, 800, 1200].map((w) => src(w) + ' ' + w + 'w').join(', '),
       sizes, width: 1200, height: 800, alt: t('galpg.p.' + p.id), loading: 'lazy', decoding: 'async' });
   }
   // «Фото: автор, лицензия» — a link to the file page on Commons (attribution required by CC BY / CC BY-SA).
