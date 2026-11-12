@@ -1,5 +1,5 @@
 {
-  "buildCommand": null,
+  "buildCommand": "sh build-version.sh",
   "outputDirectory": ".",
   "installCommand": null,
   "framework": null,

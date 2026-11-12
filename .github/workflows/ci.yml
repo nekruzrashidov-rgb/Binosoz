@@ -69,7 +69,12 @@ jobs:
         run: echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/binosoz-api" >> "$GITHUB_OUTPUT"
 
       - name: Сборка образа
-        run: docker build --file backend/src/Sitora.WebApi/Dockerfile --tag sitora-webapi:ci --tag "${{ steps.name.outputs.image }}:${{ github.sha }}" .
+      # Версия сборки (коммит и время) попадает в /health/live и в version.txt сайта.
+        run: >
+          docker build --file backend/src/Sitora.WebApi/Dockerfile
+          --build-arg GIT_SHA=${{ github.sha }}
+          --build-arg BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          --tag sitora-webapi:ci --tag "${{ steps.name.outputs.image }}:${{ github.sha }}" .
 
       - name: Публикация в GHCR (только main)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

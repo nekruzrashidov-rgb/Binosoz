@@ -14,12 +14,20 @@ RUN dotnet publish src/Sitora.WebApi/Sitora.WebApi.csproj -c Release -o /app/pub
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
+# Версия сборки для /health/live: CI передаёт --build-arg GIT_SHA=<коммит> BUILT_AT=<время>.
+# Без них (сборка на Render из репозитория) API берёт RENDER_GIT_COMMIT и время файла сборки.
+ARG GIT_SHA=""
+ARG BUILT_AT=""
+ARG RENDER_GIT_COMMIT=""
+ENV GIT_SHA=$GIT_SHA BUILT_AT=$BUILT_AT
 ENV ASPNETCORE_HTTP_PORTS=8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 EXPOSE 8080
 COPY --from=build /app/publish .
 # Сайт: страницы, скрипты и стили отдаёт сам API.
 COPY frontend/ wwwroot/
-RUN mkdir -p /app/storage /app/logs && chown $APP_UID /app/storage /app/logs
+# Версия сайта в футере и консоли — тот же коммит (в репозитории в version.txt лежит «dev»).
+RUN v="${GIT_SHA:-$RENDER_GIT_COMMIT}"; if [ -n "$v" ]; then echo "$v" | cut -c1-7 > wwwroot/version.txt; fi \
+    && mkdir -p /app/storage /app/logs && chown $APP_UID /app/storage /app/logs
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Sitora.WebApi.dll"]

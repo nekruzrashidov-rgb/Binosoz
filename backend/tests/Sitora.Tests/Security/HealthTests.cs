@@ -14,6 +14,8 @@ namespace Sitora.Tests.Security;
 
 public record HealthBody(string Status, List<HealthCheckBody> Checks);
 
+public record LiveBody(string Status, string Version, string BuiltAt);
+
 public record HealthCheckBody(string Name, string Status, int DurationMs);
 
 public class HealthTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFactory>
@@ -23,9 +25,11 @@ public class HealthTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFact
     {
         var client = factory.CreateClient();
 
-        var live = await client.GetFromJsonAsync<HealthBody>("/health/live", TestJson.Options);
+        var live = await client.GetFromJsonAsync<LiveBody>("/health/live", TestJson.Options);
         Assert.Equal("Healthy", live!.Status);
-        Assert.Empty(live.Checks);
+        // Версия сборки: в тестах GIT_SHA не задан — «dev» или короткий SHA; время сборки — ISO 8601.
+        Assert.Matches("^(dev|[0-9a-f]{7})$", live.Version);
+        Assert.True(DateTimeOffset.TryParse(live.BuiltAt, out _));
 
         foreach (var url in new[] { "/health/ready", "/health" })
         {

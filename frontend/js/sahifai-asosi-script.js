@@ -162,7 +162,21 @@
         col(t('foot.contacts'), h('span', null, c.address || ''), c.phone ? h('a', { href: 'tel:+' + phoneDigits(c.phone) }, c.phone) : null, c.telegram ? h('a', { href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, c.telegram) : null, h('a', { href: '/contact' }, t('foot.write')))),
       h('div', { class: 'foot-bottom' }, h('span', null, '© ' + new Date().getFullYear() + ' ' + t('login.heroName') + '. ' + t('footer.rights') + ' · ' + t('footer.platform')),
         h('span', { class: 'foot-dev' }, t('foot.dev') + ' ', h('a', { href: '/register' }, t('foot.devLink')))),
-      h('p', { class: 'foot-demo' }, t('foot.demo'))));
+      h('p', { class: 'foot-demo' }, t('foot.demo'), frontendVersion())));
+  }
+
+  // Which build of the site is served: version.txt holds the short commit SHA (written by the Docker build and by the
+  // Vercel build command; «dev» in the repository). Shown small in the footer and in the console, so it is visible
+  // whether Render and Vercel serve the same frontend.
+  function frontendVersion() {
+    const el = h('span', { class: 'foot-ver' });
+    fetch('/version.txt', { cache: 'no-store' }).then((r) => (r.ok ? r.text() : '')).then((v) => {
+      v = (v || '').trim().toLowerCase();
+      if (!/^([0-9a-f]{7}|dev)$/.test(v)) v = 'dev';
+      el.textContent = ' · v ' + v;
+      console.info('Binosoz frontend ' + v);
+    }).catch(() => {});
+    return el;
   }
 
   // Page head of the inner pages: a way back to the landing and the title.

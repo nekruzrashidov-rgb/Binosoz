@@ -25,7 +25,8 @@ public static class HealthEndpoints
                 return Task.CompletedTask;
             }));
 
-        app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false, ResponseWriter = WriteAsync });
+        // Живой процесс и его версия (короткий SHA коммита, время сборки) — без проверок зависимостей.
+        app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false, ResponseWriter = WriteLiveAsync });
         var ready = new HealthCheckOptions { Predicate = c => c.Tags.Contains(HealthTags.Ready), ResponseWriter = WriteAsync };
         app.MapHealthChecks("/health/ready", ready);
         app.MapHealthChecks("/health", ready);
@@ -47,6 +48,9 @@ public static class HealthEndpoints
     private static bool KeyMatches(string? given, string? expected) =>
         !string.IsNullOrEmpty(expected) && given is not null
         && System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(given), System.Text.Encoding.UTF8.GetBytes(expected));
+
+    private static Task WriteLiveAsync(HttpContext context, HealthReport report) =>
+        context.Response.WriteAsJsonAsync(new { status = report.Status.ToString(), version = BuildInfo.Version, builtAt = BuildInfo.BuiltAt });
 
     // Только имена и статусы проверок: текст ошибок и исключения наружу не отдаются, они есть в логе.
     private static Task WriteAsync(HttpContext context, HealthReport report) =>

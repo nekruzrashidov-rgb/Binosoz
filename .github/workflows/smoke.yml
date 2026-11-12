@@ -1,4 +1,5 @@
-# Smoke-проверка прода: API отвечает (/health/live = 200) и в каталоге организации есть хотя бы один дом.
+# Smoke-проверка прода: API отвечает (/health/live = 200), версия прода совпадает с последним коммитом main,
+# трогавшим backend/ или frontend/ (если ему больше 30 минут), и в каталоге организации есть хотя бы один дом.
 # Render деплоит сам и не сообщает GitHub, когда закончил, поэтому проверка идёт по расписанию (раз в час)
 # и вручную после деплоя (Actions → Smoke → Run workflow). Только чтение (GET), на проде ничего не создаёт.
 # Падение = письмо от GitHub владельцу репозитория: это и простой uptime-мониторинг.
@@ -26,8 +27,24 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      # Ожидаемая версия прода — последний коммит main, который трогал backend/ или frontend/. Сверяем, только если
+      # с него прошло больше 30 минут: Render нужно время собрать и выкатить. Иначе версия не проверяется.
+      - name: Ожидаемая версия
+        id: expected
+        run: |
+          read -r sha at <<< "$(git log -1 --format='%H %ct' origin/main -- backend frontend)"
+          age=$(( $(date +%s) - at ))
+          if [ "$age" -gt 1800 ]; then
+            echo "sha=$sha" >> "$GITHUB_OUTPUT"
+            echo "Ожидается ${sha:0:7} (коммит $((age / 60)) мин назад)"
+          else
+            echo "Коммит ${sha:0:7} моложе 30 минут — версию прода не сверяем"
+          fi
       - name: Проверка
         env:
+          EXPECTED_SHA: ${{ steps.expected.outputs.sha }}
           API_URL: ${{ inputs.api_url || vars.SMOKE_API_URL || 'https://binosoz-1.onrender.com' }}
           ORG: ${{ inputs.organization || vars.SMOKE_ORG || 'nekruz' }}
         run: bash scripts/smoke.sh
