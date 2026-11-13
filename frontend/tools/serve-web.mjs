@@ -1,11 +1,11 @@
-// Статик-сервер для папки frontend/ в разработке, без зависимостей: node scripts/serve-web.mjs [порт]
+// Статик-сервер для папки frontend/ в разработке, без зависимостей: node frontend/tools/serve-web.mjs [порт]
 // Отдаёт файлы как есть и без кэша, чтобы правки JS и CSS были видны после обновления страницы.
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = resolve(fileURLToPath(new URL('../frontend', import.meta.url)));
+const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const port = Number(process.argv[2] ?? process.env.PORT ?? 5500);
 
 const types = {

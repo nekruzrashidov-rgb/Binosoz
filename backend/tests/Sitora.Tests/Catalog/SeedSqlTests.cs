@@ -4,9 +4,9 @@ using Sitora.Tests.Infrastructure;
 
 namespace Sitora.Tests.Catalog;
 
-// scripts/seed.sql — заполнение пустой продакшен-базы (Render). Скрипт выполняется на базе этого класса тестов
+// backend/scripts/seed.sql — заполнение пустой продакшен-базы (Render). Скрипт выполняется на базе этого класса тестов
 // в транзакции и откатывается: дом из сидера разработки на время переименовывается, чтобы база была «пустой» для скрипта.
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "CA2100", Justification = "Тест: SQL — константы и файл scripts/seed.sql из репозитория, id — из этой же базы; ввода пользователя нет.")]
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "CA2100", Justification = "Тест: SQL — константы и файл backend/scripts/seed.sql из репозитория, id — из этой же базы; ввода пользователя нет.")]
 public class SeedSqlTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFactory>
 {
     [Fact]
@@ -70,7 +70,7 @@ public class SeedSqlTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
             if (File.Exists(path))
                 return path;
         }
-        throw new FileNotFoundException("Не найден scripts/seed.sql");
+        throw new FileNotFoundException("Не найден backend/scripts/seed.sql");
     }
 
     private static async Task ExecAsync(NpgsqlConnection connection, NpgsqlTransaction tx, string sql)

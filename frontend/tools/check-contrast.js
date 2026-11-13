@@ -1,6 +1,6 @@
 /* WCAG AA contrast check of every visible text on the site's public pages.
    How to run (no installs): open any page of the site in a browser (http://localhost:5500 with
-   `node scripts/serve-web.mjs`, or the deployed site), open DevTools → Console, paste this whole file and run:
+   `node frontend/tools/serve-web.mjs`, or the deployed site), open DevTools → Console, paste this whole file and run:
      await checkSite()                       // all public pages, light theme, 1280px wide
      await checkSite({ theme: 'dark' })      // the same in the dark theme
      await checkSite({ width: 375 })         // phone width
@@ -63,7 +63,7 @@
         if (!f.contentDocument) {
           f.remove();
           throw new Error('Страницу нельзя открыть во фрейме (сайт, который отдаёт API, шлёт frame-ancestors \'none\'). ' +
-            'Запустите проверку на статическом сервере (node scripts/serve-web.mjs) или на каждой странице: checkContrastDocument(document, window)');
+            'Запустите проверку на статическом сервере (node frontend/tools/serve-web.mjs) или на каждой странице: checkContrastDocument(document, window)');
         }
         // Reveal animations: show everything as if scrolled to.
         f.contentDocument.querySelectorAll('.reveal, .section-reveal').forEach((e) => e.classList.add('visible', 'in'));

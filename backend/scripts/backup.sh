@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Бэкап базы (pg_dump, формат custom) и загруженных файлов (документы, фото стройки).
 # Запуск из корня репозитория на сервере:
-#   ./scripts/backup.sh
+#   ./backend/backend/scripts/backup.sh
 # Переменные: COMPOSE_FILE (по умолчанию docker-compose.prod.yml), BACKUP_DIR (./backups),
 # KEEP_DAYS — сколько дней хранить бэкапы (14).
 set -euo pipefail

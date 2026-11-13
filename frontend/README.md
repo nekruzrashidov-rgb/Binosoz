@@ -7,7 +7,7 @@
 Сначала API (`dotnet run` в `backend/src/Sitora.WebApi`, порт 5194), затем из корня репозитория:
 
 ```bash
-node scripts/serve-web.mjs 5500
+node frontend/tools/serve-web.mjs 5500
 ```
 
 Откройте http://localhost:5500. Подойдёт и Live Server в VS Code на порту 5500. Проще всего запустить API и сайт вместе: `run.cmd` в корне репозитория.

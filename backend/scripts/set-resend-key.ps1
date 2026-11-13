@@ -1,6 +1,6 @@
 # Переключает отправку писем API (Development) на Resend: сохраняет ключ и отправителя в user secrets.
 # Ключ вводится скрыто и нигде не печатается. Запуск из корня репозитория:
-#   powershell -ExecutionPolicy Bypass -File scripts/set-resend-key.ps1
+#   powershell -ExecutionPolicy Bypass -File backend/scripts/set-resend-key.ps1
 # Без своего подтверждённого домена Resend отправляет только с onboarding@resend.dev
 # и только на почту, с которой зарегистрирован аккаунт Resend.
 param([string]$From = 'onboarding@resend.dev')

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Smoke-проверка после деплоя: API живой, и каталог организации не пустой.
-#   ./scripts/smoke.sh                                  # прод на Render, организация nekruz
-#   API_URL=https://api.sitora.tj ORG=nekruz ./scripts/smoke.sh
+#   ./backend/scripts/smoke.sh                                  # прод на Render, организация nekruz
+#   API_URL=https://api.sitora.tj ORG=nekruz ./backend/scripts/smoke.sh
 # Только чтение (GET), на проде ничего не создаёт.
 # EXPECTED_SHA=<коммит> — сверить версию прода (/health/live → version) с ожидаемым коммитом main.
 # Код выхода: 0 — всё хорошо; 1 — API не отвечает; 2 — API живой, но в каталоге нет домов (громкое предупреждение;
@@ -51,7 +51,7 @@ fi
 if [ "$count" -lt 1 ]; then
     echo "##############################################################################" >&2
     echo "ВНИМАНИЕ: в каталоге организации «$ORG» нет ни одного дома — сайт показывает пустой каталог." >&2
-    echo "Заполните базу (docs/DEPLOY.md, «Демо-данные в пустой базе»): psql \"\$DATABASE_URL\" -f scripts/seed.sql" >&2
+    echo "Заполните базу (docs/DEPLOY.md, «Демо-данные в пустой базе»): psql \"\$DATABASE_URL\" -f backend/scripts/seed.sql" >&2
     echo "##############################################################################" >&2
     [ "$STRICT_CATALOG" = "0" ] && exit 0
     exit 2

@@ -1,4 +1,4 @@
-# Заполнение пустой продакшен-базы демо-каталогом (scripts/seed.sql) без psql на своём компьютере.
+# Заполнение пустой продакшен-базы демо-каталогом (backend/scripts/seed.sql) без psql на своём компьютере.
 # Только вручную: Actions → «Seed prod» → Run workflow, в поле confirm — nekruz.
 # Строка подключения — секрет PROD_DATABASE_URL (External Database URL из Render); в лог она не попадает:
 # GitHub маскирует секреты, а скрипт её не печатает. Повторный запуск ничего не дублирует: если дом уже есть,
@@ -61,7 +61,7 @@ jobs:
           PROD_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
           PGSSLMODE: require
           PGCONNECT_TIMEOUT: "30"
-        run: psql "$PROD_DATABASE_URL" -v ON_ERROR_STOP=1 -q -f scripts/seed.sql
+        run: psql "$PROD_DATABASE_URL" -v ON_ERROR_STOP=1 -q -f backend/scripts/seed.sql
 
       # Каталог кэшируется до 30 секунд: ждём, чтобы smoke увидел новые дома.
       - name: Проверка каталога
@@ -70,4 +70,4 @@ jobs:
           ORG: ${{ vars.SMOKE_ORG || 'nekruz' }}
         run: |
           sleep 35
-          bash scripts/smoke.sh
+          bash backend/scripts/smoke.sh

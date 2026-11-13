@@ -4,7 +4,7 @@ using Sitora.Domain.Enums;
 
 namespace Sitora.Tests.Infrastructure;
 
-// scripts/seed.sql — демо-каталог для пустой базы прода (Render). Прогоняется на базе после всех миграций:
+// backend/scripts/seed.sql — демо-каталог для пустой базы прода (Render). Прогоняется на базе после всех миграций:
 // так тест ловит расхождение скрипта со схемой. Повторный запуск ничего не дублирует, сам запуск — в AuditLog.
 public class SeedScriptTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFactory>
 {
@@ -50,7 +50,7 @@ public class SeedScriptTests(SitoraApiFactory factory) : IClassFixture<SitoraApi
         Assert.Equal([318_800m, 476_000m, 625_600m, 770_300m], result.Prices.Order());
     }
 
-    // Текст — файл scripts/seed.sql из репозитория, не ввод пользователя.
+    // Текст — файл backend/scripts/seed.sql из репозитория, не ввод пользователя.
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "CA2100", Justification = "SQL из файла репозитория")]
     private async Task RunAsync(string sql)
     {
@@ -68,6 +68,6 @@ public class SeedScriptTests(SitoraApiFactory factory) : IClassFixture<SitoraApi
             if (File.Exists(path))
                 return path;
         }
-        throw new FileNotFoundException("Не найден scripts/seed.sql");
+        throw new FileNotFoundException("Не найден backend/scripts/seed.sql");
     }
 }

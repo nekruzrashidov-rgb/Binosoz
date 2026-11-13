@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Refresh token Gmail для отправки писем с кодами входа (Email__Gmail__RefreshToken). Владелец запускает один раз на своём ПК.
-//   node scripts/gmail-token.mjs                         — спросит Client ID и Client Secret (секрет без эха)
-//   node scripts/gmail-token.mjs <client_id> <secret>    — или аргументами
+//   node backend/scripts/gmail-token.mjs                         — спросит Client ID и Client Secret (секрет без эха)
+//   node backend/scripts/gmail-token.mjs <client_id> <secret>    — или аргументами
 // Node 18+, без зависимостей. Поднимает сервер на 127.0.0.1:<случайный порт>, печатает ссылку согласия Google
 // (scope gmail.send, offline, PKCE S256, state), принимает код и меняет его на токены. Печатает только refresh token;
 // в файлы ничего не пишет. Подробно — docs/DEPLOY.md, «Почта через Gmail API».

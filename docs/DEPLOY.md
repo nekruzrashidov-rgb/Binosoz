@@ -118,7 +118,7 @@ curl -i https://api.sitora.tj/api/v1/buildings
 Ручной бэкап базы и загруженных файлов:
 
 ```bash
-cd /opt/sitora && ./scripts/backup.sh
+cd /opt/sitora && ./backend/scripts/backup.sh
 ```
 
 Бэкапы ложатся в `/opt/sitora/backups`. Старше 14 дней удаляются, срок меняется переменной `KEEP_DAYS`.
@@ -126,7 +126,7 @@ cd /opt/sitora && ./scripts/backup.sh
 Ежедневно в 03:00 через cron (`crontab -e`):
 
 ```
-0 3 * * * cd /opt/sitora && ./scripts/backup.sh >> /opt/sitora/backups/backup.log 2>&1
+0 3 * * * cd /opt/sitora && ./backend/scripts/backup.sh >> /opt/sitora/backups/backup.log 2>&1
 ```
 
 Бэкапы на том же сервере не спасут при потере сервера. Копируйте папку `backups` на другой сервер или в хранилище, например через `rsync` или `rclone`. Ключ `ENCRYPTION_KEY` и файл `.env` храните отдельно от бэкапов.
@@ -137,7 +137,7 @@ cd /opt/sitora && ./scripts/backup.sh
 
 ```bash
 cd /opt/sitora
-./scripts/restore.sh backups/sitora-db-ДАТА.dump backups/sitora-files-ДАТА.tar.gz
+./backend/scripts/restore.sh backups/sitora-db-ДАТА.dump backups/sitora-files-ДАТА.tar.gz
 ```
 
 Скрипт спросит подтверждение, остановит API, заменит базу и файлы и снова запустит API.
@@ -150,7 +150,7 @@ cd /opt/sitora
 cd /opt/sitora
 git pull
 docker compose -f docker-compose.prod.yml pull
-./scripts/backup.sh
+./backend/scripts/backup.sh
 docker compose -f docker-compose.prod.yml run --rm migrate
 docker compose -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.prod.yml logs -f webapi
@@ -178,7 +178,7 @@ WEBAPI_IMAGE=ghcr.io/nekruzrashidov-rgb/binosoz-api:<полный sha преды
 - Раз в 5 минут API сам проверяет `ready` и при смене состояния («не работает» / «снова работает») шлёт уведомление в канал менеджеров через `INotificationSender`. Пока Telegram — заглушка, сообщения видны только в логе и в таблице `Notifications`.
 - Если API упал целиком, он сам ни о чём не сообщит. Поэтому нужна внешняя проверка `/health/live` раз в 1–5 минут — сервисом мониторинга доступности (UptimeRobot, Better Stack и т. п., с оповещением в Telegram) или cron-задачей на другом сервере.
 - `/health/ready` и `/health` подробно отвечают только из внутренней сети (localhost, docker, частные адреса) или с заголовком `X-Health-Key: <Health__Key>`. Снаружи без ключа — 404. `/health/live` открыт всегда.
-- Workflow **Smoke** (`.github/workflows/smoke.yml`) раз в час и вручную (Actions → Smoke → Run workflow) проверяет `/health/live` и что в каталоге организации есть дом (`scripts/smoke.sh`, только GET). Адрес и организация — переменные репозитория `SMOKE_API_URL`, `SMOKE_ORG`. Падение — письмо от GitHub.
+- Workflow **Smoke** (`.github/workflows/smoke.yml`) раз в час и вручную (Actions → Smoke → Run workflow) проверяет `/health/live` и что в каталоге организации есть дом (`backend/scripts/smoke.sh`, только GET). Адрес и организация — переменные репозитория `SMOKE_API_URL`, `SMOKE_ORG`. Падение — письмо от GitHub.
 - Ошибки уровня Error уходят в Sentry/GlitchTip, если задан `Sentry__Dsn` (`SENTRY_DSN` в `.env`): без почт, телефонов, токенов и cookie. В каждом ответе-ошибке есть `traceId` — по нему запись ищется в логе и в Sentry.
 - Почта: `Email__Provider` должен быть `Smtp` или `Resend` — с `Dev` вне Development письма с кодами никуда не уходят и сотрудники не войдут.
 
@@ -203,7 +203,7 @@ WEBAPI_IMAGE=ghcr.io/nekruzrashidov-rgb/binosoz-api:<полный sha преды
 Заполнить её домом «Некруз Резиденс» (20 этажей + коммерческий, 160 квартир: 6 продано, 5 в брони, остальные свободны):
 
 ```bash
-psql "postgresql://USER:PASSWORD@HOST/DB?sslmode=require" -f scripts/seed.sql
+psql "postgresql://USER:PASSWORD@HOST/DB?sslmode=require" -f backend/scripts/seed.sql
 ```
 
 Строка подключения — External Database URL в панели Render (её не коммитить). Скрипт повторно ничего не добавляет:
@@ -212,7 +212,7 @@ psql "postgresql://USER:PASSWORD@HOST/DB?sslmode=require" -f scripts/seed.sql
 
 1. Settings → Secrets and variables → Actions → New repository secret: имя `PROD_DATABASE_URL`, значение — External Database URL из Render.
 2. Actions → **Seed prod** → Run workflow, в поле `confirm` ввести `nekruz` (защита от случайного запуска).
-3. Workflow ставит `postgresql-client`, выполняет `scripts/seed.sql` (с `ON_ERROR_STOP`, по TLS) и затем `scripts/smoke.sh`.
+3. Workflow ставит `postgresql-client`, выполняет `backend/scripts/seed.sql` (с `ON_ERROR_STOP`, по TLS) и затем `backend/scripts/smoke.sh`.
    Строка подключения в лог не выводится. Без секрета или с неверным подтверждением workflow сразу останавливается, база не тронута.
 
 ## Render: деплой
@@ -293,7 +293,7 @@ Render закрывает исходящий SMTP (порты 587/465), поэт
    Testing refresh token живёт только 7 дней. Проверку Google проходить не нужно — входит только владелец, он один раз
    увидит «приложение не проверено» → «Дополнительно» → «Перейти».
 3. **Credentials** → Create credentials → OAuth client ID → тип **Desktop app** → скопировать Client ID и Client Secret.
-4. На своём ПК (Node 18+): `node scripts/gmail-token.mjs` → ввести Client ID и Secret (секрет не отображается) →
+4. На своём ПК (Node 18+): `node backend/scripts/gmail-token.mjs` → ввести Client ID и Secret (секрет не отображается) →
    открыть ссылку, войти как binosoz27@gmail.com → скрипт напечатает refresh token. Он ничего не сохраняет в файлы.
 5. Render → Environment:
 
@@ -316,4 +316,4 @@ Render закрывает исходящий SMTP (порты 587/465), поэт
 - у обычного Gmail суточный лимит отправки — несколько сотен писем; для конкурса достаточно;
 - письма с нового адреса могут попасть в «Спам» — проверить самому и попросить жюри заглянуть в «Спам»;
 - после смены пароля Google или отзыва доступа нужен новый refresh token (в логе API: «Refresh token Gmail отозван или
-  истёк — получите новый (scripts/gmail-token.mjs)»).
+  истёк — получите новый (backend/scripts/gmail-token.mjs)»).

@@ -1,7 +1,7 @@
 -- Demo catalog for an empty production database (Render): «Некруз Резиденс», Dushanbe, 20 floors, 160 apartments.
 --
 -- Run once against the Render PostgreSQL (External Database URL from the Render dashboard):
---   psql "postgresql://USER:PASSWORD@HOST/DB?sslmode=require" -f scripts/seed.sql
+--   psql "postgresql://USER:PASSWORD@HOST/DB?sslmode=require" -f backend/scripts/seed.sql
 --
 -- * Idempotent: if the organization already has a building named «Некруз Резиденс», nothing is changed.
 -- * Atomic: everything is one DO block — on any error nothing is left half-written.

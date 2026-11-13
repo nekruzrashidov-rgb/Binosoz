@@ -28,13 +28,16 @@ Binosoz/
 ├── .env / .env.example        ← переменные окружения (секреты только здесь)
 ├── docker-compose.yml         ← dev
 ├── docker-compose.prod.yml    ← prod
+├── deploy/Caddyfile           ← reverse proxy (prod)
+├── run.cmd / run.ps1          ← запуск API + сайта для разработки
 ├── docs/
 │   ├── TZ.md                  ← полное техзадание
 │   ├── DECISIONS.md           ← все принятые решения с обоснованием
 │   ├── RESULT.md              ← что реализовано (по ролям и этапам)
 │   ├── API_CONTRACT.md        ← все эндпоинты API
 │   ├── SECURITY.md            ← модель угроз и меры защиты
-│   └── DEPLOY.md              ← инструкция по деплою
+│   ├── DEPLOY.md              ← инструкция по деплою
+│   └── exam/                  ← разбор проекта по частям (таджикский), для защиты
 ├── backend/
 │   ├── Sitora.sln
 │   ├── src/
@@ -81,9 +84,11 @@ Binosoz/
 │   │       │                          ImpersonationAuditMiddleware
 │   │       ├── Validators/         ← FluentValidation
 │   │       └── Program.cs          ← точка входа, DI, пайплайн
-│   └── tests/
-│       └── Sitora.Tests/           ← 380 тестов, Testcontainers, покрывают:
-│                                      auth, catalog, chat, payments, sales, security
+│   ├── tests/
+│   │   └── Sitora.Tests/           ← 380 тестов, Testcontainers, покрывают:
+│   │                                  auth, catalog, chat, payments, sales, security
+│   └── scripts/                    ← backup.sh/restore.sh, seed.sql (демо для прода), smoke.sh, load/ (k6),
+│                                      gmail-token.mjs (refresh token Gmail), set-resend-key.ps1
 └── frontend/                   ← vanilla JS без сборщика; сайт отдаёт сам API (wwwroot) и копия на Vercel
     ├── index.html, apartments.html, about.html, gallery.html, contact.html, privacy.html ← публичные страницы ЖК
     ├── login.html, register.html, accept-invite.html, cabinet.html, crm.html, platform.html, payment.html,
@@ -108,6 +113,10 @@ Binosoz/
         ├── pardoxt-script.js          ← payment.html (тестовый банк)
         ├── ai-assistent.js, pwa-sabt.js ← AI-ассистент, регистрация Service Worker
         └── namunavi-malumot-mock.js   ← demo-бэкенд; сейчас ни одна страница его не подключает
+    └── tools/                  ← только разработка, НЕ публикуется (.vercelignore, .dockerignore):
+        ├── serve-web.mjs          статик-сервер: node frontend/tools/serve-web.mjs 5500
+        ├── check-contrast.js      проверка контраста WCAG AA
+        └── e2e/                   Playwright: cd frontend/tools/e2e && npm ci && npm test
 ```
 
 ## Frontend: правила
@@ -117,7 +126,7 @@ Binosoz/
   Полупрозрачность — `color-mix(in srgb, var(--accent) 20%, transparent)`. Хардкод цвета текста ломает тёмную тему.
 - **Тёмные секции** на светлом сайте (hero главной, рассрочка, «Остались вопросы?», футер, 3D-сцена, итог калькулятора)
   переопределяют `--ink/--ink-2/--muted` локально — компоненты внутри сами светлые. Новую тёмную секцию добавлять в этот список.
-- **Тёмная тема**: `[data-theme='dark']` меняет токены; проверка — `scripts/check-contrast.js` (0 текстов ниже AA в обеих темах).
+- **Тёмная тема**: `[data-theme='dark']` меняет токены; проверка — `frontend/tools/check-contrast.js` (0 текстов ниже AA в обеих темах).
 - **Честные данные**: цифры, цены, свободные квартиры — только из API; `DEFAULT_*` в config — только для demo; пустой API —
   карточка «Продажи скоро откроются». Ничего не выдумывать (даты, отзывы, фото).
 - **Переводы**: новый ключ — во все три файла `js/i18n/*.js`.

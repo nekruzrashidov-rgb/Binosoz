@@ -76,7 +76,7 @@ public class EmailOptions
 
     // Gmail API (HTTPS, порт 443 — работает и там, где исходящий SMTP закрыт, например на бесплатном Render).
     // Email__Gmail__ClientId, Email__Gmail__ClientSecret, Email__Gmail__RefreshToken — OAuth-клиент типа Desktop app
-    // и refresh token владельца ящика со scope gmail.send (scripts/gmail-token.mjs). Значения — только из окружения.
+    // и refresh token владельца ящика со scope gmail.send (backend/scripts/gmail-token.mjs). Значения — только из окружения.
     public class GmailSettings
     {
         public string? ClientId { get; set; }

@@ -32,4 +32,4 @@ if (Test-Api) {
 
 Write-Host "Сайт: $site — CRM и кабинет открываются из меню сайта. Остановить: Ctrl+C (окно API закройте отдельно)." -ForegroundColor Cyan
 Start-Process $site
-node "$root\scripts\serve-web.mjs" 5500
+node "$root\frontend\tools\serve-web.mjs" 5500

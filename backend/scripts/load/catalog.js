@@ -3,8 +3,8 @@
 //
 //   docker compose up -d                       # PostgreSQL, Redis, MinIO
 //   ASPNETCORE_ENVIRONMENT=Development dotnet run -c Release --project backend/src/Sitora.WebApi --urls http://localhost:5194
-//   k6 run scripts/load/catalog.js                                    # или
-//   k6 run -e API_URL=https://staging.example.tj -e ORG=nekruz scripts/load/catalog.js
+//   k6 run backend/scripts/load/catalog.js                                    # или
+//   k6 run -e API_URL=https://staging.example.tj -e ORG=nekruz backend/scripts/load/catalog.js
 //
 // Сценарий повторяет путь посетителя: список домов → дом → этажи → квартиры случайного этажа → карточка квартиры.
 import http from 'k6/http';

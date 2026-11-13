@@ -37,7 +37,7 @@ public class GmailEmailSender(
 {
     public const string NotConfigured =
         "Gmail не настроен: задайте Email__Gmail__ClientId, Email__Gmail__ClientSecret и Email__Gmail__RefreshToken";
-    private const string RefreshRevoked = "Refresh token Gmail отозван или истёк — получите новый (scripts/gmail-token.mjs)";
+    private const string RefreshRevoked = "Refresh token Gmail отозван или истёк — получите новый (backend/scripts/gmail-token.mjs)";
     private static readonly TimeSpan Margin = TimeSpan.FromSeconds(60);
 
     public async Task SendAsync(EmailMessage message, CancellationToken ct = default)

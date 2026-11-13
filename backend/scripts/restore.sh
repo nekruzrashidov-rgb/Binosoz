@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Восстановление из бэкапа scripts/backup.sh. ТЕКУЩИЕ ДАННЫЕ БУДУТ ЗАМЕНЕНЫ.
+# Восстановление из бэкапа backend/scripts/backup.sh. ТЕКУЩИЕ ДАННЫЕ БУДУТ ЗАМЕНЕНЫ.
 # Запуск из корня репозитория:
-#   ./scripts/restore.sh backups/sitora-db-ДАТА.dump [backups/sitora-files-ДАТА.tar.gz]
+#   ./backend/scripts/restore.sh backups/sitora-db-ДАТА.dump [backups/sitora-files-ДАТА.tar.gz]
 set -euo pipefail
 
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
@@ -10,7 +10,7 @@ compose() { docker compose -f "$COMPOSE_FILE" "$@"; }
 db_file="${1:-}"
 files_file="${2:-}"
 if [ -z "$db_file" ] || [ ! -f "$db_file" ]; then
-    echo "Укажите файл дампа базы: ./scripts/restore.sh backups/sitora-db-ДАТА.dump [файлы.tar.gz]" >&2
+    echo "Укажите файл дампа базы: ./backend/scripts/restore.sh backups/sitora-db-ДАТА.dump [файлы.tar.gz]" >&2
     exit 1
 fi
 if [ -n "$files_file" ] && [ ! -f "$files_file" ]; then

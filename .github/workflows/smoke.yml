@@ -47,4 +47,4 @@ jobs:
           EXPECTED_SHA: ${{ steps.expected.outputs.sha }}
           API_URL: ${{ inputs.api_url || vars.SMOKE_API_URL || 'https://binosoz-1.onrender.com' }}
           ORG: ${{ inputs.organization || vars.SMOKE_ORG || 'nekruz' }}
-        run: bash scripts/smoke.sh
+        run: bash backend/scripts/smoke.sh

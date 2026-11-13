@@ -10,6 +10,7 @@ backend/tests/
 _old/
 docs/
 deploy/
-scripts/
+backend/scripts/
+frontend/tools/
 **/.env
 *.md
