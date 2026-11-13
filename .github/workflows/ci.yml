@@ -51,6 +51,40 @@ jobs:
           name: test-results
           path: backend/test-results
 
+  # Сайт в браузере (Playwright, Chromium): страницы, пустые состояния, вход, язык, тема, мобильное меню,
+  # 320 px без горизонтальной прокрутки, контраст WCAG AA в светлой и тёмной теме. API не нужен.
+  e2e:
+    name: Сайт в браузере (Playwright)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend/tools/e2e
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/tools/e2e/package-lock.json
+
+      - name: Пакеты
+        run: npm ci
+
+      - name: Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Тесты
+        run: npm test
+
+      - name: Отчёт при ошибке
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report
+          path: frontend/tools/e2e/playwright-report
+
   docker:
     name: Docker-образ и compose
     runs-on: ubuntu-24.04
@@ -171,7 +205,7 @@ jobs:
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             export WEBAPI_IMAGE
             docker compose -f docker-compose.prod.yml pull migrate webapi
-            ./scripts/backup.sh
+            ./backend/scripts/backup.sh
             docker compose -f docker-compose.prod.yml run --rm migrate
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
             docker logout ghcr.io

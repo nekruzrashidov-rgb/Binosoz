@@ -1,0 +1,11 @@
+{
+  "name": "binosoz-e2e",
+  "private": true,
+  "description": "Browser checks of the public site: pages, language and theme switch, mobile menu, WCAG AA contrast in both themes.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.49.1"
+  }
+}

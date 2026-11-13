@@ -495,3 +495,8 @@ backend/obj/
 backend/.env
 *.user
 .DS_Store
+
+# Playwright (frontend/tools/e2e/)
+frontend/tools/e2e/node_modules/
+frontend/tools/e2e/test-results/
+frontend/tools/e2e/playwright-report/
