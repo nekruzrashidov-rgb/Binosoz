@@ -2673,7 +2673,7 @@ a:hover > .nr-arrow, button:hover > .nr-arrow { transform: translateX(4px); }
 }
 
 /* Cormorant Garamond draws old-style figures by default («зD», «1о»): the site uses lining figures everywhere. */
-body { font-variant-numeric: lining-nums; }
+body { font-variant-numeric: lining-nums; font-feature-settings: 'lnum' 1; } /* lnum also survives tabular-nums */
 @media (min-width: 1000px) { .nr-why-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .nr .card, .nr .eco-card, .nr .green-tile, .nr .soon-block, .nr .eco-step, .nr .eco-features li, .lux-footer .soc, .lux-footer .foot-qr img { border-radius: 2px; }
 .lux-footer .tower-logo { color: var(--ink); }
@@ -2931,3 +2931,9 @@ button.nr-layout { width: 100%; padding: 0; text-align: left; font: inherit; cur
 /* 404, privacy: the design's sharp corners. */
 .err-card, .privacy-doc.card { border-radius: 2px; }
 .err-card .btn, .privacy-page .btn { border-radius: 2px; }
+
+/* Cabinet, CRM and platform: the same typography and tokens as the site, the design's near-square corners.
+   Status chips and badges stay round (they are labels, not surfaces). */
+body:is([data-page='crm'], [data-page='cabinet'], [data-page='platform']) :is(.card, .btn, .inp, .modal, .kpi, .icon-btn, .seg, .seg button, .tbl-wrap, .drawer, .panel, .userchip, .cab-welcome, .tabs, .toolbar .inp, .eco-card, .util-card, .green-card) { border-radius: 3px; }
+body:is([data-page='crm'], [data-page='cabinet'], [data-page='platform']) h1, body:is([data-page='crm'], [data-page='cabinet'], [data-page='platform']) h2 { font-weight: 500; }
+.modal, .overlay .modal { border-radius: 3px; }
