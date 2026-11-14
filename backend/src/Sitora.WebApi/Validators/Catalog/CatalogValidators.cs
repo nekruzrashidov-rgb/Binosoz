@@ -27,6 +27,26 @@ public class SaveBuildingRequestValidator : AbstractValidator<SaveBuildingReques
         Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https";
 }
 
+// Эко-паспорт: числа неотрицательные и в разумных пределах, тексты — до 200 символов.
+public class SaveBuildingEcoRequestValidator : AbstractValidator<SaveBuildingEcoRequest>
+{
+    public SaveBuildingEcoRequestValidator()
+    {
+        RuleFor(x => x.EnergyClass).IsInEnum().WithMessage("Неизвестный класс энергоэффективности");
+        RuleFor(x => x.HeatingType).IsInEnum().WithMessage("Неизвестный тип отопления");
+        RuleFor(x => x.WallInsulationRu).MaximumLength(200).WithMessage("Утепление стен — не длиннее 200 символов");
+        RuleFor(x => x.WallInsulationTg).MaximumLength(200).WithMessage("Утепление стен — не длиннее 200 символов");
+        RuleFor(x => x.WindowsRu).MaximumLength(200).WithMessage("Окна — не длиннее 200 символов");
+        RuleFor(x => x.WindowsTg).MaximumLength(200).WithMessage("Окна — не длиннее 200 символов");
+        RuleFor(x => x.SolarPanelsKw).InclusiveBetween(0m, 100_000m).When(x => x.SolarPanelsKw is not null)
+            .WithMessage("Мощность солнечных панелей — от 0 до 100 000 кВт");
+        RuleFor(x => x.GreenAreaM2).InclusiveBetween(0m, 10_000_000m).When(x => x.GreenAreaM2 is not null)
+            .WithMessage("Площадь озеленения — от 0 до 10 000 000 м²");
+        RuleFor(x => x.EstimatedKwhPerM2Year).InclusiveBetween(0m, 2_000m).When(x => x.EstimatedKwhPerM2Year is not null)
+            .WithMessage("Расчётное потребление — от 0 до 2000 кВт·ч на м² в год");
+    }
+}
+
 public class CreateFloorRequestValidator : AbstractValidator<CreateFloorRequest>
 {
     public CreateFloorRequestValidator()

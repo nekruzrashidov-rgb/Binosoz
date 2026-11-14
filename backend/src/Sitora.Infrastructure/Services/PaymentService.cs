@@ -21,6 +21,7 @@ public class PaymentService(
     TelegramAlertService telegram,
     TimeProvider timeProvider,
     StatsCache stats,
+    PdfIssueRecorder pdfIssues,
     ILogger<PaymentService> logger) : IPaymentService
 {
     private const string DealNotFound = "Сделка не найдена";
@@ -111,7 +112,9 @@ public class PaymentService(
     {
         // GetScheduleAsync сам проверяет, что сделка своя.
         var schedule = await GetScheduleAsync(dealId, ct);
-        return await statements.RenderScheduleAsync(dealId, schedule, Today, ct);
+        var pdf = await statements.RenderScheduleAsync(dealId, schedule, Today, ct);
+        await pdfIssues.RecordAsync(dealId, IssuedPdfKind.Schedule, pdf, ct);
+        return pdf;
     }
 
     // Перевод суммы из валюты договора во вторую валюту; null, если курса USD ещё нет.
@@ -239,7 +242,9 @@ public class PaymentService(
     public async Task<byte[]> GetStatementPdfAsync(Guid dealId, DateOnly? asOf, CancellationToken ct = default)
     {
         var data = await GetStatementDataAsync(dealId, asOf, ct);
-        return statements.Render(data);
+        var pdf = statements.Render(data);
+        await pdfIssues.RecordAsync(dealId, IssuedPdfKind.Statement, pdf, ct);
+        return pdf;
     }
 
     // Возвращает курс платежа, сумму в валюте договора и в сомони.

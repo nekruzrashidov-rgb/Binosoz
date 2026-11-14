@@ -6,6 +6,7 @@ using Sitora.Domain.Entities;
 using Sitora.Domain.Exceptions;
 using Sitora.Domain.Interfaces;
 using Sitora.Infrastructure.Data;
+using Sitora.Infrastructure.Integrations;
 using Sitora.Infrastructure.Security;
 
 namespace Sitora.Infrastructure.Services;
@@ -51,7 +52,9 @@ public class DocumentService(
             ContentType = contentType,
             SizeBytes = buffer.Length,
             SignedAt = request.SignedAt,
-            UploadedById = currentUser.UserId
+            UploadedById = currentUser.UserId,
+            // Страницы PDF — для счётчика «Зелёного эффекта» (сэкономленная бумага).
+            PageCount = contentType == "application/pdf" ? PdfPages.Count(buffer.ToArray()) : null
         };
         document.FileKey = $"documents/{dealId:N}/{document.Id:N}{extension}";
 

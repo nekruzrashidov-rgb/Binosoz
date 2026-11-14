@@ -77,3 +77,15 @@ public class SmsCodeConfiguration : IEntityTypeConfiguration<SmsCode>
         builder.HasIndex(c => new { c.Phone, c.CreatedAt });
     }
 }
+
+// Выданные онлайн PDF (график, акт сверки): для счётчиков «Зелёного эффекта» по организации и месяцам.
+public class IssuedPdfConfiguration : IEntityTypeConfiguration<IssuedPdf>
+{
+    public void Configure(EntityTypeBuilder<IssuedPdf> builder)
+    {
+        builder.ToTable("IssuedPdfs");
+        builder.Property(x => x.Kind).HasConversion<string>().HasMaxLength(32);
+        builder.HasIndex(x => new { x.OrganizationId, x.CreatedAt });
+        builder.HasOne<Deal>().WithMany().HasForeignKey(x => x.DealId).OnDelete(DeleteBehavior.Cascade);
+    }
+}

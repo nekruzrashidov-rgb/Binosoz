@@ -29,6 +29,9 @@ public class Organization : BaseEntity
     // Свой домен застройщика (например, richtower.tj). Задаёт только создатель платформы.
     public string? CustomDomain { get; set; }
 
+    // Тарифы, коэффициенты «Зелёного эффекта» и признак демо-данных (столбцы Green*).
+    public OrganizationGreenSettings Green { get; set; } = new();
+
     public List<Building> Buildings { get; set; } = [];
 }
 

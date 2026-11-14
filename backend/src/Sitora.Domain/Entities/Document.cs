@@ -15,4 +15,6 @@ public class Document : BaseEntity
     public long SizeBytes { get; set; }
     public DateTime? SignedAt { get; set; }
     public Guid? UploadedById { get; set; }
+    // Страниц в PDF (из самого файла при загрузке); null — не PDF или число не определилось (тогда не считается).
+    public int? PageCount { get; set; }
 }

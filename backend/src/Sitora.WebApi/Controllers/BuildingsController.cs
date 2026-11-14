@@ -68,4 +68,12 @@ public class BuildingsController(ICatalogService catalog) : ControllerBase
     [ProducesResponseType<BuildingResponse>(StatusCodes.Status200OK)]
     public Task<BuildingResponse> Update(Guid id, SaveBuildingRequest request, CancellationToken ct) =>
         catalog.UpdateBuildingAsync(id, request, ct);
+
+    /// <summary>Эко-паспорт дома (контент-менеджер и руководители): заменяется целиком, пустые поля — «не заполнено».
+    /// Изменение пишется в журнал, кэш каталога сбрасывается. В GET дома — поле eco, только заполненное.</summary>
+    [HttpPut("{id:guid}/eco")]
+    [Authorize(Roles = Roles.CatalogEditors)]
+    [ProducesResponseType<BuildingResponse>(StatusCodes.Status200OK)]
+    public Task<BuildingResponse> UpdateEco(Guid id, SaveBuildingEcoRequest request, CancellationToken ct) =>
+        catalog.UpdateBuildingEcoAsync(id, request, ct);
 }

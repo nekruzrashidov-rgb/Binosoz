@@ -134,6 +134,7 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Auth:EmailCodesPerMinute", "100");
         builder.UseSetting("Auth:EmailCodesPerHour", "1000");
         // Старый вход по SMS выключен по умолчанию; его тесты проверяют сам вход, поэтому здесь он включён.
+        builder.UseSetting("Seed:GreenDemo", "false");
         builder.UseSetting("Auth:SmsLoginEnabled", SmsLoginEnabled ? "true" : "false");
         // Второй застройщик из сидера разработки не нужен: изоляцию проверяют тесты со своими организациями.
         builder.UseSetting("Seed:RichTower", "false");

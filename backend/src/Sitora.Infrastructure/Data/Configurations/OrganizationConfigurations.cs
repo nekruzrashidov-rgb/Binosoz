@@ -22,6 +22,17 @@ public class OrganizationConfiguration : IEntityTypeConfiguration<Organization>
         builder.Property(o => o.Email).HasMaxLength(256);
         builder.Property(o => o.CustomDomain).HasMaxLength(253);
         builder.HasIndex(o => o.CustomDomain).IsUnique().HasFilter("\"CustomDomain\" IS NOT NULL");
+        // Тарифы, коэффициенты «Зелёного эффекта» и признак демо-данных — в той же таблице, столбцы Green*.
+        builder.OwnsOne(o => o.Green, g =>
+        {
+            g.Property(x => x.TariffKwhTjs).HasColumnName("GreenTariffKwhTjs").HasPrecision(18, 4);
+            g.Property(x => x.BaselineKwhPerM2Year).HasColumnName("GreenBaselineKwhPerM2Year").HasPrecision(18, 2);
+            g.Property(x => x.BaselineSource).HasColumnName("GreenBaselineSource").HasMaxLength(500);
+            g.Property(x => x.Co2KgPerKgPaper).HasColumnName("GreenCo2KgPerKgPaper").HasPrecision(18, 4);
+            g.Property(x => x.Co2Source).HasColumnName("GreenCo2Source").HasMaxLength(500);
+            g.Property(x => x.IsDemo).HasColumnName("GreenIsDemo").HasDefaultValue(false);
+        });
+        builder.Navigation(o => o.Green).IsRequired();
     }
 }
 

@@ -819,6 +819,9 @@ namespace Sitora.Infrastructure.Data.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
+                    b.Property<int?>("PageCount")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime?>("SignedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1051,6 +1054,41 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.HasIndex("OrganizationId", "Email");
 
                     b.ToTable("Invitations", (string)null);
+                });
+
+            modelBuilder.Entity("Sitora.Domain.Entities.IssuedPdf", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DealId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("PageCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DealId");
+
+                    b.HasIndex("OrganizationId", "CreatedAt");
+
+                    b.ToTable("IssuedPdfs", (string)null);
                 });
 
             modelBuilder.Entity("Sitora.Domain.Entities.Lead", b =>
@@ -1984,6 +2022,90 @@ namespace Sitora.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.OwnsOne("Sitora.Domain.Entities.BuildingEcoInfo", "Eco", b1 =>
+                        {
+                            b1.Property<Guid>("BuildingId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("EnergyClass")
+                                .HasMaxLength(16)
+                                .HasColumnType("character varying(16)")
+                                .HasColumnName("EcoEnergyClass");
+
+                            b1.Property<decimal?>("EstimatedKwhPerM2Year")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("EcoEstimatedKwhPerM2Year");
+
+                            b1.Property<decimal?>("GreenAreaM2")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("EcoGreenAreaM2");
+
+                            b1.Property<bool?>("HasEvCharging")
+                                .HasColumnType("boolean")
+                                .HasColumnName("EcoHasEvCharging");
+
+                            b1.Property<bool?>("HasHeatMeters")
+                                .HasColumnType("boolean")
+                                .HasColumnName("EcoHasHeatMeters");
+
+                            b1.Property<bool?>("HasLedCommonAreas")
+                                .HasColumnType("boolean")
+                                .HasColumnName("EcoHasLedCommonAreas");
+
+                            b1.Property<bool?>("HasRainwaterReuse")
+                                .HasColumnType("boolean")
+                                .HasColumnName("EcoHasRainwaterReuse");
+
+                            b1.Property<bool?>("HasWasteSorting")
+                                .HasColumnType("boolean")
+                                .HasColumnName("EcoHasWasteSorting");
+
+                            b1.Property<bool?>("HasWaterMeters")
+                                .HasColumnType("boolean")
+                                .HasColumnName("EcoHasWaterMeters");
+
+                            b1.Property<string>("HeatingType")
+                                .HasMaxLength(32)
+                                .HasColumnType("character varying(32)")
+                                .HasColumnName("EcoHeatingType");
+
+                            b1.Property<decimal?>("SolarPanelsKw")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("EcoSolarPanelsKw");
+
+                            b1.Property<string>("WallInsulationRu")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("EcoWallInsulationRu");
+
+                            b1.Property<string>("WallInsulationTg")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("EcoWallInsulationTg");
+
+                            b1.Property<string>("WindowsRu")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("EcoWindowsRu");
+
+                            b1.Property<string>("WindowsTg")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("EcoWindowsTg");
+
+                            b1.HasKey("BuildingId");
+
+                            b1.ToTable("Buildings");
+
+                            b1.WithOwner()
+                                .HasForeignKey("BuildingId");
+                        });
+
+                    b.Navigation("Eco");
+
                     b.Navigation("Organization");
                 });
 
@@ -2168,6 +2290,15 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Navigation("Organization");
                 });
 
+            modelBuilder.Entity("Sitora.Domain.Entities.IssuedPdf", b =>
+                {
+                    b.HasOne("Sitora.Domain.Entities.Deal", null)
+                        .WithMany()
+                        .HasForeignKey("DealId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Sitora.Domain.Entities.Lead", b =>
                 {
                     b.HasOne("Sitora.Domain.Entities.Apartment", "Apartment")
@@ -2234,6 +2365,56 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Navigation("Deal");
 
                     b.Navigation("Payment");
+                });
+
+            modelBuilder.Entity("Sitora.Domain.Entities.Organization", b =>
+                {
+                    b.OwnsOne("Sitora.Domain.Entities.OrganizationGreenSettings", "Green", b1 =>
+                        {
+                            b1.Property<Guid>("OrganizationId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<decimal?>("BaselineKwhPerM2Year")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("GreenBaselineKwhPerM2Year");
+
+                            b1.Property<string>("BaselineSource")
+                                .HasMaxLength(500)
+                                .HasColumnType("character varying(500)")
+                                .HasColumnName("GreenBaselineSource");
+
+                            b1.Property<decimal?>("Co2KgPerKgPaper")
+                                .HasPrecision(18, 4)
+                                .HasColumnType("numeric(18,4)")
+                                .HasColumnName("GreenCo2KgPerKgPaper");
+
+                            b1.Property<string>("Co2Source")
+                                .HasMaxLength(500)
+                                .HasColumnType("character varying(500)")
+                                .HasColumnName("GreenCo2Source");
+
+                            b1.Property<bool>("IsDemo")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("boolean")
+                                .HasDefaultValue(false)
+                                .HasColumnName("GreenIsDemo");
+
+                            b1.Property<decimal?>("TariffKwhTjs")
+                                .HasPrecision(18, 4)
+                                .HasColumnType("numeric(18,4)")
+                                .HasColumnName("GreenTariffKwhTjs");
+
+                            b1.HasKey("OrganizationId");
+
+                            b1.ToTable("Organizations");
+
+                            b1.WithOwner()
+                                .HasForeignKey("OrganizationId");
+                        });
+
+                    b.Navigation("Green")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Sitora.Domain.Entities.OrganizationTariff", b =>

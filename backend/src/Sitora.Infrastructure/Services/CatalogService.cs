@@ -165,6 +165,8 @@ public class CatalogService(
     {
         if (items.Count == 0)
             return items;
+        // Незаполненный эко-паспорт в ответ не попадает совсем.
+        items = items.Select(b => b.Eco is { IsEmpty: true } ? b with { Eco = null } : b).ToList();
         var buildingIds = items.Select(b => b.Id).ToList();
         var stale = await ExpiredBookedAsync(db, timeProvider, db.Apartments.Where(a => buildingIds.Contains(a.Floor.BuildingId)), ct);
         return items.Select(b => stale.Count(x => x.BuildingId == b.Id) is var n and > 0
@@ -202,6 +204,46 @@ public class CatalogService(
         await SaveAsync("Такой дом уже есть", ct);
         return await GetBuildingAsync(id, ct);
     }
+
+    // Эко-паспорт дома: заменяется целиком; пустые строки — «не заполнено». Аудит и сброс кэша каталога — как у дома.
+    public async Task<BuildingResponse> UpdateBuildingEcoAsync(Guid id, SaveBuildingEcoRequest request, CancellationToken ct = default)
+    {
+        var building = await db.Buildings.FirstOrDefaultAsync(b => b.Id == id, ct)
+            ?? throw new NotFoundException(BuildingNotFound);
+
+        var before = building.Eco is null ? null : EcoSnapshot(building.Eco);
+        var eco = new BuildingEcoInfo
+        {
+            EnergyClass = request.EnergyClass,
+            WallInsulationRu = Clean(request.WallInsulationRu),
+            WallInsulationTg = Clean(request.WallInsulationTg),
+            WindowsRu = Clean(request.WindowsRu),
+            WindowsTg = Clean(request.WindowsTg),
+            SolarPanelsKw = request.SolarPanelsKw,
+            HasHeatMeters = request.HasHeatMeters,
+            HasWaterMeters = request.HasWaterMeters,
+            HasLedCommonAreas = request.HasLedCommonAreas,
+            HasEvCharging = request.HasEvCharging,
+            HasRainwaterReuse = request.HasRainwaterReuse,
+            HasWasteSorting = request.HasWasteSorting,
+            GreenAreaM2 = request.GreenAreaM2,
+            HeatingType = request.HeatingType,
+            EstimatedKwhPerM2Year = request.EstimatedKwhPerM2Year
+        };
+        building.Eco = eco.IsEmpty ? null : eco;
+        audit.Record(nameof(Building), building.Id, "EcoUpdated", before, building.Eco is null ? null : EcoSnapshot(building.Eco));
+        await SaveAsync("Такой дом уже есть", ct);
+        return await GetBuildingAsync(id, ct);
+
+        static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+    }
+
+    private static object EcoSnapshot(BuildingEcoInfo e) => new
+    {
+        e.EnergyClass, e.WallInsulationRu, e.WallInsulationTg, e.WindowsRu, e.WindowsTg, e.SolarPanelsKw,
+        e.HasHeatMeters, e.HasWaterMeters, e.HasLedCommonAreas, e.HasEvCharging, e.HasRainwaterReuse, e.HasWasteSorting,
+        e.GreenAreaM2, e.HeatingType, e.EstimatedKwhPerM2Year
+    };
 
     public async Task<FloorResponse> CreateFloorAsync(CreateFloorRequest request, CancellationToken ct = default)
     {
@@ -361,7 +403,26 @@ public class CatalogService(
         b.Floors.SelectMany(f => f.Apartments).Count(),
         b.Floors.SelectMany(f => f.Apartments).Count(a => a.Status == ApartmentStatus.Free),
         b.CompletionYear,
-        b.PlannedApartments);
+        b.PlannedApartments,
+        b.Eco == null ? null : new BuildingEcoResponse(
+            b.Eco.EnergyClass,
+            tg ? b.Eco.WallInsulationTg ?? b.Eco.WallInsulationRu : b.Eco.WallInsulationRu ?? b.Eco.WallInsulationTg,
+            b.Eco.WallInsulationRu,
+            b.Eco.WallInsulationTg,
+            tg ? b.Eco.WindowsTg ?? b.Eco.WindowsRu : b.Eco.WindowsRu ?? b.Eco.WindowsTg,
+            b.Eco.WindowsRu,
+            b.Eco.WindowsTg,
+            b.Eco.SolarPanelsKw,
+            b.Eco.HasHeatMeters,
+            b.Eco.HasWaterMeters,
+            b.Eco.HasLedCommonAreas,
+            b.Eco.HasEvCharging,
+            b.Eco.HasRainwaterReuse,
+            b.Eco.HasWasteSorting,
+            b.Eco.GreenAreaM2,
+            b.Eco.HeatingType,
+            b.Eco.EstimatedKwhPerM2Year),
+        b.Organization.Green.IsDemo);
 
     private static readonly Expression<Func<Floor, FloorResponse>> ToFloorResponse = f => new FloorResponse(
         f.Id,

@@ -18,5 +18,8 @@ public class Building : BaseEntity
     public int? CompletionYear { get; set; }
     public int? PlannedApartments { get; set; }
 
+    // Эко-паспорт (null — не заполнен). Меняется только через PUT /buildings/{id}/eco.
+    public BuildingEcoInfo? Eco { get; set; }
+
     public List<Floor> Floors { get; set; } = [];
 }

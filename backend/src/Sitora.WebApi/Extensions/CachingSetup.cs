@@ -14,6 +14,9 @@ public static class CachingSetup
     public const string PublicShort = "public-short";
     // Публичные отзывы: сбрасываются тегом при ответе, публикации и удалении (ReviewService).
     public const string Reviews = "reviews";
+    // «Зелёный эффект» на главной: счётчики меняются медленно, живут 5 минут.
+    public const string GreenImpact = "green-impact";
+    public static readonly TimeSpan GreenImpactLifetime = TimeSpan.FromMinutes(5);
     public const string CatalogTag = Sitora.Infrastructure.Services.CatalogCache.OutputCacheTag;
 
     public static readonly TimeSpan CatalogLifetime = TimeSpan.FromSeconds(30);
@@ -35,6 +38,7 @@ public static class CachingSetup
         {
             o.AddPolicy(Catalog, b => b.Expire(CatalogLifetime).SetVaryByQuery("*").SetVaryByHeader("Accept-Language").Tag(CatalogTag));
             o.AddPolicy(PublicShort, b => b.Expire(ShortLifetime).SetVaryByQuery("*").SetVaryByHeader("Accept-Language"));
+            o.AddPolicy(GreenImpact, b => b.Expire(GreenImpactLifetime).SetVaryByQuery("*"));
             o.AddPolicy(Reviews, b => b.Expire(CatalogLifetime).SetVaryByQuery("*").SetVaryByHeader("Accept-Language").Tag(Sitora.Infrastructure.Services.ReviewService.OutputCacheTag));
         });
         return services;
