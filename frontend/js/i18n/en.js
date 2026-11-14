@@ -1,4 +1,4 @@
-/* English interface texts (1798 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* English interface texts (1801 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -1510,7 +1510,7 @@
     "cta.done": "A manager will call you back shortly.",
     "ok.title": "Request received",
     "ct.title": "Contact us",
-    "ct.sub": "We reply within 15 minutes during business hours",
+    "ct.sub": "Leave a request or call us — we reply during office hours.",
     "ct.address": "Office address",
     "ct.phone": "Phone",
     "ct.hours": "Opening hours",
@@ -1567,7 +1567,7 @@
     "plan.cta": "Calculate your monthly payment",
     "cat.banner": "Choose an apartment online — reserve it in 15 minutes",
     "ct.manager": "Manager: {n}",
-    "ct.managerSub": "Replies within 15 minutes",
+    "ct.managerSub": "Replies during office hours",
     "ct.city": "Dushanbe",
     "ct.route": "Get directions",
     "ct.direct": "Or write directly:",
@@ -1576,7 +1576,7 @@
     "ct.when.day": "Afternoon (12–16)",
     "ct.when.evening": "Evening (16–19)",
     "ct.trust1": "Your data is protected",
-    "ct.trust2": "Reply within 15 min",
+    "ct.trust2": "We call back during office hours",
     "ct.trust3": "No obligation",
     "foot.dev": "Are you a developer?",
     "foot.devLink": "Apply →",
@@ -1698,9 +1698,9 @@
     "faq.visit": "Can I see the apartment in person?",
     "faq.visit.a": "Yes, book a viewing by phone at {phone} or message us on Telegram {tg}. Viewings are by appointment.",
     "faq.down": "What is the minimum down payment?",
-    "faq.down.a": "From {down}% of the apartment price. The rest is paid in interest-free installments for up to {years}.",
+    "faq.down.a": "From {down}% of the apartment price{term}.{zero}",
     "faq.delivery": "When will the building be completed?",
-    "faq.delivery.a": "Planned completion is {year}. You can follow construction progress in your personal account.",
+    "faq.delivery.a": "Planned completion is {year}, according to the developer. Construction progress is on the «About» page and in the personal account.",
     "faq.booking": "How do I make a reservation online?",
     "faq.booking.a": "Choose an apartment in the catalog, press “Reserve” and enter your name and phone. The reservation lasts 48 hours — during this time a manager will contact you.",
     "faq.fees": "Are there any hidden fees?",
@@ -1802,5 +1802,8 @@
     "nr.about.progressKicker": "Construction progress",
     "nr.about.overall": "The house is {n}% complete overall. The developer keeps the stages and percents.",
     "nr.about.address": "Address: {a}",
+    "faq.down.term": ", the rest in installments over up to {t}",
+    "faq.down.zero": " No overpayment: the rest is split into equal payments.",
+    "nr.faq.kicker": "Questions",
   };
 })();

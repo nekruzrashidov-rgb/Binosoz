@@ -2881,3 +2881,31 @@ button.nr-layout { width: 100%; padding: 0; text-align: left; font: inherit; cur
 .nr-cta-in { display: flex; flex-direction: column; align-items: center; }
 .nr-cta .nr-actions { justify-content: center; }
 @media (max-width: 560px) { .nr-cta .nr-btn { width: 100%; } }
+
+/* ---------- contacts (design) ---------- */
+.nr-ct .ct-split { min-height: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(28px, 4vw, 56px); align-items: start; }
+.nr-ct .ct-left, .nr-ct .ct-right { padding: 0; background: none; }
+.nr-ct .ct-right { display: block; }
+.nr-ct .ct-manager { margin-top: 0; padding: 20px 22px; background: var(--surface); border: 1px solid var(--line); border-radius: 2px; }
+.nr-ct .ct-avatar { border-radius: 2px; }
+.nr-ct .ct-cards { margin: 14px 0; gap: 10px; }
+.nr-ct .ct-card { border-radius: 2px; }
+.nr-ct .ct-ic { border-radius: 2px; }
+.nr-ct .ct-map { border-radius: 2px; }
+.nr-ct .ct-form-wrap { padding: clamp(22px, 3vw, 36px); background: var(--surface); border: 1px solid var(--line); border-radius: 2px; }
+.nr-ct .ct-form { max-width: none; }
+.nr-form-title { font-family: var(--display); font-size: clamp(32px, 3.6vw, 44px); font-weight: 500; }
+.nr-ct .fl .inp, .nr-ct .inp { border-radius: 2px; }
+.nr-ct .ct-direct { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; margin-bottom: 18px; color: var(--muted); font-weight: 600; }
+.nr-ct .ct-buttons { display: flex; gap: 18px; }
+.nr-ct .ct-direct .nr-link svg { width: 18px; height: 18px; }
+.nr-faq-wrap { max-width: 920px; }
+.nr-faq-wrap .faq-list { margin-top: 36px; }
+.nr .faq-item { border-radius: 0; background: none; border: 0; border-top: 1px solid var(--line); }
+.nr .faq-item:last-child { border-bottom: 1px solid var(--line); }
+.nr .faq-q { min-height: 64px; padding: 18px 0; font-family: var(--display); font-size: 22px; font-weight: 500; }
+@media (max-width: 900px) { .nr-ct .ct-split { grid-template-columns: minmax(0, 1fr); } }
+.nr-ct .trust li { border-radius: 2px; }
+.nr-ct .ct-val a { display: inline-flex; align-items: center; min-height: 44px; }
+.nr-ct .ct-agree input[type='checkbox'] { width: 22px; height: 44px; margin: 0; flex: none; accent-color: var(--accent); }
+.nr-ct .ct-agree { display: flex; align-items: center; gap: 10px; }

@@ -10,9 +10,6 @@ window.SITORA_CONFIG = {
   API_BASE: '/api/v1',
   ORG_SLUG: 'nekruz',
   DEFAULT_BUILDING_ID: null,
-  // Numbers for the landing's stats bar when the API is unavailable; with the API the real ones are shown.
-  DEFAULT_FLOORS: 20,
-  DEFAULT_APTS: 160,
   CONTACT: {
     phone: '+992 98 363 70 70',
     telegram: '@nekru01',
@@ -21,11 +18,8 @@ window.SITORA_CONFIG = {
     manager: 'Некруз',
     schedule: [['monFri', '9:00–19:00'], ['sat', '10:00–17:00'], ['sun', null]],
   },
-  // Apartment types on the landing when the API is unavailable; with the API the real areas and prices are shown.
-  // [rooms (0 — studio, 3 — three and more), area from, area to, price from]
-  DEFAULT_TYPES: [[0, 28, 35, 250000], [1, 45, 58, 340000], [2, 65, 80, 480000], [3, 90, 110, 650000]],
-  // Installment terms: the landing shows them, the catalog's calculator uses them as its limits.
-  INSTALLMENT: { downFrom: 10, years: 10 },
+  // Numbers of the house, prices and the installment terms are not set here: they come only from the API
+  // (the catalog, GET /buildings → installment, set by the developer in the CRM).
   // Sites without their own API (the static copy on Vercel) use the API on Render. The site served by the API itself
   // (localhost, Docker) keeps its own /api/v1: its Content-Security-Policy (connect-src 'self') would block another host.
   // The API must allow the site in Cors:AllowedOrigins (on Render: Cors__AllowedOrigins__0=https://binosoz.vercel.app).

@@ -118,8 +118,6 @@
   const counted = (n, key) => S.fmt.n(n) + ' ' + plural(n, key);
   // Contacts from config.js; the address in the page language (S.brandAddress).
   const contacts = () => { const c = (window.SITORA_CONFIG || {}).CONTACT || {}; return Object.assign({}, c, { address: S.brandAddress(c.address), manager: c.manager === 'Некруз' ? t('contact.manager') : c.manager }); };
-  // Installment terms, one source for the landing's text and the calculator's limits.
-  const installment = () => Object.assign({ downFrom: 10, years: 10 }, (window.SITORA_CONFIG || {}).INSTALLMENT);
   const telegramUrl = (tg) => 'https://t.me/' + String(tg || '').replace('@', '');
   const phoneDigits = (p) => String(p || '').replace(/\D/g, '');
 
@@ -829,14 +827,15 @@
   /* ---------- contact page ---------- */
   S.views.contact = function (root) {
     const c = contacts();
-    const page = h('div', { class: 'page-in lux contact-page' });
+    const page = h('div', { class: 'page-in nr contact-page' });
     root.appendChild(page);
+    const head = h('section', { class: 'nr-pagehead' }, h('div', { class: 'nr-wrap' },
+      h('nav', { class: 'nr-crumbs', 'aria-label': t('cat.crumbs') }, h('a', { href: '/' }, t('nav.home')), h('span', { 'aria-hidden': 'true' }, '/'), h('span', { 'aria-current': 'page' }, t('nav.contact'))),
+      h('h1', { class: 'nr-page-title' }, t('ct.title')), h('p', { class: 'nr-page-sub' }, t('ct.sub'))));
 
     const line = (ic, label, ...value) => h('div', { class: 'ct-card' }, h('span', { class: 'ct-ic' }, landIcon(ic)), h('div', null, h('small', null, label), h('div', { class: 'ct-val' }, ...value)));
     const schedule = c.schedule || [];
     const left = h('div', { class: 'ct-left' },
-      h('a', { class: 'back-link', href: '/' }, '← ' + t('nav.home')),
-      h('h1', null, accentFirst(t('ct.title'))), h('p', { class: 'muted-lux' }, t('ct.sub')),
       c.manager ? h('div', { class: 'ct-manager' }, h('span', { class: 'ct-avatar', 'aria-hidden': 'true' }, S.fmt.initials(c.manager)),
         h('div', null, h('b', null, t('ct.manager', { n: c.manager })), h('small', null, h('i', { class: 'live-dot' }), t('ct.managerSub')))) : null,
       h('div', { class: 'ct-cards' },
@@ -851,21 +850,28 @@
       // A map card: the office address on a stylised city plan.
       h('div', { class: 'ct-map', role: 'img', 'aria-label': c.address || '' },
         h('div', { class: 'ct-map-pin' }, landIcon('pin')), h('b', null, t('ct.city') + ', ' + (c.address || '').replace(/^(г\.\s*|ш\.\s*)?Душанбе,\s*/, '').replace(/,\s*Dushanbe$/, '')),
-        h('a', { class: 'btn ghost sm', href: 'https://www.openstreetmap.org/search?query=' + encodeURIComponent(c.address || ''), target: '_blank', rel: 'noopener' }, t('ct.route'))));
+        h('a', { class: 'btn nr-btn nr-btn--primary', href: 'https://www.openstreetmap.org/search?query=' + encodeURIComponent(c.address || ''), target: '_blank', rel: 'noopener' }, t('ct.route'), arrow())));
 
     // Above the form — straight to the messengers; under it — why it is safe to write.
     const formHost = h('div');
     const right = h('div', { class: 'ct-right' }, h('div', { class: 'ct-form-wrap' },
       (c.telegram || c.phone) ? h('div', { class: 'ct-direct' }, h('span', null, t('ct.direct')), h('div', { class: 'ct-buttons' },
-        c.telegram ? h('a', { class: 'btn gold', href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, landIcon('send'), 'Telegram') : null,
-        c.phone ? h('a', { class: 'btn wa', href: 'https://wa.me/' + phoneDigits(c.phone), target: '_blank', rel: 'noopener' }, landIcon('chat'), 'WhatsApp') : null)) : null,
+        c.telegram ? h('a', { class: 'nr-link', href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, landIcon('send'), 'Telegram') : null,
+        c.phone ? h('a', { class: 'nr-link', href: 'https://wa.me/' + phoneDigits(c.phone), target: '_blank', rel: 'noopener' }, landIcon('chat'), 'WhatsApp') : null)) : null,
       formHost,
       h('ul', { class: 'trust' }, [['lock', 'ct.trust1'], ['check', 'ct.trust2'], ['clipboard', 'ct.trust3']].map(([ic, k]) => h('li', null, landIcon(ic), t(k))))));
-    // FAQ: one answer open at a time; the answers take the contacts and terms from config.js.
-    const cfg = window.SITORA_CONFIG || {};
-    const plan = installment();
-    const vars = { phone: c.phone || '', tg: c.telegram || '', down: plan.downFrom, years: counted(plan.years, 'plan.years'), year: cfg.DEFAULT_YEAR || 2026 };
-    const faqList = h('div', { class: 'faq-list' }, FAQ.map((k, i) => {
+    // FAQ: one answer open at a time. The contacts come from config.js; the down payment, the term and the delivery year
+    // only from the API (the developer's installment terms and the building) — without them that question is not shown.
+    const vars = { phone: c.phone || '', tg: c.telegram || '' };
+    const faqList = h('div', { class: 'faq-list' });
+    const drawFaq = (b) => {
+      const x = siteTerms(b);
+      if (x && x.down != null) { vars.down = S.fmt.n(x.down); vars.term = x.months ? t('faq.down.term', { t: termText(x.months) }) : ''; vars.zero = x.zero ? t('faq.down.zero') : ''; }
+      if (b && b.completionYear) vars.year = b.completionYear;
+      const keys = FAQ.filter((k) => (k !== 'down' || vars.down != null) && (k !== 'delivery' || vars.year));
+      faqList.replaceChildren(...keys.map(faqItem));
+    };
+    const faqItem = (k, i) => {
       const id = 'faq-' + k;
       const item = h('div', { class: 'faq-item' });
       const q = h('button', { class: 'faq-q', type: 'button', 'aria-expanded': 'false', 'aria-controls': id, onclick: () => {
@@ -876,10 +882,12 @@
       item.append(q, h('div', { class: 'faq-a', id, role: 'region' }, h('div', null, h('p', null, t('faq.' + k + '.a', vars)))));
       if (i === 0) { item.classList.add('open'); q.setAttribute('aria-expanded', 'true'); }
       return item;
-    }));
-    const faq = h('section', { class: 'section lux-sec alt-band', id: 'faq' }, h('div', { class: 'wrap faq-wrap' },
-      h('div', { class: 'lux-head' }, h('h2', null, accentFirst(t('faq.title'))), h('p', null, t('faq.sub'))), faqList));
-    page.append(h('section', { class: 'ct-split' }, left, right), faq, siteFooter());
+    };
+    drawFaq(null);
+    const faq = h('section', { class: 'nr-sec nr-band', id: 'faq' }, h('div', { class: 'nr-wrap nr-faq-wrap' },
+      kicker(t('nr.faq.kicker')), h('h2', { class: 'nr-h2' }, t('faq.title')), faqList,
+      h('p', { class: 'nr-note' }, t('faq.sub'))));
+    page.append(head, h('section', { class: 'nr-sec nr-ct' }, h('div', { class: 'nr-wrap ct-split' }, left, right)), faq, siteFooter());
 
     // Floating labels: the label sits in the field and moves up when the field has focus or a value.
     const fl = (field, label, req) => h('label', { class: 'fl' }, field, h('span', null, label + (req ? ' *' : '')), h('em', { class: 'fl-err' }));
@@ -890,9 +898,9 @@
       const when = h('select', { class: 'inp', name: 'when' }, ['morning', 'day', 'evening'].map((k) => h('option', { value: k }, t('ct.when.' + k))));
       const cm = h('textarea', { class: 'inp', name: 'comment', placeholder: ' ', maxlength: 800, rows: 4 });
       const agree = h('input', { type: 'checkbox', name: 'agree' });
-      const btn = h('button', { class: 'btn gold lg block', type: 'submit' }, t('ct.send'));
+      const btn = h('button', { class: 'btn nr-btn nr-btn--primary block', type: 'submit' }, t('ct.send'));
       const form = h('form', { class: 'ct-form', novalidate: true },
-        h('h2', null, t('ct.formTitle')),
+        h('h2', { class: 'nr-form-title' }, t('ct.formTitle')),
         fl(name, t('f.name'), true), fl(phone, t('f.phone'), true),
         h('div', { class: 'fl-row' }, h('label', { class: 'fl fixed' }, kind, h('span', null, t('ct.kind'))), h('label', { class: 'fl fixed' }, when, h('span', null, t('ct.when')))),
         fl(cm, t('f.comment')),
@@ -919,8 +927,9 @@
       formHost.replaceChildren(form);
     }
     renderForm();
-    siteBuilding().catch(() => {});
-    return () => {};
+    let alive = true;
+    siteBuilding().then((id) => (id ? S.api.building(id) : null)).then((b) => { if (alive && b) drawFaq(b); }).catch(() => {});
+    return () => { alive = false; };
   };
 
   /* ---------- register: a developer's application to join the platform ---------- */
