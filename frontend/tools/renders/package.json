@@ -1,0 +1,7 @@
+{
+  "name": "binosoz-renders",
+  "private": true,
+  "description": "Картинки сайта из 3D-модели дома (визуализация, не фото): frontend/img/renders/*.webp. Нужен статик-сервер на 5500.",
+  "scripts": { "build": "node render.mjs" },
+  "devDependencies": { "playwright": "1.49.1" }
+}

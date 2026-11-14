@@ -144,7 +144,7 @@
     return canvasTex(1024, 192, (g, w, h) => {
       g.fillStyle = '#0d1426'; g.fillRect(0, 0, w, h);
       g.fillStyle = '#f2c46a';
-      g.font = '700 112px Unbounded, Inter, Arial, sans-serif';
+      g.font = '600 112px Manrope, Arial, sans-serif';
       g.textAlign = 'center'; g.textBaseline = 'middle';
       g.fillText(text, w / 2, h / 2 + 6);
       g.strokeStyle = 'rgba(242,196,106,.5)'; g.lineWidth = 4;
@@ -331,15 +331,16 @@
     let glass, glow, frames, mullions, slabsMesh, railFront, railSide;
     let selBand, selEdges, hoverIdx = -1, selectedIdx = -1;
     let roofLight, lampBulbs = [], lampMat, signMat;
-    let overlay = true;
+    // opts.overlay === false: windows lit like a lived-in house, without status colours (renders for the site's pictures).
+    let overlay = opts.overlay !== false;
     let aptMap = {}; // id -> inst
     let keyMap = {}; // "floor:slot" -> inst
     let apartments = [];
 
     const mats = {
       plaster: null,
-      // Gold accent — Dushanbe landmark color (Ayni Opera, Ismoili Somoni monument)
-      stone: new T.MeshStandardMaterial({ color: lin(0xc9a227), roughness: 0.45, metalness: 0.15 }),
+      // Copper-bronze accent of the site's palette (the pilasters, the canopy, the crown): matte metal, not bright gold.
+      stone: new T.MeshStandardMaterial({ color: lin(0x9a6a44), roughness: 0.42, metalness: 0.45 }),
       // Upper-body concrete/stucco — warm cream/beige Dushanbe apartment style
       concrete: new T.MeshStandardMaterial({ color: lin(0xd8d2c4), roughness: 0.82 }),
       // Window frames: anthracite aluminum
@@ -458,7 +459,7 @@
       }
 
       // --- Vertical fins / pilasters on upper body (classical vertical articulation) ---
-      const finM = new T.MeshStandardMaterial({ color: lin(0xc9a227), roughness: 0.4, metalness: 0.2 }); // gold accent fins
+      const finM = new T.MeshStandardMaterial({ color: lin(0xb88a5e), roughness: 0.45, metalness: 0.35 }); // light copper fins
       [[0, D / 2, 1.1, 0.42], [0, -D / 2, 1.1, 0.42], [W / 2, 0, 0.42, 1.1], [-W / 2, 0, 0.42, 1.1]].forEach(([x, z, fw, fd]) => {
         const fin = new T.Mesh(new T.BoxGeometry(fw, bodyH, fd), finM);
         fin.position.set(x + (x ? Math.sign(x) * 0.1 : 0), GROUND_H + bodyH / 2, z + (z ? Math.sign(z) * 0.1 : 0));
@@ -810,6 +811,13 @@
       const H = floorTop(floorsCount);
       goal.ty = H * 0.5; goal.dist = Math.max(110, H * 2.35) * (container.clientWidth < container.clientHeight ? 1.45 : 1);
       goal.pol = 1.36; goal.tx = 0; goal.tz = 0;
+      // opts.view: a fixed camera { az, pol, distK, tyK, tx } (frontend/tools/renders): distK and tyK scale the default distance and height.
+      const v = opts.view;
+      if (v) {
+        if (v.az != null) goal.az = v.az; if (v.pol != null) goal.pol = v.pol;
+        if (v.distK != null) goal.dist *= v.distK; if (v.tyK != null) goal.ty *= v.tyK;
+        if (v.tx != null) goal.tx = v.tx;
+      }
     }
     function resetView() { defaultGoal(); selectFloor(null, true); }
     function focusFloor(n) {
@@ -974,6 +982,7 @@
     build(opts.floors || 16);
     setTime(opts.time || 'dusk', true);
     resize(); defaultGoal(); Object.assign(view, goal); view.dist *= 1.25; view.az = goal.az - 0.8;
+    if (opts.view) Object.assign(view, goal);
     placeCamera();
     resume();
 
