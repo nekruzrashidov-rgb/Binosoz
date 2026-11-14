@@ -411,7 +411,9 @@
         const tools = h('div', { class: 'toolbar' }, h('div', { style: { minWidth: '200px' } }, S.field(t('cat.floor'), sel)), h('span', { class: 'spacer' }), S.isDemo() ? null : h('button', { class: 'btn ghost', type: 'button', title: t('cat.templateHint'), onclick: (e) => S.busy(e.currentTarget, () => S.api.openDoc('/apartments/import/template', null, t('cat.template')).catch(S.err)) }, t('cat.template')), imp, h('label', { class: 'btn ghost', for: 'imp-file' }, t('cat.import')), h('button', { class: 'btn', onclick: () => aptForm(null, floors.find((f) => String(f.id) === String(floorId)), drawApts) }, t('cat.addApt')));
         // Eco passport of the building: Content and leaders (the catalog section is theirs).
         const ecoForm = S.eco ? S.eco.form(b, (r) => { b.eco = r && r.eco; }) : null;
-        body.replaceChildren(buildingBar(bs, bid, 'catalog'), bform, ecoForm, h('h3', { style: { marginTop: '10px' } }, t('cat.apts')), tools, holder);
+        // Amenities of the building: the site lists only these (Content and leaders).
+        const amenForm = S.eco ? S.eco.amenitiesForm(b, (r) => { b.amenities = (r && r.amenities) || []; }) : null;
+        body.replaceChildren(buildingBar(bs, bid, 'catalog'), bform, amenForm, ecoForm, h('h3', { style: { marginTop: '10px' } }, t('cat.apts')), tools, holder);
         async function drawApts() {
           const fl = floors.find((f) => String(f.id) === String(floorId)); holder.replaceChildren(S.skeleton(4, 38));
           const list = (await S.api.floorApartments(fl)).sort((a, c) => (a.planSlot || 0) - (c.planSlot || 0));
@@ -630,6 +632,8 @@
             S.bar((bs.length * 100) / LIMIT, bs.length >= LIMIT ? 'warn' : ''), h('p', { class: 'hint' }, t('set.planHint'))))));
         // Tariffs and coefficients of the green features (owner): the utility calculator and the CO₂ figure use only these.
         if (S.eco) body.append(S.eco.settingsForm());
+        // Installment terms for the site (owner): the landing and the calculator show only what is set here.
+        if (S.eco) body.append(S.eco.installmentForm());
       },
     };
     S.views.crm._views = views;

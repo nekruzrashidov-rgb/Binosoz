@@ -144,6 +144,46 @@
     return box;
   }
 
+  // ---------- amenities of the building and the installment terms (the site shows only what is set here) ----------
+  // Keys of BuildingAmenities on the server, in the same order.
+  const AMENITIES = ['underground_parking', 'guest_parking', 'closed_yard', 'playground', 'sports_ground', 'security', 'cctv', 'concierge',
+    'elevators', 'landscaping', 'commercial_floor', 'storage_rooms', 'barrier_free', 'fitness', 'pool'];
+  // CRM, catalog section (Content and leaders): ticks for the amenities the house really has.
+  function amenitiesForm(b, onSaved) {
+    const on = new Set(b.amenities || []);
+    const boxes = AMENITIES.map((k) => [k, h('input', { type: 'checkbox', name: 'amenities', value: k, checked: on.has(k) })]);
+    const btn = h('button', { class: 'btn', type: 'submit' }, t('common.save'));
+    const el = h('form', { class: 'card stack amen-form', novalidate: true }, h('h3', null, t('amenf.title')), h('p', { class: 'muted' }, t('amenf.hint')),
+      h('div', { class: 'grid g3' }, boxes.map(([k, box]) => h('label', { class: 'check' }, box, t('amen.' + k)))), h('div', null, btn));
+    el.addEventListener('submit', async (ev) => {
+      ev.preventDefault(); S.showErrors(el, null);
+      const keys = boxes.filter(([, box]) => box.checked).map(([k]) => k);
+      await S.busy(btn, async () => { try { const r = await S.api.saveBuildingAmenities(b.id, keys); S.toast(t('common.saved'), 'ok'); if (onSaved) onSaved(r); } catch (er) { S.showErrors(el, er); } });
+    });
+    return el;
+  }
+  // CRM settings (owner): minimum down payment, maximum term, «no overpayment».
+  function installmentForm() {
+    const box = h('div', { class: 'card stack inst-settings' }, h('h3', null, t('instf.title')), S.skeleton ? S.skeleton(2, 40) : '');
+    S.api.installmentSettings().then((x) => {
+      const num = (name, v, attrs) => S.input(name, Object.assign({ type: 'number', value: v === null || v === undefined ? '' : v }, attrs));
+      const down = num('downPaymentMinPct', x.downPaymentMinPct, { min: 0, max: 100, step: '0.5' });
+      const months = num('maxMonths', x.maxMonths, { min: 1, max: 360, step: 1 });
+      const zero = h('input', { type: 'checkbox', checked: !!x.noOverpayment });
+      const btn = h('button', { class: 'btn', type: 'submit' }, t('common.save'));
+      const f = h('form', { class: 'stack', novalidate: true }, h('p', { class: 'hint' }, t('instf.hint')),
+        h('div', { class: 'grid g2' }, S.field(t('instf.down'), down), S.field(t('instf.months'), months)),
+        h('label', { class: 'check' }, zero, t('instf.zero')), h('div', null, btn));
+      const val = (el) => (el.value.trim() === '' ? null : +el.value);
+      f.addEventListener('submit', async (e) => {
+        e.preventDefault(); S.showErrors(f, null);
+        await S.busy(btn, async () => { try { await S.api.saveInstallmentSettings({ downPaymentMinPct: val(down), maxMonths: val(months), noOverpayment: zero.checked }); S.toast(t('common.saved'), 'ok'); } catch (er) { S.showErrors(f, er); } });
+      });
+      box.replaceChildren(h('h3', null, t('instf.title')), f);
+    }).catch((e) => box.replaceChildren(h('h3', null, t('instf.title')), h('div', { class: 'form-err' }, e.message)));
+    return box;
+  }
+
   // ---------- «Зелёный эффект» ----------
   // Weight: under 1 kg — in grams (one A4 sheet is 5 g: «0 кг» for a few sheets would hide the real number), else kg with one decimal.
   const weight = (kg) => (kg < 1 ? t('green.gV', { n: S.fmt.n(Math.round(kg * 1000)) }) : t('green.kgV', { n: String(Math.round(kg * 10) / 10).replace('.', ',') }));
@@ -202,5 +242,5 @@
     return card;
   }
 
-  S.eco = { block, badge, form, filled, rank, classes: CLASSES, label, utility, settingsForm, impactSection, paperCard };
+  S.eco = { block, badge, form, filled, rank, classes: CLASSES, label, utility, settingsForm, impactSection, paperCard, amenitiesForm, installmentForm };
 })();

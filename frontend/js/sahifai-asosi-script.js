@@ -7,8 +7,6 @@
 
   const STATUS_VAR = { free: 'var(--good)', booked: 'var(--warn)', sold: 'var(--muted)', onrequest: 'var(--info)' };
   const STATUS_BG = { free: 'var(--good-soft)', booked: 'var(--warn-soft)', sold: 'var(--surface-3)', onrequest: 'var(--info-soft)' };
-  // Landing features: icon and the i18n key of the card.
-  const FEATURES = [['mountain', 'why.view'], ['screen', 'why.cabinet'], ['card', 'why.plan'], ['crane', 'why.dev'], ['pin', 'why.center'], ['key', 'why.keys']];
   // Public-site icons (24×24, stroke).
   const LAND_ICONS = {
     cube: '<path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="m3 7 9 5 9-5M12 12v10"/>',
@@ -35,6 +33,16 @@
     calendar: '<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
     image: '<rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-8 8.5"/>',
     users: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 20a6 6 0 0 0-3-5.2"/>',
+    arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    camera: '<rect x="3" y="7" width="13" height="10" rx="2"/><path d="m16 11 5-3v8l-5-3"/>',
+    lift: '<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M12 3v18M8.5 9 7 7l-1.5 2M15.5 7 17 9l1.5-2"/>',
+    shop: '<path d="M4 9h16l-1-4H5zM5 9v11h14V9"/><path d="M9.5 20v-5h5v5"/>',
+    box: '<path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/>',
+    access: '<circle cx="12" cy="4.5" r="1.8"/><path d="M12 7v7h5l2 5"/><path d="M8.5 11a5.5 5.5 0 1 0 6.8 7"/>',
+    gym: '<path d="M6 8v8M3 10v4M18 8v8M21 10v4M6 12h12"/>',
+    pool: '<path d="M3 17c2 0 2-1.5 4.5-1.5S10 17 12 17s2-1.5 4.5-1.5S19 17 21 17M3 21c2 0 2-1.5 4.5-1.5S10 21 12 21s2-1.5 4.5-1.5S19 21 21 21"/><path d="M8 13V6a2 2 0 0 1 4 0M16 13V6a2 2 0 0 0-4 0M8 9h8"/>',
+    gate: '<path d="M3 21V8l9-5 9 5v13"/><path d="M7 21v-9h10v9M12 12v9"/>',
+    ball: '<circle cx="12" cy="12" r="9"/><path d="M3.5 9.5c5 1 12 1 17 0M3.5 14.5c5-1 12-1 17 0M12 3c-3 5-3 13 0 18"/>',
   };
   // Gallery photos: views of Dushanbe from Wikimedia Commons, not the complex (a demo project; there are no photos of it).
   // Files: /img/gallery/<file>-400|800|1200.webp, cropped to 3:2. Author, licence and the file page — under every photo
@@ -61,7 +69,9 @@
   const galleryCredit = (p) => h('a', { class: 'photo-credit', href: COMMONS + p.page, target: '_blank', rel: 'noopener' },
     t('galpg.photo') + ': ' + p.author + ', ' + (p.license || t('galpg.pd')));
   const FAQ = ['visit', 'down', 'delivery', 'booking', 'fees'];
-  const AMENITIES = [['car', 'about.parking'], ['play', 'about.playground'], ['shield', 'about.guard'], ['leaf', 'about.green']];
+  // Amenity key (BuildingAmenities on the server) → icon.
+  const AMEN_ICON = { underground_parking: 'car', guest_parking: 'car', closed_yard: 'gate', playground: 'play', sports_ground: 'ball', security: 'shield',
+    cctv: 'camera', concierge: 'users', elevators: 'lift', landscaping: 'leaf', commercial_floor: 'shop', storage_rooms: 'box', barrier_free: 'access', fitness: 'gym', pool: 'pool' };
   function landIcon(name) {
     const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('fill', 'none'); s.setAttribute('stroke', 'currentColor'); s.setAttribute('stroke-width', '1.8');
@@ -123,17 +133,6 @@
     return S.siteBuildingId;
   }
 
-  // Numbers count up over ~1 s. A timer puts the final value in place in case animation frames are paused
-  // (a background tab), so a counter is never left half-counted. fmt turns the number into text.
-  function countUp(el, to, fmt) {
-    const token = (el._count = (el._count || 0) + 1), from = el._shown || 0;
-    const show = (k) => { if (el._count !== token) return; el._shown = Math.round(from + (to - from) * k); el.textContent = fmt(el._shown); };
-    if (!S.motionOk) { show(1); return; }
-    const t0 = performance.now();
-    const step = (now) => { const p = Math.min(1, (now - t0) / 1000); show(1 - Math.pow(1 - p, 3)); if (p < 1 && el._count === token) requestAnimationFrame(step); };
-    show(0); requestAnimationFrame(step);
-    setTimeout(() => show(1), 1100);
-  }
 
   // Blocks with .reveal fade in as they scroll into view; without IntersectionObserver they are simply shown.
   // onShow runs for each block once it is in (counters start there). Returns the cleanup.
@@ -153,7 +152,7 @@
     const col = (title, ...items) => h('div', { class: 'foot-col' }, h('h4', null, title), ...items);
     return h('footer', { class: 'footer lux-footer' }, h('div', { class: 'wrap' },
       h('div', { class: 'foot-grid' },
-        h('div', { class: 'foot-brand' }, h('a', { class: 'row', href: '/', style: { gap: '10px' } }, S.logo(), h('b', null, t('brand.name'))), h('p', null, t('foot.tagline')),
+        h('div', { class: 'foot-brand' }, h('a', { class: 'row', href: '/', style: { gap: '12px' } }, S.towerLogo(), h('b', null, t('brand.name'))), h('p', null, t('foot.tagline')),
           h('div', { class: 'foot-social' },
             c.telegram ? h('a', { class: 'soc tg', href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener', 'aria-label': 'Telegram', title: 'Telegram' }, landIcon('send')) : null,
             c.phone ? h('a', { class: 'soc wa', href: 'https://wa.me/' + phoneDigits(c.phone), target: '_blank', rel: 'noopener', 'aria-label': 'WhatsApp', title: 'WhatsApp' }, landIcon('chat')) : null,
@@ -553,221 +552,214 @@
     return () => { alive = false; if (house) house.destroy(); };
   };
 
-  /* ---------- landing: hero, numbers, why us, how to buy, apartments teaser, contact teaser ---------- */
+  /* ---------- landing (design «Некруз Резиденс», docs/design/Main.dc.html) ----------
+     Everything that is a fact about the house comes from the API: name, floors, apartments, free ones, prices, year,
+     description, amenities, eco passport, installment terms. Without the data a block is not shown; without a building —
+     one honest card «Продажи скоро откроются». The pictures are renders of the site's 3D model, signed as such. */
+  // A render of the 3D model (frontend/tools/renders): WebP 800/1600/2400.
+  function renderImg(name, sizes, alt, eager) {
+    const src = (w) => '/img/renders/' + name + '-' + w + '.webp';
+    const tall = /tall/.test(name);
+    return h('img', { src: src(1600), srcset: [800, 1600, 2400].map((w) => src(w) + ' ' + w + 'w').join(', '), sizes,
+      width: 2400, height: tall ? 3000 : 1350, alt, loading: eager ? 'eager' : 'lazy', decoding: 'async', fetchpriority: eager ? 'high' : null });
+  }
+  // Installment terms of the developer (GET /buildings → installment); null when the developer has set none.
+  function siteTerms(b) {
+    const x = b && b.installment;
+    if (!x || (x.downPaymentMinPct == null && x.maxMonths == null && !x.noOverpayment)) return null;
+    return { down: x.downPaymentMinPct == null ? null : Number(x.downPaymentMinPct), months: x.maxMonths == null ? null : Number(x.maxMonths), zero: !!x.noOverpayment };
+  }
+  // «до 10 лет» / «до 18 месяцев»: whole years when the months divide by 12.
+  function termText(months) {
+    return months % 12 === 0 ? counted(months / 12, 'plan.years') : counted(months, 'nr.months');
+  }
+  const kicker = (text) => h('div', { class: 'nr-kicker' }, h('span', { class: 'nr-kicker-line', 'aria-hidden': 'true' }), text);
+  const arrow = () => { const s = landIcon('arrow'); s.classList.add('nr-arrow'); return s; };
+
   S.views.home = function (root) {
-    const cfg = window.SITORA_CONFIG || {};
     const c = contacts();
-    // Numbers come only from the API. The config.js DEFAULT_* numbers are for the demo mode (no API_BASE) only:
-    // a visitor must never see "160 apartments" or prices that the catalog does not have.
     // state: 'loading' → 'ready' (a building with apartments) | 'empty' (no building or no apartments yet) | 'error'.
-    const demo = S.isDemo();
-    const d = {
-      state: demo ? 'ready' : 'loading',
-      floors: demo ? cfg.DEFAULT_FLOORS || 16 : null, apts: demo ? cfg.DEFAULT_APTS || 128 : null, year: demo ? cfg.DEFAULT_YEAR || 2026 : null,
-      free: null, list: null,
-      // Apartment types: { rooms, areaFrom, areaTo, priceFrom }.
-      types: demo ? (cfg.DEFAULT_TYPES || []).map(([rooms, areaFrom, areaTo, priceFrom]) => ({ rooms, areaFrom, areaTo, priceFrom })) : [],
-    };
-    const known = () => d.state === 'ready';
-    const plan = installment();
+    const d = { state: 'loading', b: null, apts: [], types: [] };
     let alive = true;
-    const page = h('div', { class: 'page-in lux lux-home' });
+    const page = h('div', { class: 'page-in nr nr-home' });
     root.appendChild(page);
 
-    // 1. Hero: a slowly drifting gradient mesh, the name on two lines with a gold underline, two actions and three counters;
-    //    on the right a drawn poster of the building (the interactive 3D model is in the catalog).
-    const heroTitle = h('h1', { class: 'wow-title' });
-    const aboutTitle = h('h2');
-    const nameWords = () => S.brandName(d.name).split(/\s+/);
-    const drawName = () => {
-      const w = nameWords();
-      // A space between the two lines: screen readers and search engines read «Некруз Резиденс», not «НекрузРезиденс».
-      heroTitle.replaceChildren(h('span', { class: 'wow-l1' }, w[0]), w.length > 1 ? ' ' : null,
-        w.length > 1 ? h('span', { class: 'wow-l2' }, w.slice(1).join(' '), h('i', { class: 'wow-underline', 'aria-hidden': 'true' })) : null);
-      aboutTitle.replaceChildren(h('span', { class: 'gold-text' }, w[0]), w.length > 1 ? ' ' + w.slice(1).join(' ') : null);
-    };
-    drawName();
-    const badge = h('span', { class: 'wow-badge' });
-    const proof = h('p', { class: 'hero-proof', hidden: true });
-    const freeCard = h('div', { class: 'float-card glass' });
-    const heroCounters = [['floors', (v) => S.fmt.n(v)], ['apts', (v) => S.fmt.n(v)], ['zero', (v) => v + '%']]
-      .map(([k, fmt]) => ({ k, fmt, el: h('b', { class: 'wow-stat-num' }) }));
-    const heroStats = h('div', { class: 'wow-stats', hidden: true }, heroCounters.map((x) => h('div', { class: 'wow-stat' }, x.el, h('span', null, t('wow.stat.' + x.k)))));
-    const valueOf = (k) => ({ floors: d.floors, apts: d.apts, zero: 0 }[k]);
-    const countHero = () => { heroStats.hidden = !known(); if (known()) heroCounters.forEach((x) => countUp(x.el, valueOf(x.k), x.fmt)); };
-    const frame = heroModel();
-    const hero = h('section', { class: 'lux-hero wow-hero', id: 'top' },
-      h('div', { class: 'hero-mesh', 'aria-hidden': 'true' }),
-      h('div', { class: 'wrap wow-hero-in' },
-        h('div', { class: 'wow-hero-text' },
-          badge, heroTitle, h('p', { class: 'wow-sub' }, t('wow.hero.sub')), proof,
-          h('div', { class: 'lux-cta' },
-            h('a', { class: 'btn gold lg wow-cta', href: '/apartments' }, t('wow.hero.pick'), h('span', { class: 'wow-arrow', 'aria-hidden': 'true' }, '→')),
-            h('a', { class: 'btn ghost lg', href: '/apartments#hero-top' }, landIcon('cube'), t('wow.hero.3d'))),
-          heroStats),
-        h('div', { class: 'wow-hero-side' }, frame, h('p', { class: 'hero-3d-label' }, t('wow.3d.hint')), freeCard)),
-      h('button', { class: 'scroll-hint', type: 'button', 'aria-label': t('home.scroll'), onclick: () => document.getElementById('why').scrollIntoView({ behavior: 'smooth' }) }, landIcon('down')));
+    // 1. Hero: the render of the 3D model on the whole width, the name, two actions and a band of live numbers.
+    const heroKicker = h('div', { class: 'nr-kicker nr-kicker--light' });
+    const heroTitle = h('h1', { class: 'nr-hero-title' });
+    const heroStats = h('dl', { class: 'nr-hero-stats', hidden: true });
+    const hero = h('section', { class: 'nr-hero nr-dark', id: 'top' },
+      h('figure', { class: 'nr-hero-media' }, renderImg('tower-dusk-wide', '100vw', t('nr.render.alt'), true),
+        h('figcaption', { class: 'nr-render-note' }, t('nr.render'))),
+      h('div', { class: 'nr-hero-shade', 'aria-hidden': 'true' }),
+      h('div', { class: 'nr-wrap nr-hero-in' },
+        h('div', { class: 'nr-hero-text' }, heroKicker, heroTitle, h('p', { class: 'nr-hero-sub' }, t('nr.hero.sub')),
+          h('div', { class: 'nr-actions' },
+            h('a', { class: 'btn nr-btn nr-btn--primary', href: '/apartments' }, t('wow.hero.pick'), arrow()),
+            h('a', { class: 'btn nr-btn nr-btn--light', href: '/apartments#hero-top' }, t('wow.hero.3d')))),
+        heroStats));
 
-    // (The dark numbers band repeated the hero's floors and apartments a second time: removed.)
+    // 2. About the house: the description, amenities and the eco passport from the API; the render on the right.
+    const aboutText = h('p', { class: 'nr-lead' });
+    const amenList = h('ul', { class: 'nr-amen' });
+    const ecoHost = h('div', { class: 'nr-eco' });
+    const about = h('section', { class: 'nr-sec', id: 'about' }, h('div', { class: 'nr-wrap nr-split' },
+      h('div', { class: 'reveal' }, kicker(t('about.kicker')), h('h2', { class: 'nr-h2' }, t('nr.about.title')), aboutText, amenList, ecoHost),
+      h('figure', { class: 'nr-figure reveal' }, renderImg('tower-dusk-tall', '(max-width: 900px) 100vw, 600px', t('nr.render.alt')),
+        h('figcaption', { class: 'nr-figure-cap' }, t('nr.render') + ' · ' + t('nr.render.dusk')))));
 
-    // 3. Why us.
-    const why = h('section', { class: 'section lux-sec', id: 'why' }, h('div', { class: 'wrap' },
-      h('div', { class: 'lux-head reveal' }, h('h2', null, accentFirst(t('why.title'))), h('p', null, t('why.sub'))),
-      h('div', { class: 'feat-grid' }, FEATURES.map(([ic, k], i) => h('article', { class: 'feat-card reveal', style: { transitionDelay: (i % 3) * 90 + 'ms' } },
-        h('div', { class: 'feat-ic' }, landIcon(ic)), h('h3', null, t(k)), h('p', null, t(k + '.d')))))));
+    // 3. Dark band: what the platform really gives the buyer (no claims about the developer that the data does not hold).
+    const whyGrid = h('div', { class: 'nr-why-grid' });
+    const why = h('section', { class: 'nr-sec nr-dark nr-why', id: 'why' }, h('div', { class: 'nr-wrap' },
+      kicker(t('nr.why.kicker')), h('h2', { class: 'nr-h2' }, t('why.sub')), whyGrid));
 
-    // 4. How to buy.
-    const steps = h('section', { class: 'section lux-sec alt-band', id: 'steps' }, h('div', { class: 'wrap' },
-      h('div', { class: 'lux-head reveal' }, h('h2', null, accentFirst(t('steps.title')))),
-      h('ol', { class: 'steps' }, [1, 2, 3].map((n) => h('li', { class: 'step reveal', style: { transitionDelay: (n - 1) * 120 + 'ms' } },
-        h('span', { class: 'step-no' }, '0' + n), h('h3', null, t('steps.' + n)), h('p', null, t('steps.' + n + '.d')),
-        n === 1 ? h('a', { class: 'btn gold', href: '/apartments' }, t('steps.cta')) : null)))));
-
-    // About the complex: the numbers on the left, the description and amenities on the right.
-    const aboutStats = h('div', { class: 'about-stats reveal' });
-    const ecoHost = h('div', { class: 'about-eco' });
-    const about = h('section', { class: 'section lux-sec', id: 'about' }, h('div', { class: 'wrap about-grid' },
-      aboutStats,
-      h('div', { class: 'about-text reveal' },
-        h('span', { class: 'lux-kicker' }, t('about.kicker')),
-        aboutTitle,
-        h('p', null, t('about.text')),
-        h('ul', { class: 'amenities' }, AMENITIES.map(([ic, k]) => h('li', null, h('span', { class: 'am-ic' }, landIcon(ic)), t(k)))), ecoHost)));
-
-    // Layouts: one card per apartment type.
-    const layoutGrid = h('div', { class: 'layout-grid reveal' });
-    const layouts = h('section', { class: 'section lux-sec alt-band', id: 'layouts', hidden: true }, h('div', { class: 'wrap' },
-      h('div', { class: 'lux-head reveal' }, h('h2', null, accentFirst(t('layouts.title'))), h('p', null, t('layouts.sub'))),
+    // 4. Layouts: one card per apartment type of the house (areas and prices from the apartments).
+    const layoutGrid = h('div', { class: 'nr-layouts' });
+    const layouts = h('section', { class: 'nr-sec', id: 'layouts', hidden: true }, h('div', { class: 'nr-wrap' },
+      h('div', { class: 'nr-head-row' }, h('div', null, kicker(t('nr.layouts.kicker')), h('h2', { class: 'nr-h2' }, t('layouts.title'))),
+        h('p', { class: 'nr-head-note' }, t('layouts.sub'))),
       layoutGrid));
 
-    // Installment terms.
-    const term = (ic, label, value) => h('div', { class: 'plan-cell' }, h('span', { class: 'plan-ic' }, landIcon(ic)), h('small', null, label), h('b', null, value));
-    // Gallery: six views of Dushanbe from Wikimedia Commons, each with its author and licence (not the complex).
-    // An even 3×2 grid on a desktop, 2×3 on a tablet, one column on a phone.
-    const gallery = h('section', { class: 'section lux-sec', id: 'gallery' }, h('div', { class: 'wrap' },
-      h('div', { class: 'lux-head reveal' }, h('h2', null, t('gal.title')), h('p', null, t('gal.sub'))),
-      h('div', { class: 'gal-grid gal-grid--real' }, GALLERY_PHOTOS.slice(0, 6).map((p, i) =>
-        h('figure', { class: 'gal-card gal-card--photo reveal', style: { transitionDelay: (i % 3) * 80 + 'ms' } },
-          galleryImg(p, '(max-width: 540px) 100vw, (max-width: 900px) 50vw, 400px'),
-          h('figcaption', null, h('span', null, t('galpg.p.' + p.id)), galleryCredit(p))))),
-      h('div', { class: 'teaser-more' }, h('a', { class: 'btn ghost lg', href: '/gallery' }, t('nav.gallery') + ' →'))));
+    // 5. What the house looks like: three renders of the 3D model (not photos), each signed.
+    const shot = (name, key, cls) => h('figure', { class: 'nr-shot ' + (cls || '') },
+      renderImg(name, cls ? '(max-width: 900px) 100vw, 760px' : '(max-width: 900px) 100vw, 520px', t('nr.render.alt') + ' — ' + t(key)),
+      h('figcaption', null, t(key)));
+    const visuals = h('section', { class: 'nr-sec nr-sec--tight', id: 'visuals' }, h('div', { class: 'nr-wrap' },
+      h('div', { class: 'nr-head-row' }, h('div', null, kicker(t('nr.vis.kicker')), h('h2', { class: 'nr-h2' }, t('nr.vis.title'))),
+        h('a', { class: 'nr-link', href: '/gallery' }, t('nr.vis.all'), arrow())),
+      h('div', { class: 'nr-shots' }, shot('tower-dusk-tall', 'nr.render.dusk', 'nr-shot--big'), shot('tower-day-tall', 'nr.render.day'), shot('tower-night-tall', 'nr.render.night')),
+      h('p', { class: 'nr-note' }, t('nr.vis.note'))));
 
-    // No reviews section: invented example reviews undermine trust; it comes back with real buyers' reviews.
+    // 6. Installment: the developer's terms and the calculator over the real prices; hidden without terms or apartments.
+    const planHost = h('div', { class: 'nr-wrap nr-split nr-split--top' });
+    const plan = h('section', { class: 'nr-sec nr-band', id: 'installment', hidden: true }, planHost);
 
-    const planBand = h('section', { class: 'lux-plan', id: 'installment' }, h('div', { class: 'wrap' },
-      h('div', { class: 'lux-head reveal' }, h('h2', null, accentFirst(t('plan.title'))), h('p', null, t('plan.sub'))),
-      h('div', { class: 'plan-grid reveal' },
-        term('card', t('plan.down'), t('plan.downV', { n: plan.downFrom })),
-        term('calendar', t('plan.term'), t('plan.termV', { n: counted(plan.years, 'plan.years') })),
-        term('percent', t('plan.over'), '0%')),
-      h('div', { class: 'teaser-more' }, h('a', { class: 'btn gold lg', href: '/apartments#calc' }, t('plan.cta')))));
+    // 7. How to buy.
+    const steps = h('section', { class: 'nr-sec', id: 'steps' }, h('div', { class: 'nr-wrap' },
+      kicker(t('nr.steps.kicker')), h('h2', { class: 'nr-h2' }, t('nr.steps.title')),
+      h('ol', { class: 'nr-steps' }, [1, 2, 3].map((n) => h('li', { class: 'reveal' },
+        h('span', { class: 'nr-step-no', 'aria-hidden': 'true' }, '0' + n), h('h3', null, t('steps.' + n)), h('p', null, t('steps.' + n + '.d')))))));
 
-    // 5. Apartments teaser.
-    const aptGrid = h('div', { class: 'teaser-grid' });
-    const allBtn = h('a', { class: 'btn ghost lg', href: '/apartments' });
-    const teaserHead = h('div', { class: 'lux-head reveal' }, h('h2', null, t('teaser.title')), h('p', null, t('teaser.sub')));
-    const teaserMore = h('div', { class: 'teaser-more' }, allBtn);
-    const teaser = h('section', { class: 'section lux-sec', id: 'teaser' }, h('div', { class: 'wrap' }, teaserHead, aptGrid, teaserMore));
-
-    // 6. Contact teaser with a call-back form.
-    const callBox = h('div', { class: 'call-box glass reveal' });
-    const contactBand = h('section', { class: 'lux-contact', id: 'contact' }, h('div', { class: 'wrap contact-band' },
-      h('div', { class: 'reveal' },
-        h('h2', null, accentFirst(t('cta.title'))), h('p', { class: 'muted-lux' }, t('cta.sub')),
-        h('ul', { class: 'contact-lines' },
-          c.address ? h('li', null, landIcon('pin'), c.address) : null,
+    // 8. Contacts and a call-back form (dark).
+    const callBox = h('div', { class: 'nr-call' });
+    const contactBand = h('section', { class: 'nr-sec nr-dark nr-contact', id: 'contact' }, h('div', { class: 'nr-wrap nr-split' },
+      h('div', null, kicker(t('nr.contact.kicker')), h('h2', { class: 'nr-h2' }, t('cta.title')), h('p', { class: 'nr-lead' }, t('cta.sub')),
+        h('ul', { class: 'nr-contact-lines' },
+          c.address ? h('li', null, landIcon('pin'), h('span', null, c.address)) : null,
           c.phone ? h('li', null, landIcon('phone'), h('a', { href: 'tel:+' + phoneDigits(c.phone) }, c.phone)) : null,
-          c.telegram ? h('li', null, landIcon('send'), h('a', { href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, c.telegram)) : null),
-        c.telegram ? h('a', { class: 'btn gold lg', href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, landIcon('send'), t('cta.tg')) : null),
+          c.telegram ? h('li', null, landIcon('send'), h('a', { href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, c.telegram)) : null)),
       callBox));
 
+    const soonHost = h('div', { class: 'nr-wrap nr-soon', hidden: true });
     // «Зелёный эффект Binosoz» — real counters from the API; hidden when there is nothing to show.
     const green = S.eco ? S.eco.impactSection() : null;
-    page.append(hero, why, steps, about, layouts, green, gallery, planBand, teaser, contactBand, siteFooter());
-    S.$$('section', page).forEach((sec) => { if (sec !== hero) sec.classList.add('section-reveal'); });
+    page.append(hero, soonHost, about, why, layouts, visuals, green, plan, steps, contactBand, siteFooter());
     renderData(); renderCall();
     const stopReveal = revealIn(page);
 
-    // The hero background drifts a little slower than the page (--py).
-    let ticking = false;
-    const onScroll = () => { if (ticking) return; ticking = true; requestAnimationFrame(() => { ticking = false; hero.style.setProperty('--py', Math.min(window.scrollY, 900) + 'px'); }); };
-    window.addEventListener('scroll', onScroll, { passive: true });
-
     function renderData() {
-      drawName();
-      badge.textContent = '✦ ' + (d.year ? t('wow.hero.badge', { y: d.year }) : t('wow.hero.badge', { y: '' }).replace(/\s*·\s*$/, ''));
-      countHero();
-      // «Свободно 47 из 160» from the API; without the numbers the card is not shown at all.
-      freeCard.hidden = d.free === null || !d.apts;
-      freeCard.replaceChildren(h('i', { class: 'live-dot' }), h('div', null, h('small', null, t('home.freeNow')), h('b', null, d.free === null ? '' : t('home.freeOf', { n: S.fmt.n(d.free), m: S.fmt.n(d.apts || 0) }))));
-      allBtn.textContent = known() && d.apts ? t('teaser.all', { n: S.fmt.n(d.apts) }) : t('home.toCatalog');
-      if (d.list) aptGrid.replaceChildren(...d.list.map(aptCard));
-      else if (demo && d.types.length) aptGrid.replaceChildren(...d.types.slice(0, 3).map(typeCard));
-      else if (d.state === 'loading') aptGrid.replaceChildren(S.skeleton ? S.skeleton(3, 120) : '');
-      else aptGrid.replaceChildren(soonBlock());
-      teaserHead.hidden = !d.list && !(demo && d.types.length);
-      teaserMore.hidden = d.state !== 'ready';
-      layouts.hidden = !d.types.length;
-      // Social proof from the real data: apartments already sold or booked. Hidden until it is known.
-      proof.replaceChildren(...(d.taken ? [h('span', { class: 'proof-ic' }, landIcon('users')), t('home.proof', { n: counted(d.taken, 'home.families') })] : []));
-      proof.hidden = !d.taken;
-      const big = (v, l) => h('div', { class: 'about-num' }, h('b', null, v), h('span', null, l));
-      // The hero already shows floors and apartments: here the installment terms (config.js INSTALLMENT, set by the
-      // developer) and, when the API has them, the number of apartment types and the delivery year.
-      aboutStats.replaceChildren(...[
-        big(t('plan.downV', { n: plan.downFrom }), t('plan.down')),
-        big(t('plan.termV', { n: counted(plan.years, 'plan.years') }), t('plan.term')),
-        big('0%', t('plan.over')),
-        d.types.length ? big(String(d.types.length), plural(d.types.length, 'about.types')) : null,
-      ].filter(Boolean));
-      layoutGrid.replaceChildren(...d.types.map(layoutCard));
-      ecoHost.replaceChildren((S.eco && S.eco.block(d.eco, { compact: true, demo: d.isDemo })) || '');
-    }
-    // A layout card: type, area range, price from; the bed icon shows the number of rooms.
-    function layoutCard(x) {
-      const beds = Math.max(1, Math.min(3, x.rooms || 1));
-      const area = x.areaFrom === x.areaTo ? S.fmt.n(x.areaFrom) : S.fmt.n(x.areaFrom) + '–' + S.fmt.n(x.areaTo);
-      // Preview: the floor plan of this type, drawn like the plans in the catalog.
-      const plan = h('canvas', { class: 'layout-plan', width: 260, height: 160, 'aria-hidden': 'true' });
-      drawFloorPlan(plan, Math.min(3, x.rooms || 0));
-      return h('a', { class: 'layout-card', href: '/apartments' },
-        plan,
-        h('span', { class: 'layout-ic', 'aria-hidden': 'true' }, Array.from({ length: beds }, () => landIcon('bed'))),
-        h('b', { class: 'layout-type' }, t('layouts.type' + Math.min(3, x.rooms))),
-        h('span', { class: 'layout-area' }, area + ' ' + t('u.m2')),
-        h('span', { class: 'layout-price' }, t('home.chip.from', { p: S.fmt.money(x.priceFrom, 'TJS') })),
-        h('span', { class: 'apt-lux-more' }, t('layouts.cta')));
-    }
-    // A free apartment: its floor plan type drawn on top, the status badge, rooms, area and price.
-    function aptCard(a) {
-      const plan = h('canvas', { width: 320, height: 200, 'aria-hidden': 'true' });
-      drawFloorPlan(plan, Math.min(3, a.rooms));
-      return h('a', { class: 'apt-showcase-card stagger', href: '/apartments' },
-        h('div', { class: 'apt-card-visual' }, plan, h('span', { class: 'apt-card-badge' }, t('status.' + a.status))),
-        h('div', { class: 'apt-card-body' },
-          h('div', { class: 'apt-card-num' }, '№ ' + a.number + ' · ' + t('floor.n', { n: a.floor })),
-          h('div', { class: 'apt-card-rooms' }, S.fmt.rooms(a.rooms)),
-          h('div', { class: 'apt-card-area' }, S.fmt.area(a.area) + ' · ' + S.fmt.n(a.pricePerSqm) + ' TJS / ' + t('u.m2')),
-          h('div', { class: 'apt-card-price' }, S.fmt.money(a.price, 'TJS')),
-          h('span', { class: 'apt-card-btn' }, t('teaser.more'))));
-    }
-    // Without the API: apartment types instead of made-up apartments.
-    function typeCard(i) {
-      return h('a', { class: 'apt-lux', href: '/apartments' },
-        h('div', { class: 'apt-lux-top' }, S.statusChip('free')),
-        h('div', { class: 'apt-lux-meta' }, t('layouts.type' + Math.min(3, i.rooms))),
-        h('div', { class: 'apt-lux-price' }, t('home.chip.from', { p: S.fmt.money(i.priceFrom, 'TJS') })),
-        h('div', { class: 'apt-lux-sqm' }, t('teaser.typeSub')),
-        h('span', { class: 'apt-lux-more' }, t('teaser.more')));
-    }
+      const b = d.b, ready = d.state === 'ready';
+      const year = b && b.completionYear;
+      heroKicker.replaceChildren(h('span', { class: 'nr-kicker-line', 'aria-hidden': 'true' }), year ? t('nr.hero.kicker', { y: year }) : t('nr.hero.city'));
+      heroTitle.textContent = S.brandName(b && b.name);
+      // Live numbers: floors, apartments, free now, year of completion — each only when the API has it.
+      const free = d.apts.filter((a) => a.status === 'free').length;
+      const stat = (v, label) => h('div', { class: 'nr-stat' }, h('dt', null, label), h('dd', null, v));
+      const stats = ready ? [
+        b.floorsCount ? stat(S.fmt.n(b.floorsCount), plural(b.floorsCount, 'nr.floors')) : null,
+        stat(S.fmt.n(d.apts.length), plural(d.apts.length, 'nr.apts')),
+        stat(S.fmt.n(free), t('nr.freeNow')),
+        year ? stat(String(year), t('nr.yearDone')) : null,
+      ].filter(Boolean) : [];
+      heroStats.replaceChildren(...stats);
+      heroStats.hidden = !stats.length;
 
-    // The API did not answer (Render asleep longer than the retries, no connection): «Повторить» loads everything again.
-    const soonBlock = () => soonCard(d.state, () => { d.state = 'loading'; renderData(); load(); });
+      // No building or no apartments: one card instead of the house blocks.
+      const none = d.state === 'empty' || d.state === 'error';
+      soonHost.hidden = !none;
+      soonHost.replaceChildren(none ? soonCard(d.state, () => { d.state = 'loading'; renderData(); load(); }) : '');
+      about.hidden = !b;
+      aboutText.textContent = (b && b.description) || '';
+      aboutText.hidden = !aboutText.textContent;
+      amenList.replaceChildren(...((b && b.amenities) || []).map((k) => h('li', null, landIcon(AMEN_ICON[k] || 'check'), h('span', null, t('amen.' + k)))));
+      amenList.hidden = !amenList.children.length;
+      ecoHost.replaceChildren((b && S.eco && S.eco.block(b.eco, { compact: true, demo: b.isDemo })) || '');
+
+      const terms = siteTerms(b);
+      const feats = [
+        ['cube', 'nr.why.3d'], ['key', 'nr.why.booking'],
+        terms ? ['percent', 'nr.why.plan', termsLine(terms)] : null,
+        ['screen', 'nr.why.cabinet'], ['chat', 'nr.why.chat'], ['clipboard', 'nr.why.prices'],
+      ].filter(Boolean);
+      whyGrid.replaceChildren(...feats.map(([ic, k, d2]) => h('article', { class: 'nr-why-item reveal' },
+        h('span', { class: 'nr-why-ic' }, landIcon(ic)), h('h3', null, t(k)), h('p', null, d2 || t(k + '.d')))));
+
+      layouts.hidden = !d.types.length;
+      layoutGrid.replaceChildren(...d.types.map(layoutCard));
+      renderPlan(terms);
+    }
+    // «Взнос от 10%, срок до 10 лет, без переплаты» — only the terms the developer has set.
+    function termsLine(x) {
+      return [x.down != null ? t('nr.terms.down', { n: S.fmt.n(x.down) }) : null, x.months ? t('nr.terms.term', { n: termText(x.months) }) : null,
+        x.zero ? t('nr.terms.zero') : null].filter(Boolean).join(', ');
+    }
+    // A layout card as in the design: the plan drawing, the type, the area range, the price from.
+    function layoutCard(x) {
+      const area = x.areaFrom === x.areaTo ? S.fmt.n(x.areaFrom) : S.fmt.n(x.areaFrom) + '–' + S.fmt.n(x.areaTo);
+      const planCanvas = h('canvas', { class: 'nr-layout-plan', width: 320, height: 210, 'aria-hidden': 'true' });
+      drawFloorPlan(planCanvas, Math.min(3, x.rooms || 0));
+      return h('a', { class: 'nr-layout', href: '/apartments' }, h('div', { class: 'nr-layout-pic' }, planCanvas),
+        h('div', { class: 'nr-layout-body' },
+          h('div', { class: 'nr-layout-top' }, h('span', { class: 'nr-layout-type' }, t('layouts.type' + Math.min(3, x.rooms))), h('span', { class: 'nr-layout-area' }, area + ' ' + t('u.m2'))),
+          h('div', { class: 'nr-layout-bottom' }, h('span', { class: 'nr-layout-price' }, t('home.chip.from', { p: S.fmt.money(x.priceFrom, 'TJS') })),
+            h('span', { class: 'nr-layout-more' }, t('nr.look'), arrow()))));
+    }
+    // Installment: the terms on the left, on the right the calculator over the prices of the free apartments.
+    function renderPlan(terms) {
+      const prices = d.apts.filter((a) => a.status === 'free').map((a) => a.price).filter((p) => p > 0);
+      plan.hidden = !terms || !prices.length;
+      if (plan.hidden) { planHost.replaceChildren(); return; }
+      const big = (v, l) => h('div', { class: 'nr-term' }, h('b', null, v), h('span', null, l));
+      const left = h('div', null, kicker(t('nr.plan.kicker')), h('h2', { class: 'nr-h2' }, t(terms.zero ? 'nr.plan.titleZero' : 'nr.plan.title')),
+        h('p', { class: 'nr-lead' }, t(terms.zero ? 'nr.plan.subZero' : 'nr.plan.sub')),
+        h('div', { class: 'nr-terms' },
+          terms.down != null ? big(t('plan.downV', { n: S.fmt.n(terms.down) }), t('plan.down')) : null,
+          terms.months ? big(termText(terms.months), t('plan.term')) : null,
+          terms.zero ? big('0%', t('plan.over')) : null));
+      const step = 10000;
+      const lo = Math.floor(Math.min(...prices) / step) * step, hi = Math.ceil(Math.max(...prices) / step) * step;
+      const minDown = Math.max(0, Math.ceil(terms.down != null ? terms.down : 0));
+      const maxYears = terms.months ? Math.max(1, Math.floor(terms.months / 12)) : 10;
+      const st = { price: Math.min(hi, Math.max(lo, Math.round((lo + hi) / 2 / step) * step)), down: Math.min(90, Math.max(minDown, 20)), years: Math.min(maxYears, 5) };
+      const out = { price: h('b'), down: h('b'), years: h('b'), monthly: h('span', { class: 'nr-calc-sum' }), total: h('p', { class: 'nr-calc-note' }) };
+      const range = (id, label, min, max, stp, key) => {
+        const inp = h('input', { id, type: 'range', min, max, step: stp, value: st[key] });
+        inp.addEventListener('input', () => { st[key] = Number(inp.value); draw(); });
+        return h('div', { class: 'nr-range' }, h('div', { class: 'nr-range-top' }, h('label', { for: id }, label), out[key]), inp);
+      };
+      function draw() {
+        const down = Math.round(st.price * st.down / 100), months = st.years * 12;
+        out.price.textContent = S.fmt.money(st.price, 'TJS');
+        out.down.textContent = st.down + '% · ' + S.fmt.money(down, 'TJS');
+        out.years.textContent = counted(st.years, 'plan.years');
+        out.monthly.textContent = S.fmt.money(Math.round((st.price - down) / months), 'TJS');
+        out.total.textContent = terms.zero ? t('nr.calc.totalZero', { s: S.fmt.money(st.price, 'TJS') }) : t('nr.calc.totalAsk');
+      }
+      const calc = h('div', { class: 'nr-calc', id: 'calc' }, h('div', { class: 'nr-calc-title' }, t('nr.calc.title')),
+        range('nr-price', t('nr.calc.price'), lo, hi, step, 'price'),
+        range('nr-down', t('plan.down'), minDown, 90, 5, 'down'),
+        range('nr-years', t('plan.term'), 1, maxYears, 1, 'years'),
+        h('div', { class: 'nr-calc-out nr-dark' }, h('span', { class: 'nr-calc-label' }, t('nr.calc.monthly')), out.monthly, out.total),
+        h('a', { class: 'btn nr-btn nr-btn--primary', href: '/apartments#calc' }, t('nr.calc.pick'), arrow()));
+      draw();
+      planHost.replaceChildren(left, calc);
+    }
 
     function renderCall() {
-      const phone = S.input('phone', { type: 'tel', value: '+992', autocomplete: 'tel', 'aria-label': t('f.phone') });
-      const btn = h('button', { class: 'btn gold lg block', type: 'submit' }, t('cta.call'));
-      const form = h('form', { class: 'stack', novalidate: true }, h('h3', null, t('cta.formTitle')), phone, btn, h('small', { class: 'micro' }, t('cta.micro')), S.privacyNote());
+      const phone = S.input('phone', { type: 'tel', value: '+992', autocomplete: 'tel', id: 'nr-cb-phone' });
+      const btn = h('button', { class: 'btn nr-btn nr-btn--primary block', type: 'submit' }, t('cta.call'));
+      const form = h('form', { class: 'nr-call-form', novalidate: true }, h('h3', null, t('cta.formTitle')),
+        h('label', { class: 'nr-field-label', for: 'nr-cb-phone' }, t('f.phone')), phone, btn, h('small', { class: 'nr-micro' }, t('cta.micro')), S.privacyNote());
       form.addEventListener('submit', async (e) => {
         e.preventDefault(); S.showErrors(form, null);
         await S.busy(btn, async () => {
@@ -790,35 +782,22 @@
         const floors = await S.api.floors(id);
         const apts = await S.api.allApartments(floors);
         if (!alive) return;
-        const free = apts.filter((a) => a.status === 'free').sort((x, y) => x.price - y.price);
-        d.floors = b.floorsCount || Math.max(0, ...floors.map((f) => f.number)) || null;
-        d.apts = apts.length || null;
-        if (b.deliveryDate) d.year = new Date(b.deliveryDate).getFullYear();
-        else if (b.completionYear) d.year = b.completionYear;
-        if (b.name) d.name = b.name;
-        d.eco = b.eco || null; d.isDemo = !!b.isDemo;
+        d.b = b; d.apts = apts;
         d.state = apts.length ? 'ready' : 'empty';
-        d.free = apts.length ? free.length : null;
-        d.taken = apts.filter((a) => a.status === 'sold' || a.status === 'booked').length;
-        // One apartment of each room count, cheapest first.
-        const seen = new Set();
-        d.list = free.filter((a) => (seen.has(a.rooms) ? false : seen.add(a.rooms))).slice(0, 3);
-        if (d.list.length < 3) d.list = d.list.concat(free.filter((a) => !d.list.includes(a))).slice(0, 3);
-        if (!d.list.length) d.list = null;
         // Types from the real apartments: area range of all, price from the free ones (else from all). 3 — three rooms and more.
-        const types = [0, 1, 2, 3].map((rooms) => {
+        d.types = [0, 1, 2, 3].map((rooms) => {
           const all = apts.filter((a) => (rooms === 3 ? a.rooms >= 3 : a.rooms === rooms));
           if (!all.length) return null;
           const priced = all.filter((a) => a.status === 'free').length ? all.filter((a) => a.status === 'free') : all;
           return { rooms, areaFrom: Math.floor(Math.min(...all.map((a) => a.area))), areaTo: Math.ceil(Math.max(...all.map((a) => a.area))), priceFrom: Math.min(...priced.map((a) => a.price)) };
         }).filter(Boolean);
-        if (types.length) d.types = types;
         renderData();
-      } catch (e) { if (alive && !demo) { d.state = 'error'; renderData(); } }
+      } catch (e) { if (alive) { d.state = 'error'; renderData(); } }
     }
     load();
-    return () => { alive = false; stopReveal(); window.removeEventListener('scroll', onScroll); };
+    return () => { alive = false; stopReveal(); };
   };
+  S.siteTerms = siteTerms;
 
   // A drawn check mark with a message: the end state of the forms.
   function successBlock(text, again) {
@@ -1070,251 +1049,37 @@
     2: [[0, 0, 0.42, 0.58, 'living'], [0.42, 0, 0.3, 0.58, 'bedroom'], [0.72, 0, 0.28, 0.42, 'kitchen'], [0.72, 0.42, 0.28, 0.3, 'bath'], [0, 0.58, 0.72, 0.42, 'hall'], [0.72, 0.72, 0.28, 0.28, 'balcony']],
     3: [[0, 0, 0.36, 0.55, 'living'], [0.36, 0, 0.32, 0.55, 'bedroom'], [0.68, 0, 0.32, 0.55, 'bedroom2'], [0, 0.55, 0.3, 0.45, 'kitchen'], [0.3, 0.55, 0.3, 0.45, 'hall'], [0.6, 0.55, 0.2, 0.25, 'bath'], [0.8, 0.55, 0.2, 0.25, 'wc'], [0.6, 0.8, 0.4, 0.2, 'balcony']]
   };
-  // Walls in gold on the night navy, room names in the middle, a window on the top wall; sharp on high-density screens.
+  // An architect's plan as in the design: walls in the ink colour on the paper of the card, windows and the balcony in copper,
+  // room names in the middle. Colours come from the page tokens, so the plan follows the light and the dark theme;
+  // sharp on high-density screens.
   function drawFloorPlan(canvas, type) {
     const W = +canvas.getAttribute('width'), H = +canvas.getAttribute('height'), dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = W * dpr; canvas.height = H * dpr;
     const g = canvas.getContext('2d'); if (!g) return;
     g.scale(dpr, dpr);
-    g.fillStyle = '#0b1430'; g.fillRect(0, 0, W, H);
-    const pad = 16, x0 = pad, y0 = pad, w = W - pad * 2, ht = H - pad * 2;
-    g.font = '600 11px Inter, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    const css = getComputedStyle(canvas.isConnected ? canvas : document.documentElement);
+    const tok = (n, f) => (css.getPropertyValue(n) || '').trim() || f;
+    const paper = tok('--surface', '#fbf8f2'), room = tok('--bg', '#f4efe7'), ink = tok('--ink', '#1b1815'), copper = tok('--accent-text', '#8a4e2a');
+    g.fillStyle = paper; g.fillRect(0, 0, W, H);
+    const pad = 14, x0 = pad, y0 = pad, w = W - pad * 2, ht = H - pad * 2 - 18;
+    g.font = '600 10.5px Manrope, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     (PLAN_ROOMS[type] || PLAN_ROOMS[1]).forEach(([rx, ry, rw, rh, key]) => {
       const x = x0 + rx * w, y = y0 + ry * ht, ww = rw * w, hh = rh * ht;
-      g.fillStyle = key === 'balcony' ? 'rgba(53, 214, 161, 0.08)' : key === 'bath' || key === 'wc' ? 'rgba(111, 139, 255, 0.10)' : 'rgba(255, 255, 255, 0.04)';
-      g.fillRect(x, y, ww, hh);
-      g.strokeStyle = 'rgba(201, 162, 39, 0.75)'; g.lineWidth = 2; g.strokeRect(x, y, ww, hh);
       const label = t('plans.room.' + key);
-      g.fillStyle = '#b9c3e3';
-      if (ww > 30 && hh > 18) g.fillText(label.length * 6.2 > ww - 6 ? label.slice(0, Math.max(3, Math.floor((ww - 6) / 6.2) - 1)) + '.' : label, x + ww / 2, y + hh / 2);
+      if (key === 'balcony') {
+        // The balcony: a dashed copper outline, as in the design.
+        g.setLineDash([5, 4]); g.strokeStyle = copper; g.lineWidth = 1.5; g.strokeRect(x + 1, y + 1, ww - 2, hh - 2); g.setLineDash([]);
+        g.fillStyle = copper;
+      } else {
+        g.fillStyle = room; g.fillRect(x, y, ww, hh);
+        g.strokeStyle = ink; g.lineWidth = 2.5; g.strokeRect(x, y, ww, hh);
+        g.fillStyle = ink;
+      }
+      if (ww > 30 && hh > 18) g.fillText(label.length * 6 > ww - 6 ? label.slice(0, Math.max(3, Math.floor((ww - 6) / 6) - 1)) + '.' : label, x + ww / 2, y + hh / 2);
     });
-    g.strokeStyle = '#c9a227'; g.lineWidth = 4; g.strokeRect(x0, y0, w, ht);
-    g.strokeStyle = '#8fb3ff'; g.beginPath(); g.moveTo(x0 + w * 0.12, y0); g.lineTo(x0 + w * 0.3, y0); g.stroke();
-  }
-
-  /* ---------- hero picture ---------- */
-  // The landing hero: a drawn poster of the building only, no 3D engine (it froze slow phones).
-  function heroModel() {
-    const poster = h('canvas', { class: 'hero-poster', role: 'img', 'aria-label': t('wow.3d.title') });
-    const box = h('div', { class: 'hero-3d-frame' }, poster);
-    // Only the drawn poster: no 3D engine on the landing (it froze slow phones). The interactive model with real
-    // apartment statuses is in the catalog, behind the «Смотреть 3D-модель» button.
-    drawHeroBuilding(poster, () => !box.isConnected);
-    return box;
-  }
-
-  // Реалистичный рисованный дом-постер. Пока 3D модель загружается, показывает красивое здание с окнами.
-  // done() — остановить когда возвращает true. Возвращает функцию stop.
-  function drawHeroBuilding(canvas, done) {
-    let timer = null, raf = 0, lit = [], time = 0;
-    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const FLOORS = 22, COLS = 7, SIDE_FLOORS = 14, SIDE_COLS = 4;
-    const shuffle = () => {
-      lit = Array.from({ length: (FLOORS * COLS) + (SIDE_FLOORS * SIDE_COLS * 2) }, (_, i) => {
-        const isSide = i >= FLOORS * COLS;
-        return Math.random() > (isSide ? 0.45 : 0.28) ? 0.35 + Math.random() * 0.5 : 0;
-      });
-    };
-    const size = () => {
-      const r = canvas.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const W = Math.max(260, Math.round(r.width || 420)), H = Math.max(300, Math.round(r.height || 560));
-      if (canvas.width !== W * dpr || canvas.height !== H * dpr) { canvas.width = W * dpr; canvas.height = H * dpr; }
-      return { W, H, dpr };
-    };
-    const draw = () => {
-      if (done()) return stop();
-      time += 0.016;
-      const { W, H, dpr } = size(), g = canvas.getContext('2d');
-      if (!g) return;
-      g.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-      // Небо — градиент ночи с оттенком золота
-      const sky = g.createLinearGradient(0, 0, 0, H * 0.7);
-      sky.addColorStop(0, '#0b0806'); sky.addColorStop(0.5, '#130e0a'); sky.addColorStop(1, '#24190f');
-      g.fillStyle = sky; g.fillRect(0, 0, W, H);
-
-      // Звёзды
-      if (!reduce) {
-        const starSeed = [[0.12,0.08],[0.28,0.04],[0.45,0.12],[0.62,0.06],[0.78,0.09],[0.9,0.15],
-          [0.07,0.22],[0.35,0.18],[0.55,0.03],[0.82,0.25],[0.18,0.3],[0.72,0.19]];
-        starSeed.forEach(([sx, sy], i) => {
-          const a = 0.3 + 0.4 * Math.abs(Math.sin(time * 0.7 + i * 1.3));
-          g.fillStyle = 'rgba(255,255,255,' + a.toFixed(2) + ')';
-          g.beginPath(); g.arc(sx * W, sy * H, 0.8 + (i % 3) * 0.4, 0, Math.PI * 2); g.fill();
-        });
-      }
-
-      // Золотое свечение за зданием
-      const glow = g.createRadialGradient(W / 2, H * 0.5, 20, W / 2, H * 0.5, W * 0.65);
-      glow.addColorStop(0, 'rgba(176,90,32,0.18)'); glow.addColorStop(0.5, 'rgba(176,90,32,0.06)'); glow.addColorStop(1, 'rgba(176,90,32,0)');
-      g.fillStyle = glow; g.fillRect(0, 0, W, H);
-
-      const ground = H * 0.88;
-
-      // ── Боковые здания (фон) ──
-      const drawSide = (sx, sw, sh, opacity, litOffset) => {
-        g.globalAlpha = opacity;
-        g.fillStyle = '#120d09'; g.fillRect(sx, ground - sh, sw, sh);
-        // фасад
-        g.fillStyle = '#1a120b'; g.fillRect(sx, ground - sh, sw, sh);
-        // горизонтальные линии этажей
-        const sfH = sh / SIDE_FLOORS;
-        for (let i = 0; i <= SIDE_FLOORS; i++) {
-          g.strokeStyle = 'rgba(176,90,32,' + (i % 4 === 0 ? 0.4 : 0.1) + ')';
-          g.lineWidth = 0.5; g.beginPath();
-          g.moveTo(sx, ground - sh + i * sfH); g.lineTo(sx + sw, ground - sh + i * sfH); g.stroke();
-        }
-        // окна
-        const scw = (sw - 10) / SIDE_COLS, swW = scw - 4, swH = Math.max(2, sfH - 5);
-        for (let r = 0; r < SIDE_FLOORS; r++) for (let c = 0; c < SIDE_COLS; c++) {
-          const a = lit[litOffset + r * SIDE_COLS + c];
-          g.fillStyle = a ? 'rgba(242,196,106,' + (a * 0.7).toFixed(2) + ')' : 'rgba(255,255,255,0.02)';
-          g.fillRect(sx + 5 + c * scw, ground - sh + r * sfH + 3, swW, swH);
-        }
-        g.globalAlpha = 1;
-      };
-      const mainW = Math.min(W * 0.42, 200), mainH = ground - H * 0.08, mainX = (W - mainW) / 2;
-      const sideW = Math.min(W * 0.22, 100), sideH = mainH * 0.65;
-      drawSide(mainX - sideW - 8, sideW, sideH, 0.55, FLOORS * COLS);
-      drawSide(mainX + mainW + 8, sideW, sideH, 0.5, FLOORS * COLS + SIDE_FLOORS * SIDE_COLS);
-
-      // ── Главное здание ──
-      const bX = mainX, bY = ground - mainH, bW = mainW, bH = mainH;
-      const fH = bH / FLOORS;
-
-      // Основа здания — гранитный цоколь (нижние 2 этажа)
-      const plinthH = fH * 2.2;
-      g.fillStyle = '#16100b'; g.fillRect(bX, bY, bW, bH);
-      const gran = g.createLinearGradient(bX, ground - plinthH, bX + bW, ground);
-      gran.addColorStop(0, '#1a1612'); gran.addColorStop(1, '#0f100c');
-      g.fillStyle = gran; g.fillRect(bX - 4, ground - plinthH, bW + 8, plinthH + 4);
-
-      // Вертикальные пилястры
-      const pilW = 6, pilCount = 5;
-      for (let p = 0; p < pilCount; p++) {
-        const px = bX + (bW / (pilCount - 1)) * p - pilW / 2;
-        g.fillStyle = 'rgba(176,90,32,0.12)'; g.fillRect(px, bY, pilW, bH);
-      }
-
-      // Горизонтальные линии — карнизы
-      for (let i = 0; i <= FLOORS; i++) {
-        const isCornice = i % 5 === 0 || i === 0 || i === FLOORS;
-        const isBelt = i % 3 === 0;
-        if (isCornice) {
-          g.fillStyle = 'rgba(176,90,32,0.5)'; g.fillRect(bX - 3, bY + i * fH - 1, bW + 6, 3);
-        } else if (isBelt) {
-          g.fillStyle = 'rgba(176,90,32,0.22)'; g.fillRect(bX, bY + i * fH, bW, 1.5);
-        } else {
-          g.strokeStyle = 'rgba(176,90,32,0.1)'; g.lineWidth = 0.5;
-          g.beginPath(); g.moveTo(bX, bY + i * fH); g.lineTo(bX + bW, bY + i * fH); g.stroke();
-        }
-      }
-
-      // Окна главного здания
-      const cw = (bW - 16) / COLS, wW = Math.max(2, cw - 5), wH = Math.max(3, fH - 7);
-      for (let r = 0; r < FLOORS; r++) for (let c = 0; c < COLS; c++) {
-        const a = lit[r * COLS + c];
-        const wx = bX + 8 + c * cw, wy = bY + r * fH + 4;
-        // Тёмная рама окна
-        g.fillStyle = 'rgba(0,0,0,0.5)'; g.fillRect(wx - 1, wy - 1, wW + 2, wH + 2);
-        // Стекло / свет
-        if (a) {
-          const warm = g.createLinearGradient(wx, wy, wx + wW, wy + wH);
-          warm.addColorStop(0, 'rgba(255,215,100,' + (a * 0.95).toFixed(2) + ')');
-          warm.addColorStop(1, 'rgba(242,180,60,' + (a * 0.65).toFixed(2) + ')');
-          g.fillStyle = warm;
-        } else {
-          g.fillStyle = 'rgba(90,50,25,0.25)';
-        }
-        g.fillRect(wx, wy, wW, wH);
-        // Оконная рама (крест)
-        if (wW > 6 && wH > 6) {
-          g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 0.8;
-          g.beginPath(); g.moveTo(wx + wW / 2, wy); g.lineTo(wx + wW / 2, wy + wH); g.stroke();
-        }
-      }
-
-      // Вертикальные золотые фины на углах
-      g.fillStyle = 'rgba(176,90,32,0.6)';
-      g.fillRect(bX - 3, bY, 3, bH);
-      g.fillRect(bX + bW, bY, 3, bH);
-
-      // Парапет верхний
-      g.fillStyle = '#120d09'; g.fillRect(bX - 6, bY - 12, bW + 12, 14);
-      g.fillStyle = 'rgba(176,90,32,0.6)'; g.fillRect(bX - 6, bY - 14, bW + 12, 3);
-
-      // Антенна
-      g.strokeStyle = 'rgba(176,90,32,0.75)'; g.lineWidth = 2;
-      g.beginPath(); g.moveTo(W / 2, bY - 12); g.lineTo(W / 2, bY - 48); g.stroke();
-      g.lineWidth = 1; g.strokeStyle = 'rgba(176,90,32,0.4)';
-      g.beginPath(); g.moveTo(W / 2 - 8, bY - 36); g.lineTo(W / 2 + 8, bY - 36); g.stroke();
-      // Мигающий красный огонь
-      const blink = reduce ? 0.85 : (0.4 + Math.abs(Math.sin(time * 1.6)) * 0.6);
-      g.fillStyle = 'rgba(255,70,70,' + blink.toFixed(2) + ')';
-      g.beginPath(); g.arc(W / 2, bY - 50, 2.5, 0, Math.PI * 2); g.fill();
-      if (!reduce) {
-        g.fillStyle = 'rgba(255,70,70,' + (blink * 0.3).toFixed(2) + ')';
-        g.beginPath(); g.arc(W / 2, bY - 50, 6, 0, Math.PI * 2); g.fill();
-      }
-
-      // Вход — колонны и козырёк
-      const entW = bW * 0.42, entX = bX + (bW - entW) / 2;
-      g.fillStyle = 'rgba(176,90,32,0.08)'; g.fillRect(entX, ground - plinthH, entW, plinthH);
-      // 3 колонны
-      [0.15, 0.5, 0.85].forEach((t) => {
-        const cx = entX + entW * t;
-        g.fillStyle = '#1a160e'; g.fillRect(cx - 3.5, ground - plinthH + 4, 7, plinthH - 4);
-        g.fillStyle = 'rgba(176,90,32,0.5)'; g.fillRect(cx - 4, ground - plinthH, 8, 5);
-        g.fillRect(cx - 4, ground - 10, 8, 10);
-      });
-      // Козырёк входа
-      g.fillStyle = 'rgba(176,90,32,0.35)'; g.fillRect(entX - 4, ground - plinthH - 2, entW + 8, 4);
-
-      // Земля
-      const groundGrad = g.createLinearGradient(0, ground, 0, H);
-      groundGrad.addColorStop(0, '#100b08'); groundGrad.addColorStop(1, '#0b0806');
-      g.fillStyle = groundGrad; g.fillRect(0, ground, W, H - ground);
-      // Золотая линия земли
-      g.fillStyle = 'rgba(176,90,32,0.4)'; g.fillRect(0, ground, W, 1.5);
-
-      // Отражение в земле
-      if (!reduce) {
-        g.save(); g.globalAlpha = 0.08; g.translate(0, ground * 2); g.scale(1, -1);
-        for (let r = Math.max(0, FLOORS - 6); r < FLOORS; r++) for (let c = 0; c < COLS; c++) {
-          const a = lit[r * COLS + c];
-          if (a) { g.fillStyle = 'rgba(242,196,106,' + a + ')'; g.fillRect(bX + 8 + c * cw, bY + r * fH + 4, wW, wH); }
-        }
-        g.restore();
-      }
-
-      // Метка «интерактивная 3D»
-      if (!canvas.dataset.labelDrawn) {
-        canvas.dataset.labelDrawn = '1';
-      }
-    };
-    // The twinkle runs at ~12 frames a second and only while the poster is on screen and the tab is visible.
-    let last = 0, visible = true;
-    const loop = (now) => {
-      raf = 0;
-      if (done()) return stop();
-      if (!visible || document.hidden) return;
-      const dt = now - last;
-      if (dt > 80) { last = now; time += dt / 1000; draw(); }
-      raf = requestAnimationFrame(loop);
-    };
-    const resume = () => { if (!reduce && !raf && visible && !document.hidden) raf = requestAnimationFrame(loop); };
-    const io = 'IntersectionObserver' in window ? new IntersectionObserver((es) => { visible = es[es.length - 1].isIntersecting; resume(); }) : null;
-    if (io) io.observe(canvas);
-    document.addEventListener('visibilitychange', resume);
-    const stop = () => {
-      clearInterval(timer); cancelAnimationFrame(raf); timer = null; raf = 0;
-      if (io) io.disconnect();
-      document.removeEventListener('visibilitychange', resume);
-    };
-    shuffle();
-    requestAnimationFrame(draw);
-    if (!reduce) { timer = setInterval(shuffle, 1800); resume(); }
-    return stop;
+    // Windows: thick copper strokes on the top wall.
+    g.strokeStyle = copper; g.lineWidth = 5;
+    [[0.1, 0.3], [0.55, 0.85]].forEach(([a1, a2]) => { g.beginPath(); g.moveTo(x0 + w * a1, y0); g.lineTo(x0 + w * a2, y0); g.stroke(); });
   }
 
   // For the other public pages (about.js, gallery.js): the same footer, reveal on scroll, icons and headings.

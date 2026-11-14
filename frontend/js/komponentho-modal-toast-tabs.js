@@ -75,6 +75,13 @@
   // Each copy of the logo gets its own gradient id (lg1, lg2…): the same id twice on a page is invalid HTML, and Safari
   // drops the gradient when the first copy is hidden (the mobile menu, the footer off screen).
   let logoN = 0;
+  // The complex's logo of the design (docs/design): a tower, the outline in the ink colour, the floors in copper.
+  S.towerLogo = () => {
+    const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    s.setAttribute('viewBox', '0 0 34 34'); s.setAttribute('width', '34'); s.setAttribute('height', '34'); s.setAttribute('aria-hidden', 'true'); s.setAttribute('class', 'tower-logo');
+    s.innerHTML = '<rect x="9" y="6" width="16" height="26" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M13 11h8M13 16h8M13 21h8M13 26h8" stroke="var(--accent-text)" stroke-width="1.4"/><path d="M17 2v4" stroke="currentColor" stroke-width="1.6"/>';
+    return s;
+  };
   S.logo = () => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); const id = 'lg' + (++logoN); s.setAttribute('viewBox', '0 0 32 32'); s.setAttribute('width', 28); s.setAttribute('height', 28); s.setAttribute('aria-hidden', 'true'); s.innerHTML = '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e0874a"/><stop offset="1" stop-color="#9a4f1c"/></linearGradient></defs><path d="M16 1.5l4 9.3 10 1.2-7.4 6.9 2 10L16 23.7 7.4 28.9l2-10L2 12l10-1.2z" fill="url(#' + id + ')"/><path d="M16 1.5l4 9.3 10 1.2-7.4 6.9 2 10L16 23.7z" fill="#f0c89a" opacity=".92"/>'; return s; };
   // The complex's name and address in the page language. The API and config.js hold them in Russian; the default
   // complex («Некруз Резиденс», пр. Борбад, 15) is shown from i18n (brand.name, contact.address), any other as it is.

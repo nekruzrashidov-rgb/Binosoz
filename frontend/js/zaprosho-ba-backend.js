@@ -59,7 +59,9 @@
 
   const M = (S.map = {
     building(b) {
-      return { id: b.id, name: pick(b, ['name', 'title'], '') || pick(b, ['nameRu'], ''), nameRu: pick(b, ['nameRu'], ''), nameTg: pick(b, ['nameTg'], ''), description: pick(b, ['description'], '') || pick(b, ['descriptionRu'], ''), descriptionRu: pick(b, ['descriptionRu'], ''), descriptionTg: pick(b, ['descriptionTg'], ''), address: pick(b, ['address'], ''), deliveryDate: pick(b, ['deliveryDate', 'completionDate', 'deadline'], ''), floorsCount: num(pick(b, ['floorsCount', 'floors', 'floorCount'], 0)), modelUrl: pick(b, ['modelUrl'], null), total: num(pick(b, ['totalApartments', 'apartmentsCount', 'total'], 0)), free: num(pick(b, ['freeApartments', 'freeCount', 'free'], 0)), completionYear: pick(b, ['completionYear'], null), plannedApartments: pick(b, ['plannedApartments'], null), eco: b.eco || null, isDemo: !!b.isDemo };
+      return { id: b.id, name: pick(b, ['name', 'title'], '') || pick(b, ['nameRu'], ''), nameRu: pick(b, ['nameRu'], ''), nameTg: pick(b, ['nameTg'], ''), description: pick(b, ['description'], '') || pick(b, ['descriptionRu'], ''), descriptionRu: pick(b, ['descriptionRu'], ''), descriptionTg: pick(b, ['descriptionTg'], ''), address: pick(b, ['address'], ''), deliveryDate: pick(b, ['deliveryDate', 'completionDate', 'deadline'], ''), floorsCount: num(pick(b, ['floorsCount', 'floors', 'floorCount'], 0)), modelUrl: pick(b, ['modelUrl'], null), total: num(pick(b, ['totalApartments', 'apartmentsCount', 'total'], 0)), free: num(pick(b, ['freeApartments', 'freeCount', 'free'], 0)), completionYear: pick(b, ['completionYear'], null), plannedApartments: pick(b, ['plannedApartments'], null), eco: b.eco || null, isDemo: !!b.isDemo,
+        // Amenities (keys of BuildingAmenities) and the developer's installment terms: only what the API has.
+        amenities: Array.isArray(b.amenities) ? b.amenities : [], installment: b.installment || null };
     },
     floor(f) { return { id: f.id, number: num(pick(f, ['number', 'floorNumber', 'level'], 0)), commercial: !!pick(f, ['isCommercial', 'commercial'], false), total: num(pick(f, ['totalApartments', 'apartmentsCount', 'total'], 0)), free: num(pick(f, ['freeApartments', 'freeCount', 'free'], 0)) }; },
     apt(a, floorNo) {
@@ -424,6 +426,9 @@
     greenImpact() { return request('GET', '/public/green-impact', { auth: false, query: { organization: cfgSlug() } }); },
     greenStats() { return request('GET', '/stats/green'); },
     saveGreenSettings(b) { return request('PUT', '/owner/green-settings', { body: b }); },
+    installmentSettings() { return request('GET', '/owner/installment-settings'); },
+    saveInstallmentSettings(b) { return request('PUT', '/owner/installment-settings', { body: b }); },
+    saveBuildingAmenities(id, keys) { return request('PUT', '/buildings/' + id + '/amenities', { body: { amenities: keys } }).then(M.building); },
     // Eco passport of a building (Content and leaders): the whole passport, empty fields — «not filled».
     saveBuildingEco(id, eco) { return request('PUT', '/buildings/' + id + '/eco', { body: eco }).then(M.building); },
     createBuilding(b) { return withFields(request('POST', '/buildings', { body: { nameRu: b.nameRu, nameTg: b.nameTg, address: b.address, floorsCount: b.floorsCount, descriptionRu: b.descriptionRu || null, descriptionTg: b.descriptionTg || null, modelUrl: null, completionYear: b.completionYear || null, plannedApartments: b.plannedApartments || null } })).then(M.building); },
