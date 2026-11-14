@@ -942,10 +942,16 @@
   const validPhone = (v) => { const d = phoneDigits(v); return /^992\d{9}$/.test(d) || /^\d{9}$/.test(d); };
 
   S.views.register = function (root) {
-    const page = h('div', { class: 'page-in lux reg-page' });
+    // Design docs/design/Register.dc.html: on the left a dark column with what the platform gives, on the right the form.
+    const page = h('div', { class: 'page-in nr reg-page' });
     root.appendChild(page);
     const card = h('div', { class: 'reg-card' });
-    page.append(h('section', { class: 'reg-wrap' }, card), siteFooter());
+    const perks = [['cube', 'reg2.perk1'], ['clipboard', 'reg2.perk2'], ['screen', 'reg2.perk3']];
+    const aside = h('aside', { class: 'reg-aside nr-dark' },
+      h('div', { class: 'nr-kicker' }, h('span', { class: 'nr-kicker-line', 'aria-hidden': 'true' }), 'BINOSOZ'),
+      h('h1', { class: 'reg-title' }, t('reg2.title')), h('p', { class: 'reg-lead' }, t('reg2.sub')),
+      h('ul', { class: 'reg-perks' }, perks.map(([ic, k]) => h('li', null, h('span', { class: 'reg-perk-ic' }, landIcon(ic)), h('div', null, h('b', null, t(k)), h('span', null, t(k + '.d')))))));
+    page.append(h('section', { class: 'reg-split' }, aside, h('div', { class: 'reg-main' }, card)), siteFooter());
 
     const fl = (field, label, req) => h('label', { class: 'fl' }, field, h('span', null, label + (req ? ' *' : '')), h('em', { class: 'fl-err' }));
     const company = h('input', { class: 'inp', name: 'companyName', placeholder: ' ', maxlength: 200, autocomplete: 'organization' });
@@ -954,7 +960,7 @@
     const phone = h('input', { class: 'inp', name: 'contactPhone', type: 'tel', placeholder: ' ', value: '+992', autocomplete: 'tel' });
     const comment = h('textarea', { class: 'inp', name: 'comment', placeholder: ' ', maxlength: 1000, rows: 4 });
     phone.addEventListener('input', () => { phone.value = formatPhone(phone.value); });
-    const btn = h('button', { class: 'btn gold lg block', type: 'submit' }, t('reg2.send'));
+    const btn = h('button', { class: 'btn nr-btn nr-btn--primary block', type: 'submit' }, t('reg2.send'));
     const form = h('form', { class: 'ct-form reg-form', novalidate: true },
       fl(company, t('reg2.company'), true), h('small', { class: 'fl-hint' }, t('reg2.companyPh')),
       fl(owner, t('reg2.owner'), true),
@@ -982,13 +988,8 @@
       });
     });
 
-    card.append(
-      h('a', { class: 'back-link', href: '/' }, '← ' + t('nav.home')),
-      h('div', { class: 'reg-brand' }, S.logo(), h('b', null, 'BINOSOZ')),
-      h('h1', null, accentFirst(t('reg2.title'))),
-      h('p', { class: 'muted-lux' }, t('reg2.sub')),
-      h('ul', { class: 'reg-perks' }, ['reg2.perk1', 'reg2.perk2', 'reg2.perk3'].map((k) => h('li', null, landIcon('check'), t(k)))),
-      form);
+    card.append(h('h2', { class: 'nr-form-title' }, t('reg2.formTitle')), form,
+      h('p', { class: 'reg-have' }, t('reg2.have') + ' ', h('a', { href: '/login' }, t('nav.login'))));
     return () => {};
   };
 

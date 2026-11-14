@@ -1,4 +1,4 @@
-/* Russian interface texts (1801 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* Russian interface texts (1807 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -1082,7 +1082,7 @@
     "cab.month.10": "ноября",
     "cab.month.11": "декабря",
     "login.toSite": "На сайт",
-    "login.heroEyebrow": "Жилой комплекс · Душанбе",
+    "login.heroEyebrow": "Личный кабинет",
     "brand.name": "Некруз Резиденс",
     "contact.address": "г. Душанбе, пр. Борбад, 15",
     "contact.manager": "Некруз",
@@ -1805,5 +1805,11 @@
     "faq.down.term": ", остаток — в рассрочку до {t}",
     "faq.down.zero": " Без переплаты: остаток делится на равные платежи.",
     "nr.faq.kicker": "Вопросы",
+    "login.heroTitle": "Ваша квартира — всегда под рукой",
+    "reg2.formTitle": "Заявка на подключение",
+    "reg2.have": "Уже зарегистрированы?",
+    "reg2.perk1.d": "Покупатель выбирает квартиру на модели дома.",
+    "reg2.perk2.d": "Вся воронка продаж в одном кабинете.",
+    "reg2.perk3.d": "Статус брони и график платежей онлайн.",
   };
 })();

@@ -211,18 +211,18 @@
     // The building on the left (55%), the form on the right; on a phone the building shrinks to a strip above the form.
     function loginShell(c) {
       const cc = (window.SITORA_CONFIG || {}).CONTACT || {};
-      const rnd = (a, b) => a + Math.random() * (b - a);
-      const sky = h('div', { class: 'lg-sky', 'aria-hidden': 'true' }, Array.from({ length: 46 }, () => {
-        const size = rnd(1.5, 4).toFixed(1) + 'px';
-        return h('i', { style: { left: rnd(0, 100).toFixed(1) + '%', top: rnd(0, 100).toFixed(1) + '%', width: size, height: size, animationDelay: rnd(0, 8).toFixed(1) + 's', animationDuration: rnd(7, 14).toFixed(1) + 's' } });
-      }));
+      // The picture is a render of the site's 3D model (frontend/tools/renders), signed as such.
+      const src = (w) => '/img/renders/tower-night-tall-' + w + '.webp';
+      const pic = h('figure', { class: 'lg-pic', 'aria-hidden': 'true' },
+        h('img', { src: src(1600), srcset: [800, 1600, 2400].map((w) => src(w) + ' ' + w + 'w').join(', '), sizes: '(max-width: 768px) 100vw, 55vw', width: 2400, height: 3000, alt: '', decoding: 'async' }));
+      const words = t('brand.name').split(/\s+/);
       const lang = h('div', { class: 'seg lg-lang', role: 'group', 'aria-label': 'Language' }, S.LANGS.map(([k, l]) => h('button', { type: 'button', class: S.lang === k ? 'on' : '', 'aria-pressed': String(S.lang === k), onclick: () => { if (S.lang !== k) S.setLang(k); } }, l)));
       const facts = h('ul', { class: 'lg-facts' },
         cc.address ? h('li', null, S.icon('pin'), S.brandAddress(cc.address)) : null,
         cc.phone ? h('li', null, S.icon('phone'), h('a', { href: 'tel:' + cc.phone.replace(/[^\d+]/g, '') }, cc.phone)) : null);
-      const hero = h('aside', { class: 'lg-hero' }, sky,
-        h('div', { class: 'lg-hero-top' }, h('a', { class: 'lg-brand', href: '/', 'aria-label': t('login.toSite') }, S.logo(), h('small', { class: 'lg-platform' }, t('footer.platform'))), lang),
-        h('div', { class: 'lg-hero-text' }, h('p', { class: 'lg-eyebrow' }, t('login.heroEyebrow')), h('h1', { class: 'lg-name' }, t('brand.name')), h('p', { class: 'lg-sub' }, t('login.heroSub')), facts));
+      const hero = h('aside', { class: 'lg-hero nr-dark' }, pic, h('div', { class: 'lg-shade', 'aria-hidden': 'true' }), h('span', { class: 'nr-render-note lg-note' }, t('nr.render')),
+        h('div', { class: 'lg-hero-top' }, h('a', { class: 'lg-brand', href: '/', 'aria-label': t('login.toSite') }, S.towerLogo(), h('span', { class: 'brand-word' }, h('b', null, words[0]), words.length > 1 ? h('small', null, words.slice(1).join(' ')) : null)), lang),
+        h('div', { class: 'lg-hero-text' }, h('p', { class: 'lg-eyebrow' }, t('login.heroEyebrow')), h('h1', { class: 'lg-name' }, t('login.heroTitle')), h('p', { class: 'lg-sub' }, t('login.heroSub')), facts));
       return h('div', { class: 'lg-split' }, hero, h('main', { class: 'lg-side' }, h('div', { class: 'lg-frame' }, c), demoChips()));
     }
 

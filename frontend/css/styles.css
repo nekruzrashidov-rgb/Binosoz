@@ -2909,3 +2909,21 @@ button.nr-layout { width: 100%; padding: 0; text-align: left; font: inherit; cur
 .nr-ct .ct-val a { display: inline-flex; align-items: center; min-height: 44px; }
 .nr-ct .ct-agree input[type='checkbox'] { width: 22px; height: 44px; margin: 0; flex: none; accent-color: var(--accent); }
 .nr-ct .ct-agree { display: flex; align-items: center; gap: 10px; }
+
+/* ---------- register (design) ---------- */
+.reg-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: calc(100vh - var(--hdr-h, 76px)); }
+.reg-aside { position: relative; padding: clamp(40px, 6vw, 88px) clamp(24px, 5vw, 72px); display: flex; flex-direction: column; justify-content: center; }
+.reg-title { margin-top: 22px; font-family: var(--display); font-weight: 500; font-size: clamp(44px, 6vw, 84px); line-height: 0.98; color: var(--ink); }
+.reg-lead { margin-top: 22px; max-width: 520px; font-size: 17px; line-height: 1.65; color: var(--ink-2); }
+.reg-aside .reg-perks { margin: 36px 0 0; gap: 0; }
+.reg-aside .reg-perks li { align-items: flex-start; gap: 16px; padding: 18px 0; border-top: 1px solid var(--line); color: var(--ink); }
+.reg-aside .reg-perks li:last-child { border-bottom: 1px solid var(--line); }
+.reg-perk-ic svg { width: 26px; height: 26px; color: var(--accent-text); stroke-width: 1.5; }
+.reg-aside .reg-perks b { display: block; font-family: var(--display); font-size: 22px; font-weight: 500; }
+.reg-aside .reg-perks div span { display: block; margin-top: 4px; font-size: 14.5px; font-weight: 500; color: var(--muted); }
+.reg-main { display: flex; align-items: center; justify-content: center; padding: clamp(28px, 5vw, 72px) clamp(16px, 4vw, 56px); background: var(--bg); }
+.nr .reg-card { max-width: 520px; border-radius: 2px; box-shadow: 0 24px 60px rgba(27, 24, 21, 0.08); }
+.nr .reg-card .fl .inp { border-radius: 2px; }
+.reg-have { margin-top: 18px; color: var(--muted); font-size: 14px; }
+.reg-have a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 700; color: var(--accent-text); }
+@media (max-width: 900px) { .reg-split { grid-template-columns: minmax(0, 1fr); min-height: 0; } .reg-aside { padding: 40px 16px; } .reg-main { padding: 28px 16px 48px; } }

@@ -1,4 +1,4 @@
-/* English interface texts (1801 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* English interface texts (1807 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -1082,7 +1082,7 @@
     "cab.month.10": "November",
     "cab.month.11": "December",
     "login.toSite": "To the website",
-    "login.heroEyebrow": "Residential complex · Dushanbe",
+    "login.heroEyebrow": "Personal account",
     "brand.name": "Nekruz Residence",
     "contact.address": "15 Borbad Ave, Dushanbe",
     "contact.manager": "Nekruz",
@@ -1805,5 +1805,11 @@
     "faq.down.term": ", the rest in installments over up to {t}",
     "faq.down.zero": " No overpayment: the rest is split into equal payments.",
     "nr.faq.kicker": "Questions",
+    "login.heroTitle": "Your apartment, always at hand",
+    "reg2.formTitle": "Request to join",
+    "reg2.have": "Already registered?",
+    "reg2.perk1.d": "Buyers pick an apartment on the model of the house.",
+    "reg2.perk2.d": "The whole sales funnel in one workspace.",
+    "reg2.perk3.d": "Booking status and payment schedule online.",
   };
 })();
