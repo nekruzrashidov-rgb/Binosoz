@@ -2927,3 +2927,7 @@ button.nr-layout { width: 100%; padding: 0; text-align: left; font: inherit; cur
 .reg-have { margin-top: 18px; color: var(--muted); font-size: 14px; }
 .reg-have a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 700; color: var(--accent-text); }
 @media (max-width: 900px) { .reg-split { grid-template-columns: minmax(0, 1fr); min-height: 0; } .reg-aside { padding: 40px 16px; } .reg-main { padding: 28px 16px 48px; } }
+
+/* 404, privacy: the design's sharp corners. */
+.err-card, .privacy-doc.card { border-radius: 2px; }
+.err-card .btn, .privacy-page .btn { border-radius: 2px; }
