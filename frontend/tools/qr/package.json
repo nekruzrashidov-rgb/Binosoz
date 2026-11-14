@@ -1,0 +1,7 @@
+{
+  "name": "binosoz-qr",
+  "private": true,
+  "description": "Генерация frontend/img/qr-binosoz.svg (QR-код сайта) — запускается один раз, локально, без внешних сервисов.",
+  "scripts": { "build": "node make-qr.mjs" },
+  "devDependencies": { "qrcode": "1.5.4" }
+}
