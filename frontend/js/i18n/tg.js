@@ -1,4 +1,4 @@
-/* Tajik interface texts (1774 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* Tajik interface texts (1794 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. Tajik strings should be proof-read by a native speaker before launch. */
 (function () {
   const S = (window.S = window.S || {});
@@ -1778,5 +1778,25 @@
     "instf.down": "Пардохти аввалияи ҳадди ақал, %",
     "instf.months": "Мӯҳлати ҳадди аксар, моҳ",
     "instf.zero": "Бе изофапардохт: бақия баробар тақсим мешавад, фоиз ҳисоб намешавад",
+    "nr.cat.sub": "Ошёнаро дар модели 3D-и бино интихоб кунед, нақшаро бинед ва хонаро онлайн брон кунед.",
+    "nr.cat.model": "Модели 3D-и бино",
+    "nr.cat.selFloor": "Ошёнаи интихобшуда",
+    "nr.cat.freeOf": "Озод {n} аз {m}",
+    "nr.cat.noUnits": "Дар ин ошёна хонаи ин навъ нест. Навъ ё ошёнаи дигарро интихоб кунед.",
+    "nr.cat.pickHint": "Хонаро аз рӯйхат ё дар модел интихоб кунед.",
+    "nr.cat.aptN": "Хонаи {n}",
+    "nr.cat.comShort": "Т",
+    "nr.cat.area": "Масоҳат",
+    "nr.cat.sqm": "Барои 1 м²",
+    "nr.cat.price": "Нарх",
+    "nr.cat.perMonth": "Бо муҳлатдиҳӣ: аз {s} дар як моҳ",
+    "nr.cat.perMonthNote": "бо пардохти аввали {d}% ва мӯҳлати то {t}",
+    "nr.cat.calcTitle": "Пардохти моҳонаро ҳисоб кунед",
+    "nr.cat.calcSub": "Ҳисоб барои хонаи интихобшуда: бақия пас аз пардохти аввал ба моҳҳо тақсим мешавад. Шартҳои дақиқ — аз менеҷер.",
+    "nr.cat.calcSubZero": "Ҳисоб барои хонаи интихобшуда. Қисм-қисм бевосита ба сохтмончӣ, бе бонк ва изофапардохт пардохт кунед.",
+    "nr.cat.calcFor": "Хонаи {n} · {p}",
+    "nr.cat.zero": "изофапардохт 0%",
+    "nr.cat.allKicker": "Ҳамаи хонаҳо",
+    "nr.cat.plansSub": "Масоҳат ва нархҳо — аз рӯи хонаҳои бино. Навъро пахш кунед, то чунин хонаҳоро дар рӯйхат бинед.",
   };
 })();

@@ -186,67 +186,63 @@
   const pageHead = (title, sub) => h('section', { class: 'lux-pagehead' }, h('div', { class: 'wrap' },
     h('a', { class: 'back-link', href: '/' }, '← ' + t('nav.home')), h('h1', null, accentFirst(title)), sub ? h('p', null, sub) : null));
 
-  /* ---------- catalog: the 3D tower, the list with filters, the calculator ---------- */
+  /* ---------- catalog (design docs/design/Apartments.dc.html): the 3D model in a frame with the floors on its right,
+     the panel of the chosen floor and apartment, the calculator over the developer's terms, then the layouts, the eco
+     passport and the whole list with filters. Every number comes from the API. ---------- */
   S.views.apartments = function (root) {
     const cfg = window.SITORA_CONFIG || {};
-    const st = { building: null, floors: [], apts: [], rate: null, sel: null, floor: null, rooms: 'all', maxPrice: 0, sort: 'price', onlyFree: true, shown: 12, overlay: true, time: 'dusk' };
+    const st = { building: null, floors: [], apts: [], rate: null, sel: null, floor: null, floorRooms: 'all', rooms: 'all', maxPrice: 0, priceCap: 0, sort: 'price', onlyFree: true, shown: 12, time: 'dusk', calcApt: null };
     let house = null, alive = true;
-    const page = h('div', { class: 'page-in landing-page lux' });
+    const page = h('div', { class: 'page-in nr nr-cat' });
     root.appendChild(page);
-    // Page hero: breadcrumbs, title, and the ways to reach the manager on the right.
+
+    // 1. Page head: breadcrumbs, the title, live numbers, the ways to reach the manager.
     const cc = contacts();
-    const topStats = h('div', { class: 'apts-hero-stats' });
-    page.appendChild(h('section', { class: 'cat-hero apts-hero' }, h('div', { class: 'wrap cat-hero-in' },
-      h('div', { class: 'cat-hero-text' },
-        h('nav', { class: 'crumbs', 'aria-label': t('cat.crumbs') }, h('a', { href: '/' }, t('nav.home')), h('span', { 'aria-hidden': 'true' }, '/'), h('span', { 'aria-current': 'page' }, t('nav.apartments'))),
-        h('h1', { class: 'apts-hero-title' }, accentFirst(t('cat.title'))), h('p', { class: 'apts-hero-sub' }, t('cat.sub')), topStats),
-      (cc.phone || cc.telegram) ? h('div', { class: 'cat-hero-contact' },
-        cc.phone ? h('a', { class: 'cat-call', href: 'tel:+' + phoneDigits(cc.phone) }, h('span', { class: 'ct-ic' }, landIcon('phone')), h('span', null, h('small', null, t('home.call')), h('b', null, cc.phone))) : null,
-        cc.telegram ? h('a', { class: 'btn gold', href: telegramUrl(cc.telegram), target: '_blank', rel: 'noopener' }, landIcon('send'), 'Telegram') : null) : null)));
+    const topStats = h('dl', { class: 'nr-cat-stats' });
+    page.appendChild(h('section', { class: 'nr-pagehead' }, h('div', { class: 'nr-wrap nr-pagehead-in' },
+      h('div', null,
+        h('nav', { class: 'nr-crumbs', 'aria-label': t('cat.crumbs') }, h('a', { href: '/' }, t('nav.home')), h('span', { 'aria-hidden': 'true' }, '/'), h('span', { 'aria-current': 'page' }, t('nav.apartments'))),
+        h('h1', { class: 'nr-page-title' }, t('cat.title')), h('p', { class: 'nr-page-sub' }, t('nr.cat.sub')), topStats),
+      (cc.phone || cc.telegram) ? h('div', { class: 'nr-pagehead-contact' },
+        cc.phone ? h('a', { class: 'nr-phone', href: 'tel:+' + phoneDigits(cc.phone) }, landIcon('phone'), cc.phone) : null,
+        cc.telegram ? h('a', { class: 'btn nr-btn nr-btn--primary', href: telegramUrl(cc.telegram), target: '_blank', rel: 'noopener' }, landIcon('send'), 'Telegram') : null) : null)));
 
-
-    const houseBox = h('div', { class: 'house3d', id: 'house3d' });
+    // 2. The model and the floor panel.
+    const houseBox = h('div', { class: 'house3d nr-house', id: 'house3d' });
     const tip = h('div', { class: 'tip', hidden: true });
-    const sheetHost = h('div');
-    const floorbar = h('div', { class: 'floorbar glass pe', role: 'group', 'aria-label': t('hero.floors') });
-    const heroTitle = h('div', { class: 'hero-title' });
-    const stats = h('div', { class: 'stat-strip pe' });
-    const loading = h('div', { class: 'hero-loading' }, t('hero.loading'));
+    const loading = h('div', { class: 'nr-stage-loading' }, t('hero.loading'));
+    const rail = h('div', { class: 'nr-rail', role: 'group', 'aria-label': t('hero.floors') });
+    const timeSeg = h('div', { class: 'nr-seg', role: 'group', 'aria-label': t('hero.time') }, ['day', 'dusk', 'night'].map((k) => h('button', { type: 'button', 'aria-pressed': String(st.time === k), 'data-k': k,
+      onclick: () => { st.time = k; house && house.setTime(k); S.$$('button', timeSeg).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === k))); } }, t('time.' + k))));
+    const tools = h('div', { class: 'nr-model-tools' },
+      h('button', { class: 'nr-icon-btn', type: 'button', title: t('hero.zoomIn'), 'aria-label': t('hero.zoomIn'), onclick: () => house && house.zoom(0.8) }, S.icon('zin')),
+      h('button', { class: 'nr-icon-btn', type: 'button', title: t('hero.zoomOut'), 'aria-label': t('hero.zoomOut'), onclick: () => house && house.zoom(1.25) }, S.icon('zout')),
+      h('button', { class: 'nr-icon-btn', type: 'button', title: t('hero.reset'), 'aria-label': t('hero.reset'), onclick: () => { house && (house.clearSelection(), house.resetView()); } }, S.icon('rotate')));
+    const legend = h('div', { class: 'nr-legend' }, ['free', 'booked', 'sold', 'onrequest'].map((k) => h('span', null, h('i', { class: 'nr-dot ' + k }), t('status.' + k))));
+    const panel = h('div', { class: 'nr-floorpanel', 'aria-live': 'polite' });
+    const stage = h('section', { class: 'nr-sec nr-stage-sec', id: 'hero-top' }, h('div', { class: 'nr-wrap nr-stage-grid' },
+      h('div', { class: 'nr-model' },
+        h('div', { class: 'nr-model-head' }, h('span', { class: 'nr-model-title' }, t('nr.cat.model')), timeSeg),
+        h('div', { class: 'nr-stage' }, houseBox, tip, loading, rail, tools),
+        legend),
+      panel));
+    page.appendChild(stage);
 
-    const legend = h('div', { class: 'legend glass pe' }, [['free', 'status.free'], ['booked', 'status.booked'], ['sold', 'status.sold'], ['onrequest', 'status.onrequest']].map(([k, key]) => h('span', null, h('i', { style: { background: { free: '#2fd6a3', booked: '#ffb030', sold: '#4a5570', onrequest: '#6f8bff' }[k] } }), t(key))));
-
-    const timeSeg = h('div', { class: 'seg', role: 'group', 'aria-label': t('hero.time') }, ['day', 'dusk', 'night'].map((k) => h('button', { class: st.time === k ? 'on' : '', 'data-k': k, onclick: () => { st.time = k; house && house.setTime(k); S.$$('button', timeSeg).forEach((b) => b.classList.toggle('on', b.dataset.k === k)); } }, t('time.' + k))));
-    const viewSeg = h('div', { class: 'seg', role: 'group' }, [['1', 'hero.statuses'], ['0', 'hero.photo']].map(([v, key]) => h('button', { class: (st.overlay ? '1' : '0') === v ? 'on' : '', 'data-k': v, onclick: () => { st.overlay = v === '1'; house && house.setOverlay(st.overlay); S.$$('button', viewSeg).forEach((b) => b.classList.toggle('on', b.dataset.k === v)); legend.style.visibility = st.overlay ? 'visible' : 'hidden'; } }, t(key))));
-    const ctrls = h('div', { class: 'ctrls pe' }, timeSeg, viewSeg,
-      h('button', { class: 'icon-btn', title: t('hero.zoomIn'), 'aria-label': t('hero.zoomIn'), onclick: () => house && house.zoom(0.8) }, S.icon('zin')),
-      h('button', { class: 'icon-btn', title: t('hero.zoomOut'), 'aria-label': t('hero.zoomOut'), onclick: () => house && house.zoom(1.25) }, S.icon('zout')),
-      h('button', { class: 'icon-btn', title: t('hero.reset'), 'aria-label': t('hero.reset'), onclick: () => { st.floor = null; st.sel = null; house && (house.clearSelection(), house.resetView()); renderSheet(); renderFloors(); } }, S.icon('rotate')));
-
-    const hero = h('section', { class: 'hero', id: 'hero-top' },
-      houseBox, h('div', { class: 'hero-shade' }), tip, loading,
-      h('div', { class: 'hero-ui' }, h('div', { class: 'wrap hero-uiwrap', style: { height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative' } },
-        h('div', { class: 'hero-top' }, heroTitle),
-        h('div', { class: 'hero-bottom' }, h('div', { class: 'stack', style: { gap: '10px' } }, stats, legend), ctrls)),
-      ),
-      h('div', { class: 'wrap', style: { position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 3 } }, h('div', { style: { position: 'relative', height: '100%' } }, floorbar, sheetHost)));
-    page.appendChild(hero);
-
-    const aptSection = h('section', { class: 'section', id: 'apartments' });
-    const calcSection = h('section', { class: 'section alt', id: 'calc' });
-    // Floor plans: one drawn plan per apartment type, with the areas and prices of this building.
-    const plansSection = h('section', { class: 'section lux-sec', id: 'plans' });
-    // Eco passport of the building (S.eco): only when the developer filled something in.
-    const ecoSection = h('section', { class: 'section', id: 'eco', hidden: true });
-    page.append(plansSection, ecoSection, aptSection, calcSection, siteFooter());
+    const calcSection = h('section', { class: 'nr-sec nr-dark', id: 'calc' });
+    const plansSection = h('section', { class: 'nr-sec', id: 'plans' });
+    const ecoSection = h('section', { class: 'nr-sec nr-sec--tight', id: 'eco', hidden: true });
+    const aptSection = h('section', { class: 'nr-sec nr-band', id: 'apartments' });
+    page.append(calcSection, plansSection, ecoSection, aptSection, siteFooter());
 
     // ---------- data ----------
-    // No building, no apartments, or the API did not answer: the 3D stage, plans and calculator are hidden and one
-    // card says so (with the phone and a request link). Nothing invented is shown.
+    // No building, no apartments, or the API did not answer: one honest card instead of the model, the calculator and the
+    // lists (with the phone and a request link). Nothing invented is shown.
     function showEmpty(state) {
-      hero.hidden = true; plansSection.hidden = true; calcSection.hidden = true; ecoSection.hidden = true; topStats.replaceChildren();
-      aptSection.replaceChildren(h('div', { class: 'wrap' }, soonCard(state, () => {
-        hero.hidden = false; plansSection.hidden = false; calcSection.hidden = false;
-        aptSection.replaceChildren(); loading.replaceChildren(t('hero.loading')); load();
+      [stage, calcSection, plansSection, ecoSection].forEach((s) => { s.hidden = true; });
+      topStats.replaceChildren();
+      aptSection.replaceChildren(h('div', { class: 'nr-wrap' }, soonCard(state, () => {
+        [stage, calcSection, plansSection].forEach((s) => { s.hidden = false; });
+        aptSection.replaceChildren(); load();
       })));
     }
     async function load() {
@@ -271,167 +267,157 @@
       }
       if (!alive) return;
       loading.remove();
+      // The floor with free apartments, the highest first (the best views); without free ones — the top floor.
+      const residential = st.floors.filter((f) => !f.commercial).map((f) => f.number).sort((a, b) => b - a);
+      st.floor = residential.find((n) => st.apts.some((a) => a.floor === n && a.status === 'free')) || residential[0] || null;
+      st.sel = firstFree(st.floor);
       renderAll();
       initHouse();
       // /apartments#calc from the landing: the calculator exists only now, after the data.
       if (location.hash === '#calc') setTimeout(() => scrollTo('calc'), 100);
     }
+    const firstFree = (n) => st.apts.filter((a) => a.floor === n).sort((a, b) => a.number - b.number).find((a) => a.status === 'free') || null;
 
     function initHouse() {
-      const floors = st.floors.filter((f) => !f.commercial).map((f) => f.number);
       // The 3D engine is loaded now (once): when the stage comes near the screen.
       if (!S.House3D) {
-        const go = () => loadHouse3D().then(() => { if (alive && S.House3D) initHouse(); }).catch(() => { /* no 3D: the floor list and the apartments below still work */ });
+        const go = () => loadHouse3D().then(() => { if (alive && S.House3D) initHouse(); }).catch(() => { /* no 3D: the floor list and the apartments still work */ });
         if ('IntersectionObserver' in window) {
           const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); go(); } }, { rootMargin: '200px' });
-          io.observe(hero);
+          io.observe(stage);
         } else go();
         return;
       }
       try {
-      house = S.House3D.create(houseBox, {
-        floors: Math.max(...st.floors.map((f) => f.number), 1), time: st.time,
-        onSelectApartment: (a) => { st.sel = st.apts.find((x) => x.id === a.id) || null; st.floor = st.sel ? st.sel.floor : st.floor; renderSheet(); renderFloors(); },
-        onSelectFloor: (n) => { st.floor = n; if (st.sel && st.sel.floor !== n) st.sel = null; renderSheet(); renderFloors(); },
-        onHover: (a, x, y) => {
-          if (!a) { tip.hidden = true; return; }
-          const apt = st.apts.find((z) => z.id === a.id) || a;
-          tip.replaceChildren(h('b', null, '№ ' + apt.number), ' · ' + S.fmt.rooms(apt.rooms) + ' · ' + S.fmt.area(apt.area) + ' · ' + t('status.' + apt.status));
-          tip.style.left = Math.min(x, houseBox.clientWidth - 260) + 'px'; tip.style.top = y + 'px'; tip.hidden = false;
-        },
-      });
+        house = S.House3D.create(houseBox, {
+          floors: Math.max(...st.floors.map((f) => f.number), 1), time: st.time,
+          onSelectApartment: (a) => { const apt = st.apts.find((x) => x.id === a.id); if (apt) pickApt(apt, true); },
+          onSelectFloor: (n) => { if (n === null) return; selectFloor(n, true); },
+          onHover: (a, x, y) => {
+            if (!a) { tip.hidden = true; return; }
+            const apt = st.apts.find((z) => z.id === a.id) || a;
+            tip.replaceChildren(h('b', null, '№ ' + apt.number), ' · ' + S.fmt.rooms(apt.rooms) + ' · ' + S.fmt.area(apt.area) + ' · ' + t('status.' + apt.status));
+            tip.style.left = Math.min(x, houseBox.clientWidth - 260) + 'px'; tip.style.top = y + 'px'; tip.hidden = false;
+          },
+        });
       } catch (e) {
         S.logError(e); house = null;
         houseBox.replaceChildren(h('div', { class: 'empty', style: { padding: '60px 16px', textAlign: 'center' } }, t('house.no3d')));
         return;
       }
       pushToHouse();
-      void floors;
     }
-    function pushToHouse() { if (!house) return; house.setData(st.apts.map((a) => ({ id: a.id, floor: a.floor, planSlot: a.planSlot, number: a.number, status: a.status, rooms: a.rooms, area: a.area, price: a.price }))); if (st.sel) house.selectApartment(st.sel.id); else if (st.floor !== null) house.selectFloor(st.floor); }
+    function pushToHouse() {
+      if (!house) return;
+      house.setData(st.apts.map((a) => ({ id: a.id, floor: a.floor, planSlot: a.planSlot, number: a.number, status: a.status, rooms: a.rooms, area: a.area, price: a.price })));
+      if (st.sel) house.selectApartment(st.sel.id); else if (st.floor !== null) house.selectFloor(st.floor);
+    }
 
     // ---------- render ----------
-    function renderAll() { renderHero(); renderTopStats(); renderFloors(); renderSheet(); renderPlans(); renderEco(); renderApartments(); renderCalc(); }
-    function renderEco() {
-      const card = S.eco ? S.eco.block(st.building.eco, { demo: st.building.isDemo }) : null;
-      ecoSection.hidden = !card;
-      ecoSection.replaceChildren(card ? h('div', { class: 'wrap' }, card) : '');
-    }
-
-    // Numbers in the page head: free apartments, the lowest price of a free one, floors.
+    function renderAll() { renderTopStats(); renderRail(); renderPanel(); renderCalc(); renderPlans(); renderEco(); renderApartments(); }
     function renderTopStats() {
       const free = st.apts.filter((a) => a.status === 'free');
       const prices = (free.length ? free : st.apts).map((a) => a.price).filter((p) => p > 0);
-      const stat = (v, l) => h('div', { class: 'apts-hero-stat' }, h('b', { class: 'apts-hero-stat-num' }, v), h('span', { class: 'apts-hero-stat-label' }, l));
+      const stat = (v, l) => h('div', null, h('dt', null, l), h('dd', null, v));
       topStats.replaceChildren(stat(S.fmt.n(free.length), t('wow.cat.free')),
         prices.length ? stat(S.fmt.money(Math.min(...prices), 'TJS'), t('wow.cat.from')) : null,
         stat(S.fmt.n(st.building.floorsCount || st.floors.length), t('wow.cat.floors')));
     }
-
-    // Studio, 1-, 2- and 3-room: the smallest area and the price range of that type in this building (the type's typical
-    // area when the building has none). The button filters the list below by that type and scrolls to it.
-    function renderPlans() {
-      const cards = PLAN_TYPES.map((type) => {
-        const list = st.apts.filter((a) => (type === 3 ? a.rooms >= 3 : a.rooms === type));
-        const area = list.length ? Math.min(...list.map((a) => a.area)) : PLAN_AREAS[type];
-        const prices = list.map((a) => a.price).filter((p) => p > 0);
-        const lo = Math.min(...prices), hi = Math.max(...prices);
-        const range = !prices.length ? t('plans.onRequest') : lo === hi ? S.fmt.money(lo, 'TJS') : S.fmt.money(lo, 'TJS') + ' – ' + S.fmt.money(hi, 'TJS');
-        const canvas = h('canvas', { class: 'plan-canvas', width: 320, height: 220, role: 'img', 'aria-label': t('layouts.type' + type) });
-        drawFloorPlan(canvas, type);
-        return h('article', { class: 'plan-card' }, canvas,
-          h('div', { class: 'plan-card-body' }, h('h3', null, t('layouts.type' + type)),
-            h('div', { class: 'plan-badges' }, h('span', { class: 'plan-badge' }, t('plans.from') + ' ' + S.fmt.area(area)), h('span', { class: 'plan-badge gold' }, range)),
-            h('button', { class: 'btn gold block', type: 'button', onclick: () => { st.rooms = String(type); st.shown = 12; renderApartments(); scrollTo('apartments'); } }, t('plans.pick'))));
-      });
-      plansSection.replaceChildren(h('div', { class: 'wrap' },
-        h('div', { class: 'lux-head' }, h('h2', null, accentFirst(t('plans.title'))), h('p', null, t('plans.sub'))),
-        h('div', { class: 'plan-grid' }, cards)));
+    function renderEco() {
+      const card = S.eco ? S.eco.block(st.building.eco, { demo: st.building.isDemo }) : null;
+      ecoSection.hidden = !card;
+      ecoSection.replaceChildren(card ? h('div', { class: 'nr-wrap' }, card) : '');
     }
 
-    function minPrice() { const f = st.apts.filter((a) => a.status === 'free'); return f.length ? Math.min(...f.map((a) => a.price)) : 0; }
-    function renderHero() {
-      const b = st.building, free = st.apts.filter((a) => a.status === 'free').length;
-      heroTitle.replaceChildren(
-        h('span', { class: 'eyebrow' }, S.icon('pin'), S.brandAddress(b.address) || t('hero.city')),
-        h('h2', { class: 'hero-name' }, S.brandName(b.name)),
-        h('p', null, S.lang === 'tg' && b.descriptionTg ? b.descriptionTg : (b.description || t('hero.sub'))),
-        h('div', { class: 'hero-cta pe' }, h('button', { class: 'btn gold lg', onclick: () => scrollTo('apartments') }, t('hero.cta1')), h('button', { class: 'btn ghost lg', style: { color: '#fff', borderColor: 'rgba(255,255,255,.4)' }, onclick: () => scrollTo('calc') }, t('hero.cta2'))));
-      stats.replaceChildren(
-        stat(S.fmt.n(free), t('stat.free')), stat(S.fmt.money(minPrice(), 'TJS'), t('stat.from')), stat(b.deliveryDate ? S.fmt.date(b.deliveryDate).slice(3) : b.completionYear ? String(b.completionYear) : '—', t('stat.delivery')));
-    }
-    const stat = (v, l) => h('div', { class: 'stat glass' }, h('b', null, v), h('span', null, l));
-
-    function renderFloors() {
-      const list = st.floors.slice().sort((a, b) => b.number - a.number);
+    // Floors on the right of the model, the top floor first; the number of free apartments under each.
+    function renderRail() {
       const free = (n) => st.apts.filter((a) => a.floor === n && a.status === 'free').length;
-      floorbar.replaceChildren(h('h4', null, t('hero.floors')), list.map((f) => { const c = free(f.number); return h('button', { class: 'fbtn' + (st.floor === f.number ? ' on' : '') + (c ? '' : ' zero'), title: f.commercial ? t('floor.commercial') : t('floor.n', { n: f.number }) + ', ' + t('floor.free', { n: c }), onclick: () => selectFloor(f.number) }, h('span', null, f.commercial ? 'К' : f.number), h('small', null, f.commercial ? '' : c)); })); // TODO: i18n
+      rail.replaceChildren(...st.floors.slice().sort((a, b) => b.number - a.number).map((f) => {
+        const c = free(f.number);
+        return h('button', { type: 'button', class: 'nr-rail-btn' + (c ? '' : ' zero'), 'aria-pressed': String(st.floor === f.number),
+          'aria-label': f.commercial ? t('floor.commercial') : t('floor.n', { n: f.number }) + ', ' + t('floor.free', { n: c }), onclick: () => selectFloor(f.number) },
+        h('span', null, f.commercial ? t('nr.cat.comShort') : f.number));
+      }));
+      const on = S.$('[aria-pressed="true"]', rail);
+      if (on && on.scrollIntoView && rail.scrollHeight > rail.clientHeight) on.scrollIntoView({ block: 'nearest' });
     }
-    function selectFloor(n) {
-      st.floor = st.floor === n ? null : n; st.sel = null;
-      if (house) { if (st.floor === null) { house.clearSelection(); house.resetView(); } else house.selectFloor(n); }
-      renderFloors(); renderSheet();
+    function selectFloor(n, fromModel) {
+      st.floor = n; st.floorRooms = 'all';
+      st.sel = firstFree(n);
+      if (house && !fromModel) { if (st.sel) house.selectApartment(st.sel.id); else house.selectFloor(n); }
+      renderRail(); renderPanel(); syncCalc();
+    }
+    function pickApt(a, fromModel) {
+      st.sel = a; st.floor = a.floor;
+      if (house && !fromModel) house.selectApartment(a.id);
+      renderRail(); renderPanel(); syncCalc();
     }
 
-    function planSvg(floorNo, selId) {
-      const apts = st.apts.filter((a) => a.floor === floorNo);
-      const bySlot = {}; apts.forEach((a, i) => { bySlot[a.planSlot !== null && a.planSlot !== undefined ? a.planSlot : i] = a; });
-      const pos = { 0: [14, 164, 126, 46], 1: [160, 164, 126, 46], 2: [244, 112, 46, 46], 3: [244, 62, 46, 46], 4: [160, 10, 126, 46], 5: [14, 10, 126, 46], 6: [10, 62, 46, 46], 7: [10, 112, 46, 46] };
-      const ns = 'http://www.w3.org/2000/svg';
-      const svg = document.createElementNS(ns, 'svg'); svg.setAttribute('viewBox', '0 0 300 220'); svg.setAttribute('class', 'plan'); svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', t('plan.label', { n: floorNo }));
-      const core = document.createElementNS(ns, 'rect'); core.setAttribute('x', 70); core.setAttribute('y', 66); core.setAttribute('width', 160); core.setAttribute('height', 88); core.setAttribute('rx', 8); core.setAttribute('fill', 'rgba(150,165,210,.14)'); core.setAttribute('stroke', 'rgba(150,165,210,.4)'); svg.appendChild(core);
-      const ct = document.createElementNS(ns, 'text'); ct.setAttribute('x', 150); ct.setAttribute('y', 114); ct.setAttribute('text-anchor', 'middle'); ct.setAttribute('fill', 'rgba(170,182,224,.8)'); ct.textContent = t('plan.core'); svg.appendChild(ct);
-      for (let s = 0; s < 8; s++) {
-        const [x, y, w, hh] = pos[s]; const a = bySlot[s];
-        const g = document.createElementNS(ns, 'g'); g.setAttribute('class', 'slot' + (a && a.id === selId ? ' on' : ''));
-        const r = document.createElementNS(ns, 'rect'); r.setAttribute('x', x); r.setAttribute('y', y); r.setAttribute('width', w); r.setAttribute('height', hh); r.setAttribute('rx', 9);
-        const st2 = a ? a.status : 'sold';
-        r.setAttribute('fill', { free: 'rgba(47,214,163,.28)', booked: 'rgba(255,176,48,.3)', sold: 'rgba(120,134,170,.28)', onrequest: 'rgba(111,139,255,.3)' }[st2]);
-        r.setAttribute('stroke', { free: '#2fd6a3', booked: '#ffb030', sold: '#6a7696', onrequest: '#6f8bff' }[st2]); r.setAttribute('stroke-width', 1.5);
-        g.appendChild(r);
-        const tx = document.createElementNS(ns, 'text'); tx.setAttribute('x', x + w / 2); tx.setAttribute('y', y + hh / 2 + 4.5); tx.setAttribute('text-anchor', 'middle'); tx.setAttribute('fill', 'currentColor'); tx.textContent = a ? '№' + a.number : '—'; g.appendChild(tx);
-        if (a) { g.addEventListener('click', () => pickApt(a)); g.setAttribute('tabindex', 0); g.setAttribute('role', 'button'); g.setAttribute('aria-label', '№ ' + a.number + ', ' + t('status.' + a.status)); g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pickApt(a); } }); }
-        svg.appendChild(g);
+    // The developer's terms for «от … в месяц»: the minimum down payment over the longest term.
+    const terms = () => siteTerms(st.building);
+    function cheapestMonthly(price) {
+      const x = terms(); if (!x || !x.months) return null;
+      const down = Math.round(price * (x.down || 0) / 100);
+      return { monthly: Math.round((price - down) / x.months), down: x.down || 0, months: x.months };
+    }
+
+    function renderPanel() {
+      const f = st.floor, fl = st.floors.find((x) => x.number === f);
+      if (f === null || !fl) { panel.replaceChildren(h('p', { class: 'nr-panel-hint' }, t('nr.cat.pickHint'))); return; }
+      if (fl.commercial) {
+        panel.replaceChildren(h('div', { class: 'nr-panel-head' }, h('div', null, h('div', { class: 'nr-kicker' }, t('nr.cat.selFloor')), h('h2', { class: 'nr-panel-floor' }, t('floor.commercial')))),
+          h('p', { class: 'nr-lead' }, t('floor.commercialText')),
+          h('button', { class: 'btn nr-btn nr-btn--primary', type: 'button', onclick: () => leadModal(t('lead.commercial')) }, t('lead.send')));
+        return;
       }
-      return svg;
+      const onFloor = st.apts.filter((a) => a.floor === f).sort((a, b) => a.number - b.number);
+      const free = onFloor.filter((a) => a.status === 'free').length;
+      const match = (a) => st.floorRooms === 'all' || (st.floorRooms === '3' ? a.rooms >= 3 : a.rooms === +st.floorRooms);
+      const units = onFloor.filter(match);
+      const pills = h('div', { class: 'nr-pills', role: 'group', 'aria-label': t('filter.rooms') }, [['all', t('filter.all')], ['0', t('apt.studio')], ['1', '1'], ['2', '2'], ['3', '3+']].map(([v, l]) =>
+        h('button', { type: 'button', class: 'nr-pill', 'aria-pressed': String(st.floorRooms === v), onclick: () => { st.floorRooms = v; renderPanel(); } }, l)));
+      const list = h('div', { class: 'nr-units' }, units.map((a) => h('button', { type: 'button', class: 'nr-unit st-' + a.status, 'aria-pressed': String(!!st.sel && st.sel.id === a.id), onclick: () => pickApt(a) },
+        h('span', { class: 'nr-unit-top' }, h('b', null, t('nr.cat.aptN', { n: a.number })), h('span', { class: 'nr-unit-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status))),
+        h('span', { class: 'nr-unit-type' }, t('layouts.type' + Math.min(3, a.rooms))),
+        h('span', { class: 'nr-unit-meta' }, S.fmt.area(a.area)),
+        h('span', { class: 'nr-unit-price' }, S.fmt.money(a.price, 'TJS')))));
+      panel.replaceChildren(
+        h('div', { class: 'nr-panel-head' },
+          h('div', null, h('div', { class: 'nr-kicker' }, t('nr.cat.selFloor')), h('h2', { class: 'nr-panel-floor' }, t('floor.n', { n: f }))),
+          h('div', { class: 'nr-panel-free' }, t('nr.cat.freeOf', { n: S.fmt.n(free), m: S.fmt.n(onFloor.length) }))),
+        pills, units.length ? list : h('p', { class: 'nr-panel-hint' }, t('nr.cat.noUnits')),
+        st.sel && st.sel.floor === f ? detail(st.sel) : h('p', { class: 'nr-panel-hint' }, t('nr.cat.pickHint')));
     }
-    function pickApt(a) { st.sel = a; st.floor = a.floor; house && house.selectApartment(a.id); renderSheet(); renderFloors(); }
-
-    function monthly(price, down, months) { const d = Math.round((price * down) / 100); return { down: d, monthly: Math.round((price - d) / months) }; }
-
-    function renderSheet() {
-      sheetHost.replaceChildren();
-      if (st.floor === null && !st.sel) return;
-      const f = st.floor;
-      const fl = st.floors.find((x) => x.number === f);
-      const a = st.sel;
-      const body = [h('button', { class: 'icon-btn x', 'aria-label': t('common.close'), onclick: () => { st.sel = null; st.floor = null; house && (house.clearSelection(), house.resetView()); renderSheet(); renderFloors(); } }, S.icon('x'))];
-      if (fl && fl.commercial) {
-        body.push(h('div', { class: 'apt-head' }, h('h3', null, t('floor.commercial')), h('p', { class: 'muted', style: { marginTop: '6px' } }, t('floor.commercialText'))), h('button', { class: 'btn', onclick: () => leadModal(t('lead.commercial')) }, t('lead.send')));
-      } else {
-        const free = st.apts.filter((x) => x.floor === f && x.status === 'free').length;
-        body.push(h('div', { class: 'apt-head' }, h('div', { class: 'muted', style: { fontSize: '12px', fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase' } }, t('floor.n', { n: f })), h('h3', null, a ? t('apt.title', { n: a.number }) : t('floor.free', { n: free }))), planSvg(f, a && a.id));
-        if (!a) body.push(h('p', { class: 'muted', style: { textAlign: 'center' } }, t('sheet.pick')));
-        if (a) {
-          const eq = st.rate ? Math.round(a.price / st.rate.rate) : null;
-          const m = monthly(a.price, 30, 60);
-          body.push(
-            h('div', { class: 'row between' }, S.statusChip(a.status), h('span', { class: 'muted', style: { fontWeight: 700 } }, S.fmt.rooms(a.rooms) + ' · ' + S.fmt.area(a.area))),
-            S.eco && S.eco.badge(st.building.eco) ? h('a', { href: '#eco', class: 'eco-badge-link', onclick: (e) => { e.preventDefault(); scrollTo('eco'); } }, S.eco.badge(st.building.eco)) : null,
-            h('div', null, h('div', { class: 'price' }, S.fmt.money(a.price, 'TJS')), eq ? h('div', { class: 'muted', style: { fontWeight: 600, fontSize: '13px' } }, '≈ $' + S.fmt.n(eq) + ' · ' + t('price.estimate')) : null, h('div', { class: 'muted', style: { fontSize: '13px' } }, S.fmt.n(a.pricePerSqm) + ' TJS / ' + t('u.m2'))),
-            h('div', { class: 'card flat', style: { padding: '12px', background: 'rgba(255,255,255,.06)' } }, h('div', { class: 'muted', style: { fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em' } }, t('calc.example')), h('div', { style: { fontWeight: 800, fontSize: '17px', marginTop: '2px' } }, S.fmt.money(m.monthly, 'TJS') + ' / ' + t('u.month')), h('div', { class: 'muted', style: { fontSize: '12.5px' } }, t('calc.exampleSub', { d: S.fmt.money(m.down, 'TJS') }))),
-            a.status === 'free' ? h('button', { class: 'btn gold lg block', onclick: () => bookModal(a) }, t('book.cta')) : h('div', { class: 'form-err', style: { background: 'rgba(255,255,255,.08)', color: 'inherit' } }, t('book.unavailable')),
-            h('div', { class: 'row' }, h('button', { class: 'btn ghost grow', onclick: () => { st.calcApt = a; renderCalc(); scrollTo('calc'); } }, t('calc.open')), h('button', { class: 'btn ghost grow', onclick: () => leadModal(t('lead.aboutApt', { n: a.number }), a.id) }, t('lead.ask'))));
-        }
-      }
-      sheetHost.appendChild(h('aside', { class: 'sheet glass pe', style: { position: 'absolute' }, 'aria-live': 'polite' }, body));
+    // The chosen apartment: its plan, the facts, the price, «от … в месяц» by the developer's terms, booking.
+    function detail(a) {
+      const plan = h('canvas', { class: 'nr-detail-plan', width: 300, height: 200, role: 'img', 'aria-label': t('layouts.type' + Math.min(3, a.rooms)) });
+      drawFloorPlan(plan, Math.min(3, a.rooms));
+      const eq = st.rate ? Math.round(a.price / st.rate.rate) : null;
+      const m = cheapestMonthly(a.price);
+      const badge = S.eco && S.eco.badge(st.building.eco);
+      return h('div', { class: 'nr-detail' }, h('div', { class: 'nr-detail-pic' }, plan),
+        h('div', { class: 'nr-detail-body' },
+          h('div', { class: 'nr-detail-kicker' }, t('nr.cat.aptN', { n: a.number }) + ' · ' + t('floor.n', { n: a.floor })),
+          h('h3', { class: 'nr-detail-type' }, t('layouts.type' + Math.min(3, a.rooms))),
+          h('dl', { class: 'nr-detail-facts' }, h('div', null, h('dt', null, t('nr.cat.area')), h('dd', null, S.fmt.area(a.area))), h('div', null, h('dt', null, t('nr.cat.sqm')), h('dd', null, S.fmt.money(a.pricePerSqm, 'TJS')))),
+          h('div', { class: 'nr-detail-label' }, t('nr.cat.price')),
+          h('div', { class: 'nr-detail-price' }, S.fmt.money(a.price, 'TJS')),
+          eq ? h('div', { class: 'nr-detail-note' }, '≈ $' + S.fmt.n(eq) + ' · ' + t('price.estimate')) : null,
+          m ? h('div', { class: 'nr-detail-month' }, t('nr.cat.perMonth', { s: S.fmt.money(m.monthly, 'TJS') }), h('small', null, t('nr.cat.perMonthNote', { d: S.fmt.n(m.down), t: termText(m.months) }))) : null,
+          badge ? h('a', { href: '#eco', class: 'eco-badge-link', onclick: (e) => { e.preventDefault(); scrollTo('eco'); } }, badge) : null,
+          a.status === 'free'
+            ? h('button', { class: 'btn nr-btn nr-btn--primary block', type: 'button', onclick: () => bookModal(a) }, t('book.cta'))
+            : h('p', { class: 'nr-detail-off' }, t('book.unavailable')),
+          h('div', { class: 'nr-detail-links' },
+            h('button', { class: 'nr-link', type: 'button', onclick: () => { st.calcApt = a; renderCalc(); scrollTo('calc'); } }, t('calc.open'), arrow()),
+            h('button', { class: 'nr-link', type: 'button', onclick: () => leadModal(t('lead.aboutApt', { n: a.number }), a.id) }, t('lead.ask'), arrow()))));
     }
 
     // ---------- booking ----------
     function bookModal(a) {
       const name = S.input('name', { placeholder: t('f.namePh'), required: true, autocomplete: 'name' });
       const phone = S.input('phone', { placeholder: '+992 9XX XX XX XX', type: 'tel', value: '+992', autocomplete: 'tel' });
-      const form = h('form', { class: 'stack', novalidate: true }, S.field(t('f.name'), name), S.field(t('f.phone'), phone, t('f.phoneHint')), h('p', { class: 'hint' }, t('book.note')));
+      const form = h('form', { class: 'stack', novalidate: true }, S.field(t('f.name'), name), S.field(t('f.phone'), phone, t('f.phoneHint')), h('p', { class: 'hint' }, t('book.note')), S.privacyNote());
       const btn = h('button', { class: 'btn gold', type: 'submit' }, t('book.confirm'));
       form.id = 'bookform'; btn.setAttribute('form', 'bookform');
       const md = S.modal({ title: t('book.title', { n: a.number }), body: [h('div', { class: 'card flat', style: { marginBottom: '14px' } }, h('div', { class: 'row between' }, h('b', null, t('apt.title', { n: a.number })), S.fmt.money(a.price, 'TJS')), h('div', { class: 'muted' }, t('floor.n', { n: a.floor }) + ' · ' + S.fmt.rooms(a.rooms) + ' · ' + S.fmt.area(a.area))), form], actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
@@ -440,13 +426,13 @@
         await S.busy(btn, async () => {
           try {
             const r = await S.api.book(a.id, { name: name.value.trim(), phone: phone.value.replace(/[\s()-]/g, '') });
-            md.close(); a.status = 'booked'; pushToHouse(); renderSheet(); renderApartments(); renderHero();
+            md.close(); a.status = 'booked'; pushToHouse(); renderPanel(); renderRail(); renderApartments(); renderTopStats();
             S.modal({ title: t('book.doneTitle'), body: h('div', { class: 'stack' }, h('p', null, t('book.doneText', { n: a.number })), r && r.expiresAt ? h('div', { class: 'next' }, h('span', null, t('book.until')), h('b', null, S.fmt.dt(r.expiresAt))) : null, h('p', { class: 'muted' }, t('book.doneNote'))), actions: [h('button', { class: 'btn', onclick: (ev) => ev.target.closest('.overlay').querySelector('.x').click() }, t('common.ok'))] });
           } catch (er) { S.showErrors(form, er); if (er.status === 409) { refreshApts(); } }
         });
       });
     }
-    async function refreshApts() { try { st.apts = await S.api.allApartments(st.floors); pushToHouse(); renderSheet(); renderApartments(); renderHero(); renderFloors(); } catch (e) { /* ignore */ } }
+    async function refreshApts() { try { st.apts = await S.api.allApartments(st.floors); pushToHouse(); renderPanel(); renderRail(); renderApartments(); renderTopStats(); } catch (e) { /* ignore */ } }
 
     function leadModal(preset, aptId) {
       const name = S.input('name', { placeholder: t('f.namePh'), autocomplete: 'name' });
@@ -461,7 +447,69 @@
       });
     }
 
-    // ---------- apartments list ----------
+    // ---------- calculator (dark): the chosen apartment, the developer's terms ----------
+    function syncCalc() { if (!st.calcApt) renderCalc(); }
+    function renderCalc() {
+      const x = terms();
+      const a = st.calcApt || st.sel;
+      const free = st.apts.filter((z) => z.status === 'free');
+      const price = a ? a.price : free.length ? Math.round(free.reduce((s, z) => s + z.price, 0) / free.length / 10000) * 10000 : 0;
+      if (!price) { calcSection.hidden = true; return; }
+      calcSection.hidden = false;
+      const minDown = Math.max(0, Math.ceil(x && x.down != null ? x.down : 0));
+      const maxYears = x && x.months ? Math.max(1, Math.floor(x.months / 12)) : 10;
+      const cs = { down: Math.min(90, Math.max(minDown, 20)), years: Math.min(maxYears, 5) };
+      const out = { down: h('b'), years: h('b'), monthly: h('span', { class: 'nr-calc-sum' }), note: h('p', { class: 'nr-calc-note' }) };
+      const range = (id, label, min, max, step, key) => {
+        const inp = h('input', { id, type: 'range', min, max, step, value: cs[key] });
+        inp.addEventListener('input', () => { cs[key] = Number(inp.value); draw(); });
+        return h('div', { class: 'nr-range' }, h('div', { class: 'nr-range-top' }, h('label', { for: id }, label), out[key]), inp);
+      };
+      let monthlyNow = 0;
+      function draw() {
+        const down = Math.round(price * cs.down / 100), months = cs.years * 12;
+        monthlyNow = Math.round((price - down) / months);
+        out.down.textContent = cs.down + '% · ' + S.fmt.money(down, 'TJS');
+        out.years.textContent = counted(cs.years, 'nr.yearsN');
+        out.monthly.textContent = S.fmt.money(monthlyNow, 'TJS');
+        out.note.textContent = (a ? t('nr.cat.calcFor', { n: a.number, p: S.fmt.money(price, 'TJS') }) + ' · ' : '') + (x && x.zero ? t('nr.cat.zero') : t('nr.calc.totalAsk'));
+      }
+      const utilHost = h('div', { class: 'util-host' });
+      const send = h('button', { class: 'btn nr-btn nr-btn--primary', type: 'button', onclick: () => leadModal(t('lead.calc', { p: S.fmt.n(price), d: cs.down, m: cs.years * 12, mo: S.fmt.n(monthlyNow) }), a && a.id) }, t('calc.send'));
+      calcSection.replaceChildren(h('div', { class: 'nr-wrap nr-split nr-split--top' },
+        h('div', null, kicker(t('nr.plan.kicker')), h('h2', { class: 'nr-h2' }, t('nr.cat.calcTitle')), h('p', { class: 'nr-lead' }, t(x && x.zero ? 'nr.cat.calcSubZero' : 'nr.cat.calcSub')), utilHost),
+        h('div', { class: 'nr-calc nr-calc--dark' },
+          range('c-down', t('plan.down'), minDown, 90, 5, 'down'),
+          range('c-years', t('plan.term'), 1, maxYears, 1, 'years'),
+          h('div', { class: 'nr-calc-out' }, h('span', { class: 'nr-calc-label' }, t('nr.calc.monthly')), out.monthly, out.note), send)));
+      draw();
+      // Energy costs of the chosen apartment (S.eco.utility): only with the building's estimated use and the developer's tariff.
+      if (a && S.eco) S.api.utility(a.id).then((r) => { if (alive && r && utilHost.isConnected) utilHost.replaceChildren(S.eco.utility(r, a)); }).catch(() => {});
+    }
+
+    // ---------- layouts: one card per type, the button filters the list ----------
+    function renderPlans() {
+      const cards = PLAN_TYPES.map((type) => {
+        const list = st.apts.filter((a) => (type === 3 ? a.rooms >= 3 : a.rooms === type));
+        if (!list.length) return null;
+        const prices = (list.some((a) => a.status === 'free') ? list.filter((a) => a.status === 'free') : list).map((a) => a.price).filter((p) => p > 0);
+        const lo = Math.floor(Math.min(...list.map((a) => a.area))), hi = Math.ceil(Math.max(...list.map((a) => a.area)));
+        const canvas = h('canvas', { class: 'nr-layout-plan', width: 320, height: 210, role: 'img', 'aria-label': t('layouts.type' + type) });
+        drawFloorPlan(canvas, type);
+        return h('button', { class: 'nr-layout', type: 'button', onclick: () => { st.rooms = String(type); st.shown = 12; renderApartments(); scrollTo('apartments'); } },
+          h('div', { class: 'nr-layout-pic' }, canvas),
+          h('div', { class: 'nr-layout-body' },
+            h('div', { class: 'nr-layout-top' }, h('span', { class: 'nr-layout-type' }, t('layouts.type' + type)), h('span', { class: 'nr-layout-area' }, (lo === hi ? S.fmt.n(lo) : S.fmt.n(lo) + '–' + S.fmt.n(hi)) + ' ' + t('u.m2'))),
+            h('div', { class: 'nr-layout-bottom' }, prices.length ? h('span', { class: 'nr-layout-price' }, t('home.chip.from', { p: S.fmt.money(Math.min(...prices), 'TJS') })) : h('span'),
+              h('span', { class: 'nr-layout-more' }, t('nr.look'), arrow()))));
+      }).filter(Boolean);
+      plansSection.hidden = !cards.length;
+      plansSection.replaceChildren(h('div', { class: 'nr-wrap' },
+        h('div', { class: 'nr-head-row' }, h('div', null, kicker(t('nr.layouts.kicker')), h('h2', { class: 'nr-h2' }, t('plans.title'))), h('p', { class: 'nr-head-note' }, t('nr.cat.plansSub'))),
+        h('div', { class: 'nr-layouts' }, cards)));
+    }
+
+    // ---------- the whole list with filters ----------
     function filtered() {
       let l = st.apts.slice();
       if (st.onlyFree) l = l.filter((a) => a.status === 'free');
@@ -473,27 +521,27 @@
       return l.sort(s);
     }
     function renderApartments() {
-      const list = filtered();
       const rooms = [['all', t('filter.all')], ['0', t('apt.studio')], ['1', '1'], ['2', '2'], ['3', '3+']];
-      const price = h('input', { class: 'range', type: 'range', id: 'f-price', min: Math.floor(Math.min(...st.apts.map((a) => a.price)) / 10000) * 10000, max: st.maxPrice, step: 10000, value: st.priceCap, 'aria-label': t('filter.price'), oninput: (e) => { st.priceCap = +e.target.value; priceVal.textContent = S.fmt.money(st.priceCap, 'TJS'); st.shown = 12; drawList(); } });
-      const priceVal = h('span', { class: 'num', style: { fontWeight: 800 } }, S.fmt.money(st.priceCap, 'TJS'));
+      const minP = Math.floor(Math.min(...st.apts.map((a) => a.price)) / 10000) * 10000;
+      const price = h('input', { type: 'range', id: 'f-price', min: minP, max: st.maxPrice, step: 10000, value: st.priceCap, oninput: (e) => { st.priceCap = +e.target.value; priceVal.textContent = S.fmt.money(st.priceCap, 'TJS'); st.shown = 12; drawList(); } });
+      const priceVal = h('b', null, S.fmt.money(st.priceCap, 'TJS'));
       const sort = S.select('sort', [['price', t('sort.price')], ['priceDesc', t('sort.priceDesc')], ['area', t('sort.area')], ['floor', t('sort.floor')]], st.sort); sort.addEventListener('change', () => { st.sort = sort.value; drawList(); });
-      const grid = h('div', { class: 'grid g4', id: 'apt-grid' });
-      const more = h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '18px' } });
-      const count = h('div', { class: 'muted', style: { fontWeight: 700 } });
+      const grid = h('div', { class: 'nr-unit-grid', id: 'apt-grid' });
+      const more = h('div', { class: 'nr-more' });
+      const count = h('p', { class: 'nr-head-note' });
       function drawList() {
         const l = filtered(); count.textContent = t('list.found', { n: l.length });
         grid.replaceChildren(...(l.length ? l.slice(0, st.shown).map(renderCard) : [h('div', { style: { gridColumn: '1/-1' } }, S.empty(t('list.none'), 'building'))]));
-        more.replaceChildren(l.length > st.shown ? h('button', { class: 'btn ghost', onclick: () => { st.shown += 12; drawList(); } }, t('list.more', { n: l.length - st.shown })) : '');
+        more.replaceChildren(l.length > st.shown ? h('button', { class: 'btn nr-btn nr-btn--dark', type: 'button', onclick: () => { st.shown += 12; drawList(); } }, t('list.more', { n: l.length - st.shown })) : '');
       }
-      aptSection.replaceChildren(h('div', { class: 'wrap' },
-        h('div', { class: 'sec-head' }, h('div', null, h('h2', null, accentFirst(t('apts.title'))), h('p', null, t('apts.sub'))), count),
-        h('div', { class: 'filters' },
-          h('div', { class: 'field' }, h('label', null, t('filter.rooms')), h('div', { class: 'pill-group' }, rooms.map(([v, l]) => h('button', { class: 'pill' + (st.rooms === v ? ' on' : ''), onclick: (e) => { st.rooms = v; st.shown = 12; S.$$('.pill', e.target.parentNode).forEach((p) => p.classList.remove('on')); e.target.classList.add('on'); drawList(); } }, l)))),
-          h('div', { class: 'field' }, h('label', { for: 'f-price' }, t('filter.priceTo')), price, priceVal),
-          S.field(t('filter.sort'), sort),
+      aptSection.replaceChildren(h('div', { class: 'nr-wrap' },
+        h('div', { class: 'nr-head-row' }, h('div', null, kicker(t('nr.cat.allKicker')), h('h2', { class: 'nr-h2' }, t('apts.title'))), count),
+        h('div', { class: 'nr-filters' },
+          h('div', { class: 'nr-filter' }, h('span', { class: 'nr-filter-label', id: 'f-rooms' }, t('filter.rooms')), h('div', { class: 'nr-pills', role: 'group', 'aria-labelledby': 'f-rooms' }, rooms.map(([v, l]) => h('button', { type: 'button', class: 'nr-pill', 'aria-pressed': String(st.rooms === v), onclick: (e) => { st.rooms = v; st.shown = 12; S.$$('.nr-pill', e.currentTarget.parentNode).forEach((p) => p.setAttribute('aria-pressed', String(p === e.currentTarget))); drawList(); } }, l)))),
+          h('div', { class: 'nr-filter nr-range' }, h('div', { class: 'nr-range-top' }, h('label', { for: 'f-price' }, t('filter.priceTo')), priceVal), price),
+          h('div', { class: 'nr-filter' }, S.field(t('filter.sort'), sort)),
           ecoFilter(),
-          h('div', { class: 'field' }, h('label', null, t('filter.status')), h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.onlyFree, onchange: (e) => { st.onlyFree = e.target.checked; st.shown = 12; drawList(); } }), t('filter.onlyFree'))), h('span')),
+          h('label', { class: 'check nr-filter nr-check' }, h('input', { type: 'checkbox', checked: st.onlyFree, onchange: (e) => { st.onlyFree = e.target.checked; st.shown = 12; drawList(); } }), t('filter.onlyFree'))),
         grid, more));
       drawList();
     }
@@ -502,50 +550,22 @@
       if (!cls || !S.eco) return null;
       const s = S.select('minClass', [['any', t('filter.all')]].concat(S.eco.classes.map(([k, l]) => [k, l])), st.minClass || 'any');
       s.addEventListener('change', () => { st.minClass = s.value; st.shown = 12; renderApartments(); });
-      return S.field(t('eco.filter'), s);
+      return h('div', { class: 'nr-filter' }, S.field(t('eco.filter'), s));
     }
-    // Catalog card: the floor plan of its type on top with the status and floor badges; number, rooms, area, price.
+    // A card of the list: the plan of its type, status and floor, number, type, area, price; it opens the apartment on the model.
     function renderCard(a) {
-      const plan = h('canvas', { width: 320, height: 180, 'aria-hidden': 'true' });
+      const plan = h('canvas', { class: 'nr-unit-plan', width: 320, height: 180, 'aria-hidden': 'true' });
       drawFloorPlan(plan, Math.min(3, a.rooms));
-      return h('button', { class: 'apt-card wow-apt', type: 'button', onclick: () => { scrollTo('home'); setTimeout(() => pickApt(a), 350); }, 'aria-label': t('apt.title', { n: a.number }) },
-        h('div', { class: 'apt-card-top' }, plan,
-          h('span', { class: 'apt-status-badge ' + a.status }, t('status.' + a.status)),
-          h('span', { class: 'apt-floor-badge' }, t('floor.n', { n: a.floor }))),
-        h('div', { class: 'apt-card-body' },
-          h('div', { class: 'apt-card-num' }, '№ ' + a.number),
-          h('div', { class: 'apt-card-rooms' }, S.fmt.rooms(a.rooms)),
-          h('div', { class: 'apt-card-area' }, S.fmt.area(a.area)),
-          h('div', { class: 'apt-card-price' }, S.fmt.money(a.price, 'TJS'), h('span', { class: 'apt-card-price-label' }, S.fmt.n(a.pricePerSqm) + ' TJS / ' + t('u.m2'))),
-          h('span', { class: 'apt-card-cta' }, t('card.show') + ' →')));
+      return h('button', { class: 'nr-unit-card', type: 'button', onclick: () => { pickApt(a); scrollTo('home'); }, 'aria-label': t('apt.title', { n: a.number }) + ', ' + t('status.' + a.status) },
+        h('span', { class: 'nr-unit-card-pic' }, plan),
+        h('span', { class: 'nr-unit-card-body' },
+          h('span', { class: 'nr-unit-top' }, h('b', null, t('nr.cat.aptN', { n: a.number })), h('span', { class: 'nr-unit-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status))),
+          h('span', { class: 'nr-unit-type' }, t('layouts.type' + Math.min(3, a.rooms))),
+          h('span', { class: 'nr-unit-meta' }, t('floor.n', { n: a.floor }) + ' · ' + S.fmt.area(a.area) + ' · ' + S.fmt.n(a.pricePerSqm) + ' TJS / ' + t('u.m2')),
+          h('span', { class: 'nr-unit-price' }, S.fmt.money(a.price, 'TJS'))));
     }
 
-    // ---------- calculator ----------
-    function renderCalc() {
-      const plan = installment();
-      const a = st.calcApt;
-      const free = st.apts.filter((x) => x.status === 'free');
-      const basePrice = a ? a.price : free.length ? Math.round(free.reduce((s, x) => s + x.price, 0) / free.length / 10000) * 10000 : 600000;
-      const price = S.input('price', { type: 'number', min: 10000, step: 1000, value: basePrice });
-      const down = h('input', { class: 'range', type: 'range', id: 'c-down', min: plan.downFrom, max: 90, step: 5, value: Math.max(30, plan.downFrom), 'aria-label': t('calc.down') });
-      const months = h('input', { class: 'range', type: 'range', id: 'c-months', min: 6, max: plan.years * 12, step: 6, value: Math.min(60, plan.years * 12), 'aria-label': t('calc.months') });
-      const dv = h('b', { class: 'num' }), mv = h('b', { class: 'num' });
-      const out = h('div', { class: 'calc-out' });
-      const upd = () => {
-        const p = Math.max(0, +price.value || 0); const r = monthly(p, +down.value, +months.value);
-        dv.textContent = down.value + '% · ' + S.fmt.money(r.down, 'TJS'); mv.textContent = months.value + ' ' + t('u.monthsShort');
-        out.replaceChildren(h('small', null, t('calc.monthly')), h('div', { class: 'big' }, S.fmt.money(r.monthly, 'TJS')), h('small', null, t('calc.noInterest')), h('div', { style: { marginTop: '14px', position: 'relative', zIndex: 1 } }, h('button', { class: 'btn gold', onclick: () => leadModal(t('lead.calc', { p: S.fmt.n(p), d: down.value, m: months.value, mo: S.fmt.n(r.monthly) }), a && a.id) }, t('calc.send'))));
-      };
-      [price, down, months].forEach((el) => el.addEventListener('input', upd));
-      // Energy costs of the chosen apartment (S.eco.utility): only with the building's estimated use and the developer's tariff.
-      const utilHost = h('div', { class: 'util-host' });
-      calcSection.replaceChildren(h('div', { class: 'wrap' }, h('div', { class: 'sec-head' }, h('div', null, h('h2', null, accentFirst(t('calc.title'))), h('p', null, a ? t('calc.forApt', { n: a.number }) : t('calc.sub')))),
-        h('div', { class: 'calc' }, h('div', { class: 'card stack' }, S.field(t('calc.price') + ' (TJS)', price), h('div', { class: 'field' }, h('label', { for: 'c-down' }, t('calc.down')), down, dv), h('div', { class: 'field' }, h('label', { for: 'c-months' }, t('calc.months')), months, mv)), out), utilHost));
-      upd();
-      if (a && S.eco) S.api.utility(a.id).then((r) => { if (alive && r && st.calcApt === a) utilHost.replaceChildren(S.eco.utility(r, a)); }).catch(() => {});
-    }
-
-    function scrollTo(id) { const el = document.getElementById(id === 'home' ? 'hero-top' : id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    function scrollTo(id) { const el = document.getElementById(id === 'home' ? 'hero-top' : id); if (el) el.scrollIntoView({ behavior: S.motionOk === false ? 'auto' : 'smooth', block: 'start' }); }
     S.scrollTo = scrollTo;
 
     load();

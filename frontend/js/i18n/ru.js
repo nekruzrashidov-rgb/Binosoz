@@ -1,4 +1,4 @@
-/* Russian interface texts (1774 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* Russian interface texts (1794 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -1778,5 +1778,25 @@
     "instf.down": "Минимальный первоначальный взнос, %",
     "instf.months": "Максимальный срок, месяцев",
     "instf.zero": "Без переплаты: остаток делится поровну, проценты не начисляются",
+    "nr.cat.sub": "Выберите этаж на 3D-модели дома, посмотрите планировку и забронируйте квартиру онлайн.",
+    "nr.cat.model": "3D-модель дома",
+    "nr.cat.selFloor": "Выбранный этаж",
+    "nr.cat.freeOf": "Свободно {n} из {m}",
+    "nr.cat.noUnits": "На этом этаже нет квартир такого типа. Выберите другой тип или этаж.",
+    "nr.cat.pickHint": "Выберите квартиру в списке или на модели.",
+    "nr.cat.aptN": "Кв. {n}",
+    "nr.cat.comShort": "К",
+    "nr.cat.area": "Площадь",
+    "nr.cat.sqm": "За м²",
+    "nr.cat.price": "Стоимость",
+    "nr.cat.perMonth": "В рассрочку: от {s} в месяц",
+    "nr.cat.perMonthNote": "при взносе {d}% и сроке до {t}",
+    "nr.cat.calcTitle": "Рассчитайте ежемесячный платёж",
+    "nr.cat.calcSub": "Расчёт для выбранной квартиры: остаток после взноса делится на месяцы. Точные условия — у менеджера.",
+    "nr.cat.calcSubZero": "Расчёт для выбранной квартиры. Платите частями напрямую застройщику, без банка и переплаты.",
+    "nr.cat.calcFor": "Кв. {n} · {p}",
+    "nr.cat.zero": "переплата 0%",
+    "nr.cat.allKicker": "Все квартиры",
+    "nr.cat.plansSub": "Площади и цены — по квартирам дома. Нажмите на тип, чтобы увидеть такие квартиры в списке.",
   };
 })();

@@ -1,4 +1,4 @@
-/* English interface texts (1774 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* English interface texts (1794 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -1778,5 +1778,25 @@
     "instf.down": "Minimum down payment, %",
     "instf.months": "Maximum term, months",
     "instf.zero": "No overpayment: the rest is split evenly, no interest is charged",
+    "nr.cat.sub": "Pick a floor on the 3D model, look at the layout and book the apartment online.",
+    "nr.cat.model": "3D model of the house",
+    "nr.cat.selFloor": "Selected floor",
+    "nr.cat.freeOf": "{n} of {m} free",
+    "nr.cat.noUnits": "No apartments of this type on this floor. Pick another type or floor.",
+    "nr.cat.pickHint": "Pick an apartment in the list or on the model.",
+    "nr.cat.aptN": "Apt {n}",
+    "nr.cat.comShort": "C",
+    "nr.cat.area": "Area",
+    "nr.cat.sqm": "Per m²",
+    "nr.cat.price": "Price",
+    "nr.cat.perMonth": "In installments: from {s} a month",
+    "nr.cat.perMonthNote": "with {d}% down over up to {t}",
+    "nr.cat.calcTitle": "Work out your monthly payment",
+    "nr.cat.calcSub": "For the chosen apartment: the rest after the down payment is divided by the months. A manager will confirm the exact terms.",
+    "nr.cat.calcSubZero": "For the chosen apartment. Pay the developer directly in parts, with no bank and no overpayment.",
+    "nr.cat.calcFor": "Apt {n} · {p}",
+    "nr.cat.zero": "0% overpayment",
+    "nr.cat.allKicker": "All apartments",
+    "nr.cat.plansSub": "Areas and prices come from the apartments of the house. Click a type to see those apartments in the list.",
   };
 })();
