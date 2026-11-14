@@ -93,7 +93,9 @@
           h('div', { class: 'card' }, h('h3', null, t('dash.byStage')), STAGES.map((s) => { const n = +stages[s] || 0; return h('div', { class: 'hbar' }, S.stageChip(s), S.bar((n / total) * 100), h('b', { class: 'num', style: { textAlign: 'right' } }, n)); }),
             rate && rate.rate ? h('p', { class: 'hint', style: { marginTop: '14px' } }, t('dash.rate', { r: rate.rate, d: S.fmt.date(rate.date) })) : h('p', { class: 'hint', style: { marginTop: '14px' } }, t('dash.noRate')),
             r.salesNote === 'usdWithoutRate' ? h('p', { class: 'hint' }, t('dash.usdNoRate')) : null),
-          S.isDemo() ? null : salesCharts(salesRows));
+          S.isDemo() ? null : salesCharts(salesRows),
+          // «Сэкономлено бумаги»: pages of the PDFs issued online and uploaded, by month (GET /stats/green).
+          S.eco && !S.isDemo() ? S.eco.paperCard() : null);
       },
 
       async pipeline(body) {
@@ -407,7 +409,9 @@
         const imp = h('input', { type: 'file', id: 'imp-file', accept: '.xlsx', hidden: true });
         imp.addEventListener('change', async () => { const f = imp.files[0]; if (!f) return; try { const r = await S.api.importApartments(b.id, f); S.toast(r && r.message ? r.message : t('cat.imported'), 'ok'); drawApts(); } catch (er) { S.modal({ title: t('cat.importErr'), body: h('div', { class: 'stack' }, h('p', null, er.message), er.errors ? h('pre', { class: 'paper', style: { whiteSpace: 'pre-wrap' } }, JSON.stringify(er.errors, null, 1)) : null) }); } imp.value = ''; });
         const tools = h('div', { class: 'toolbar' }, h('div', { style: { minWidth: '200px' } }, S.field(t('cat.floor'), sel)), h('span', { class: 'spacer' }), S.isDemo() ? null : h('button', { class: 'btn ghost', type: 'button', title: t('cat.templateHint'), onclick: (e) => S.busy(e.currentTarget, () => S.api.openDoc('/apartments/import/template', null, t('cat.template')).catch(S.err)) }, t('cat.template')), imp, h('label', { class: 'btn ghost', for: 'imp-file' }, t('cat.import')), h('button', { class: 'btn', onclick: () => aptForm(null, floors.find((f) => String(f.id) === String(floorId)), drawApts) }, t('cat.addApt')));
-        body.replaceChildren(buildingBar(bs, bid, 'catalog'), bform, h('h3', { style: { marginTop: '10px' } }, t('cat.apts')), tools, holder);
+        // Eco passport of the building: Content and leaders (the catalog section is theirs).
+        const ecoForm = S.eco ? S.eco.form(b, (r) => { b.eco = r && r.eco; }) : null;
+        body.replaceChildren(buildingBar(bs, bid, 'catalog'), bform, ecoForm, h('h3', { style: { marginTop: '10px' } }, t('cat.apts')), tools, holder);
         async function drawApts() {
           const fl = floors.find((f) => String(f.id) === String(floorId)); holder.replaceChildren(S.skeleton(4, 38));
           const list = (await S.api.floorApartments(fl)).sort((a, c) => (a.planSlot || 0) - (c.planSlot || 0));
@@ -624,6 +628,8 @@
           h('div', { class: 'card stack' }, h('h3', null, t('set.plan')),
             h('dl', { class: 'kv' }, h('dt', null, t('set.tariff')), h('dd', null, t('set.standard')), h('dt', null, t('set.objects')), h('dd', null, t('set.objectsN', { n: bs.length, m: LIMIT }))),
             S.bar((bs.length * 100) / LIMIT, bs.length >= LIMIT ? 'warn' : ''), h('p', { class: 'hint' }, t('set.planHint'))))));
+        // Tariffs and coefficients of the green features (owner): the utility calculator and the CO₂ figure use only these.
+        if (S.eco) body.append(S.eco.settingsForm());
       },
     };
     S.views.crm._views = views;

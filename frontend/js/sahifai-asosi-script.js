@@ -157,7 +157,9 @@
           h('div', { class: 'foot-social' },
             c.telegram ? h('a', { class: 'soc tg', href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener', 'aria-label': 'Telegram', title: 'Telegram' }, landIcon('send')) : null,
             c.phone ? h('a', { class: 'soc wa', href: 'https://wa.me/' + phoneDigits(c.phone), target: '_blank', rel: 'noopener', 'aria-label': 'WhatsApp', title: 'WhatsApp' }, landIcon('chat')) : null,
-            h('a', { class: 'btn ghost sm', href: '/login' }, t('foot.login')))),
+            h('a', { class: 'btn ghost sm', href: '/login' }, t('foot.login'))),
+          // Desktop only: a QR code of the site, to open it on a phone during a demo (frontend/tools/qr/make-qr.mjs).
+          h('div', { class: 'foot-qr' }, h('img', { src: '/img/qr-binosoz.svg', alt: t('qr.alt'), width: 88, height: 88, loading: 'lazy' }), h('span', null, t('qr.open')))),
         col(t('foot.apts'), h('a', { href: '/apartments' }, t('foot.catalog')), h('a', { href: '/apartments#calc' }, t('foot.calc')), h('a', { href: '/apartments' }, t('foot.3d'))),
         col(t('foot.info'), h('a', { href: '/#why' }, t('foot.why')), h('a', { href: '/#steps' }, t('foot.steps')), h('a', { href: '/login' }, t('foot.cabinet'))),
         col(t('foot.contacts'), h('span', null, c.address || ''), c.phone ? h('a', { href: 'tel:+' + phoneDigits(c.phone) }, c.phone) : null, c.telegram ? h('a', { href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, c.telegram) : null, h('a', { href: '/contact' }, t('foot.write')))),
@@ -234,13 +236,15 @@
     const calcSection = h('section', { class: 'section alt', id: 'calc' });
     // Floor plans: one drawn plan per apartment type, with the areas and prices of this building.
     const plansSection = h('section', { class: 'section lux-sec', id: 'plans' });
-    page.append(plansSection, aptSection, calcSection, siteFooter());
+    // Eco passport of the building (S.eco): only when the developer filled something in.
+    const ecoSection = h('section', { class: 'section', id: 'eco', hidden: true });
+    page.append(plansSection, ecoSection, aptSection, calcSection, siteFooter());
 
     // ---------- data ----------
     // No building, no apartments, or the API did not answer: the 3D stage, plans and calculator are hidden and one
     // card says so (with the phone and a request link). Nothing invented is shown.
     function showEmpty(state) {
-      hero.hidden = true; plansSection.hidden = true; calcSection.hidden = true; topStats.replaceChildren();
+      hero.hidden = true; plansSection.hidden = true; calcSection.hidden = true; ecoSection.hidden = true; topStats.replaceChildren();
       aptSection.replaceChildren(h('div', { class: 'wrap' }, soonCard(state, () => {
         hero.hidden = false; plansSection.hidden = false; calcSection.hidden = false;
         aptSection.replaceChildren(); loading.replaceChildren(t('hero.loading')); load();
@@ -308,7 +312,12 @@
     function pushToHouse() { if (!house) return; house.setData(st.apts.map((a) => ({ id: a.id, floor: a.floor, planSlot: a.planSlot, number: a.number, status: a.status, rooms: a.rooms, area: a.area, price: a.price }))); if (st.sel) house.selectApartment(st.sel.id); else if (st.floor !== null) house.selectFloor(st.floor); }
 
     // ---------- render ----------
-    function renderAll() { renderHero(); renderTopStats(); renderFloors(); renderSheet(); renderPlans(); renderApartments(); renderCalc(); }
+    function renderAll() { renderHero(); renderTopStats(); renderFloors(); renderSheet(); renderPlans(); renderEco(); renderApartments(); renderCalc(); }
+    function renderEco() {
+      const card = S.eco ? S.eco.block(st.building.eco, { demo: st.building.isDemo }) : null;
+      ecoSection.hidden = !card;
+      ecoSection.replaceChildren(card ? h('div', { class: 'wrap' }, card) : '');
+    }
 
     // Numbers in the page head: free apartments, the lowest price of a free one, floors.
     function renderTopStats() {
@@ -346,7 +355,7 @@
       const b = st.building, free = st.apts.filter((a) => a.status === 'free').length;
       heroTitle.replaceChildren(
         h('span', { class: 'eyebrow' }, S.icon('pin'), S.brandAddress(b.address) || t('hero.city')),
-        h('h1', null, S.brandName(b.name)),
+        h('h2', { class: 'hero-name' }, S.brandName(b.name)),
         h('p', null, S.lang === 'tg' && b.descriptionTg ? b.descriptionTg : (b.description || t('hero.sub'))),
         h('div', { class: 'hero-cta pe' }, h('button', { class: 'btn gold lg', onclick: () => scrollTo('apartments') }, t('hero.cta1')), h('button', { class: 'btn ghost lg', style: { color: '#fff', borderColor: 'rgba(255,255,255,.4)' }, onclick: () => scrollTo('calc') }, t('hero.cta2'))));
       stats.replaceChildren(
@@ -409,6 +418,7 @@
           const m = monthly(a.price, 30, 60);
           body.push(
             h('div', { class: 'row between' }, S.statusChip(a.status), h('span', { class: 'muted', style: { fontWeight: 700 } }, S.fmt.rooms(a.rooms) + ' · ' + S.fmt.area(a.area))),
+            S.eco && S.eco.badge(st.building.eco) ? h('a', { href: '#eco', class: 'eco-badge-link', onclick: (e) => { e.preventDefault(); scrollTo('eco'); } }, S.eco.badge(st.building.eco)) : null,
             h('div', null, h('div', { class: 'price' }, S.fmt.money(a.price, 'TJS')), eq ? h('div', { class: 'muted', style: { fontWeight: 600, fontSize: '13px' } }, '≈ $' + S.fmt.n(eq) + ' · ' + t('price.estimate')) : null, h('div', { class: 'muted', style: { fontSize: '13px' } }, S.fmt.n(a.pricePerSqm) + ' TJS / ' + t('u.m2'))),
             h('div', { class: 'card flat', style: { padding: '12px', background: 'rgba(255,255,255,.06)' } }, h('div', { class: 'muted', style: { fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em' } }, t('calc.example')), h('div', { style: { fontWeight: 800, fontSize: '17px', marginTop: '2px' } }, S.fmt.money(m.monthly, 'TJS') + ' / ' + t('u.month')), h('div', { class: 'muted', style: { fontSize: '12.5px' } }, t('calc.exampleSub', { d: S.fmt.money(m.down, 'TJS') }))),
             a.status === 'free' ? h('button', { class: 'btn gold lg block', onclick: () => bookModal(a) }, t('book.cta')) : h('div', { class: 'form-err', style: { background: 'rgba(255,255,255,.08)', color: 'inherit' } }, t('book.unavailable')),
@@ -458,6 +468,8 @@
       if (st.onlyFree) l = l.filter((a) => a.status === 'free');
       if (st.rooms !== 'all') l = l.filter((a) => (st.rooms === '3' ? a.rooms >= 3 : a.rooms === +st.rooms));
       if (st.priceCap) l = l.filter((a) => a.price <= st.priceCap);
+      const cls = st.building && st.building.eco && st.building.eco.energyClass;
+      if (cls && st.minClass && st.minClass !== 'any' && S.eco.rank(cls) > S.eco.rank(st.minClass)) l = [];
       const s = { price: (a, b) => a.price - b.price, priceDesc: (a, b) => b.price - a.price, area: (a, b) => b.area - a.area, floor: (a, b) => b.floor - a.floor }[st.sort];
       return l.sort(s);
     }
@@ -481,9 +493,17 @@
           h('div', { class: 'field' }, h('label', null, t('filter.rooms')), h('div', { class: 'pill-group' }, rooms.map(([v, l]) => h('button', { class: 'pill' + (st.rooms === v ? ' on' : ''), onclick: (e) => { st.rooms = v; st.shown = 12; S.$$('.pill', e.target.parentNode).forEach((p) => p.classList.remove('on')); e.target.classList.add('on'); drawList(); } }, l)))),
           h('div', { class: 'field' }, h('label', { for: 'f-price' }, t('filter.priceTo')), price, priceVal),
           S.field(t('filter.sort'), sort),
+          ecoFilter(),
           h('div', { class: 'field' }, h('label', null, t('filter.status')), h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.onlyFree, onchange: (e) => { st.onlyFree = e.target.checked; st.shown = 12; drawList(); } }), t('filter.onlyFree'))), h('span')),
         grid, more));
       drawList();
+    }
+    function ecoFilter() {
+      const cls = st.building && st.building.eco && st.building.eco.energyClass;
+      if (!cls || !S.eco) return null;
+      const s = S.select('minClass', [['any', t('filter.all')]].concat(S.eco.classes.map(([k, l]) => [k, l])), st.minClass || 'any');
+      s.addEventListener('change', () => { st.minClass = s.value; st.shown = 12; renderApartments(); });
+      return S.field(t('eco.filter'), s);
     }
     // Catalog card: the floor plan of its type on top with the status and floor badges; number, rooms, area, price.
     function renderCard(a) {
@@ -518,9 +538,12 @@
         out.replaceChildren(h('small', null, t('calc.monthly')), h('div', { class: 'big' }, S.fmt.money(r.monthly, 'TJS')), h('small', null, t('calc.noInterest')), h('div', { style: { marginTop: '14px', position: 'relative', zIndex: 1 } }, h('button', { class: 'btn gold', onclick: () => leadModal(t('lead.calc', { p: S.fmt.n(p), d: down.value, m: months.value, mo: S.fmt.n(r.monthly) }), a && a.id) }, t('calc.send'))));
       };
       [price, down, months].forEach((el) => el.addEventListener('input', upd));
+      // Energy costs of the chosen apartment (S.eco.utility): only with the building's estimated use and the developer's tariff.
+      const utilHost = h('div', { class: 'util-host' });
       calcSection.replaceChildren(h('div', { class: 'wrap' }, h('div', { class: 'sec-head' }, h('div', null, h('h2', null, accentFirst(t('calc.title'))), h('p', null, a ? t('calc.forApt', { n: a.number }) : t('calc.sub')))),
-        h('div', { class: 'calc' }, h('div', { class: 'card stack' }, S.field(t('calc.price') + ' (TJS)', price), h('div', { class: 'field' }, h('label', { for: 'c-down' }, t('calc.down')), down, dv), h('div', { class: 'field' }, h('label', { for: 'c-months' }, t('calc.months')), months, mv)), out)));
+        h('div', { class: 'calc' }, h('div', { class: 'card stack' }, S.field(t('calc.price') + ' (TJS)', price), h('div', { class: 'field' }, h('label', { for: 'c-down' }, t('calc.down')), down, dv), h('div', { class: 'field' }, h('label', { for: 'c-months' }, t('calc.months')), months, mv)), out), utilHost));
       upd();
+      if (a && S.eco) S.api.utility(a.id).then((r) => { if (alive && r && st.calcApt === a) utilHost.replaceChildren(S.eco.utility(r, a)); }).catch(() => {});
     }
 
     function scrollTo(id) { const el = document.getElementById(id === 'home' ? 'hero-top' : id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
@@ -602,13 +625,14 @@
 
     // About the complex: the numbers on the left, the description and amenities on the right.
     const aboutStats = h('div', { class: 'about-stats reveal' });
+    const ecoHost = h('div', { class: 'about-eco' });
     const about = h('section', { class: 'section lux-sec', id: 'about' }, h('div', { class: 'wrap about-grid' },
       aboutStats,
       h('div', { class: 'about-text reveal' },
         h('span', { class: 'lux-kicker' }, t('about.kicker')),
         aboutTitle,
         h('p', null, t('about.text')),
-        h('ul', { class: 'amenities' }, AMENITIES.map(([ic, k]) => h('li', null, h('span', { class: 'am-ic' }, landIcon(ic)), t(k)))))));
+        h('ul', { class: 'amenities' }, AMENITIES.map(([ic, k]) => h('li', null, h('span', { class: 'am-ic' }, landIcon(ic)), t(k)))), ecoHost)));
 
     // Layouts: one card per apartment type.
     const layoutGrid = h('div', { class: 'layout-grid reveal' });
@@ -657,7 +681,9 @@
         c.telegram ? h('a', { class: 'btn gold lg', href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, landIcon('send'), t('cta.tg')) : null),
       callBox));
 
-    page.append(hero, why, steps, about, layouts, gallery, planBand, teaser, contactBand, siteFooter());
+    // «Зелёный эффект Binosoz» — real counters from the API; hidden when there is nothing to show.
+    const green = S.eco ? S.eco.impactSection() : null;
+    page.append(hero, why, steps, about, layouts, green, gallery, planBand, teaser, contactBand, siteFooter());
     S.$$('section', page).forEach((sec) => { if (sec !== hero) sec.classList.add('section-reveal'); });
     renderData(); renderCall();
     const stopReveal = revealIn(page);
@@ -695,6 +721,7 @@
         d.types.length ? big(String(d.types.length), plural(d.types.length, 'about.types')) : null,
       ].filter(Boolean));
       layoutGrid.replaceChildren(...d.types.map(layoutCard));
+      ecoHost.replaceChildren((S.eco && S.eco.block(d.eco, { compact: true, demo: d.isDemo })) || '');
     }
     // A layout card: type, area range, price from; the bed icon shows the number of rooms.
     function layoutCard(x) {
@@ -769,6 +796,7 @@
         if (b.deliveryDate) d.year = new Date(b.deliveryDate).getFullYear();
         else if (b.completionYear) d.year = b.completionYear;
         if (b.name) d.name = b.name;
+        d.eco = b.eco || null; d.isDemo = !!b.isDemo;
         d.state = apts.length ? 'ready' : 'empty';
         d.free = apts.length ? free.length : null;
         d.taken = apts.filter((a) => a.status === 'sold' || a.status === 'booked').length;

@@ -51,6 +51,23 @@ test('catalog without data: one empty card, no 3D stage', async ({ page }) => {
   expect(await page.evaluate(() => !!window.THREE)).toBe(false);
 });
 
+test('without data: no eco passport and no energy costs (nothing filled in — nothing shown)', async ({ page }) => {
+  await open(page, '/apartments');
+  await expect(page.locator('#eco')).toBeHidden();
+  await expect(page.locator('.eco-card')).toHaveCount(0);
+  await expect(page.locator('.util-card')).toHaveCount(0);
+  await open(page, '/');
+  await expect(page.locator('.eco-card')).toHaveCount(0);
+});
+
+test('without data: the «Зелёный эффект» section is not shown (no invented counters)', async ({ page }) => {
+  await open(page, '/');
+  await expect(page.locator('#green')).toBeHidden();
+  await expect(page.locator('.green-tile')).toHaveCount(0);
+  await open(page, '/about');
+  await expect(page.locator('#green-model')).toBeVisible();
+});
+
 test('login: the buyer tab is chosen by default', async ({ page }) => {
   await open(page, '/login');
   await expect(page.locator('.login-tabs button.on')).toHaveText('Покупатель');

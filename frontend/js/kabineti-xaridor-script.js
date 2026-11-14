@@ -47,9 +47,10 @@
     // How a buyer gets the code: 'email' or 'phone' (remembered); methods — { email, sms } from the server.
     let by = S.store.get('sitora.loginBy') === 'phone' ? 'phone' : 'email', phoneVal = '+992', methods = null;
     const smsOn = () => !!methods && !!methods.sms;
+    const DEMO_BUYER = 'demo-buyer@binosoz.tj';
     S.api.authMethods().then((m) => {
       methods = m || null;
-      if (smsOn() && step === 'buyer') draw();
+      if ((smsOn() || (methods && methods.demo)) && step === 'buyer') draw();
     }).catch(() => {});
     // Server codes for «the code cannot be delivered» → a clear text in the page language.
     const humanError = (er) => {
@@ -141,6 +142,15 @@
           notice = t('login.resetDone'); step = 'staff'; draw();
         };
         focus = pass.input;
+      } else if (step === 'demo') {
+        // Demo buyer for the jury (only when GET /auth/methods says demo: true): the password is given by the presenter.
+        const email = S.input('email', { type: 'email', value: DEMO_BUYER, readonly: true, autocomplete: 'username' });
+        const pass = passwordField(t('login.password'), 'password', 'current-password');
+        btn.textContent = t('login.enter');
+        form.append(h('h2', null, t('demo.loginTitle')), h('p', { class: 'muted' }, t('demo.loginHint')), S.field(t('login.email'), email), pass.field, btn,
+          link(t('login.forgotBack'), () => { step = 'buyer'; draw(); }));
+        submit = async () => enter(await S.api.passwordLogin(DEMO_BUYER, pass.input.value));
+        focus = pass.input;
       } else if (step === 'buyer' && byPhoneNow()) {
         const phone = S.input('phone', { type: 'tel', value: phoneVal, autocomplete: 'tel', inputmode: 'tel' });
         btn.textContent = t('login.sendCode');
@@ -193,6 +203,8 @@
       }
       form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await submit(); } catch (er) { S.showErrors(form, humanError(er)); } }); });
       // Tabs only on the first screens; the code, 2FA and password-reset steps keep their own "back" link.
+      // «Войти как демо-покупатель» under the buyer's form — only when the server has the demo login on.
+      if (step === 'buyer' && methods && methods.demo) form.append(h('button', { class: 'btn ghost block demo-login', type: 'button', onclick: () => { step = 'demo'; notice = ''; draw(); } }, t('demo.loginButton')));
       card.replaceChildren(step === 'staff' || step === 'buyer' || step === 'register' ? tabs() : null, form);
       setTimeout(() => focus && focus.focus(), 30);
     }

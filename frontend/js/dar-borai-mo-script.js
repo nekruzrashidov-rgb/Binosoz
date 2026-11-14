@@ -71,7 +71,14 @@
         h('a', { class: 'btn gold lg', href: '/apartments' }, t('aboutpg.cta.apts')),
         h('a', { class: 'btn ghost lg', href: '/contact' }, t('aboutpg.cta.contact')))));
 
-    page.append(hero, complex, team, timeline, cta, site.footer());
+    // Why this is a green business model: paper → digital documents, trips → 3D tour and the online account,
+    // energy-efficient buildings → eco passport and the cost calculator. A link to the live counters on the landing.
+    const green = h('section', { class: 'section lux-sec', id: 'green-model' }, h('div', { class: 'wrap about-green' },
+      h('h2', null, site.accentFirst(t('aboutpg.green.title'))),
+      h('p', null, t('aboutpg.green.text')),
+      h('ul', { class: 'about-green-list' }, ['paper', 'trips', 'energy'].map((k) => h('li', null, h('b', null, t('aboutpg.green.' + k + '.h')), ' ', t('aboutpg.green.' + k)))),
+      h('a', { class: 'btn ghost', href: '/#green' }, t('aboutpg.green.link'))));
+    page.append(hero, complex, team, green, timeline, cta, site.footer());
     [complex, team, timeline, cta].forEach((sec) => sec.classList.add('section-reveal'));
     const stopReveal = site.reveal(page);
 

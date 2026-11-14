@@ -59,7 +59,7 @@
 
   const M = (S.map = {
     building(b) {
-      return { id: b.id, name: pick(b, ['name', 'title'], '') || pick(b, ['nameRu'], ''), nameRu: pick(b, ['nameRu'], ''), nameTg: pick(b, ['nameTg'], ''), description: pick(b, ['description'], '') || pick(b, ['descriptionRu'], ''), descriptionRu: pick(b, ['descriptionRu'], ''), descriptionTg: pick(b, ['descriptionTg'], ''), address: pick(b, ['address'], ''), deliveryDate: pick(b, ['deliveryDate', 'completionDate', 'deadline'], ''), floorsCount: num(pick(b, ['floorsCount', 'floors', 'floorCount'], 0)), modelUrl: pick(b, ['modelUrl'], null), total: num(pick(b, ['totalApartments', 'apartmentsCount', 'total'], 0)), free: num(pick(b, ['freeApartments', 'freeCount', 'free'], 0)), completionYear: pick(b, ['completionYear'], null), plannedApartments: pick(b, ['plannedApartments'], null) };
+      return { id: b.id, name: pick(b, ['name', 'title'], '') || pick(b, ['nameRu'], ''), nameRu: pick(b, ['nameRu'], ''), nameTg: pick(b, ['nameTg'], ''), description: pick(b, ['description'], '') || pick(b, ['descriptionRu'], ''), descriptionRu: pick(b, ['descriptionRu'], ''), descriptionTg: pick(b, ['descriptionTg'], ''), address: pick(b, ['address'], ''), deliveryDate: pick(b, ['deliveryDate', 'completionDate', 'deadline'], ''), floorsCount: num(pick(b, ['floorsCount', 'floors', 'floorCount'], 0)), modelUrl: pick(b, ['modelUrl'], null), total: num(pick(b, ['totalApartments', 'apartmentsCount', 'total'], 0)), free: num(pick(b, ['freeApartments', 'freeCount', 'free'], 0)), completionYear: pick(b, ['completionYear'], null), plannedApartments: pick(b, ['plannedApartments'], null), eco: b.eco || null, isDemo: !!b.isDemo };
     },
     floor(f) { return { id: f.id, number: num(pick(f, ['number', 'floorNumber', 'level'], 0)), commercial: !!pick(f, ['isCommercial', 'commercial'], false), total: num(pick(f, ['totalApartments', 'apartmentsCount', 'total'], 0)), free: num(pick(f, ['freeApartments', 'freeCount', 'free'], 0)) }; },
     apt(a, floorNo) {
@@ -417,6 +417,15 @@
       const body = { nameRu: pick(b, ['nameRu'], cur.nameRu), nameTg: pick(b, ['nameTg'], cur.nameTg), address: pick(b, ['address'], cur.address), floorsCount: num(pick(b, ['floorsCount'], cur.floorsCount)), descriptionRu: pick(b, ['descriptionRu'], cur.descriptionRu) || null, descriptionTg: pick(b, ['descriptionTg'], cur.descriptionTg) || null, modelUrl: pick(b, ['modelUrl'], cur.modelUrl) || null, completionYear: pick(b, ['completionYear'], cur.completionYear) || null, plannedApartments: pick(b, ['plannedApartments'], cur.plannedApartments) || null };
       return request('PUT', '/buildings/' + id, { body }).then(M.building);
     },
+    // Estimated energy costs of an apartment (null: the building has no estimated use or the developer no tariff → 204).
+    async utility(apartmentId) { const r = await request('GET', '/apartments/' + apartmentId + '/utility', { auth: false }); return r && r.costPerYearTjs !== undefined ? r : null; },
+    greenSettings() { return request('GET', '/owner/green-settings'); },
+    // «Зелёный эффект»: the public aggregate of the developer's site (ORG_SLUG) and the CRM statistics with months.
+    greenImpact() { return request('GET', '/public/green-impact', { auth: false, query: { organization: cfgSlug() } }); },
+    greenStats() { return request('GET', '/stats/green'); },
+    saveGreenSettings(b) { return request('PUT', '/owner/green-settings', { body: b }); },
+    // Eco passport of a building (Content and leaders): the whole passport, empty fields — «not filled».
+    saveBuildingEco(id, eco) { return request('PUT', '/buildings/' + id + '/eco', { body: eco }).then(M.building); },
     createBuilding(b) { return withFields(request('POST', '/buildings', { body: { nameRu: b.nameRu, nameTg: b.nameTg, address: b.address, floorsCount: b.floorsCount, descriptionRu: b.descriptionRu || null, descriptionTg: b.descriptionTg || null, modelUrl: null, completionYear: b.completionYear || null, plannedApartments: b.plannedApartments || null } })).then(M.building); },
     // Floors 1..n of a new building, so apartments can be added right away (the server does not create them by itself).
     async createFloors(buildingId, count, onStep, from) { for (let n = from || 1; n <= count; n++) { await request('POST', '/floors', { body: { buildingId, number: n, planImageUrl: null } }); if (onStep) onStep(n); } },

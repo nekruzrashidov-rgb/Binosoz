@@ -263,7 +263,10 @@ textarea.inp { resize: vertical; min-height: 78px; }
 .hero-title { max-width: 560px; animation: rise 0.8s cubic-bezier(.2, .8, .2, 1) both; }
 .hero-title .eyebrow { display: inline-flex; gap: 8px; align-items: center; font-weight: 600; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent-text); margin-bottom: 10px; }
 .hero-title .eyebrow::before { content: ''; display: block; width: 24px; height: 1px; background: var(--accent); }
-.hero-title h1 { font-size: clamp(32px, 5.5vw, 68px); margin: 0 0 14px; color: #fff; font-weight: 700; line-height: 1.08; letter-spacing: -0.02em; }
+/* The catalog page already has its <h1> (the page head): the building name in the 3D stage is an <h2> styled the same. */
+/* Catalog 3D stage: in the dark theme the accent is light — dark text on it (accent-ink), as on every other accent button. */
+#hero-top .hero-cta .btn.gold { color: var(--accent-ink); }
+.hero-title h1, .hero-title .hero-name { font-size: clamp(32px, 5.5vw, 68px); margin: 0 0 14px; color: #fff; font-weight: 700; line-height: 1.08; letter-spacing: -0.02em; }
 .hero-title p { color: rgba(245, 235, 220, 0.82); font-size: 15.5px; max-width: 440px; line-height: 1.6; font-weight: 400; }
 .hero-cta { display: flex; gap: 12px; margin-top: 22px; flex-wrap: wrap; }
 /* hero CTA buttons override */
@@ -1870,7 +1873,7 @@ body.menu-open { overflow: hidden; }
 @media (min-width: 769px) { .landing-page .filters { position: sticky; top: calc(var(--hdr-h, var(--top-h)) + env(safe-area-inset-top, 0px)); z-index: 80; } }
 .landing-page .pill-group { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
 .landing-page .pill { padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 500; white-space: nowrap; background: var(--bg); border: 1px solid var(--line); color: var(--ink-2); }
-.landing-page .pill.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.landing-page .pill.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .landing-page .pill:hover:not(.on) { border-color: var(--accent); color: var(--accent-text); }
 /* Catalog cards — светлые */
 .apt-card.wow-apt { display: flex; flex-direction: column; gap: 0; padding: 0; text-align: left; font: inherit; color: var(--ink); border-radius: 12px; overflow: hidden;
@@ -1882,7 +1885,7 @@ body.menu-open { overflow: hidden; }
 .apt-status-badge.booked { background: var(--warn-soft); color: var(--warn); }
 .apt-status-badge.sold { background: var(--bad-soft); color: var(--bad); }
 .apt-status-badge.onrequest { background: var(--info-soft); color: var(--info); }
-.apt-floor-badge { position: absolute; top: 12px; right: 12px; background: rgba(255,255,255,0.85); border: 1px solid var(--line); padding: 3px 8px; border-radius: 6px; font-size: 11px; color: var(--ink-2); }
+.apt-floor-badge { position: absolute; top: 12px; right: 12px; background: color-mix(in srgb, var(--surface) 90%, transparent); border: 1px solid var(--line); padding: 3px 8px; border-radius: 6px; font-size: 11px; color: var(--ink-2); }
 .wow-apt .apt-card-body { padding: 18px 20px; width: 100%; color: var(--ink); }
 .wow-apt .apt-card-price { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 20px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--accent-text); font-weight: 700; }
 .apt-card-price-label { font-size: 11px; color: var(--muted); font-weight: 400; }
@@ -2288,7 +2291,7 @@ a.float-card:hover {
 /* Dark islands on the light site (hero, numbers, installment, contact band, footer, contact page, calculator result):
    light text tokens inside them, so every component that uses var(--ink) / var(--ink-2) / var(--muted)
    — headings from ".lux h1, .lux h2, .lux h3" included — stays readable without its own white colour. */
-.wow-hero, .lux-hero, .hero, .lux-plan, .lux-contact, .lux-footer, .calc-out, .mob-overlay {
+.wow-hero, .lux-hero, .hero, .lux-plan, .lux-contact, .lux-footer, .calc-out, .mob-overlay, .lux-green {
   --ink: #f5ece0; --ink-2: #e2d3bf; --muted: #c9b8a2; --accent-text: #f0a56c;
 }
 /* The selected segment is a light pill even inside a dark island: dark text on it. */
@@ -2392,3 +2395,75 @@ a.float-card:hover {
 @media (pointer: coarse), (max-width: 768px) {
   .lux-footer .foot-privacy, .consent-note a { display: inline-flex; align-items: center; min-height: 44px; }
 }
+/* Eco passport of a building (eko-pasport-script.js): scale A++…D in status tokens, facts, features. */
+.eco-card { display: flex; flex-direction: column; gap: 16px; padding: clamp(18px, 3vw, 28px); }
+.eco-card.compact { margin-top: 18px; padding: 18px; gap: 12px; }
+.eco-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.eco-head h3 { margin: 0; color: var(--ink); }
+.eco-ic { display: inline-flex; width: 36px; height: 36px; align-items: center; justify-content: center; border-radius: 50%; background: var(--good-soft); color: var(--good); }
+.eco-scale { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; max-width: 420px; }
+.eco-step { padding: 6px 0; text-align: center; font-weight: 800; font-size: 13px; border-radius: 6px; color: var(--ink); border: 2px solid transparent; }
+.eco-step.good { background: color-mix(in srgb, var(--good) 14%, transparent); }
+.eco-step.warn { background: color-mix(in srgb, var(--warn) 14%, transparent); }
+.eco-step.bad { background: color-mix(in srgb, var(--bad) 14%, transparent); }
+.eco-step.on { transform: scale(1.08); border-color: var(--ink); }
+.eco-step.on.good { background: color-mix(in srgb, var(--good) 40%, transparent); }
+.eco-step.on.warn { background: color-mix(in srgb, var(--warn) 40%, transparent); }
+.eco-step.on.bad { background: color-mix(in srgb, var(--bad) 40%, transparent); }
+.eco-class-text { margin: 8px 0 0; font-weight: 700; color: var(--ink); }
+.eco-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 20px; margin: 0; }
+.eco-facts dt { font-size: 12.5px; color: var(--ink-2); }
+.eco-facts dd { margin: 2px 0 0; font-weight: 700; color: var(--ink); }
+.eco-features { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.eco-features li { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: var(--r-pill); background: var(--good-soft); color: var(--ink); font-size: 13.5px; font-weight: 600; }
+.eco-features svg { color: var(--good); }
+.eco-note { margin: 0; font-size: 12.5px; color: var(--ink-2); }
+/* Colour inherited: dark text on the light page, light text in the dark apartment sheet. */
+.eco-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--r-pill); font-size: 12.5px; font-weight: 800; color: inherit; }
+.eco-badge.good { background: color-mix(in srgb, var(--good) 22%, transparent); }
+.eco-badge.warn { background: color-mix(in srgb, var(--warn) 22%, transparent); }
+.eco-badge.bad { background: color-mix(in srgb, var(--bad) 22%, transparent); }
+.eco-badge-link { align-self: flex-start; text-decoration: none; }
+.demo-badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: var(--r-pill); font-size: 12px; font-weight: 700; background: color-mix(in srgb, var(--info) 24%, transparent); color: inherit; }
+/* Energy costs of an apartment (under the installment calculator). */
+.util-host:empty { display: none; }
+.util-host { margin-top: 20px; }
+.util-card { display: flex; flex-direction: column; gap: 12px; padding: clamp(18px, 3vw, 26px); }
+.util-card .muted { margin: 0; }
+.util-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.util-row { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); }
+.util-row span { font-size: 12.5px; color: var(--ink-2); }
+.util-row b { color: var(--ink); }
+/* «Зелёный эффект Binosoz» on the landing: a dark island (light text tokens, see the dark-islands rule above). */
+.lux-green, .lux .lux-green.section, .lux-green.section { padding-block: 80px; background: radial-gradient(circle at 15% 20%, color-mix(in srgb, var(--good) 22%, transparent), transparent 55%), #10140f; color: var(--ink); border-block: 1px solid color-mix(in srgb, var(--good) 30%, transparent); }
+.lux-green .lux-head { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.lux-green h2 { color: var(--ink); margin: 0; }
+.lux-green .lux-head p { color: var(--ink-2); max-width: 640px; margin: 0; }
+.green-kicker { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: color-mix(in srgb, var(--good) 45%, var(--ink)); }
+.green-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 32px; }
+.green-tile { display: flex; flex-direction: column; gap: 6px; padding: 24px 18px; border-radius: 14px; text-align: center; background: rgba(255, 255, 255, 0.06); border: 1px solid color-mix(in srgb, var(--good) 30%, transparent); }
+.green-tile b { font-family: var(--display); font-size: clamp(26px, 3.4vw, 38px); color: var(--ink); }
+.green-tile span { font-size: 14px; color: var(--ink-2); }
+.green-note { margin: 20px auto 0; max-width: 720px; text-align: center; font-size: 13px; color: var(--ink-2); }
+@media (max-width: 860px) { .green-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 420px) { .green-tiles { grid-template-columns: minmax(0, 1fr); } }
+/* CRM: «Сэкономлено бумаги». */
+.green-card { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+.green-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.green-kpis div { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); }
+.green-kpis b { font-size: 22px; color: var(--ink); }
+.green-kpis span { font-size: 12.5px; color: var(--ink-2); }
+.green-chart { width: 100%; height: auto; max-height: 220px; }
+.green-chart rect { fill: var(--good); }
+.green-chart text { fill: var(--ink-2); font-size: 12px; }
+/* /about: why this is a green model. */
+.about-green { max-width: 860px; display: flex; flex-direction: column; gap: 14px; }
+.about-green p, .about-green li { color: var(--ink-2); line-height: 1.6; }
+.about-green-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; }
+.about-green-list b { color: var(--ink); }
+.about-green .btn { align-self: flex-start; }
+/* Footer QR code (desktop only): white quiet zone so phones read it in both themes. */
+.foot-qr { display: none; align-items: center; gap: 12px; margin-top: 16px; }
+.foot-qr img { width: 88px; height: 88px; padding: 6px; border-radius: 10px; background: #fff; }
+.foot-qr span { font-size: 13px; color: var(--ink-2); }
+@media (min-width: 1024px) and (pointer: fine) { .foot-qr { display: flex; } }
