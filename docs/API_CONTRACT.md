@@ -33,7 +33,7 @@
 
 | Метод | Путь | Тело | Ответ |
 | --- | --- | --- | --- |
-| GET | `/auth/methods` | — | 200 `{ email, sms }` — какие способы входа по коду реально работают: `email` — письма уходят (Development или `Email__Provider` = Smtp/Resend, или Gmail со всеми тремя `Email__Gmail__*`), `sms` — вход по SMS включён (`Auth__SmsLoginEnabled`) и SMS-провайдер подключён. Публичный |
+| GET | `/auth/methods` | — | 200 `{ email, sms, demo }` (`demo` — включён вход демо-покупателя паролем, `Auth__DemoPasswordLogin`) — какие способы входа по коду реально работают: `email` — письма уходят (Development или `Email__Provider` = Smtp/Resend, или Gmail со всеми тремя `Email__Gmail__*`), `sms` — вход по SMS включён (`Auth__SmsLoginEnabled`) и SMS-провайдер подключён. Публичный |
 | POST | `/auth/email/send` | `{ email }` | 200 `{ message, expiresInSeconds }` — всегда одинаковый, даже если почты нет. Код уходит только покупателю, сотруднику — нет (ответ тот же). Почтовый сервис не настроен (вне Development) — 503 `email_not_configured` для любой почты |
 | POST | `/auth/email/verify` | `{ email, code }` | 200 `AuthResponse` — только покупатель. Почта сотрудника — 401 «Сотрудники входят по паролю» |
 | POST | `/auth/register` | `{ email, firstName, lastName, phone, organization? }` | 200, как `/auth/email/send`. Пароля нет. Без почтового сервиса — 503 `email_not_configured` до создания карточки. Создаются карточка клиента у застройщика `organization` (slug; без него — единственный застройщик платформы) и учётная запись покупателя; уходят приветственное письмо и код для входа. Дальше — `/auth/email/verify`. Телефон обязателен. Без имени или фамилии и с неверным телефоном — 422; телефон из карточки с другой почтой — 409; почта сотрудника — 409; неизвестный застройщик — 404 |
@@ -406,6 +406,19 @@ TwoFactorRequired = { requiresTwoFactor: true, tempToken, expiresAt }
 | GET | `/buildings/{id}/floorplan` | Manager, Accountant, Content, руководители | Номера этажей, для которых есть план: `[1, 5]` |
 | GET | `/buildings/{id}/floorplan/{floor}` | то же | `image/svg+xml`: у `<rect id="apt-{apartmentId}">` — `fill` по статусу (Free `#22c55e`, Booked `#f59e0b`, Sold `#ef4444`, OnRequest `#6b7280`), `<title>` «Кв. N, площадь м², цена валюта», `class="fp-apt"`, `data-apartment-id`, `data-number`, `data-status` (`free`/`booked`/`sold`/`onrequest`), `data-deal-id` (действующая сделка, у брони и продажи). Квартира другого дома в шаблоне — серая, без данных. Нет плана или этажа — 404 |
 | PUT | `/buildings/{id}/floorplan/{floor}` | Owner, ObjectAdmin, SuperAdmin | `{ svgTemplate }` (до 200 тыс. символов) → 204. Разрешены `svg, g, rect, text, tspan, title, desc, line, path, polygon, polyline, circle, ellipse`; `<script>`, `<foreignObject>` и прочее — 422; атрибуты `on*`, `href` и `url()` в `style` удаляются. Этаж должен существовать (иначе 404). Аудит `FloorPlan` / `Updated` |
+
+## «Зелёная» часть
+
+| Метод | Путь | Кто | Ответ |
+| --- | --- | --- | --- |
+| GET | `/buildings/{id}`, `/buildings` | все | у дома поле `eco` (эко-паспорт, только заполненные поля; нет данных — поля нет) и `isDemo` (данные застройщика демонстрационные) |
+| PUT | `/buildings/{id}/eco` | Content, руководители | `{ energyClass?: APlusPlus|APlus|A|B|C|D, wallInsulationRu/Tg?, windowsRu/Tg?, solarPanelsKw?, hasHeatMeters?, hasWaterMeters?, hasLedCommonAreas?, hasEvCharging?, hasRainwaterReuse?, hasWasteSorting?, greenAreaM2?, heatingType?: Central|IndividualGas|HeatPump|Electric, estimatedKwhPerM2Year? }` — паспорт целиком, пустое — «не заполнено»; аудит `EcoUpdated`, сброс кэша каталога |
+| GET/PUT | `/owner/green-settings` | руководители организации | `{ tariffKwhTjs?, baselineKwhPerM2Year?, baselineSource?, co2KgPerKgPaper?, co2Source?, isDemo }`; у типового дома и CO₂ источник обязателен |
+| GET | `/apartments/{id}/utility` | все | расходы на энергию квартиры: кВт·ч и TJS в год и месяц, сравнение с типовым домом (если задан) и его источник; 204 — нет тарифа или расчётного потребления дома |
+| GET | `/public/green-impact?organization=slug` | все, кэш 5 мин | `{ documentsDigital, pagesSaved, paperKgSaved, co2KgSaved?, co2Source?, onlineActions, isDemo }`; без organization — 400, неизвестная — 404 |
+| GET | `/stats/green` | менеджер, руководители | `{ totals, onlineBookings, onlinePayments, chatMessages, months: [{ month, documents, pages, paperKg }] }` за 12 месяцев |
+
+Коды ошибок: `invalid_energy_class`, `invalid_heating_type`, `eco_text_too_long`, `invalid_solar_power`, `invalid_green_area`, `invalid_energy_use`, `invalid_tariff`, `invalid_baseline`, `invalid_co2_factor`, `source_required`, `source_too_long`, `demo_read_only` (демо-менеджер: только просмотр и чат).
 
 ## CRM
 

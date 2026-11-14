@@ -37,6 +37,7 @@ Binosoz/
 │   ├── API_CONTRACT.md        ← все эндпоинты API
 │   ├── SECURITY.md            ← модель угроз и меры защиты
 │   ├── DEPLOY.md              ← инструкция по деплою
+│   ├── DEMO_SCRIPT.md         ← сценарий показа жюри на 3 минуты (RU + TJ)
 │   └── exam/                  ← разбор проекта по частям (таджикский), для защиты
 ├── backend/
 │   ├── Sitora.sln
@@ -98,7 +99,7 @@ Binosoz/
     ├── css/styles.css             ← 171 КБ: токены (:root и [data-theme='dark']), все компоненты
     └── js/
         ├── tanzimot-api-url.js        ← config: API_BASE ('/api/v1'; Vercel → Render), ORG_SLUG, CONTACT, INSTALLMENT
-        ├── i18n/ru.js, tg.js, en.js   ← тексты (по 1622 ключа); ru — на каждой странице и запасной
+        ├── i18n/ru.js, tg.js, en.js   ← тексты (по 1702 ключа); ru — на каждой странице и запасной
         ├── tarjumaho-ru-tg-en.js      ← S.t(), S.initLang()/S.setLang() (грузит tg/en по требованию), S.bus
         ├── komponentho-modal-toast-tabs.js ← h() DOM-builder, иконки, модалки, тосты
         ├── zaprosho-ba-backend.js     ← все вызовы API, токены (localStorage sitora.auth)
@@ -106,6 +107,7 @@ Binosoz/
         ├── sahifai-asosi-script.js    ← публичный сайт: главная, каталог, калькулятор, контакты, футер
         ├── modeli-3d-bino-script.js   ← 3D-дом каталога (Three.js r128, грузится лениво; единственный 3D-движок)
         ├── galereya-script.js, dar-borai-mo-script.js ← /gallery (фото Душанбе + планировки), /about
+        ├── eko-pasport-script.js   ← «зелёная» часть (S.eco): эко-паспорт, расходы на энергию, «Зелёный эффект», формы CRM
         ├── siyosati-mahfiyat-script.js ← /privacy: политика конфиденциальности (тексты privacy.*; сверять с кодом при изменениях)
         ├── kabineti-xaridor-script.js ← вход и кабинет покупателя
         ├── crm-script.js, panelho-crm-script.js ← CRM и её боковые панели
@@ -116,6 +118,7 @@ Binosoz/
     └── tools/                  ← только разработка, НЕ публикуется (.vercelignore, .dockerignore):
         ├── serve-web.mjs          статик-сервер: node frontend/tools/serve-web.mjs 5500
         ├── check-contrast.js      проверка контраста WCAG AA
+        ├── qr/                    QR-код сайта в SVG: cd frontend/tools/qr && npm ci && npm run build
         └── e2e/                   Playwright: cd frontend/tools/e2e && npm ci && npm test
 ```
 
@@ -124,7 +127,8 @@ Binosoz/
 - **Цвета — только токены**: `--ink/--ink-2/--muted` (текст), `--bg/--surface/--surface-2` (фоны), `--accent` (фон кнопок),
   `--accent-text` (медный текст и ссылки), `--accent-2` (градиенты), статусы `--good/--warn/--bad/--info` и их `-soft`.
   Полупрозрачность — `color-mix(in srgb, var(--accent) 20%, transparent)`. Хардкод цвета текста ломает тёмную тему.
-- **Тёмные секции** на светлом сайте (hero главной, рассрочка, «Остались вопросы?», футер, 3D-сцена, итог калькулятора)
+- **Тёмные секции** на светлом сайте (hero главной, рассрочка, «Остались вопросы?», футер, 3D-сцена, итог калькулятора,
+  «Зелёный эффект Binosoz» — `.lux-green`)
   переопределяют `--ink/--ink-2/--muted` локально — компоненты внутри сами светлые. Новую тёмную секцию добавлять в этот список.
 - **Тёмная тема**: `[data-theme='dark']` меняет токены; проверка — `frontend/tools/check-contrast.js` (0 текстов ниже AA в обеих темах).
 - **Честные данные**: цифры, цены, свободные квартиры — только из API; `DEFAULT_*` в config — только для demo; пустой API —
@@ -191,6 +195,8 @@ Storage__RootPath=/app/storage
 Sentry__Dsn=                     # пусто — ошибки никуда не отправляются
 Health__Key=                     # ключ X-Health-Key для /health/ready снаружи
 Auth__RefreshCookie__Mode=Dual
+Auth__DemoPasswordLogin=false    # true — вход демо-покупателя (demo-buyer@binosoz.tj) паролем для жюри
+SEED_DEMO_ACCOUNTS=false         # true + SEED_DEMO_BUYER_PASSWORD / SEED_DEMO_MANAGER_PASSWORD — демо-доступ (--migrate)
 Logging__File__Enabled=true      # файлы логов (только VPS; на Render — stdout)
 ```
 
