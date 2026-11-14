@@ -32,6 +32,9 @@ public class Organization : BaseEntity
     // Тарифы, коэффициенты «Зелёного эффекта» и признак демо-данных (столбцы Green*).
     public OrganizationGreenSettings Green { get; set; } = new();
 
+    // Условия рассрочки для сайта (столбцы Installment*).
+    public OrganizationInstallmentSettings Installment { get; set; } = new();
+
     public List<Building> Buildings { get; set; } = [];
 }
 

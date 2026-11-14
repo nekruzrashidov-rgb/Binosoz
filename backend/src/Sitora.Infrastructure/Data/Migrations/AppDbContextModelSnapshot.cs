@@ -434,6 +434,12 @@ namespace Sitora.Infrastructure.Data.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
+                    b.PrimitiveCollection<List<string>>("Amenities")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text[]")
+                        .HasDefaultValueSql("'{}'::text[]");
+
                     b.Property<int?>("CompletionYear")
                         .HasColumnType("integer");
 
@@ -2413,7 +2419,38 @@ namespace Sitora.Infrastructure.Data.Migrations
                                 .HasForeignKey("OrganizationId");
                         });
 
+                    b.OwnsOne("Sitora.Domain.Entities.OrganizationInstallmentSettings", "Installment", b1 =>
+                        {
+                            b1.Property<Guid>("OrganizationId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<decimal?>("DownPaymentMinPct")
+                                .HasPrecision(5, 2)
+                                .HasColumnType("numeric(5,2)")
+                                .HasColumnName("InstallmentDownPaymentMinPct");
+
+                            b1.Property<int?>("MaxMonths")
+                                .HasColumnType("integer")
+                                .HasColumnName("InstallmentMaxMonths");
+
+                            b1.Property<bool>("NoOverpayment")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("boolean")
+                                .HasDefaultValue(false)
+                                .HasColumnName("InstallmentNoOverpayment");
+
+                            b1.HasKey("OrganizationId");
+
+                            b1.ToTable("Organizations");
+
+                            b1.WithOwner()
+                                .HasForeignKey("OrganizationId");
+                        });
+
                     b.Navigation("Green")
+                        .IsRequired();
+
+                    b.Navigation("Installment")
                         .IsRequired();
                 });
 

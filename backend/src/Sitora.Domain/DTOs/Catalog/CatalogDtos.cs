@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Sitora.Domain.DTOs.Settings;
 using Sitora.Domain.Enums;
 
 namespace Sitora.Domain.DTOs.Catalog;
@@ -21,7 +22,14 @@ public record BuildingResponse(
     int? PlannedApartments = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] BuildingEcoResponse? Eco = null,
     // Данные застройщика помечены как демонстрационные (на сайте — бейдж «Демо-данные»).
-    bool IsDemo = false);
+    bool IsDemo = false,
+    // Удобства дома (ключи BuildingAmenities); пустой список в JSON не попадает.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? Amenities = null,
+    // Условия рассрочки застройщика; не заданы — поля нет.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] InstallmentTermsResponse? Installment = null);
+
+// PUT /buildings/{id}/amenities: весь список целиком (ключи BuildingAmenities); пустой — удобств на сайте нет.
+public record SaveBuildingAmenitiesRequest(List<string>? Amenities = null);
 
 // Эко-паспорт в ответе: только заполненные поля (null в JSON не попадает); весь объект — только если что-то заполнено.
 // WallInsulation и Windows — на языке запроса; Ru/Tg — для формы в CRM.

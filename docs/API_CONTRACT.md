@@ -399,6 +399,16 @@ TwoFactorRequired = { requiresTwoFactor: true, tempToken, expiresAt }
 - `ApartmentResponse`: `id, floorId, buildingId, floorNumber, number, rooms, area, pricePerM2, price, currency, status, planSlot (0–7), model3dId`.
 - `BuildingResponse`: `name` на языке запроса, `nameRu/Tg`, `descriptionRu/Tg`, `totalApartments`, `freeApartments`.
 
+### Удобства дома и условия рассрочки
+
+| Метод | Путь | Кто | Ответ |
+| --- | --- | --- | --- |
+| GET | `/buildings/{id}`, `/buildings` | все | у дома поле `amenities` — ключи удобств (только непустой список) и `installment` — `{ downPaymentMinPct?, maxMonths?, noOverpayment }` (только если условия заданы) |
+| PUT | `/buildings/{id}/amenities` | Content, руководители | `{ amenities: string[] }` — список целиком; ключи: `underground_parking, guest_parking, closed_yard, playground, sports_ground, security, cctv, concierge, elevators, landscaping, commercial_floor, storage_rooms, barrier_free, fitness, pool` (`BuildingAmenities.Keys`), порядок — как в этом списке, повторы убираются; неизвестный ключ — 400 «Неизвестное удобство дома» (`invalid_amenity`); аудит `AmenitiesUpdated`, сброс кэша каталога |
+| GET/PUT | `/owner/installment-settings` | руководители организации | `{ downPaymentMinPct? (0–100), maxMonths? (1–360), noOverpayment }`; пустое — «не задано», сайт это условие не пишет; аудит `InstallmentSettingsUpdated`, сброс кэша каталога. Коды: `invalid_down_payment`, `invalid_installment_term` |
+
+Сайт пишет удобства и условия рассрочки только из этих полей: чего нет — того на сайте нет.
+
 ### Планы этажей
 
 | Метод | Путь | Роли | Примечание |

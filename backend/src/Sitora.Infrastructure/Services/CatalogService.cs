@@ -1,8 +1,10 @@
 using System.Globalization;
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using Sitora.Domain.Common;
 using Sitora.Domain.DTOs.Catalog;
 using Sitora.Domain.DTOs.Common;
+using Sitora.Domain.DTOs.Settings;
 using Sitora.Domain.Entities;
 using Sitora.Domain.Enums;
 using Sitora.Domain.Exceptions;
@@ -166,7 +168,9 @@ public class CatalogService(
         if (items.Count == 0)
             return items;
         // Незаполненный эко-паспорт в ответ не попадает совсем.
-        items = items.Select(b => b.Eco is { IsEmpty: true } ? b with { Eco = null } : b).ToList();
+        // Пустой список удобств — тоже.
+        items = items.Select(b => b.Eco is { IsEmpty: true } ? b with { Eco = null } : b)
+            .Select(b => b.Amenities is { Count: 0 } ? b with { Amenities = null } : b).ToList();
         var buildingIds = items.Select(b => b.Id).ToList();
         var stale = await ExpiredBookedAsync(db, timeProvider, db.Apartments.Where(a => buildingIds.Contains(a.Floor.BuildingId)), ct);
         return items.Select(b => stale.Count(x => x.BuildingId == b.Id) is var n and > 0
@@ -236,6 +240,18 @@ public class CatalogService(
         return await GetBuildingAsync(id, ct);
 
         static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+    }
+
+    // Удобства дома: список заменяется целиком; неизвестные ключи отсекает валидатор, порядок — как в BuildingAmenities.
+    public async Task<BuildingResponse> UpdateBuildingAmenitiesAsync(Guid id, SaveBuildingAmenitiesRequest request, CancellationToken ct = default)
+    {
+        var building = await db.Buildings.FirstOrDefaultAsync(b => b.Id == id, ct)
+            ?? throw new NotFoundException(BuildingNotFound);
+        var before = building.Amenities.ToList();
+        building.Amenities = BuildingAmenities.Normalize(request.Amenities);
+        audit.Record(nameof(Building), building.Id, "AmenitiesUpdated", new { Amenities = before }, new { building.Amenities });
+        await SaveAsync("Такой дом уже есть", ct);
+        return await GetBuildingAsync(id, ct);
     }
 
     private static object EcoSnapshot(BuildingEcoInfo e) => new
@@ -422,7 +438,11 @@ public class CatalogService(
             b.Eco.GreenAreaM2,
             b.Eco.HeatingType,
             b.Eco.EstimatedKwhPerM2Year),
-        b.Organization.Green.IsDemo);
+        b.Organization.Green.IsDemo,
+        b.Amenities,
+        b.Organization.Installment.DownPaymentMinPct == null && b.Organization.Installment.MaxMonths == null && !b.Organization.Installment.NoOverpayment
+            ? null
+            : new InstallmentTermsResponse(b.Organization.Installment.DownPaymentMinPct, b.Organization.Installment.MaxMonths, b.Organization.Installment.NoOverpayment));
 
     private static readonly Expression<Func<Floor, FloorResponse>> ToFloorResponse = f => new FloorResponse(
         f.Id,

@@ -94,6 +94,7 @@ public static class DependencyInjection
         services.AddScoped<ApartmentImporter>();
         services.AddScoped<ICatalogService, CatalogService>();
         services.AddScoped<IGreenService, GreenService>();
+        services.AddScoped<IInstallmentService, InstallmentService>();
         services.AddScoped<PdfIssueRecorder>();
         services.AddScoped<ILeadService, LeadService>();
         services.AddScoped<IBookingService, BookingService>();

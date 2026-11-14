@@ -21,5 +21,9 @@ public class Building : BaseEntity
     // Эко-паспорт (null — не заполнен). Меняется только через PUT /buildings/{id}/eco.
     public BuildingEcoInfo? Eco { get; set; }
 
+    // Удобства дома — ключи из Sitora.Domain.Common.BuildingAmenities (на сайте — со значками и переводами).
+    // Меняются только через PUT /buildings/{id}/amenities.
+    public List<string> Amenities { get; set; } = [];
+
     public List<Floor> Floors { get; set; } = [];
 }

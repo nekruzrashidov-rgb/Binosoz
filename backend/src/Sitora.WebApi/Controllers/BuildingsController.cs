@@ -76,4 +76,12 @@ public class BuildingsController(ICatalogService catalog) : ControllerBase
     [ProducesResponseType<BuildingResponse>(StatusCodes.Status200OK)]
     public Task<BuildingResponse> UpdateEco(Guid id, SaveBuildingEcoRequest request, CancellationToken ct) =>
         catalog.UpdateBuildingEcoAsync(id, request, ct);
+
+    /// <summary>Удобства дома (контент-менеджер и руководители): список ключей целиком, неизвестный ключ — 400.
+    /// Изменение пишется в журнал, кэш каталога сбрасывается. В GET дома — поле amenities, только непустое.</summary>
+    [HttpPut("{id:guid}/amenities")]
+    [Authorize(Roles = Roles.CatalogEditors)]
+    [ProducesResponseType<BuildingResponse>(StatusCodes.Status200OK)]
+    public Task<BuildingResponse> UpdateAmenities(Guid id, SaveBuildingAmenitiesRequest request, CancellationToken ct) =>
+        catalog.UpdateBuildingAmenitiesAsync(id, request, ct);
 }

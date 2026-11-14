@@ -63,6 +63,17 @@ public class SeedScriptTests(SitoraApiFactory factory) : IClassFixture<SitoraApi
         Assert.Equal(Sitora.Infrastructure.Data.Seed.GreenDemoSeeder.BaselineSource, green.Org.BaselineSource);
         Assert.True(green.Org.IsDemo);
         Assert.Null(green.Org.Co2KgPerKgPaper);
+
+        // Удобства дома и условия рассрочки — тоже как у сидера разработки.
+        var site = await factory.WithDbAsync(async db => new
+        {
+            Amenities = await db.Buildings.IgnoreQueryFilters().AsNoTracking().Where(b => b.NameRu == SeedName).Select(b => b.Amenities).SingleAsync(),
+            Installment = await db.Organizations.IgnoreQueryFilters().AsNoTracking().Where(o => o.Id == Sitora.Domain.Entities.Organization.DefaultId).Select(o => o.Installment).SingleAsync()
+        });
+        Assert.Equal(Sitora.Infrastructure.Data.Seed.GreenDemoSeeder.Amenities, site.Amenities);
+        Assert.Equal(Sitora.Infrastructure.Data.Seed.GreenDemoSeeder.InstallmentDownPaymentMinPct, site.Installment.DownPaymentMinPct);
+        Assert.Equal(Sitora.Infrastructure.Data.Seed.GreenDemoSeeder.InstallmentMaxMonths, site.Installment.MaxMonths);
+        Assert.True(site.Installment.NoOverpayment);
     }
 
     // Текст — файл backend/scripts/seed.sql из репозитория, не ввод пользователя.

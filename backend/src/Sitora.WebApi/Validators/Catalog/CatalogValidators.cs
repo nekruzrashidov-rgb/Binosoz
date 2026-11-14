@@ -1,4 +1,5 @@
 using FluentValidation;
+using Sitora.Domain.Common;
 using Sitora.Domain.DTOs.Catalog;
 using Sitora.Domain.Entities;
 
@@ -28,6 +29,15 @@ public class SaveBuildingRequestValidator : AbstractValidator<SaveBuildingReques
 }
 
 // Эко-паспорт: числа неотрицательные и в разумных пределах, тексты — до 200 символов.
+// Удобства — только ключи из BuildingAmenities.
+public class SaveBuildingAmenitiesRequestValidator : AbstractValidator<SaveBuildingAmenitiesRequest>
+{
+    public SaveBuildingAmenitiesRequestValidator()
+    {
+        RuleForEach(x => x.Amenities).Must(BuildingAmenities.IsKnown).WithMessage("Неизвестное удобство дома");
+    }
+}
+
 public class SaveBuildingEcoRequestValidator : AbstractValidator<SaveBuildingEcoRequest>
 {
     public SaveBuildingEcoRequestValidator()

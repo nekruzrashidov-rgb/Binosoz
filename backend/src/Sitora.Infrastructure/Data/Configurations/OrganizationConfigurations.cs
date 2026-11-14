@@ -33,6 +33,16 @@ public class OrganizationConfiguration : IEntityTypeConfiguration<Organization>
             g.Property(x => x.IsDemo).HasColumnName("GreenIsDemo").HasDefaultValue(false);
         });
         builder.Navigation(o => o.Green).IsRequired();
+
+        // Условия рассрочки для сайта — столбцы Installment*.
+        builder.OwnsOne(o => o.Installment, i =>
+        {
+            i.Property(x => x.DownPaymentMinPct).HasColumnName("InstallmentDownPaymentMinPct").HasPrecision(5, 2);
+            i.Property(x => x.MaxMonths).HasColumnName("InstallmentMaxMonths");
+            i.Property(x => x.NoOverpayment).HasColumnName("InstallmentNoOverpayment").HasDefaultValue(false);
+            i.Ignore(x => x.IsEmpty);
+        });
+        builder.Navigation(o => o.Installment).IsRequired();
     }
 }
 

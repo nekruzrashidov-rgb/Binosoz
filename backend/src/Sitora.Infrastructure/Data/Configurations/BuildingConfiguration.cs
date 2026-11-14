@@ -15,6 +15,9 @@ public class BuildingConfiguration : IEntityTypeConfiguration<Building>
         builder.Property(b => b.DescriptionRu).HasMaxLength(4000);
         builder.Property(b => b.DescriptionTg).HasMaxLength(4000);
         builder.Property(b => b.ModelUrl).HasMaxLength(500);
+        // Удобства — массив ключей (text[]), по умолчанию пустой.
+        builder.Property(b => b.Amenities).HasColumnType("text[]").HasDefaultValueSql("'{}'::text[]").IsRequired();
+
         // Эко-паспорт — в той же таблице, столбцы Eco*; все необязательные (не заполнен — Eco = null).
         builder.OwnsOne(b => b.Eco, eco =>
         {

@@ -13,8 +13,8 @@
 --   A booked apartment gets a real active booking (with a demo lead: a booking needs a customer or a lead) expiring in 30 days,
 --   so managers can cancel, extend or turn it into a deal in the CRM. Sold apartments have no deal: they are catalog data only.
 -- * The seed itself is recorded in AuditLog (Building / Seeded).
--- * A second DO block (any run, never overwrites): the demo eco passport of the building and the organization tariffs,
---   marked as demo data — the same values as GreenDemoSeeder.cs.
+-- * A second DO block (any run, never overwrites): the demo eco passport and amenities of the building, the organization
+--   tariffs and installment terms, marked as demo data — the same values as GreenDemoSeeder.cs.
 DO $$
 DECLARE
   org        constant uuid := '01a20000-0000-7000-8000-000000000001';
@@ -100,9 +100,10 @@ BEGIN
   RAISE NOTICE 'Создан дом «Некруз Резиденс»: 21 этаж (0 — коммерческий), 160 квартир, продано %, в брони %', sold_n, booked_n;
 END $$;
 
--- «Зелёная» часть (демо): эко-паспорт дома и тарифы организации — те же значения, что в GreenDemoSeeder.cs
+-- Демо-значения: эко-паспорт и удобства дома, тарифы и условия рассрочки организации — те же, что в GreenDemoSeeder.cs
 -- (SeedSqlTests сверяет). Организация помечается демо (GreenIsDemo): на сайте бейдж «Демо-данные».
--- Ничего не перезаписывает: паспорт — только если не заполнен, тарифы — только если тариф не задан.
+-- Ничего не перезаписывает: паспорт — только если не заполнен, удобства — только если список пуст, тарифы — только если
+-- тариф не задан, рассрочка — только если условия не заданы.
 -- Коэффициент CO₂ не задаётся (проверенного источника нет, docs/DECISIONS.md) — без него CO₂ на сайте не показывается.
 DO $$
 DECLARE
@@ -137,4 +138,20 @@ BEGIN
   WHERE "Id" = org AND "GreenTariffKwhTjs" IS NULL;
   GET DIAGNOSTICS n = ROW_COUNT;
   IF n > 0 THEN RAISE NOTICE 'Тарифы организации заполнены демо-значениями (помечены как демо)'; END IF;
+
+  UPDATE "Buildings" SET
+    "Amenities" = ARRAY['underground_parking', 'closed_yard', 'playground', 'cctv', 'elevators', 'landscaping'],
+    "UpdatedAt" = now()
+  WHERE "OrganizationId" = org AND "NameRu" = 'Некруз Резиденс' AND cardinality("Amenities") = 0;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n > 0 THEN RAISE NOTICE 'Удобства дома заполнены демо-значениями'; END IF;
+
+  UPDATE "Organizations" SET
+    "InstallmentDownPaymentMinPct" = 10,
+    "InstallmentMaxMonths" = 120,
+    "InstallmentNoOverpayment" = true,
+    "UpdatedAt" = now()
+  WHERE "Id" = org AND "InstallmentDownPaymentMinPct" IS NULL AND "InstallmentMaxMonths" IS NULL AND NOT "InstallmentNoOverpayment";
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n > 0 THEN RAISE NOTICE 'Условия рассрочки заполнены демо-значениями'; END IF;
 END $$;

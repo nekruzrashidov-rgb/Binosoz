@@ -76,6 +76,12 @@ public static class ErrorCatalog
         E("Укажите источник коэффициента CO₂", "source_required", "Манбаи зариби CO₂-ро нишон диҳед");
         E("Неизвестный класс энергоэффективности", "invalid_energy_class", "Синфи номаълуми самаранокии энергия");
         E("Неизвестный тип отопления", "invalid_heating_type", "Навъи номаълуми гармидиҳӣ");
+
+        // ---------- удобства дома и условия рассрочки ----------
+        E("Неизвестное удобство дома", "invalid_amenity", "Қулайии номаълуми бино");
+        E("Первоначальный взнос — от 0 до 100%", "invalid_down_payment", "Пардохти аввалия — аз 0 то 100%");
+        E(Validators.Settings.SaveInstallmentSettingsRequestValidator.MonthsMessage, "invalid_installment_term",
+            $"Мӯҳлати муҳлатдиҳӣ — аз 1 то {Sitora.Infrastructure.Services.PaymentScheduleCalculator.MaxMonths} моҳ");
         E("Утепление стен — не длиннее 200 символов", "eco_text_too_long", "Гармигузаронии деворҳо — на зиёда аз 200 аломат");
         E("Окна — не длиннее 200 символов", "eco_text_too_long", "Тирезаҳо — на зиёда аз 200 аломат");
         E("Мощность солнечных панелей — от 0 до 100 000 кВт", "invalid_solar_power", "Иқтидори панелҳои офтобӣ — аз 0 то 100 000 кВт");
