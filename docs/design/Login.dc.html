@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Вход — Некруз Резиденс</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4EFE7;font-family:'Manrope', 'Inter', system-ui, sans-serif;color:#1B1815;-webkit-font-smoothing:antialiased}
+a{color:#1B1815;text-decoration:none}
+a:hover{color:#8A4E2A}
+button{font-family:'Manrope', 'Inter', system-ui, sans-serif}
+.nav a{font-size:14px;font-weight:600;letter-spacing:.02em;color:#1B1815}
+.nav a:hover{color:#8A4E2A}
+.btn-p:hover{background:#6F3D1F !important;color:#F4EFE7 !important}
+.btn-s:hover{background:#1B1815 !important;color:#F4EFE7 !important}
+.btn-l:hover{background:#F4EFE7 !important;color:#1B1815 !important}
+.lift{transition:transform .25s ease, box-shadow .25s ease}
+.lift:hover{transform:translateY(-3px);box-shadow:0 18px 40px rgba(27,24,21,.12)}
+.zoom img{transition:transform .8s ease}
+.zoom:hover img{transform:scale(1.04)}
+input:focus,textarea:focus,select:focus,button:focus-visible,a:focus-visible{outline:2px solid #8A4E2A;outline-offset:2px}
+</style>
+</helmet>
+
+<header style="background:#F4EFE7;border-bottom:1px solid #E6DDCE">
+<div style="max-width:1320px;margin:0 auto;padding:18px 32px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px 32px">
+<a href="Main.dc.html" aria-label="Некруз Резиденс — на главную" style="display:flex;align-items:center;gap:12px"><svg width="34" height="34" viewBox="0 0 34 34" fill="none" aria-hidden="true"><rect x="9" y="6" width="16" height="26" stroke="#1B1815" stroke-width="1.6"/><path d="M13 11h8M13 16h8M13 21h8M13 26h8" stroke="#8A4E2A" stroke-width="1.4"/><path d="M17 2v4" stroke="#1B1815" stroke-width="1.6"/></svg><span style="display:flex;flex-direction:column;line-height:1"><span style="font-family:'Cormorant Garamond', 'Playfair Display', Georgia, serif;font-size:24px;font-weight:700;letter-spacing:.16em;color:#1B1815">NEKRUZ</span><span style="font-size:10px;font-weight:600;letter-spacing:.34em;color:#8A4E2A;margin-top:4px">RESIDENCE</span></span></a>
+<nav class="nav" aria-label="Главное меню" style="display:flex;flex-wrap:wrap;gap:8px 34px;align-items:center"><a href="Main.dc.html" style="padding-bottom:6px;border-bottom:2px solid transparent">Главная</a><a href="Apartments.dc.html" style="padding-bottom:6px;border-bottom:2px solid transparent">Квартиры</a><a href="Gallery.dc.html" style="padding-bottom:6px;border-bottom:2px solid transparent">Галерея</a><a href="About.dc.html" style="padding-bottom:6px;border-bottom:2px solid transparent">О проекте</a><a href="Contact.dc.html" style="padding-bottom:6px;border-bottom:2px solid transparent">Контакты</a></nav>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px">
+<a href="tel:+992983637070" style="font-size:14px;font-weight:700;letter-spacing:.01em">+992 98 363 70 70</a>
+<div role="group" aria-label="Язык" style="display:flex;border:1px solid #CDBFA9;border-radius:2px">
+<button type="button" style="border:0;background:#1B1815;color:#F4EFE7;font-size:12px;font-weight:700;padding:8px 11px;min-width:44px;min-height:36px;cursor:pointer">RU</button>
+<button type="button" style="border:0;background:transparent;color:#1B1815;font-size:12px;font-weight:700;padding:8px 11px;min-width:44px;min-height:36px;cursor:pointer">TJ</button>
+<button type="button" style="border:0;background:transparent;color:#1B1815;font-size:12px;font-weight:700;padding:8px 11px;min-width:44px;min-height:36px;cursor:pointer">EN</button>
+</div>
+<a href="Login.dc.html" style="font-size:14px;font-weight:600;min-height:44px;display:flex;align-items:center">Войти</a>
+</div>
+</div>
+</header>
+
+<section style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));min-height:760px">
+<div style="position:relative;background:#14110F;color:#F4EFE7;overflow:hidden;min-height:420px">
+<img src="/_blob/1cfa75ac68cf817e0ce0b3617e6b826b" alt="Лобби комплекса" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">
+<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(20,17,15,.2) 0%,rgba(20,17,15,.86) 100%)"></div>
+<div style="position:relative;height:100%;box-sizing:border-box;padding:56px;display:flex;flex-direction:column;justify-content:flex-end;min-height:420px">
+<div style="font-size:12px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#C98655">Личный кабинет</div>
+<h2 style="margin:16px 0 0;font-family:'Cormorant Garamond', 'Playfair Display', Georgia, serif;font-weight:500;font-size:clamp(38px,4vw,60px);line-height:1;max-width:460px">Ваша квартира — всегда под рукой</h2>
+<p style="margin:18px 0 0;max-width:420px;font-size:17px;line-height:1.65;color:#E9E1D3">Статус брони, история платежей и ход строительства — в одном месте.</p>
+</div>
+</div>
+<div style="display:flex;align-items:center;justify-content:center;padding:56px 32px">
+<div style="width:100%;max-width:440px">
+<h1 style="margin:0;font-family:'Cormorant Garamond', 'Playfair Display', Georgia, serif;font-weight:500;font-size:48px;line-height:1">Вход</h1>
+<div role="tablist" aria-label="Тип входа" style="margin-top:28px;display:grid;grid-template-columns:1fr 1fr;border:1px solid #CDBFA9;border-radius:2px;overflow:hidden">
+<button type="button" role="tab" aria-selected="{{isBuyer}}" onClick="{{setBuyer}}" style="min-height:52px;border:0;font-size:14px;font-weight:700;cursor:pointer;background:{{buyBg}};color:{{buyFg}}">Покупатель</button>
+<button type="button" role="tab" aria-selected="{{isStaff}}" onClick="{{setStaff}}" style="min-height:52px;border:0;font-size:14px;font-weight:700;cursor:pointer;background:{{staffBg}};color:{{staffFg}}">Сотрудник</button>
+</div>
+<sc-if value="{{isBuyer}}" hint-placeholder-val="{{true}}">
+<form onSubmit="{{noop}}" style="margin-top:32px;display:flex;flex-direction:column;gap:20px">
+<p style="margin:0;font-size:16px;line-height:1.6;color:#5E564C">Введите номер телефона, который вы указали при бронировании. Мы отправим код подтверждения.</p>
+<div><label for="lp" style="display:block;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5E564C;margin-bottom:8px">Телефон</label><input id="lp" type="tel" placeholder="+992" style="width:100%;box-sizing:border-box;height:56px;padding:0 18px;border:1px solid #CDBFA9;border-radius:2px;background:#FBF8F2;font-size:17px;font-family:'Manrope', 'Inter', system-ui, sans-serif;color:#1B1815"></div>
+<button class="btn-p" type="submit" style="min-height:58px;border:0;border-radius:2px;background:#8A4E2A;color:#F4EFE7;font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer">Получить код</button>
+</form>
+</sc-if>
+<sc-if value="{{isStaff}}" hint-placeholder-val="{{false}}">
+<form onSubmit="{{noop}}" style="margin-top:32px;display:flex;flex-direction:column;gap:20px">
+<div><div style="font-size:20px;font-weight:700">Вход для сотрудников</div><p style="margin:8px 0 0;font-size:15px;line-height:1.6;color:#5E564C">Почта и пароль из письма «Вы приглашены в Binosoz».</p></div>
+<div><label for="le" style="display:block;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5E564C;margin-bottom:8px">Почта</label><input id="le" type="email" style="width:100%;box-sizing:border-box;height:56px;padding:0 18px;border:1px solid #CDBFA9;border-radius:2px;background:#FBF8F2;font-size:17px;font-family:'Manrope', 'Inter', system-ui, sans-serif;color:#1B1815"></div>
+<div><label for="lw" style="display:block;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5E564C;margin-bottom:8px">Пароль</label>
+<div style="position:relative"><input id="lw" type="{{pwType}}" style="width:100%;box-sizing:border-box;height:56px;padding:0 18px;border:1px solid #CDBFA9;border-radius:2px;background:#FBF8F2;font-size:17px;font-family:'Manrope', 'Inter', system-ui, sans-serif;color:#1B1815;padding-right:64px"><button type="button" onClick="{{togglePw}}" aria-label="{{pwLabel}}" style="position:absolute;right:4px;top:4px;width:48px;height:48px;border:0;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5E564C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+<button class="btn-p" type="submit" style="min-height:58px;border:0;border-radius:2px;background:#8A4E2A;color:#F4EFE7;font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer">Войти</button>
+<a href="Login.dc.html" style="font-size:15px;font-weight:700;text-decoration:underline;min-height:44px;display:flex;align-items:center">Забыли пароль?</a>
+</form>
+</sc-if>
+<div style="margin-top:36px;padding-top:24px;border-top:1px solid #E6DDCE;font-size:15px;color:#5E564C">Вы застройщик? <a href="Register.dc.html" style="font-weight:700;text-decoration:underline">Подать заявку</a></div>
+</div>
+</div>
+</section>
+<footer style="background:#14110F;color:#F4EFE7">
+<div style="max-width:1320px;margin:0 auto;padding:72px 32px 36px">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:48px 40px">
+<div style="grid-column:span 2;min-width:260px">
+<div style="font-family:'Cormorant Garamond', 'Playfair Display', Georgia, serif;font-size:34px;font-weight:600;letter-spacing:.14em">NEKRUZ</div>
+<div style="font-size:11px;font-weight:600;letter-spacing:.34em;color:#C98655;margin-top:6px">RESIDENCE · ДУШАНБЕ</div>
+<p style="margin:22px 0 0;max-width:380px;font-size:15px;line-height:1.7;color:#B9AE9E">Жилой комплекс бизнес-класса в центре Душанбе. 20 этажей, 160 квартир, рассрочка без процентов.</p>
+</div>
+<div>
+<div style="font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#C98655;margin-bottom:18px">Квартиры</div>
+<div style="display:flex;flex-direction:column;gap:6px;font-size:15px">
+<a href="Apartments.dc.html" style="color:#F4EFE7;min-height:32px">Каталог квартир</a>
+<a href="Apartments.dc.html#calc" style="color:#F4EFE7;min-height:32px">Калькулятор рассрочки</a>
+<a href="Gallery.dc.html" style="color:#F4EFE7;min-height:32px">Галерея</a>
+<a href="About.dc.html" style="color:#F4EFE7;min-height:32px">О проекте</a>
+</div>
+</div>
+<div>
+<div style="font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#C98655;margin-bottom:18px">Контакты</div>
+<div style="display:flex;flex-direction:column;gap:6px;font-size:15px;line-height:1.55">
+<span>г. Душанбе, пр. Борбад, 15</span>
+<a href="tel:+992983637070" style="color:#F4EFE7;min-height:32px">+992 98 363 70 70</a>
+<a href="https://t.me/nekru01" style="color:#F4EFE7;min-height:32px">Telegram @nekru01</a>
+<a href="https://wa.me/992983637070" style="color:#F4EFE7;min-height:32px">WhatsApp</a>
+<a href="Login.dc.html" style="color:#F4EFE7;min-height:32px">Личный кабинет</a>
+</div>
+</div>
+</div>
+<div style="margin-top:56px;padding-top:24px;border-top:1px solid #3A332D;display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px 24px;font-size:13px;color:#B9AE9E">
+<span>© 2026 Некруз Резиденс. Все права защищены · Платформа Binosoz</span>
+<span>Вы застройщик? <a href="Register.dc.html" style="color:#F4EFE7;font-weight:700;text-decoration:underline">Подать заявку</a></span>
+</div>
+</div>
+</footer>
+
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  state = { tab: 'buyer', pw: false };
+  renderVals() {
+    const S = this.state;
+    const b = S.tab === 'buyer';
+    return {
+      isBuyer: b, isStaff: !b,
+      buyBg: b ? '#1B1815' : 'transparent', buyFg: b ? '#F4EFE7' : '#1B1815',
+      staffBg: !b ? '#1B1815' : 'transparent', staffFg: !b ? '#F4EFE7' : '#1B1815',
+      setBuyer: () => this.setState({ tab: 'buyer' }), setStaff: () => this.setState({ tab: 'staff' }),
+      pwType: S.pw ? 'text' : 'password', pwLabel: S.pw ? 'Скрыть пароль' : 'Показать пароль',
+      togglePw: () => this.setState({ pw: !S.pw }),
+      noop: (e) => { if (e && e.preventDefault) e.preventDefault(); }
+    };
+  }
+}
+</script>
+</body>
+</html>

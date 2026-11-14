@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Галерея — Некруз Резиденс</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4EFE7;font-family:'Manrope', 'Inter', system-ui, sans-serif;color:#1B1815;-webkit-font-smoothing:antialiased}
+a{color:#1B1815;text-decoration:none}
+a:hover{color:#8A4E2A}
+button{font-family:'Manrope', 'Inter', system-ui, sans-serif}
+.nav a{font-size:14px;font-weight:600;letter-spacing:.02em;color:#1B1815}
+.nav a:hover{color:#8A4E2A}
+.btn-p:hover{background:#6F3D1F !important;color:#F4EFE7 !important}
+.btn-s:hover{background:#1B1815 !important;color:#F4EFE7 !important}
+.btn-l:hover{background:#F4EFE7 !important;color:#1B1815 !important}
+.lift{transition:transform .25s ease, box-shadow .25s ease}
+.lift:hover{transform:translateY(-3px);box-shadow:0 18px 40px rgba(27,24,21,.12)}
+.zoom img{transition:transform .8s ease}
+.zoom:hover img{transform:scale(1.04)}
+input:focus,textarea:focus,select:focus,button:focus-visible,a:focus-visible{outline:2px solid #8A4E2A;outline-offset:2px}
+</style>
+</helmet>
+
+<header style="background:#F4EFE7;border-bottom:1px solid #E6DDCE">
+<div style="max-width:1320px;margin:0 auto;padding:18px 32px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px 32px">
+<a href="Main.dc.html" aria-label="Некруз Резиденс — на главную" style="display:flex;align-items:center;gap:12px"><svg width="34" height="34" viewBox="0 0 34 34" fill="none" aria-hidden="true"><rect x="9" y="6" width="16" height="26" stroke="#1B1815" stroke-width="1.6"/><path d="M13 11h8M13 16h8M13 21h8M13 26h8" stroke="#8A4E2A" stroke-width="1.4"/><path d="M17 2v4" stroke="#1B1815" stroke-width="1.6"/></svg><span style="display:flex;flex-direction:column;line-height:1"><span style="font-family:'Cormorant Garamond', 'Playfair Display', Georgia, serif;font-size:24px;font-weight:700;letter-spacing:.16em;color:#1B1815">NEKRUZ</span><span style="font-size:10px;font-weight:600;letter-spacing:.34em;color:#8A4E2A;margin-top:4px">RESIDENCE</span></span></a>
+<nav class="nav" aria-label="Главное меню" style="display:flex;flex-wrap:wrap;gap:8px 34px;align-items:center"><a href="Main.dc.html" style="padding-bottom:6px;border-bottom:2px solid transparent">Главная</a><a href="Apartments.dc.html" style="padding-bottom:6px;border-bottom:2px solid transparent">Квартиры</a><a href="Gallery.dc.html" style="color:#8A4E2A;border-bottom:2px solid #8A4E2A;padding-bottom:6px">Галерея</a><a href="About.dc.html" style="padding-bottom:6px;border-bottom:2px solid transparent">О проекте</a><a href="Contact.dc.html" style="padding-bottom:6px;border-bottom:2px solid transparent">Контакты</a></nav>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px">
+<a href="tel:+992983637070" style="font-size:14px;font-weight:700;letter-spacing:.01em">+992 98 363 70 70</a>
+<div role="group" aria-label="Язык" style="display:flex;border:1px solid #CDBFA9;border-radius:2px">
+<button type="button" style="border:0;background:#1B1815;color:#F4EFE7;font-size:12px;font-weight:700;padding:8px 11px;min-width:44px;min-height:36px;cursor:pointer">RU</button>
+<button type="button" style="border:0;background:transparent;color:#1B1815;font-size:12px;font-weight:700;padding:8px 11px;min-width:44px;min-height:36px;cursor:pointer">TJ</button>
+<button type="button" style="border:0;background:transparent;color:#1B1815;font-size:12px;font-weight:700;padding:8px 11px;min-width:44px;min-height:36px;cursor:pointer">EN</button>
+</div>
+<a href="Login.dc.html" style="font-size:14px;font-weight:600;min-height:44px;display:flex;align-items:center">Войти</a>
+</div>
+</div>
+</header>
+
+<section style="background:#E6DDCE;border-bottom:1px solid #CDBFA9">
+<div style="max-width:1320px;margin:0 auto;padding:56px 32px 52px">
+<div style="font-size:13px;font-weight:600;color:#5E564C"><a href="Main.dc.html" style="color:#5E564C">Главная</a> &nbsp;/&nbsp; <span style="color:#1B1815">Галерея</span></div>
+<h1 style="margin:22px 0 0;font-family:'Cormorant Garamond', 'Playfair Display', Georgia, serif;font-weight:500;font-size:clamp(46px,6vw,88px);line-height:.96;letter-spacing:-.015em">Галерея комплекса</h1>
+<p style="margin:22px 0 0;max-width:640px;font-size:18px;line-height:1.65;color:#5E564C">Фасад, интерьеры, инфраструктура и планировки Некруз Резиденс.</p>
+</div>
+</section>
+<section style="padding:48px 0 104px">
+<div style="max-width:1320px;margin:0 auto;padding:0 32px">
+<div role="group" aria-label="Категории" style="display:flex;flex-wrap:wrap;gap:10px">
+<sc-for list="{{tabs}}" as="t" hint-placeholder-count="5">
+<button type="button" onClick="{{t.pick}}" aria-pressed="{{t.on}}" style="min-height:48px;padding:0 24px;border:1px solid {{t.bd}};border-radius:2px;background:{{t.bg}};color:{{t.fg}};font-size:14px;font-weight:700;cursor:pointer">{{t.label}}</button>
+</sc-for>
+</div>
+<div style="margin-top:36px;display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:20px">
+<sc-for list="{{items}}" as="it" hint-placeholder-count="6">
+<button type="button" onClick="{{it.open}}" aria-label="{{it.title}}" class="zoom" style="position:relative;display:block;width:100%;padding:0;border:0;text-align:left;cursor:pointer;background:#FBF8F2;overflow:hidden;border-radius:2px;aspect-ratio:3/2">
+<sc-if value="{{it.isImg}}" hint-placeholder-val="{{true}}"><img src="{{it.src}}" alt="{{it.alt}}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"></sc-if>
+<sc-if value="{{it.isPlan}}" hint-placeholder-val="{{false}}"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:18px;background:#FBF8F2;border:1px solid #E6DDCE"><div style="width:100%;max-width:340px"><sc-if value="{{it.pStudio}}" hint-placeholder-val="{{true}}"><svg viewBox="0 0 320 230" width="100%" role="img" aria-label="Планировка: studio" style="display:block;background:#FBF8F2"><rect x="20" y="20" width="78" height="66" fill="#F4EFE7" stroke="#1B1815" stroke-width="3"/><text x="59" y="57" text-anchor="middle" font-family="Manrope,sans-serif" font-size="10.5" font-weight="600" fill="#1B1815">С/у</text><rect x="20" y="86" width="78" height="94" fill="#F4EFE7" stroke="#1B1815" stroke-width="3"/><text x="59" y="137" text-anchor="middle" font-family="Manrope,sans-serif" font-size="10.5" font-weight="600" fill="#1B1815">Прихожая</text><rect x="98" y="20" width="202" height="62" fill="#F4EFE7" stroke="#1B1815" stroke-width="3"/><text x="199" y="55" text-anchor="middle" font-family="Manrope,sans-serif" font-size="10.5" font-weight="600" fill="#1B1815">Кухня</text><rect x="98" y="82" width="202" height="98" fill="#F4EFE7" stroke="#1B1815" stroke-width="3"/><text x="199" y="135" text-anchor="middle" font-family="Manrope,sans-serif" font-size="10.5" font-weight="600" fill="#1B1815">Жилая зона</text><rect x="160" y="180" width="140" height="34" fill="none" stroke="#8A4E2A" stroke-width="1.5" stroke-dasharray="5 4"/><text x="230" y="200" text-anchor="middle" font-family="Manrope,sans-serif" font-size="9.5" font-weight="600" fill="#8A4E2A">Балкон</text><line x1="150" y1="20" x2="250" y2="20" stroke="#8A4E2A" stroke-width="5"/><line x1="300" y1="90" x2="300" y2="138" stroke="#8A4E2A" stroke-width="5"/></svg></sc-if><sc-if value="{{it.p1k}}" hint-placeholder-val="{{false}}"><svg viewBox="0 0 320 230" width="100%" role="img" aria-label="Планировка: 1k" style="display:block;background:#FBF8F2"><rect x="20" y="20" width="80" height="62" fill="#F4EFE7" stroke="#1B1815" stroke-width="3"/><text x="60" y="55" text-anchor="middle" font-family="Manrope,sans-serif" font-size="10.5" font-weight="600" fill="#1B1815">С/у</text><rect x="20" y="82" width="80" height="98" fill="#F4EFE7" stroke="#1B1815" stroke-width="3"/><text x="60" y="135" text-anchor="middle" font-family="Manrope,sans-serif" font-size="10.5" font-weight="600" fill="#1B1815">Прихожая</text><rect x="100" y="20" width="90" height="100" fill="#F4EFE7" stroke="#1B1815" stroke-width="3"/><text x="145" y="74" text-anchor="middle" font-family="Manrope,sans-serif" font-size="10.5" font-weight="600" fill="#1B1815">Спальня</text><rect x="190" y="20" width="110" height="160" fill="#F4EFE7" stroke="#1B1815" stroke-width="3"/><text x="245" y="104" text-anchor="middle" font-family="Manrope,sans-serif" font-size="10.5" font-weight="600" fill="#1B1815">Кухня-гостиная</text><rect x="100" y="120" width="90" height="60" fill="#F4EFE7" stroke="#1B1815" stroke-width="3"/><text x="145" y="154" text-anchor="middle" font-family="Manrope,sans-serif" font-size="10.5" font-weight="600" fill="#1B1815">Гардероб</text><rect x="190" y="180" width="110" height="34" fill="none" stroke="#8A4E2A" stroke-width="1.5" stroke-dasharray="5 4"/><text x="245" y="200" text-anchor="middle" font-family="Manrope,sans-serif" font-size="9.5" font-weight="600" fill="#8A4E2A">Балкон</text><line x1="110" y1="20" x2="180" y2="20" stroke="#8A4E2A" stroke-width="5"/><line x1="210" y1="20" x2="290" y2="20" stroke="#8A4E2A" stroke-width="5"/><line x1="300" y1="60" x2="300" y2="108" stroke="#8A4E2A" stroke-width="5"/></svg></sc-if><sc-if value="{{it.p2k}}" hint-placeholder-val="{{false}}"><svg viewBox="0 0 320 230" width="100%" role="img" aria-label="Планировка: 2k" style="display:block;background:#FBF8F2"><rect x="20" y="20" width="70" height="56" fill="#F4EFE7" stroke="#1B1815" stroke-width="3"/><text x="55" y="52" text-anchor="middle" font-family="Manrope,sans-serif" font-size="10.5" font-weight="600" fill="#1B1815">С/у</text><rect x="20" y="76" width="70" height="104" fill="#F4EFE7" stroke="#1B1815" stroke-width="3"/><text x="55" y="132" text-anchor="middle" font-family="Manrope,sans-serif" font-size="10.5" font-weight="600" fill="#1B1815">Прихожая</text><rect x="90" y="20" width="90" height="84" fill="#F4EFE7" stroke="#1B1815" stroke-width="3"/><text x="135" y="66" text-anchor="middle" font-family="Manrope,sans-serif" font-size="10.5" font-weight="600" fill="#1B1815">Спальня 1</text><rect x="90" y="104" width="90" height="76" fill="#F4EFE7" stroke="#1B1815" stroke-width="3"/><text x="135" y="146" text-anchor="middle" font-family="Manrope,sans-serif" font-size="10.5" font-weight="600" fill="#1B1815">Спальня 2</text><rect x="180" y="20" width="120" height="160" fill="#F4EFE7" stroke="#1B1815" stroke-width="3"/><text x="240" y="104" text-anchor="middle" font-family="Manrope,sans-serif" font-size="10.5" font-weight="600" fill="#1B1815">Кухня-гостиная</text><rect x="180" y="180" width="120" height="34" fill="none" stroke="#8A4E2A" stroke-width="1.5" stroke-dasharray="5 4"/><text x="240" y="200" text-anchor="middle" font-family="Manrope,sans-serif" font-size="9.5" font-weight="600" fill="#8A4E2A">Балкон</text><line x1="100" y1="20" x2="170" y2="20" stroke="#8A4E2A" stroke-width="5"/><line x1="190" y1="20" x2="290" y2="20" stroke="#8A4E2A" stroke-width="5"/><line x1="300" y1="60" x2="300" y2="114" stroke="#8A4E2A" stroke-width="5"/></svg></sc-if><sc-if value="{{it.p3k}}" hint-placeholder-val="{{false}}"><svg viewBox="0 0 320 230" width="100%" role="img" aria-label="Планировка: 3k" style="display:block;background:#FBF8F2"><rect x="20" y="20" width="64" height="60" fill="#F4EFE7" stroke="#1B1815" stroke-width="3"/><text x="52" y="54" text-anchor="middle" font-family="Manrope,sans-serif" font-size="10.5" font-weight="600" fill="#1B1815">С/у</text><rect x="20" y="80" width="64" height="100" fill="#F4EFE7" stroke="#1B1815" stroke-width="3"/><text x="52" y="134" text-anchor="middle" font-family="Manrope,sans-serif" font-size="10.5" font-weight="600" fill="#1B1815">Прихожая</text><rect x="84" y="20" width="76" height="80" fill="#F4EFE7" stroke="#1B1815" stroke-width="3"/><text x="122" y="64" text-anchor="middle" font-family="Manrope,sans-serif" font-size="10.5" font-weight="600" fill="#1B1815">Спальня 1</text><rect x="84" y="100" width="76" height="80" fill="#F4EFE7" stroke="#1B1815" stroke-width="3"/><text x="122" y="144" text-anchor="middle" font-family="Manrope,sans-serif" font-size="10.5" font-weight="600" fill="#1B1815">Спальня 2</text><rect x="160" y="20" width="60" height="70" fill="#F4EFE7" stroke="#1B1815" stroke-width="3"/><text x="190" y="59" text-anchor="middle" font-family="Manrope,sans-serif" font-size="10.5" font-weight="600" fill="#1B1815">Спальня 3</text><rect x="220" y="20" width="80" height="70" fill="#F4EFE7" stroke="#1B1815" stroke-width="3"/><text x="260" y="59" text-anchor="middle" font-family="Manrope,sans-serif" font-size="10.5" font-weight="600" fill="#1B1815">С/у 2</text><rect x="160" y="90" width="140" height="90" fill="#F4EFE7" stroke="#1B1815" stroke-width="3"/><text x="230" y="139" text-anchor="middle" font-family="Manrope,sans-serif" font-size="10.5" font-weight="600" fill="#1B1815">Гостиная</text><rect x="160" y="180" width="140" height="34" fill="none" stroke="#8A4E2A" stroke-width="1.5" stroke-dasharray="5 4"/><text x="230" y="200" text-anchor="middle" font-family="Manrope,sans-serif" font-size="9.5" font-weight="600" fill="#8A4E2A">Балкон</text><line x1="170" y1="20" x2="210" y2="20" stroke="#8A4E2A" stroke-width="5"/><line x1="94" y1="20" x2="150" y2="20" stroke="#8A4E2A" stroke-width="5"/><line x1="300" y1="110" x2="300" y2="146" stroke="#8A4E2A" stroke-width="5"/></svg></sc-if></div></div></sc-if>
+<sc-if value="{{it.isSoon}}" hint-placeholder-val="{{false}}"><div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#E6DDCE;color:#5E564C;font-size:14px;font-weight:600;text-align:center;padding:24px"><sc-if value="{{it.iCar}}" hint-placeholder-val="{{true}}"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#8A4E2A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 16V12l2-5h12l2 5v4"/><circle cx="8" cy="16.500" r="1.800"/><circle cx="16" cy="16.500" r="1.800"/><path d="M4 12h16"/></svg></sc-if><sc-if value="{{it.iGym}}" hint-placeholder-val="{{false}}"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#8A4E2A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8v8M3 10v4M18 8v8M21 10v4M6 12h12"/></svg></sc-if><sc-if value="{{it.iKids}}" hint-placeholder-val="{{false}}"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#8A4E2A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7" r="3"/><path d="M5 21v-3a7 7 0 0114 0v3"/></svg></sc-if>Визуализация появится позже</div></sc-if>
+<span style="position:absolute;left:0;bottom:0;right:0;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 20px;background:rgba(20,17,15,.84);color:#F4EFE7;font-size:14px;font-weight:600"><span>{{it.title}}</span><span style="font-size:11px;letter-spacing:.14em;color:#C98655">{{it.tag}}</span></span>
+</button>
+</sc-for>
+</div>
+<p style="margin:28px 0 0;font-size:14px;color:#5E564C">Это визуализации: фотографии стройки и готовых интерьеров появятся по мере строительства.</p>
+</div>
+</section>
+<sc-if value="{{hasOpen}}" hint-placeholder-val="{{false}}">
+<div role="dialog" aria-modal="true" aria-label="Просмотр" style="position:fixed;inset:0;z-index:50;background:rgba(20,17,15,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px">
+<button type="button" onClick="{{close}}" aria-label="Закрыть" style="position:absolute;top:20px;right:24px;width:48px;height:48px;border:1px solid #5A5047;background:transparent;border-radius:2px;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F4EFE7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+<sc-if value="{{open.isImg}}" hint-placeholder-val="{{false}}"><img src="{{open.src}}" alt="{{open.alt}}" style="max-width:100%;max-height:78vh;object-fit:contain;border-radius:2px"></sc-if>
+<div style="margin-top:20px;display:flex;align-items:center;gap:20px;color:#F4EFE7;font-size:16px;font-weight:600">
+<button type="button" onClick="{{prev}}" aria-label="Предыдущее" style="width:48px;height:48px;border:1px solid #5A5047;background:transparent;border-radius:2px;cursor:pointer;transform:scaleX(-1);display:flex;align-items:center;justify-content:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F4EFE7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+<span>{{open.title}}</span>
+<button type="button" onClick="{{next}}" aria-label="Следующее" style="width:48px;height:48px;border:1px solid #5A5047;background:transparent;border-radius:2px;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F4EFE7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+</div>
+</div>
+</sc-if>
+<footer style="background:#14110F;color:#F4EFE7">
+<div style="max-width:1320px;margin:0 auto;padding:72px 32px 36px">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:48px 40px">
+<div style="grid-column:span 2;min-width:260px">
+<div style="font-family:'Cormorant Garamond', 'Playfair Display', Georgia, serif;font-size:34px;font-weight:600;letter-spacing:.14em">NEKRUZ</div>
+<div style="font-size:11px;font-weight:600;letter-spacing:.34em;color:#C98655;margin-top:6px">RESIDENCE · ДУШАНБЕ</div>
+<p style="margin:22px 0 0;max-width:380px;font-size:15px;line-height:1.7;color:#B9AE9E">Жилой комплекс бизнес-класса в центре Душанбе. 20 этажей, 160 квартир, рассрочка без процентов.</p>
+</div>
+<div>
+<div style="font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#C98655;margin-bottom:18px">Квартиры</div>
+<div style="display:flex;flex-direction:column;gap:6px;font-size:15px">
+<a href="Apartments.dc.html" style="color:#F4EFE7;min-height:32px">Каталог квартир</a>
+<a href="Apartments.dc.html#calc" style="color:#F4EFE7;min-height:32px">Калькулятор рассрочки</a>
+<a href="Gallery.dc.html" style="color:#F4EFE7;min-height:32px">Галерея</a>
+<a href="About.dc.html" style="color:#F4EFE7;min-height:32px">О проекте</a>
+</div>
+</div>
+<div>
+<div style="font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#C98655;margin-bottom:18px">Контакты</div>
+<div style="display:flex;flex-direction:column;gap:6px;font-size:15px;line-height:1.55">
+<span>г. Душанбе, пр. Борбад, 15</span>
+<a href="tel:+992983637070" style="color:#F4EFE7;min-height:32px">+992 98 363 70 70</a>
+<a href="https://t.me/nekru01" style="color:#F4EFE7;min-height:32px">Telegram @nekru01</a>
+<a href="https://wa.me/992983637070" style="color:#F4EFE7;min-height:32px">WhatsApp</a>
+<a href="Login.dc.html" style="color:#F4EFE7;min-height:32px">Личный кабинет</a>
+</div>
+</div>
+</div>
+<div style="margin-top:56px;padding-top:24px;border-top:1px solid #3A332D;display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px 24px;font-size:13px;color:#B9AE9E">
+<span>© 2026 Некруз Резиденс. Все права защищены · Платформа Binosoz</span>
+<span>Вы застройщик? <a href="Register.dc.html" style="color:#F4EFE7;font-weight:700;text-decoration:underline">Подать заявку</a></span>
+</div>
+</div>
+</footer>
+
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1900}}'>
+class Component extends DCLogic {
+  state = { cat: 'all', open: null };
+  ITEMS = [{"id": 1, "cat": "fasad", "kind": "img", "src": "/_blob/115f27c61e2c90658c0e6b679b8d572f", "title": "Фасад здания", "alt": "Фасад Некруз Резиденс в золотой час"}, {"id": 2, "cat": "fasad", "kind": "img", "src": "/_blob/cf09ad8eb443a463158f8ada574b8488", "title": "Фасад вечером", "alt": "Вечерний вид на комплекс"}, {"id": 3, "cat": "interior", "kind": "img", "src": "/_blob/1cfa75ac68cf817e0ce0b3617e6b826b", "title": "Лобби / холл", "alt": "Лобби с ресепшеном и зоной отдыха"}, {"id": 4, "cat": "interior", "kind": "img", "src": "/_blob/c8b42628c07e7baf7dfe82eab1423eca", "title": "Гостиная", "alt": "Гостиная типовой квартиры"}, {"id": 5, "cat": "interior", "kind": "img", "src": "/_blob/e72e64f46eaeca454d640c1cd214af1e", "title": "Кухня-гостиная", "alt": "Кухня с островом"}, {"id": 6, "cat": "infra", "kind": "img", "src": "/_blob/31d580f1b0413b7a8929a0849066daf9", "title": "Терраса с бассейном на крыше", "alt": "Терраса с бассейном"}, {"id": 7, "cat": "infra", "kind": "soon", "src": "", "title": "Подземный паркинг", "alt": "", "icon": "car"}, {"id": 8, "cat": "infra", "kind": "soon", "src": "", "title": "Фитнес-зал", "alt": "", "icon": "gym"}, {"id": 9, "cat": "infra", "kind": "soon", "src": "", "title": "Детская площадка", "alt": "", "icon": "kids"}, {"id": 10, "cat": "plans", "kind": "plan", "src": "", "title": "Студия · 28–35 м²", "alt": "", "plan": "studio"}, {"id": 11, "cat": "plans", "kind": "plan", "src": "", "title": "1-комнатная · 45–58 м²", "alt": "", "plan": "1k"}, {"id": 12, "cat": "plans", "kind": "plan", "src": "", "title": "2-комнатная · 65–80 м²", "alt": "", "plan": "2k"}, {"id": 13, "cat": "plans", "kind": "plan", "src": "", "title": "3-комнатная · 90–110 м²", "alt": "", "plan": "3k"}];
+  renderVals() {
+    const S = this.state;
+    const tabs = [['all', 'Все'], ['fasad', 'Фасад'], ['interior', 'Интерьер'], ['infra', 'Инфраструктура'], ['plans', 'Планировки']].map((t) => ({
+      label: t[1], on: S.cat === t[0],
+      bg: S.cat === t[0] ? '#1B1815' : 'transparent', fg: S.cat === t[0] ? '#F4EFE7' : '#1B1815', bd: S.cat === t[0] ? '#1B1815' : '#CDBFA9',
+      pick: () => this.setState({ cat: t[0] })
+    }));
+    const list = this.ITEMS.filter((x) => S.cat === 'all' || x.cat === S.cat);
+    const tags = { img: 'РЕНДЕР', plan: 'ПЛАН', soon: 'СКОРО' };
+    const items = list.map((x) => ({
+      title: x.title, alt: x.alt, src: x.src, plan: x.plan || '', icon: x.icon || '',
+      isImg: x.kind === 'img', isPlan: x.kind === 'plan', isSoon: x.kind === 'soon', tag: tags[x.kind],
+      pStudio: x.plan === 'studio', p1k: x.plan === '1k', p2k: x.plan === '2k', p3k: x.plan === '3k',
+      iCar: x.icon === 'car', iGym: x.icon === 'gym', iKids: x.icon === 'kids',
+      open: () => { if (x.kind === 'img') this.setState({ open: x.id }); }
+    }));
+    const imgs = this.ITEMS.filter((x) => x.kind === 'img');
+    const cur = imgs.find((x) => x.id === S.open);
+    const idx = cur ? imgs.indexOf(cur) : 0;
+    return {
+      tabs, items, hasOpen: !!cur,
+      open: cur ? { isImg: true, src: cur.src, alt: cur.alt, title: cur.title } : { isImg: false, src: '', alt: '', title: '' },
+      close: () => this.setState({ open: null }),
+      prev: () => this.setState({ open: imgs[(idx + imgs.length - 1) % imgs.length].id }),
+      next: () => this.setState({ open: imgs[(idx + 1) % imgs.length].id })
+    };
+  }
+}
+</script>
+</body>
+</html>

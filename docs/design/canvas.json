@@ -1,0 +1,96 @@
+{
+ "v": 3,
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-11-10T15:30:00Z"
+ },
+ "title": "Некруз Резиденс — новый дизайн сайта",
+ "launch": {
+  "view": "canvas"
+ },
+ "pages": [],
+ "boards": {
+  "Main.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 4700,
+   "title": "Главная",
+   "expand": "fill",
+   "is_interactive": true
+  },
+  "Apartments.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 1440,
+   "h": 2400,
+   "title": "Квартиры",
+   "expand": "fill",
+   "is_interactive": true
+  },
+  "Gallery.dc.html": {
+   "x": 3040,
+   "y": 0,
+   "w": 1440,
+   "h": 2000,
+   "title": "Галерея",
+   "expand": "fill",
+   "is_interactive": true
+  },
+  "About.dc.html": {
+   "x": 4560,
+   "y": 0,
+   "w": 1440,
+   "h": 3300,
+   "title": "О проекте",
+   "expand": "fill",
+   "is_interactive": false
+  },
+  "Contact.dc.html": {
+   "x": 0,
+   "y": 4820,
+   "w": 1440,
+   "h": 2300,
+   "title": "Контакты",
+   "expand": "fill",
+   "is_interactive": true
+  },
+  "Login.dc.html": {
+   "x": 1520,
+   "y": 4820,
+   "w": 1440,
+   "h": 1100,
+   "title": "Вход",
+   "expand": "fill",
+   "is_interactive": true
+  },
+  "Register.dc.html": {
+   "x": 3040,
+   "y": 4820,
+   "w": 1440,
+   "h": 1000,
+   "title": "Регистрация застройщика",
+   "expand": "fill",
+   "is_interactive": true
+  }
+ },
+ "order": [
+  "Main.dc.html",
+  "Apartments.dc.html",
+  "Gallery.dc.html",
+  "About.dc.html",
+  "Contact.dc.html",
+  "Login.dc.html",
+  "Register.dc.html"
+ ],
+ "notes": {
+  "t1": {
+   "x": 0,
+   "y": -300,
+   "text": "Некруз Резиденс — новый дизайн сайта",
+   "kind": "title1",
+   "maxW": 6000
+  }
+ },
+ "designSystems": []
+}
