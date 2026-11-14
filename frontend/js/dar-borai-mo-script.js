@@ -1,99 +1,91 @@
-/* About the project (/about): hero with the numbers of the building, the complex and its amenities, the team,
-   the construction timeline and a call to action. The footer, icons and headings come from site.js (S.site). */
+/* About the project (/about, design docs/design/About.dc.html): a dark hero with the building's numbers, the complex
+   (its description and address), the amenities, the construction progress, why the platform is a green model and a
+   call to action. Everything about the house comes from the API: no invented amenities, dates or team members —
+   a block without data is not shown. The footer, icons and headings come from site.js (S.site). */
 (function () {
   const S = (window.S = window.S || {});
   const h = (...a) => S.h(...a);
   const t = (...a) => S.t(...a);
   S.views = S.views || {};
 
-  const FEATURES = [['🏊', 'aboutpg.f.pool'], ['🏋️', 'aboutpg.f.gym'], ['🚗', 'aboutpg.f.parking'], ['🛡️', 'aboutpg.f.guard'], ['🌳', 'aboutpg.f.playground'], ['🏢', 'aboutpg.f.lifts']];
-  const TEAM = [['aboutpg.team.1.n', 'aboutpg.team.1.r'], ['aboutpg.team.2.n', 'aboutpg.team.2.r'], ['aboutpg.team.3.n', 'aboutpg.team.3.r']];
-  const MILESTONES = [['2022 Q1', 'aboutpg.tl.1'], ['2023 Q2', 'aboutpg.tl.2'], ['2024 Q4', 'aboutpg.tl.3'], ['2026 Q1', 'aboutpg.tl.4']];
-
   S.views.about = function (root) {
-    const cfg = window.SITORA_CONFIG || {};
     const site = S.site;
-    const accent = (text) => site.accentFirst(text);
-    // Floors and apartments only from the API (config.js DEFAULT_* numbers only in the demo mode); a chip without its
-    // number is not shown. The delivery text stays as the developer set it until the API has a completion year.
-    const demo = S.isDemo();
-    const d = { floors: demo ? cfg.DEFAULT_FLOORS || 20 : null, apts: demo ? cfg.DEFAULT_APTS || 160 : null, delivery: cfg.DEFAULT_DELIVERY || 'Q1 2026' };
     let alive = true;
-
-    const page = h('div', { class: 'page-in lux about-page' });
+    const page = h('div', { class: 'page-in nr about-page' });
     root.appendChild(page);
 
-    // Floors and apartments count up from 0 (1.2 s, ease-out); with less motion or for a robot they are shown at once.
-    const chips = h('div', { class: 'about-chips' });
-    const floorsChip = h('span', { class: 'about-chip' }), aptsChip = h('span', { class: 'about-chip' }), deliveryChip = h('span', { class: 'about-chip' });
-    chips.append(floorsChip, aptsChip, deliveryChip);
-    let counting = 0;
-    const drawChips = () => {
-      deliveryChip.textContent = t('aboutpg.chip.delivery', { y: d.delivery });
-      floorsChip.hidden = !d.floors; aptsChip.hidden = !d.apts;
-      const set = (k) => { floorsChip.textContent = t('aboutpg.chip.floors', { n: Math.round((d.floors || 0) * k) }); aptsChip.textContent = t('aboutpg.chip.apts', { n: Math.round((d.apts || 0) * k) }); };
-      if (!S.motionOk) { set(1); return; }
-      const token = ++counting, t0 = performance.now();
-      const step = (now) => { if (token !== counting) return; const p = Math.min(1, (now - t0) / 1200); set(1 - Math.pow(1 - p, 3)); if (p < 1) requestAnimationFrame(step); };
-      set(0); requestAnimationFrame(step);
-      // Without frames (a background tab) the final numbers still appear.
-      setTimeout(() => { if (token === counting) { counting++; set(1); } }, 1400);
-    };
-    drawChips();
+    // 1. Hero: the render of the 3D model, the name and the numbers of the building (each only when the API has it).
+    const title = h('h1', { class: 'nr-page-title nr-about-title' }, S.brandName());
+    const chips = h('ul', { class: 'nr-chips' });
+    const hero = h('section', { class: 'nr-about-hero nr-dark' },
+      h('figure', { class: 'nr-hero-media' }, site.renderImg('tower-dusk-wide', '100vw', t('nr.render.alt'), true),
+        h('figcaption', { class: 'nr-render-note' }, t('nr.render'))),
+      h('div', { class: 'nr-hero-shade', 'aria-hidden': 'true' }),
+      h('div', { class: 'nr-wrap nr-about-hero-in' },
+        h('nav', { class: 'nr-crumbs', 'aria-label': t('cat.crumbs') }, h('a', { href: '/' }, t('nav.home')), h('span', { 'aria-hidden': 'true' }, '/'), h('span', { 'aria-current': 'page' }, t('nav.project'))),
+        title, h('p', { class: 'nr-hero-sub' }, t('aboutpg.hero.sub')), chips));
 
-    const hero = h('section', { class: 'about-hero' }, h('div', { class: 'wrap' },
-      h('nav', { class: 'crumbs', 'aria-label': t('cat.crumbs') }, h('a', { href: '/' }, t('nav.home')), h('span', { 'aria-hidden': 'true' }, '/'), h('span', { 'aria-current': 'page' }, t('nav.project'))),
-      h('h1', { class: 'about-title' }, t('brand.name')),
-      h('p', { class: 'about-lead' }, t('aboutpg.hero.sub')),
-      chips));
+    // 2. The complex: the developer's description and the address.
+    const text = h('div', { class: 'nr-about-text' });
+    const complex = h('section', { class: 'nr-sec', id: 'complex', hidden: true }, h('div', { class: 'nr-wrap nr-split nr-split--top' },
+      h('div', null, site.kicker(t('aboutpg.complex')), h('h2', { class: 'nr-h2' }, t('nr.about.title'))), text));
 
-    const complex = h('section', { class: 'section lux-sec', id: 'complex' }, h('div', { class: 'wrap about-cols' },
-      h('div', { class: 'about-copy reveal' },
-        h('h2', null, accent(t('aboutpg.complex'))),
-        h('p', null, t('aboutpg.p1')), h('p', null, t('aboutpg.p2')), h('p', null, t('aboutpg.p3'))),
-      h('div', { class: 'about-feats reveal' }, FEATURES.map(([ic, k]) => h('div', { class: 'about-feat' }, h('span', { class: 'about-feat-ic', 'aria-hidden': 'true' }, ic), h('b', null, t(k)))))));
+    // 3. Amenities: only those the content manager ticked in the CRM.
+    const amenGrid = h('div', { class: 'nr-amen-grid' });
+    const amenities = h('section', { class: 'nr-sec nr-sec--tight', id: 'amenities', hidden: true }, h('div', { class: 'nr-wrap' }, amenGrid));
 
-    const team = h('section', { class: 'section lux-sec alt-band', id: 'team' }, h('div', { class: 'wrap' },
-      h('div', { class: 'lux-head reveal' }, h('h2', null, accent(t('aboutpg.team')))),
-      h('div', { class: 'team-grid' }, TEAM.map(([n, r], i) => h('article', { class: 'team-card reveal', style: { transitionDelay: i * 90 + 'ms' } },
-        h('span', { class: 'team-ava', 'aria-hidden': 'true' }, S.fmt.initials(t(n))),
-        h('h3', null, t(n)), h('i', { class: 'team-line', 'aria-hidden': 'true' }), h('p', null, t(r)))))));
+    // 4. Construction progress (GET /public/buildings/{id}/progress): stages and percents as the developer keeps them.
+    const stages = h('ol', { class: 'nr-stages' });
+    const overall = h('p', { class: 'nr-lead' });
+    const progress = h('section', { class: 'nr-sec nr-dark', id: 'timeline', hidden: true }, h('div', { class: 'nr-wrap' },
+      site.kicker(t('nr.about.progressKicker')), h('h2', { class: 'nr-h2' }, t('aboutpg.timeline')), overall, stages));
 
-    const timeline = h('section', { class: 'section lux-sec', id: 'timeline' }, h('div', { class: 'wrap' },
-      h('div', { class: 'lux-head reveal' }, h('h2', null, accent(t('aboutpg.timeline')))),
-      h('ol', { class: 'timeline' }, MILESTONES.map(([when, k], i) => h('li', { class: 'tl-item reveal' + (i === MILESTONES.length - 1 ? ' last' : ''), style: { transitionDelay: i * 90 + 'ms' } },
-        h('span', { class: 'tl-dot', 'aria-hidden': 'true' }),
-        h('time', null, when), h('h3', null, t(k)), h('p', null, t(k + '.d')))))));
+    // 5. Why this is a green business model: paper → digital documents, trips → 3D and the online account,
+    //    energy-efficient buildings → eco passport and the cost calculator. A link to the live counters on the landing.
+    const green = h('section', { class: 'nr-sec nr-band', id: 'green-model' }, h('div', { class: 'nr-wrap nr-split nr-split--top' },
+      h('div', null, site.kicker(t('green.kicker')), h('h2', { class: 'nr-h2' }, t('aboutpg.green.title')), h('p', { class: 'nr-lead' }, t('aboutpg.green.text')),
+        h('a', { class: 'nr-link', href: '/#green' }, t('aboutpg.green.link'), site.arrow())),
+      h('ul', { class: 'nr-green-list' }, ['paper', 'trips', 'energy'].map((k) => h('li', null, h('h3', null, t('aboutpg.green.' + k + '.h')), h('p', null, t('aboutpg.green.' + k)))))));
 
-    const cta = h('section', { class: 'section lux-sec alt-band', id: 'cta' }, h('div', { class: 'wrap about-cta reveal' },
-      h('h2', null, accent(t('aboutpg.cta'))),
-      h('div', { class: 'about-cta-btns' },
-        h('a', { class: 'btn gold lg', href: '/apartments' }, t('aboutpg.cta.apts')),
-        h('a', { class: 'btn ghost lg', href: '/contact' }, t('aboutpg.cta.contact')))));
+    // 6. Call to action.
+    const cta = h('section', { class: 'nr-sec nr-cta' }, h('div', { class: 'nr-wrap nr-cta-in' },
+      h('h2', { class: 'nr-h2' }, t('aboutpg.cta')),
+      h('div', { class: 'nr-actions' },
+        h('a', { class: 'btn nr-btn nr-btn--primary', href: '/apartments' }, t('aboutpg.cta.apts'), site.arrow()),
+        h('a', { class: 'btn nr-btn nr-btn--dark', href: '/contact' }, t('aboutpg.cta.contact')))));
 
-    // Why this is a green business model: paper → digital documents, trips → 3D tour and the online account,
-    // energy-efficient buildings → eco passport and the cost calculator. A link to the live counters on the landing.
-    const green = h('section', { class: 'section lux-sec', id: 'green-model' }, h('div', { class: 'wrap about-green' },
-      h('h2', null, site.accentFirst(t('aboutpg.green.title'))),
-      h('p', null, t('aboutpg.green.text')),
-      h('ul', { class: 'about-green-list' }, ['paper', 'trips', 'energy'].map((k) => h('li', null, h('b', null, t('aboutpg.green.' + k + '.h')), ' ', t('aboutpg.green.' + k)))),
-      h('a', { class: 'btn ghost', href: '/#green' }, t('aboutpg.green.link'))));
-    page.append(hero, complex, team, green, timeline, cta, site.footer());
-    [complex, team, timeline, cta].forEach((sec) => sec.classList.add('section-reveal'));
+    page.append(hero, complex, amenities, progress, green, cta, site.footer());
     const stopReveal = site.reveal(page);
 
-    // The building's own numbers: floors, apartments (planned or counted) and the delivery year.
     (async () => {
       try {
         const id = await site.building();
-        if (!id) return;
+        if (!id || !alive) return;
         const b = await S.api.building(id);
         if (!alive) return;
-        if (b.floorsCount) d.floors = b.floorsCount;
-        if (b.plannedApartments) d.apts = b.plannedApartments;
-        if (b.completionYear) d.delivery = String(b.completionYear);
-        drawChips();
-      } catch (e) { /* no numbers: the floors and apartments chips stay hidden */ }
+        title.textContent = S.brandName(b.name);
+        const apts = b.plannedApartments || b.total || 0;
+        chips.replaceChildren(...[
+          b.floorsCount ? t('aboutpg.chip.floors', { n: b.floorsCount }) : null,
+          apts ? t('aboutpg.chip.apts', { n: apts }) : null,
+          b.completionYear ? t('aboutpg.chip.delivery', { y: b.completionYear }) : null,
+        ].filter(Boolean).map((x) => h('li', null, x)));
+        const desc = S.lang === 'tg' && b.descriptionTg ? b.descriptionTg : b.description;
+        const address = S.brandAddress(b.address) || site.contacts().address;
+        text.replaceChildren(...[desc ? h('p', { class: 'nr-lead' }, desc) : null,
+          address ? h('p', { class: 'nr-about-address' }, site.icon('pin'), h('span', null, t('nr.about.address', { a: address }))) : null].filter(Boolean));
+        complex.hidden = !text.children.length;
+        amenGrid.replaceChildren(...(b.amenities || []).map((k) => h('div', { class: 'nr-amen-card' }, site.icon(site.amenIcon(k)), h('h3', null, t('amen.' + k)))));
+        amenities.hidden = !amenGrid.children.length;
+        const p = await S.api.publicProgress(id).catch(() => null);
+        if (!alive || !p || !p.stages || !p.stages.length) return;
+        overall.textContent = t('nr.about.overall', { n: p.overallPercent });
+        stages.replaceChildren(...p.stages.map((s) => h('li', { class: 'nr-stage-item' + (s.percent >= 100 ? ' done' : '') },
+          h('span', { class: 'nr-stage-dot', 'aria-hidden': 'true' }),
+          h('div', { class: 'nr-stage-top' }, h('h3', null, s.name), h('b', null, s.percent + '%')),
+          h('div', { class: 'nr-stage-bar', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': s.percent, 'aria-label': s.name }, h('i', { style: { width: Math.max(0, Math.min(100, s.percent)) + '%' } })))));
+        progress.hidden = false;
+      } catch (e) { /* no data: the blocks stay hidden */ }
     })();
 
     return () => { alive = false; stopReveal(); };

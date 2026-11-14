@@ -1,4 +1,4 @@
-/* English interface texts (1795 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* English interface texts (1798 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -34,7 +34,7 @@
     "nav.gallery": "Gallery",
     "nav.project": "About",
     "common.delete": "Delete",
-    "aboutpg.hero.sub": "An elite residential complex in the heart of Dushanbe",
+    "aboutpg.hero.sub": "A residential complex in Dushanbe. Apartments are sold online on the Binosoz platform.",
     "aboutpg.chip.floors": "{n} floors",
     "aboutpg.chip.apts": "{n} apartments",
     "aboutpg.chip.delivery": "Delivery {y}",
@@ -1225,7 +1225,7 @@
     "privacy.s9.p": "If this policy changes, the new version will appear on this page with a new date.",
     "meta.home": "Nekruz Residence — apartments in a new building in Dushanbe: a 3D model of the house, prices and free apartments, online booking and a buyer’s account.",
     "meta.apartments": "Apartments at Nekruz Residence in Dushanbe: a 3D model of the building with available apartments, filters, floor plans and an installment calculator.",
-    "meta.about": "Nekruz Residence is a business-class residential complex in Dushanbe: amenities, the project team and the construction history.",
+    "meta.about": "Nekruz Residence — a residential complex in Dushanbe: the house, its amenities and construction progress. Apartments are sold online on the Binosoz platform.",
     "meta.gallery": "Views of Dushanbe (photos from Wikimedia Commons, authors credited) and floor plans of Nekruz Residence.",
     "meta.contact": "Contact Nekruz Residence. Manager Nekruz: +992 98 363 70 70, Telegram @nekru01. 15 Borbad Ave, Dushanbe.",
     "meta.register": "Connect your construction company to the Binosoz platform: a site with a 3D model of the building, a sales CRM, installments and a buyer’s account.",
@@ -1799,5 +1799,8 @@
     "nr.cat.allKicker": "All apartments",
     "nr.cat.plansSub": "Areas and prices come from the apartments of the house. Click a type to see those apartments in the list.",
     "galpg.f.renders": "Renders",
+    "nr.about.progressKicker": "Construction progress",
+    "nr.about.overall": "The house is {n}% complete overall. The developer keeps the stages and percents.",
+    "nr.about.address": "Address: {a}",
   };
 })();

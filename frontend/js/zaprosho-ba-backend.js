@@ -426,6 +426,8 @@
     greenImpact() { return request('GET', '/public/green-impact', { auth: false, query: { organization: cfgSlug() } }); },
     greenStats() { return request('GET', '/stats/green'); },
     saveGreenSettings(b) { return request('PUT', '/owner/green-settings', { body: b }); },
+    // Construction progress for the public site: stage names and percents, no photos.
+    publicProgress(buildingId) { return request('GET', '/public/buildings/' + buildingId + '/progress'); },
     installmentSettings() { return request('GET', '/owner/installment-settings'); },
     saveInstallmentSettings(b) { return request('PUT', '/owner/installment-settings', { body: b }); },
     saveBuildingAmenities(id, keys) { return request('PUT', '/buildings/' + id + '/amenities', { body: { amenities: keys } }).then(M.building); },

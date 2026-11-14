@@ -1,4 +1,4 @@
-/* Tajik interface texts (1795 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* Tajik interface texts (1798 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. Tajik strings should be proof-read by a native speaker before launch. */
 (function () {
   const S = (window.S = window.S || {});
@@ -34,7 +34,7 @@
     "nav.gallery": "Галерея",
     "nav.project": "Дар бораи лоиҳа",
     "common.delete": "Нест кардан",
-    "aboutpg.hero.sub": "Маҷмааи истиқоматии элитӣ дар маркази Душанбе",
+    "aboutpg.hero.sub": "Маҷмааи истиқоматӣ дар Душанбе. Хонаҳо онлайн дар платформаи Binosoz фурӯхта мешаванд.",
     "aboutpg.chip.floors": "{n} ошёна",
     "aboutpg.chip.apts": "{n} манзил",
     "aboutpg.chip.delivery": "Супурдан {y}",
@@ -1225,7 +1225,7 @@
     "privacy.s9.p": "Агар сиёсат тағйир ёбад, таҳрири нав дар ҳамин саҳифа бо санаи нав пайдо мешавад.",
     "meta.home": "Некрӯз Резиденс — хонаҳо дар бинои нави Душанбе: модели 3D-и бино, нархҳо ва хонаҳои озод, брони онлайн ва кабинети шахсии харидор.",
     "meta.apartments": "Феҳристи хонаҳои Некрӯз Резиденс дар Душанбе: модели 3D-и бино бо хонаҳои холӣ, филтрҳо, нақшаҳо ва ҳисобкунаки муҳлатдиҳӣ.",
-    "meta.about": "Некрӯз Резиденс — маҷмааи истиқоматии синфи бизнес дар Душанбе: инфрасохтор, дастаи лоиҳа ва таърихи сохтмон.",
+    "meta.about": "Некрӯз Резиденс — маҷмааи истиқоматӣ дар Душанбе: тавсифи бино, қулайиҳо ва рафти сохтмон. Хонаҳо онлайн дар платформаи Binosoz фурӯхта мешаванд.",
     "meta.gallery": "Манзараҳои Душанбе (аксҳо аз Wikimedia Commons, муаллифон нишон дода шудаанд) ва нақшаҳои хонаҳои Некрӯз Резиденс.",
     "meta.contact": "Тамос бо Некрӯз Резиденс. Менеҷер Некрӯз: +992 98 363 70 70, Telegram @nekru01. ш. Душанбе, х. Борбад, 15.",
     "meta.register": "Ширкати сохтмонии худро ба платформаи Binosoz пайваст кунед: сайт бо модели 3D-и бино, CRM-и фурӯш, муҳлатдиҳӣ ва кабинети харидор.",
@@ -1799,5 +1799,8 @@
     "nr.cat.allKicker": "Ҳамаи хонаҳо",
     "nr.cat.plansSub": "Масоҳат ва нархҳо — аз рӯи хонаҳои бино. Навъро пахш кунед, то чунин хонаҳоро дар рӯйхат бинед.",
     "galpg.f.renders": "Тасвирҳо",
+    "nr.about.progressKicker": "Рафти сохтмон",
+    "nr.about.overall": "Омодагии умумии бино — {n}%. Марҳилаҳо ва фоизҳоро сохтмончӣ пеш мебарад.",
+    "nr.about.address": "Суроға: {a}",
   };
 })();
