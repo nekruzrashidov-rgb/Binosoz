@@ -1,4 +1,4 @@
-/* English interface texts (1794 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* English interface texts (1795 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -68,7 +68,7 @@
     "aboutpg.cta.apts": "View apartments",
     "aboutpg.cta.contact": "Contact us",
     "galpg.title": "Gallery",
-    "galpg.sub": "Views of Dushanbe and floor plans of Nekruz Residence.",
+    "galpg.sub": "Renders of the house's 3D model, views of Dushanbe and apartment layouts.",
     "galpg.filters": "Categories",
     "galpg.f.all": "All",
     "galpg.f.city": "Dushanbe",
@@ -86,7 +86,7 @@
     "galpg.zoom": "Enlarge",
     "galpg.prev": "Previous",
     "galpg.next": "Next",
-    "galpg.note": "These are views of Dushanbe from Wikimedia Commons, not photos of the complex. Author and licence are under each photo. Floor plans are diagrams.",
+    "galpg.note": "Renders are frames of the house's 3D model, not photos. The views of Dushanbe come from Wikimedia Commons and are not pictures of the complex; the author and licence are under each photo. Layouts are diagrams. Construction photos will be added as building progresses.",
     "plans.title": "Apartment floor plans",
     "plans.sub": "Four apartment types — pick yours and see what is available.",
     "plans.from": "from",
@@ -1798,5 +1798,6 @@
     "nr.cat.zero": "0% overpayment",
     "nr.cat.allKicker": "All apartments",
     "nr.cat.plansSub": "Areas and prices come from the apartments of the house. Click a type to see those apartments in the list.",
+    "galpg.f.renders": "Renders",
   };
 })();

@@ -1118,5 +1118,5 @@
     const el = document.createElement('script'); el.type = 'application/ld+json'; el.textContent = JSON.stringify(data);
     document.head.appendChild(el);
   })();
-  S.site = { footer: siteFooter, reveal: revealIn, icon: landIcon, accentFirst, contacts, drawFloorPlan, building: siteBuilding, galleryPhotos: GALLERY_PHOTOS, galleryImg, galleryCredit };
+  S.site = { footer: siteFooter, reveal: revealIn, icon: landIcon, accentFirst, contacts, drawFloorPlan, building: siteBuilding, galleryPhotos: GALLERY_PHOTOS, galleryImg, galleryCredit, renderImg, kicker: (x) => kicker(x), arrow: () => arrow() };
 })();

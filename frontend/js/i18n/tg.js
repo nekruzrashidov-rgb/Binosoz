@@ -1,4 +1,4 @@
-/* Tajik interface texts (1794 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* Tajik interface texts (1795 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. Tajik strings should be proof-read by a native speaker before launch. */
 (function () {
   const S = (window.S = window.S || {});
@@ -67,8 +67,8 @@
     "aboutpg.cta": "Имрӯз манзилро банд кунед",
     "aboutpg.cta.apts": "Дидани манзилҳо",
     "aboutpg.cta.contact": "Бо мо тамос гиред",
-    "galpg.title": "Галерея",
-    "galpg.sub": "Манзараҳои Душанбе ва нақшаҳои хонаҳои Некрӯз Резиденс.",
+    "galpg.title": "Галереяи маҷмаа",
+    "galpg.sub": "Тасвирҳои модели 3D-и бино, манзараҳои Душанбе ва нақшаҳои хонаҳо.",
     "galpg.filters": "Категорияҳо",
     "galpg.f.all": "Ҳама",
     "galpg.f.city": "Душанбе",
@@ -86,7 +86,7 @@
     "galpg.zoom": "Калон кардан",
     "galpg.prev": "Қаблӣ",
     "galpg.next": "Навбатӣ",
-    "galpg.note": "Инҳо манзараҳои Душанбе аз Wikimedia Commons мебошанд, на аксҳои маҷмаа. Муаллиф ва иҷозатнома дар зери ҳар акс. Нақшаҳо — схемаҳо.",
+    "galpg.note": "Тасвирҳо — кадрҳои модели 3D-и бино, на сурат. Манзараҳои Душанбе — аз Wikimedia Commons, на суратҳои маҷмаа: муаллиф ва иҷозатнома дар зери ҳар сурат. Нақшаҳо — схемаҳо. Суратҳои сохтмон бо пешрафти корҳо илова мешаванд.",
     "plans.title": "Нақшаҳои манзилҳо",
     "plans.sub": "Чор навъи манзил — навъи худро интихоб кунед ва манзилҳои холиро бинед.",
     "plans.from": "аз",
@@ -1798,5 +1798,6 @@
     "nr.cat.zero": "изофапардохт 0%",
     "nr.cat.allKicker": "Ҳамаи хонаҳо",
     "nr.cat.plansSub": "Масоҳат ва нархҳо — аз рӯи хонаҳои бино. Навъро пахш кунед, то чунин хонаҳоро дар рӯйхат бинед.",
+    "galpg.f.renders": "Тасвирҳо",
   };
 })();

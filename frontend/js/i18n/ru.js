@@ -1,4 +1,4 @@
-/* Russian interface texts (1794 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* Russian interface texts (1795 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -67,8 +67,8 @@
     "aboutpg.cta": "Забронируйте квартиру сегодня",
     "aboutpg.cta.apts": "Смотреть квартиры",
     "aboutpg.cta.contact": "Связаться с нами",
-    "galpg.title": "Галерея",
-    "galpg.sub": "Виды Душанбе и планировки квартир Некруз Резиденс.",
+    "galpg.title": "Галерея комплекса",
+    "galpg.sub": "Визуализации 3D-модели дома, виды Душанбе и планировки квартир.",
     "galpg.filters": "Категории",
     "galpg.f.all": "Все",
     "galpg.f.city": "Душанбе",
@@ -86,7 +86,7 @@
     "galpg.zoom": "Увеличить",
     "galpg.prev": "Предыдущее",
     "galpg.next": "Следующее",
-    "galpg.note": "Это виды Душанбе с Wikimedia Commons, а не снимки комплекса. Автор и лицензия — под каждым фото. Планировки — схемы.",
+    "galpg.note": "Визуализации — кадры 3D-модели дома, а не фотографии. Виды Душанбе — с Wikimedia Commons, это не снимки комплекса: автор и лицензия — под каждым фото. Планировки — схемы. Фото стройки появятся по мере строительства.",
     "plans.title": "Планировки квартир",
     "plans.sub": "Четыре типа квартир — выберите свой и посмотрите свободные варианты.",
     "plans.from": "от",
@@ -1798,5 +1798,6 @@
     "nr.cat.zero": "переплата 0%",
     "nr.cat.allKicker": "Все квартиры",
     "nr.cat.plansSub": "Площади и цены — по квартирам дома. Нажмите на тип, чтобы увидеть такие квартиры в списке.",
+    "galpg.f.renders": "Визуализации",
   };
 })();
