@@ -30,6 +30,21 @@ public class ConstructionTests(SitoraApiFactory factory) : IClassFixture<SitoraA
     }
 
     [Fact]
+    public async Task PublicProgress_GuestSeesStageNamesAndPercents_WithoutPhotos_UnknownIs404()
+    {
+        var guest = factory.CreateClient();
+        var r = await guest.GetAsync($"/api/v1/public/buildings/{await SeededBuildingIdAsync()}/progress");
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        var body = await r.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("photos", body, StringComparison.OrdinalIgnoreCase);
+        var progress = System.Text.Json.JsonSerializer.Deserialize<PublicProgressResponse>(body, TestJson.Options)!;
+        Assert.Equal(65, progress.Stages.Single(s => s.Name == "Монолитный каркас").Percent);
+        Assert.Equal((int)Math.Round(progress.Stages.Average(s => s.Percent), MidpointRounding.AwayFromZero), progress.OverallPercent);
+
+        Assert.Equal(HttpStatusCode.NotFound, (await guest.GetAsync($"/api/v1/public/buildings/{Guid.NewGuid()}/progress")).StatusCode);
+    }
+
+    [Fact]
     public async Task Progress_HiddenFromCustomersWithoutDealInBuilding()
     {
         var url = $"/api/v1/buildings/{await SeededBuildingIdAsync()}/stages";

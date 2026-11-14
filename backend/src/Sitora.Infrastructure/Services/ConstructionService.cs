@@ -33,6 +33,21 @@ public class ConstructionService(
         return new BuildingProgressResponse(buildingId, overall, stages.Select(ToResponse).ToList());
     }
 
+    // Ход стройки для сайта застройщика: названия этапов и проценты, без фото. Дом — только активной организации.
+    public async Task<PublicProgressResponse> GetPublicProgressAsync(Guid buildingId, CancellationToken ct = default)
+    {
+        if (!await db.Buildings.AsNoTracking().AnyAsync(b => b.Id == buildingId && b.Organization.IsActive, ct))
+            throw new NotFoundException("Дом не найден");
+
+        var stages = await db.ConstructionStages.AsNoTracking()
+            .Where(s => s.BuildingId == buildingId)
+            .OrderBy(s => s.SortOrder).ThenBy(s => s.Name)
+            .Select(s => new PublicStageResponse(s.Name, s.Percent, s.UpdatedAt))
+            .ToListAsync(ct);
+        var overall = stages.Count == 0 ? 0 : (int)Math.Round(stages.Average(s => s.Percent), MidpointRounding.AwayFromZero);
+        return new PublicProgressResponse(overall, stages);
+    }
+
     public async Task<StageResponse> CreateStageAsync(Guid buildingId, SaveStageRequest request, CancellationToken ct = default)
     {
         if (!await db.Buildings.AnyAsync(b => b.Id == buildingId, ct))

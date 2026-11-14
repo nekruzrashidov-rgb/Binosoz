@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 using Sitora.Domain.DTOs.Construction;
 using Sitora.Domain.Interfaces;
 using Sitora.Infrastructure.Services;
@@ -20,6 +21,15 @@ public class ConstructionController(IConstructionService construction) : Control
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public Task<BuildingProgressResponse> Stages(Guid buildingId, CancellationToken ct) =>
         construction.GetStagesAsync(buildingId, ct);
+
+    /// <summary>Ход стройки для публичного сайта: названия этапов и проценты, без фото. Пустой список — этапов ещё нет.</summary>
+    [HttpGet("public/buildings/{buildingId:guid}/progress")]
+    [AllowAnonymous]
+    [OutputCache(PolicyName = Sitora.WebApi.Extensions.CachingSetup.Catalog)]
+    [ProducesResponseType<PublicProgressResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public Task<PublicProgressResponse> PublicProgress(Guid buildingId, CancellationToken ct) =>
+        construction.GetPublicProgressAsync(buildingId, ct);
 
     [HttpPost("buildings/{buildingId:guid}/stages")]
     [Authorize(Roles = Roles.CatalogEditors)]
