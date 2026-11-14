@@ -48,6 +48,21 @@ public class SeedScriptTests(SitoraApiFactory factory) : IClassFixture<SitoraApi
         Assert.Equal(1, result.Audit);
         // ROUND(area × price / 100) × 100 — как Apartment.CalculatePrice: 42.5 × 7500, 68 × 7000, 92 × 6800, 118.5 × 6500.
         Assert.Equal([318_800m, 476_000m, 625_600m, 770_300m], result.Prices.Order());
+
+        // «Зелёная» часть: те же демо-значения, что у сидера разработки (GreenDemoSeeder), организация помечена демо.
+        var green = await factory.WithDbAsync(async db => new
+        {
+            Eco = await db.Buildings.IgnoreQueryFilters().AsNoTracking().Where(b => b.NameRu == SeedName).Select(b => b.Eco).SingleAsync(),
+            Org = await db.Organizations.IgnoreQueryFilters().AsNoTracking().Where(o => o.Id == Sitora.Domain.Entities.Organization.DefaultId).Select(o => o.Green).SingleAsync()
+        });
+        var expected = Sitora.Infrastructure.Data.Seed.GreenDemoSeeder.Eco();
+        Assert.NotNull(green.Eco);
+        Assert.Equivalent(expected, green.Eco);
+        Assert.Equal(Sitora.Infrastructure.Data.Seed.GreenDemoSeeder.TariffKwhTjs, green.Org.TariffKwhTjs);
+        Assert.Equal(Sitora.Infrastructure.Data.Seed.GreenDemoSeeder.BaselineKwhPerM2Year, green.Org.BaselineKwhPerM2Year);
+        Assert.Equal(Sitora.Infrastructure.Data.Seed.GreenDemoSeeder.BaselineSource, green.Org.BaselineSource);
+        Assert.True(green.Org.IsDemo);
+        Assert.Null(green.Org.Co2KgPerKgPaper);
     }
 
     // Текст — файл backend/scripts/seed.sql из репозитория, не ввод пользователя.

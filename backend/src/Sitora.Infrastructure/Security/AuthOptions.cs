@@ -10,6 +10,10 @@ public class AuthOptions
     // Старый вход покупателей по SMS: выключен, пока не подключён SMS-провайдер.
     public bool SmsLoginEnabled { get; set; }
 
+    // Вход демо-покупателя (demo-buyer@binosoz.tj) по паролю — для жюри, у которого нет доступа к его почте.
+    // По умолчанию выключен; остальные покупатели по паролю не входят никогда.
+    public bool DemoPasswordLogin { get; set; }
+
     // Не чаще одной отправки кода в минуту и пяти в час — на почту и на IP.
     [Range(1, 100)]
     public int EmailCodesPerMinute { get; set; } = 1;

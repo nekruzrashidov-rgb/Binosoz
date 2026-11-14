@@ -27,6 +27,9 @@ public class LoginChannels(IConfiguration configuration, IHostEnvironment enviro
 
     public bool SmsWorks => auth.Value.SmsLoginEnabled && SmsProviderConnected;
 
+    // Вход демо-покупателя по паролю включён (Auth:DemoPasswordLogin) — сайт показывает кнопку «Войти как демо-покупатель».
+    public bool DemoLogin => auth.Value.DemoPasswordLogin;
+
     public static bool EmailWorksFor(IConfiguration configuration, IHostEnvironment environment)
     {
         if (environment.IsDevelopment())

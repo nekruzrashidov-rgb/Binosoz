@@ -60,7 +60,9 @@ public static class DatabaseInitializer
         await EnsureSuperAdminAsync(provider.GetRequiredService<UserManager<AppUser>>(),
             provider.GetRequiredService<IConfiguration>(), logger);
 
-        if (provider.GetRequiredService<IHostEnvironment>().IsDevelopment())
+        // Демо-доступ для жюри — в любом окружении, только при SEED_DEMO_ACCOUNTS=true (после каталога разработки — ниже).
+        var isDevelopment = provider.GetRequiredService<IHostEnvironment>().IsDevelopment();
+        if (isDevelopment)
         {
             await SeedDevelopmentUsersAsync(
                 provider.GetRequiredService<UserManager<AppUser>>(),
@@ -73,11 +75,16 @@ public static class DatabaseInitializer
                 logger);
             await ConstructionSeeder.SeedAsync(db);
             await FloorPlanSeeder.SeedAsync(db);
+            // Демо-значения «зелёной» части; тесты выключают (Seed:GreenDemo=false), чтобы начинать с пустого паспорта.
+            if (provider.GetRequiredService<IConfiguration>().GetValue("Seed:GreenDemo", true))
+                await GreenDemoSeeder.SeedAsync(db, logger);
             // Второй застройщик; тесты его выключают (Seed:RichTower=false), чтобы данные сидера были предсказуемы.
             if (provider.GetRequiredService<IConfiguration>().GetValue("Seed:RichTower", true))
                 await RichTowerSeeder.SeedAsync(db, provider.GetRequiredService<UserManager<AppUser>>(),
                     provider.GetRequiredService<IConfiguration>(), logger);
         }
+
+        await DemoAccountsSeeder.SeedAsync(provider, logger);
     }
 
     private static async Task SeedRolesAsync(RoleManager<IdentityRole<Guid>> roleManager)

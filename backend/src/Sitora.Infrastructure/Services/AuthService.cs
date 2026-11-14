@@ -689,7 +689,9 @@ public class AuthService(
         if (user is null || !user.IsActive)
             throw await UnknownAccountFailureAsync(address, request.Password ?? "", ct);
 
-        if (!await IsStaffAsync(user))
+        // Покупатель входит по коду; исключение — демо-покупатель для жюри при Auth:DemoPasswordLogin=true.
+        if (!await IsStaffAsync(user) && !(authOptions.Value.DemoPasswordLogin
+                && string.Equals(user.Email, Sitora.Infrastructure.Data.Seed.DemoAccountsSeeder.BuyerEmail, StringComparison.OrdinalIgnoreCase)))
             throw new BadRequestException(CustomerUseCode);
 
         if (await userManager.IsLockedOutAsync(user))

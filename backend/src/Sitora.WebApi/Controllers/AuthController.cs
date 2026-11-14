@@ -24,7 +24,7 @@ public class AuthController(IAuthService auth, IOptions<AuthOptions> options, IH
     [HttpGet("methods")]
     [AllowAnonymous]
     [ProducesResponseType<AuthMethodsResponse>(StatusCodes.Status200OK)]
-    public AuthMethodsResponse Methods() => new(channels.EmailWorks, channels.SmsWorks);
+    public AuthMethodsResponse Methods() => new(channels.EmailWorks, channels.SmsWorks, channels.DemoLogin);
 
     /// <summary>Код для входа на почту — только покупателям (сотрудники входят по паролю). Ответ одинаковый, есть ли такая учётная запись.</summary>
     /// <remarks>Не чаще одного кода в минуту и пяти в час на почту и на IP. Код живёт 10 минут, 5 попыток ввода.</remarks>

@@ -13,6 +13,8 @@
 --   A booked apartment gets a real active booking (with a demo lead: a booking needs a customer or a lead) expiring in 30 days,
 --   so managers can cancel, extend or turn it into a deal in the CRM. Sold apartments have no deal: they are catalog data only.
 -- * The seed itself is recorded in AuditLog (Building / Seeded).
+-- * A second DO block (any run, never overwrites): the demo eco passport of the building and the organization tariffs,
+--   marked as demo data — the same values as GreenDemoSeeder.cs.
 DO $$
 DECLARE
   org        constant uuid := '01a20000-0000-7000-8000-000000000001';
@@ -96,4 +98,43 @@ BEGIN
           ts, NULL, ts, ts);
 
   RAISE NOTICE 'Создан дом «Некруз Резиденс»: 21 этаж (0 — коммерческий), 160 квартир, продано %, в брони %', sold_n, booked_n;
+END $$;
+
+-- «Зелёная» часть (демо): эко-паспорт дома и тарифы организации — те же значения, что в GreenDemoSeeder.cs
+-- (SeedSqlTests сверяет). Организация помечается демо (GreenIsDemo): на сайте бейдж «Демо-данные».
+-- Ничего не перезаписывает: паспорт — только если не заполнен, тарифы — только если тариф не задан.
+-- Коэффициент CO₂ не задаётся (проверенного источника нет, docs/DECISIONS.md) — без него CO₂ на сайте не показывается.
+DO $$
+DECLARE
+  org constant uuid := '01a20000-0000-7000-8000-000000000001';
+  n   int;
+BEGIN
+  UPDATE "Buildings" SET
+    "EcoEnergyClass" = 'A',
+    "EcoWallInsulationRu" = 'Минеральная вата 100 мм',
+    "EcoWallInsulationTg" = 'Пахтаи маъданӣ 100 мм',
+    "EcoWindowsRu" = 'Двухкамерный стеклопакет',
+    "EcoWindowsTg" = 'Шишапакети дукамера',
+    "EcoHasHeatMeters" = true,
+    "EcoHasWaterMeters" = true,
+    "EcoHasLedCommonAreas" = true,
+    "EcoHasWasteSorting" = true,
+    "EcoGreenAreaM2" = 1200,
+    "EcoHeatingType" = 'Central',
+    "EcoEstimatedKwhPerM2Year" = 120,
+    "UpdatedAt" = now()
+  WHERE "OrganizationId" = org AND "NameRu" = 'Некруз Резиденс'
+    AND "EcoEnergyClass" IS NULL AND "EcoEstimatedKwhPerM2Year" IS NULL;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n > 0 THEN RAISE NOTICE 'Эко-паспорт дома заполнен демо-значениями'; END IF;
+
+  UPDATE "Organizations" SET
+    "GreenTariffKwhTjs" = 0.29,
+    "GreenBaselineKwhPerM2Year" = 180,
+    "GreenBaselineSource" = 'Демо-значение для показа на конкурсе, не официальные данные',
+    "GreenIsDemo" = true,
+    "UpdatedAt" = now()
+  WHERE "Id" = org AND "GreenTariffKwhTjs" IS NULL;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n > 0 THEN RAISE NOTICE 'Тарифы организации заполнены демо-значениями (помечены как демо)'; END IF;
 END $$;

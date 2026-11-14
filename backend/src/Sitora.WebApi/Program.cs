@@ -262,6 +262,8 @@ app.UseOutputCache();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<ImpersonationAuditMiddleware>();
+// Демо-менеджер для жюри: только просмотр и чат.
+app.UseMiddleware<DemoReadOnlyMiddleware>();
 app.UseMiddleware<PresenceMiddleware>();
 app.UseRateLimiter();
 
