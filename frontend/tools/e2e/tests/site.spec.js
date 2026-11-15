@@ -96,6 +96,105 @@ test('login: the buyer tab is chosen by default', async ({ page }) => {
   await expect(page.locator('.login-tabs button.on')).toHaveText('Покупатель');
 });
 
+// The buyer signs in with e-mail and an own 6-digit code: six cells, digits only, paste fills all, Backspace goes back.
+test('login: the buyer form has an e-mail and six digit cells', async ({ page }) => {
+  await open(page, '/login');
+  const cells = page.locator('.pin-cell[data-pin="pin"]');
+  await expect(page.locator('input[name=email]')).toBeVisible();
+  await expect(cells).toHaveCount(6);
+  await expect(cells.first()).toHaveAttribute('inputmode', 'numeric');
+  await expect(cells.first()).toHaveAttribute('autocomplete', 'current-password');
+  await expect(cells.first()).toHaveAttribute('type', 'password');
+  await expect(page.getByRole('button', { name: 'Забыли код?' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Регистрация' })).toBeVisible();
+
+  // Letters are not taken; digits move to the next cell.
+  await cells.first().click();
+  await page.keyboard.type('4a8-2x9');
+  expect(await cells.evaluateAll((els) => els.map((e) => e.value).join(''))).toBe('4829');
+  await expect(cells.nth(4)).toBeFocused();
+  // Backspace in an empty cell clears the previous one and goes back.
+  await page.keyboard.press('Backspace');
+  expect(await cells.evaluateAll((els) => els.map((e) => e.value).join(''))).toBe('482');
+  await expect(cells.nth(3)).toBeFocused();
+
+  // Pasting 6 digits (with spaces) fills every cell.
+  await cells.nth(2).evaluate((el) => {
+    const data = new DataTransfer();
+    data.setData('text/plain', '25 08 17');
+    el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  expect(await cells.evaluateAll((els) => els.map((e) => e.value).join(''))).toBe('250817');
+
+  // «Показать код» shows the digits, «Скрыть код» hides them again.
+  await page.getByRole('button', { name: 'Показать код' }).click();
+  await expect(cells.first()).toHaveAttribute('type', 'text');
+  await page.getByRole('button', { name: 'Скрыть код' }).click();
+  await expect(cells.first()).toHaveAttribute('type', 'password');
+});
+
+test('login: «Забыли код?» opens the reset by a code from e-mail', async ({ page }) => {
+  await open(page, '/login');
+  await page.locator('input[name=email]').fill('buyer@mail.tj');
+  await page.getByRole('button', { name: 'Забыли код?' }).click();
+  await expect(page.getByRole('heading', { name: 'Сброс кода входа' })).toBeVisible();
+  await expect(page.locator('input[name=email]')).toHaveValue('buyer@mail.tj');
+  await expect(page.getByRole('button', { name: 'Получить код' })).toBeVisible();
+  await page.getByRole('button', { name: '← Ко входу' }).click();
+  await expect(page.getByRole('heading', { name: 'Вход в кабинет' })).toBeVisible();
+});
+
+test('registration: the code twice, a weak code is explained before sending', async ({ page }) => {
+  await open(page, '/login');
+  await page.getByRole('button', { name: 'Регистрация' }).click();
+  await expect(page.getByRole('heading', { name: 'Регистрация' })).toBeVisible();
+  const pin = page.locator('.pin-cell[data-pin="pin"]');
+  const repeat = page.locator('.pin-cell[data-pin="pinRepeat"]');
+  await expect(pin).toHaveCount(6);
+  await expect(repeat).toHaveCount(6);
+  await expect(pin.first()).toHaveAttribute('autocomplete', 'new-password');
+
+  await pin.first().click();
+  await page.keyboard.type('123456');
+  await expect(page.locator('.pin-hint.bad')).toContainText('цифры подряд');
+  for (let i = 0; i < 6; i++) await page.keyboard.press('Backspace');
+  await page.keyboard.type('777777');
+  await expect(page.locator('.pin-hint.bad')).toContainText('одинаковые');
+
+  // Without the API: the form still checks names, e-mail and the repeat before sending anything.
+  for (let i = 0; i < 6; i++) await page.keyboard.press('Backspace');
+  await page.keyboard.type('482915');
+  await expect(page.locator('.pin-hint.bad')).toHaveCount(0);
+  await expect(repeat.first()).toBeFocused();
+  await page.keyboard.type('482916');
+  await page.locator('input[name=firstName]').fill('Фарход');
+  await page.locator('input[name=lastName]').fill('Каримов');
+  await page.locator('input[name=email]').fill('farhod@mail.tj');
+  await page.getByRole('button', { name: 'Продолжить' }).click();
+  await expect(page.locator('.field[data-name="pinRepeat"] .ferr')).toHaveText('Коды не совпадают');
+});
+
+// The reset and registration screens of /login: every text passes AA in both themes, no horizontal scroll.
+for (const theme of ['light', 'dark']) {
+  test(`login screens: contrast AA and no horizontal scroll (${theme} theme)`, async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate((t) => localStorage.setItem('sitora.theme', t), theme);
+    await open(page, '/login');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    await page.addScriptTag({ path: path.join(__dirname, '..', '..', 'check-contrast.js') });
+    const check = async (name) => {
+      const res = await page.evaluate(() => window.checkContrastDocument(document, window));
+      expect({ name, fails: res.fails, darkOnImage: res.darkOnImage, hscroll: res.hscroll }).toEqual({ name, fails: [], darkOnImage: [], hscroll: false });
+    };
+    await check('login');
+    await page.getByRole('button', { name: 'Регистрация' }).click();
+    await check('register');
+    await page.getByRole('button', { name: 'Уже есть учётная запись — войти' }).click();
+    await page.getByRole('button', { name: 'Забыли код?' }).click();
+    await check('forgot');
+  });
+}
+
 test('language: TJ and EN load on demand and switch the page', async ({ page, isMobile }) => {
   await open(page, '/');
   if (isMobile) await page.locator('.menu-btn').click();
