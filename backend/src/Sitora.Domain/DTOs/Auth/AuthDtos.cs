@@ -30,19 +30,27 @@ public record CurrentUserResponse(
 // OrganizationId — организация, в которую вошли «как владелец»; при входе под конкретным пользователем — его организация (у покупателя null).
 public record ImpersonationInfo(Guid ImpersonatedBy, Guid? OrganizationId);
 
-// Вход по коду из почты.
-public record EmailSendRequest(string Email);
+// Письмо с кодом подтверждения отправлено: код живёт ExpiresInSeconds, новый можно запросить через ResendAfterSeconds.
+public record EmailSendResponse(string Message, int ExpiresInSeconds, int ResendAfterSeconds = 60);
 
-public record EmailSendResponse(string Message, int ExpiresInSeconds);
+// GET /auth/methods: какие способы входа сейчас работают. Pin — вход покупателя по своему 6-значному коду (всегда).
+public record AuthMethodsResponse(bool Email, bool Sms, bool Demo = false, bool Pin = true);
 
-// GET /auth/methods: какие способы входа по коду сейчас доходят до людей.
-public record AuthMethodsResponse(bool Email, bool Sms, bool Demo = false);
-
-public record EmailVerifyRequest(string Email, string Code);
-
-// Регистрация покупателя на сайте застройщика (без пароля: дальше вход по коду из почты).
+// Регистрация покупателя: имя, почта, телефон (для карточки клиента) и свой 6-значный код входа.
 // Organization — короткое имя застройщика (slug); без него — единственный застройщик платформы.
-public record RegisterCustomerRequest(string Email, string FirstName, string LastName, string Phone, string? Organization = null);
+public record CustomerRegisterRequest(string Name, string Email, string? Phone, string Pin, string? Organization = null);
+
+// Подтверждение почты кодом из письма (регистрация) — выдаёт токены.
+public record CustomerConfirmRequest(string Email, string Code);
+
+// Только почта: повторить код подтверждения, запросить сброс кода входа.
+public record CustomerEmailRequest(string Email);
+
+// Вход покупателя: почта и свой 6-значный код.
+public record CustomerLoginRequest(string Email, string Pin);
+
+// Новый код входа по коду из письма «Забыли код?».
+public record CustomerPinResetRequest(string Email, string Code, string NewPin);
 
 // Пароль принят, но у учётной записи включена 2FA: токены выдаст /auth/2fa/verify с кодом из приложения.
 public record TwoFactorRequiredResponse(bool RequiresTwoFactor, string TempToken, DateTime ExpiresAt);

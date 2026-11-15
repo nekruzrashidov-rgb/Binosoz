@@ -22,8 +22,8 @@ public class CabinetOverviewTests(SitoraApiFactory factory) : IClassFixture<Sito
     {
         // Только что зарегистрировался на сайте: карточка клиента есть, сделок нет.
         var email = $"new{Guid.NewGuid():N}@customers.test";
-        (await factory.CreateClient().PostAsJsonAsync("/api/v1/auth/register",
-            new RegisterCustomerRequest(email, "Некруз", "Рашидов", SitoraApiFactory.RandomPhone(), Organization.DefaultSlug))).EnsureSuccessStatusCode();
+        (await factory.CreateClient().PostAsJsonAsync("/api/v1/auth/customer/register",
+            new CustomerRegisterRequest("Некруз Рашидов", email, SitoraApiFactory.RandomPhone(), SitoraApiFactory.CustomerTestPin, Organization.DefaultSlug))).EnsureSuccessStatusCode();
         var client = await factory.CreateEmailClientAsync(email);
 
         var overview = await TestScenarios.ReadAsync<CabinetOverviewResponse>(await client.GetAsync(Url));

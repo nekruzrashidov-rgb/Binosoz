@@ -253,7 +253,7 @@ public class GmailHalfConfiguredTests(GmailHalfConfiguredFactory factory) : ICla
         var methods = await client.GetFromJsonAsync<JsonElement>("/api/v1/auth/methods");
         Assert.False(methods.GetProperty("email").GetBoolean());
 
-        var send = await client.PostAsJsonAsync("/api/v1/auth/email/send", new { email = "buyer@example.test" });
+        var send = await client.PostAsJsonAsync("/api/v1/auth/customer/pin/reset-request", new { email = "buyer@example.test" });
         Assert.Equal(HttpStatusCode.ServiceUnavailable, send.StatusCode);
         Assert.Equal("email_not_configured", (await send.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
 

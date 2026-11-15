@@ -18,7 +18,7 @@ public class RegistrationAndPlatformTests(SitoraApiFactory factory) : IClassFixt
     private readonly HttpClient _client = factory.CreateClient();
 
     [Fact]
-    public async Task Register_CreatesCustomerInOrganization_AndCodeSignsInAsCustomer()
+    public async Task Register_CreatesCustomerInOrganization_ConfirmSignsIn_ThenPinLogin()
     {
         var email = $"Buyer-{Guid.NewGuid():N}@Mail.Test";
         var normalized = email.ToLowerInvariant();
@@ -27,35 +27,79 @@ public class RegistrationAndPlatformTests(SitoraApiFactory factory) : IClassFixt
         var response = await Register(email, "Новый Покупатель", phone);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        // Два письма: приветствие и код для входа (последним).
-        Assert.Equal(2, factory.Email.SentCount(normalized));
+        // Одно письмо — код подтверждения регистрации.
+        Assert.Equal(1, factory.Email.SentCount(normalized));
         var code = factory.Email.LastCode(normalized);
         Assert.NotNull(code);
         var customer = await factory.WithDbAsync(db => db.Customers.IgnoreQueryFilters().SingleAsync(c => c.Email == normalized));
         Assert.Equal((Organization.DefaultId, "Новый Покупатель", phone), (customer.OrganizationId, customer.FullName, customer.Phone));
-        // Учётная запись покупателя — сразу, без пароля, и регистрация в аудите.
-        Assert.NotNull(customer.UserId);
-        await factory.WithDbAsync(async db =>
+        // Учётная запись — сразу, с кодом входа в виде хеша Identity, почта не подтверждена; регистрация в аудите.
+        var userId = await factory.WithDbAsync(async db =>
         {
-            var user = await db.Users.SingleAsync(u => u.Id == customer.UserId);
-            Assert.Null(user.PasswordHash);
+            var user = await db.Users.SingleAsync(u => u.Email == normalized);
+            Assert.False(user.EmailConfirmed);
+            Assert.False(string.IsNullOrEmpty(user.PasswordHash));
+            Assert.DoesNotContain(Pin, user.PasswordHash);
             Assert.True(await db.AuditLogs.IgnoreQueryFilters().AnyAsync(l => l.EntityId == user.Id && l.Action == "Registered"));
+            return user.Id;
         });
 
-        var auth = await TestScenarios.ReadAsync<AuthResponse>(await _client.PostAsJsonAsync("/api/v1/auth/email/verify",
-            new EmailVerifyRequest(normalized, code!)));
-        Assert.Equal("Customer", auth.User.Role);
+        // До подтверждения почты вход по верному коду — 403 email_not_confirmed.
+        var early = await _client.PostAsJsonAsync("/api/v1/auth/customer/login", new CustomerLoginRequest(normalized, Pin));
+        Assert.Equal(HttpStatusCode.Forbidden, early.StatusCode);
+        Assert.Contains("email_not_confirmed", await early.Content.ReadAsStringAsync());
+
+        var auth = await TestScenarios.ReadAsync<AuthResponse>(await _client.PostAsJsonAsync("/api/v1/auth/customer/confirm",
+            new CustomerConfirmRequest(normalized, code!)));
+        Assert.Equal(("Customer", userId), (auth.User.Role, auth.User.Id));
+        Assert.Equal(userId, await factory.WithDbAsync(db => db.Customers.IgnoreQueryFilters().Where(c => c.Id == customer.Id).Select(c => c.UserId).SingleAsync()));
+        Assert.True(await factory.WithDbAsync(db => db.AuditLogs.IgnoreQueryFilters().AnyAsync(l => l.EntityId == userId && l.Action == "EmailConfirmed")));
+
+        // Дальше — вход почтой и своим кодом, без письма.
+        var before = factory.Email.SentCount(normalized);
+        var login = await TestScenarios.ReadAsync<AuthResponse>(await _client.PostAsJsonAsync("/api/v1/auth/customer/login",
+            new CustomerLoginRequest(email.ToUpperInvariant(), Pin)));
+        Assert.Equal(userId, login.User.Id);
+        Assert.Equal(before, factory.Email.SentCount(normalized));
 
         // Сотрудник застройщика видит нового клиента в CRM.
         var manager = await factory.CreateManagerClientAsync();
         var list = await manager.GetFromJsonAsync<PagedResult<CustomerListItem>>($"/api/v1/customers?search={Uri.EscapeDataString(phone)}", TestJson.Options);
         Assert.Contains(list!.Items, c => c.Id == customer.Id);
 
-        // Повторная регистрация той же почты просто присылает код.
-        await factory.WithDbAsync(db => db.EmailCodes.Where(c => c.Email == normalized)
-            .ExecuteUpdateAsync(s => s.SetProperty(c => c.CreatedAt, c => c.CreatedAt.AddMinutes(-2))));
-        Assert.Equal(HttpStatusCode.OK, (await Register(email, "Новый Покупатель", phone)).StatusCode);
-        Assert.Equal(1, await factory.WithDbAsync(db => db.Customers.IgnoreQueryFilters().CountAsync(c => c.Email == normalized)));
+        // Подтверждённая почта с кодом — 409 email_taken.
+        var again = await Register(email, "Новый Покупатель", phone);
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+        Assert.Contains("email_taken", await again.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Register_Unconfirmed_CanRepeat_WithNewPin_AndResendCode()
+    {
+        var email = $"again-{Guid.NewGuid():N}@mail.test";
+        var phone = SitoraApiFactory.RandomPhone();
+        (await Register(email, "Первая Попытка", phone)).EnsureSuccessStatusCode();
+        await ShiftCodesBackAsync(email);
+
+        // Повторная регистрация до подтверждения: новое имя и новый код входа, карточка та же.
+        (await Register(email, "Вторая Попытка", phone, pin: "583920")).EnsureSuccessStatusCode();
+        Assert.Equal(1, await factory.WithDbAsync(db => db.Customers.IgnoreQueryFilters().CountAsync(c => c.Email == email)));
+        await ShiftCodesBackAsync(email);
+
+        // Повтор кода: одинаковый ответ для любой почты, письмо — только ждущему подтверждения.
+        var sent = factory.Email.SentCount(email);
+        var resend = await _client.PostAsJsonAsync("/api/v1/auth/customer/confirm/resend", new CustomerEmailRequest(email));
+        var unknown = await _client.PostAsJsonAsync("/api/v1/auth/customer/confirm/resend", new CustomerEmailRequest($"nobody-{Guid.NewGuid():N}@mail.test"));
+        Assert.Equal((HttpStatusCode.OK, HttpStatusCode.OK), (resend.StatusCode, unknown.StatusCode));
+        Assert.Equal(await resend.Content.ReadAsStringAsync(), await unknown.Content.ReadAsStringAsync());
+        Assert.Equal(sent + 1, factory.Email.SentCount(email));
+
+        var auth = await TestScenarios.ReadAsync<AuthResponse>(await _client.PostAsJsonAsync("/api/v1/auth/customer/confirm",
+            new CustomerConfirmRequest(email, factory.Email.LastCode(email)!)));
+        Assert.Equal("Вторая Попытка", auth.User.FullName);
+        // Старый код входа больше не подходит, новый — подходит.
+        Assert.Equal(HttpStatusCode.Unauthorized, (await _client.PostAsJsonAsync("/api/v1/auth/customer/login", new CustomerLoginRequest(email, Pin))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await _client.PostAsJsonAsync("/api/v1/auth/customer/login", new CustomerLoginRequest(email, "583920"))).StatusCode);
     }
 
     [Fact]
@@ -69,8 +113,8 @@ public class RegistrationAndPlatformTests(SitoraApiFactory factory) : IClassFixt
 
         Assert.Equal(HttpStatusCode.NotFound, (await Register($"x-{Guid.NewGuid():N}@mail.test", "Имя Фамилия", SitoraApiFactory.RandomPhone(), "no-such-developer")).StatusCode);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, (await Register($"y-{Guid.NewGuid():N}@mail.test", "Имя Фамилия", "12345")).StatusCode);
-        // Без фамилии — 422; почта сотрудника покупателем не становится — 409.
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await Register($"z-{Guid.NewGuid():N}@mail.test", "Имя", SitoraApiFactory.RandomPhone())).StatusCode);
+        // Имя из одной буквы — 422; почта сотрудника покупателем не становится — 409.
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await Register($"z-{Guid.NewGuid():N}@mail.test", "И", SitoraApiFactory.RandomPhone())).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await Register(SitoraApiFactory.ManagerEmail, "Менеджер Покупатель", SitoraApiFactory.RandomPhone())).StatusCode);
     }
 
@@ -135,16 +179,16 @@ public class RegistrationAndPlatformTests(SitoraApiFactory factory) : IClassFixt
         Assert.Equal(HttpStatusCode.NotFound, (await platform.PostAsync($"/api/v1/platform/impersonate/{Guid.NewGuid()}", null)).StatusCode);
     }
 
-    // fullName — «Имя Фамилия»: в запросе это два поля.
-    private Task<HttpResponseMessage> Register(string email, string fullName, string phone, string? organization = null)
-    {
-        var parts = fullName.Split(' ', 2);
-        return _client.PostAsJsonAsync("/api/v1/auth/register",
-            new RegisterCustomerRequest(email, parts[0], parts.Length > 1 ? parts[1] : "", phone, organization ?? Organization.DefaultSlug));
-    }
+    private const string Pin = SitoraApiFactory.CustomerTestPin;
 
-    private async Task Send(string email) =>
-        (await _client.PostAsJsonAsync("/api/v1/auth/email/send", new EmailSendRequest(email))).EnsureSuccessStatusCode();
+    private Task<HttpResponseMessage> Register(string email, string fullName, string phone, string? organization = null, string pin = Pin) =>
+        _client.PostAsJsonAsync("/api/v1/auth/customer/register",
+            new CustomerRegisterRequest(fullName, email, phone, pin, organization ?? Organization.DefaultSlug));
+
+    // Повторный код — не раньше чем через минуту: сдвигаем прошлые коды назад.
+    private Task ShiftCodesBackAsync(string email) =>
+        factory.WithDbAsync(db => db.EmailCodes.Where(c => c.Email == email)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.CreatedAt, c => c.CreatedAt.AddMinutes(-2))));
 }
 
 // Сидер разработки со вторым застройщиком: Rich Tower, его владелец и дом.

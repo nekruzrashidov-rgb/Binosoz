@@ -19,44 +19,86 @@ namespace Sitora.WebApi.Controllers;
 [TypeFilter(typeof(RefreshCookieFilter))]
 public class AuthController(IAuthService auth, IOptions<AuthOptions> options, IHostEnvironment environment, LoginChannels channels) : ControllerBase
 {
-    /// <summary>Какие способы входа по коду сейчас работают: email — письма с кодами уходят (настроен почтовый сервис),
-    /// sms — вход по SMS включён и SMS-провайдер подключён. Сайт по нему выбирает, что предложить покупателю.</summary>
+    /// <summary>Какие способы входа сейчас работают: pin — вход покупателя по своему коду (всегда), email — письма с кодами
+    /// подтверждения уходят (настроен почтовый сервис), sms — вход по SMS включён и SMS-провайдер подключён,
+    /// demo — кнопка «Войти как демо-покупатель». Сайт по нему выбирает, что предложить покупателю.</summary>
     [HttpGet("methods")]
     [AllowAnonymous]
     [ProducesResponseType<AuthMethodsResponse>(StatusCodes.Status200OK)]
     public AuthMethodsResponse Methods() => new(channels.EmailWorks, channels.SmsWorks, channels.DemoLogin);
 
-    /// <summary>Код для входа на почту — только покупателям (сотрудники входят по паролю). Ответ одинаковый, есть ли такая учётная запись.</summary>
-    /// <remarks>Не чаще одного кода в минуту и пяти в час на почту и на IP. Код живёт 10 минут, 5 попыток ввода.</remarks>
-    [HttpPost("email/send")]
-    [AllowAnonymous]
-    [EnableRateLimiting(RateLimitPolicies.Sms)]
-    [ProducesResponseType<EmailSendResponse>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
-    public async Task<ActionResult<EmailSendResponse>> SendEmailCode(EmailSendRequest request, CancellationToken ct) =>
-        Ok(await auth.SendEmailCodeAsync(request, HttpContext.Connection.RemoteIpAddress?.ToString(), ct));
-
-    /// <summary>Проверка кода из почты — вход покупателя. Почта сотрудника — 401 «Сотрудники входят по паролю».</summary>
-    [HttpPost("email/verify")]
-    [AllowAnonymous]
-    [EnableRateLimiting(RateLimitPolicies.Login)]
-    [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
-    public Task<AuthResponse> VerifyEmailCode(EmailVerifyRequest request, CancellationToken ct) =>
-        auth.VerifyEmailCodeAsync(request, ct);
-
     /// <summary>
-    /// Регистрация покупателя на сайте застройщика (organization — его короткое имя). Создаёт карточку клиента
-    /// и отправляет код на почту; дальше — обычный /auth/email/verify. Телефон из чужой карточки — 409.
+    /// Регистрация покупателя: имя, почта, телефон и свой 6-значный код входа (не одинаковые цифры и не подряд — иначе 422).
+    /// Создаёт карточку клиента у застройщика (organization — его короткое имя) и учётную запись с неподтверждённой почтой,
+    /// отправляет на почту код подтверждения → /auth/customer/confirm. Почта уже зарегистрирована — 409 email_taken;
+    /// телефон из чужой карточки — 409.
     /// </summary>
-    [HttpPost("register")]
+    [HttpPost("customer/register")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicies.Sms)]
     [ProducesResponseType<EmailSendResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
-    public async Task<ActionResult<EmailSendResponse>> Register(RegisterCustomerRequest request, CancellationToken ct) =>
+    public async Task<ActionResult<EmailSendResponse>> RegisterCustomer(CustomerRegisterRequest request, CancellationToken ct) =>
         Ok(await auth.RegisterCustomerAsync(request, HttpContext.Connection.RemoteIpAddress?.ToString(), ct));
+
+    /// <summary>Новый код подтверждения регистрации. Ответ одинаковый для любой почты; не чаще раза в минуту.</summary>
+    [HttpPost("customer/confirm/resend")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Sms)]
+    [ProducesResponseType<EmailSendResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
+    public async Task<ActionResult<EmailSendResponse>> ResendConfirmation(CustomerEmailRequest request, CancellationToken ct) =>
+        Ok(await auth.ResendConfirmationAsync(request, HttpContext.Connection.RemoteIpAddress?.ToString(), ct));
+
+    /// <summary>Код из письма подтверждает почту и сразу выдаёт токены. Неверный или устаревший код — 401 invalid_code.</summary>
+    /// <remarks>Код живёт 10 минут, 5 попыток ввода.</remarks>
+    [HttpPost("customer/confirm")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Login)]
+    [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    public Task<AuthResponse> ConfirmCustomer(CustomerConfirmRequest request, CancellationToken ct) =>
+        auth.ConfirmCustomerAsync(request, ct);
+
+    /// <summary>
+    /// Вход покупателя: почта и свой 6-значный код. Неверный код и незнакомая почта — одинаково 401 invalid_pin
+    /// (attemptsLeft); 5 ошибок — 429 pin_locked на 15 минут (lockedUntil, retryAfterSeconds). Почта не подтверждена —
+    /// 403 email_not_confirmed; код ещё не задан (покупателя завёл менеджер) — 409 pin_not_set.
+    /// </summary>
+    [HttpPost("customer/login")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Login)]
+    [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
+    public Task<AuthResponse> CustomerLogin(CustomerLoginRequest request, CancellationToken ct) =>
+        auth.CustomerLoginAsync(request, ct);
+
+    /// <summary>«Забыли код?»: код для сброса на почту. Ответ одинаковый для любой почты; не чаще раза в минуту.</summary>
+    [HttpPost("customer/pin/reset-request")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Sms)]
+    [ProducesResponseType<EmailSendResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
+    public async Task<ActionResult<EmailSendResponse>> RequestPinReset(CustomerEmailRequest request, CancellationToken ct) =>
+        Ok(await auth.RequestPinResetAsync(request, HttpContext.Connection.RemoteIpAddress?.ToString(), ct));
+
+    /// <summary>
+    /// Новый код входа по коду из письма: блокировка снимается, все refresh-токены покупателя отзываются, выдаются новые.
+    /// Слабый код — 422, неверный или устаревший код из письма — 401 invalid_code.
+    /// </summary>
+    [HttpPost("customer/pin/reset")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Login)]
+    [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    public Task<AuthResponse> ResetPin(CustomerPinResetRequest request, CancellationToken ct) =>
+        auth.ResetPinAsync(request, ct);
 
     /// <summary>Сведения о приглашении по токену из письма: организация, роль, имя и почта. Недействительное — 404.</summary>
     [HttpGet("invitations/{token}")]
@@ -81,7 +123,7 @@ public class AuthController(IAuthService auth, IOptions<AuthOptions> options, IH
 
     /// <summary>
     /// Вход сотрудника (Owner, ObjectAdmin, Manager, Accountant, Content, SuperAdmin) по почте и паролю.
-    /// Покупателю — 400 «Используйте вход по коду». 5 неудачных попыток — блокировка на 15 минут.
+    /// Покупателю — 400 «Используйте вход по коду» (/auth/customer/login). 5 неудачных попыток — блокировка на 15 минут.
     /// С включённой 2FA ответ — { requiresTwoFactor: true, tempToken, expiresAt }, токены выдаёт /auth/2fa/verify.
     /// </summary>
     [HttpPost("login")]

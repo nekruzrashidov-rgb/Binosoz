@@ -19,7 +19,7 @@ using Sitora.Infrastructure.Security;
 
 namespace Sitora.Infrastructure.Services;
 
-public class AuthService(
+public partial class AuthService(
     AppDbContext db,
     UserManager<AppUser> userManager,
     JwtTokenService tokens,
@@ -51,60 +51,7 @@ public class AuthService(
     private static readonly TimeSpan ChallengeLifetime = TimeSpan.FromMinutes(5);
     private const int MaxChallengeAttempts = 5;
 
-    // ---------- Вход по почте ----------
-
-    // Ответ одинаковый, есть ли такая учётная запись: код создаётся и учитывается в лимитах всегда,
-    // а письмо уходит, только если почта принадлежит сотруднику или покупателю.
-    public async Task<EmailSendResponse> SendEmailCodeAsync(EmailSendRequest request, string? requestIp, CancellationToken ct = default)
-    {
-        var address = EmailAddress.Normalize(request.Email)
-            ?? throw new BusinessRuleException("Неверный адрес почты");
-        // Без почтового провайдера код не дойдёт: 503 вместо «код отправлен» (одинаково для любой почты).
-        if (!channels.EmailWorks)
-            throw new ServiceUnavailableException(LoginChannels.EmailNotConfigured);
-        var now = Now;
-        var limits = authOptions.Value;
-
-        await EnsureEmailCodeLimitAsync(c => c.Email == address, now, limits, ct);
-        if (!string.IsNullOrEmpty(requestIp))
-            await EnsureEmailCodeLimitAsync(c => c.RequestIp == requestIp, now, limits, ct);
-
-        var code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
-        if (IsDevFixedCodeEmail(address))
-            logger.LogInformation("OTP для {Email}: {Code} (разработка; подходит и {FixedCode})", address, code, AuthOptions.DevFixedCode);
-        var known = await IsKnownEmailAsync(address, ct);
-        db.EmailCodes.Add(new EmailCode
-        {
-            Email = address,
-            CodeHash = HashCode(address, code),
-            RequestIp = requestIp,
-            Sent = known,
-            ExpiresAt = now.Add(EmailCode.Lifetime)
-        });
-        await db.SaveChangesAsync(ct);
-
-        // Письмо подписано брендом застройщика: покупатель знает его, а не платформу.
-        if (known)
-        {
-            var brand = await brands.NameForEmailAsync(address, ct);
-            // Сбой почтового сервиса не меняет ответ: иначе по ошибке 500 было бы видно, что почта зарегистрирована.
-            try
-            {
-                await email.SendAsync(new EmailMessage(address, $"{brand}: код для входа {code}",
-                    $"Ваш код для входа в {brand}: {code}\n\nКод действует {EmailCode.Lifetime.TotalMinutes:0} минут. " +
-                    "Никому его не сообщайте. Если вы не запрашивали код, просто удалите это письмо."), ct);
-            }
-            catch (Exception e) when (e is not OperationCanceledException)
-            {
-                logger.LogError(e, "Письмо с кодом входа не отправлено: ошибка почтового сервиса");
-            }
-        }
-        else
-            logger.LogInformation("Код не отправлен: почта не найдена среди покупателей");
-
-        return new EmailSendResponse("Если почта зарегистрирована, мы отправили на неё код для входа",
-            (int)EmailCode.Lifetime.TotalSeconds);
-    }
+    // ---------- Коды из почты (общие для регистрации и сброса кода входа покупателя) ----------
 
     private async Task EnsureEmailCodeLimitAsync(System.Linq.Expressions.Expression<Func<EmailCode, bool>> who, DateTime now,
         AuthOptions limits, CancellationToken ct)
@@ -121,163 +68,9 @@ public class AuthService(
         && (authOptions.Value.DevFixedCodeForAnyEmail
             || authOptions.Value.DevFixedCodeEmails.Any(e => string.Equals(EmailAddress.Normalize(e), address, StringComparison.Ordinal)));
 
-    // Разработка: неизвестная почта с кодом 123456 становится покупателем застройщика по умолчанию.
-    private async Task EnsureDevCustomerAsync(string address, CancellationToken ct)
-    {
-        if (await userManager.FindByEmailAsync(address) is not null
-            || await db.Customers.IgnoreQueryFilters().AnyAsync(c => c.Email == address, ct))
-            return;
-
-        var organizationId = await db.Organizations.IgnoreQueryFilters()
-            .Where(o => o.IsActive)
-            .OrderBy(o => o.Id == Organization.DefaultId ? 0 : 1).ThenBy(o => o.CreatedAt)
-            .Select(o => (Guid?)o.Id)
-            .FirstOrDefaultAsync(ct) ?? throw new UnauthorizedException(InvalidEmailCode);
-
-        var customer = new Customer
-        {
-            OrganizationId = organizationId,
-            FullName = address.Split('@')[0],
-            // Телефон обязателен и уникален у застройщика: условный номер из почты, клиент поменяет его у менеджера.
-            Phone = "+992" + (BitConverter.ToUInt32(SHA256.HashData(Encoding.UTF8.GetBytes(address)), 0) % 1_000_000_000).ToString("D9"),
-            Email = address
-        };
-        db.Customers.Add(customer);
-        audit.Record(nameof(Customer), customer.Id, "CreatedOnDevLogin", null, new { customer.Email }, organizationId);
-        await db.SaveChangesAsync(ct);
-        logger.LogInformation("Разработка: для {Email} создан покупатель", address);
-    }
-
-    // Код уходит только покупателю: сотрудники входят по паролю.
-    private async Task<bool> IsKnownEmailAsync(string address, CancellationToken ct)
-    {
-        var user = await userManager.FindByEmailAsync(address);
-        if (user is not null)
-            return user.IsActive && !await IsStaffAsync(user);
-        return await db.Customers.IgnoreQueryFilters().AnyAsync(c => c.Email == address, ct);
-    }
-
     // Сотрудник — любая роль, кроме покупателя.
     private async Task<bool> IsStaffAsync(AppUser user) =>
         (await userManager.GetRolesAsync(user)).Any(r => r != RoleNames.Customer);
-
-    public async Task<AuthResponse> VerifyEmailCodeAsync(EmailVerifyRequest request, CancellationToken ct = default)
-    {
-        var address = EmailAddress.Normalize(request.Email) ?? throw new UnauthorizedException(InvalidEmailCode);
-        var now = Now;
-
-        // Сотрудник по коду не входит, даже с кодом разработки: у него пароль.
-        if (await userManager.FindByEmailAsync(address) is { } existing && await IsStaffAsync(existing))
-            throw new UnauthorizedException(StaffUsePassword);
-
-        // Действует только последний код: запрос нового делает прежние бесполезными.
-        var stored = await db.EmailCodes
-            .Where(c => c.Email == address)
-            .OrderByDescending(c => c.CreatedAt)
-            .FirstOrDefaultAsync(ct);
-        // Разработка: подходит 123456 (для любой почты при Auth:DevFixedCodeForAnyEmail, иначе — из Auth:DevFixedCodeEmails),
-        // даже если код не запрашивали; неизвестная почта становится покупателем.
-        var devFixedCode = IsDevFixedCodeEmail(address) && request.Code.Trim() == AuthOptions.DevFixedCode;
-        if (devFixedCode)
-        {
-            if (stored is not null)
-                stored.UsedAt = now;
-            await EnsureDevCustomerAsync(address, ct);
-        }
-        else
-        {
-            if (stored is null || !stored.IsUsable(now))
-                throw new UnauthorizedException(InvalidEmailCode);
-
-            if (!FixedTimeEquals(stored.CodeHash, HashCode(address, request.Code.Trim())))
-            {
-                stored.Attempts++;
-                await db.SaveChangesAsync(ct);
-                throw new UnauthorizedException(InvalidEmailCode);
-            }
-
-            stored.UsedAt = now;
-        }
-
-        await db.SaveChangesAsync(ct);
-
-        var user = await userManager.FindByEmailAsync(address) ?? await GetOrCreateCustomerUserByEmailAsync(address, ct);
-        await EnsureCanSignInAsync(user, ct);
-
-        audit.Record(nameof(AppUser), user.Id, "Login", null, new { Method = "EmailCode" }, user.OrganizationId);
-        logger.LogInformation("Пользователь {UserId} вошёл по коду из почты", user.Id);
-        return await IssueTokensAsync(user, ct);
-    }
-
-    // Покупатель сам регистрируется на сайте застройщика: появляются карточка клиента и учётная запись покупателя
-    // (без пароля), приходит приветственное письмо, и сразу — код для входа, как при обычном входе.
-    public async Task<EmailSendResponse> RegisterCustomerAsync(RegisterCustomerRequest request, string? requestIp, CancellationToken ct = default)
-    {
-        var address = EmailAddress.Normalize(request.Email) ?? throw new BusinessRuleException("Неверный адрес почты");
-        // Регистрация заканчивается письмом с кодом: без почты карточка появилась бы, а войти было бы нельзя.
-        if (!channels.EmailWorks)
-            throw new ServiceUnavailableException(LoginChannels.EmailNotConfigured);
-        var phone = PhoneNumber.Normalize(request.Phone) ?? throw new BusinessRuleException("Неверный номер телефона");
-        var fullName = $"{request.FirstName?.Trim()} {request.LastName?.Trim()}".Trim();
-        if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName) || fullName.Length > 200)
-            throw new BusinessRuleException("Укажите имя и фамилию (вместе до 200 символов)");
-        // Почта сотрудника не становится покупателем: он входит по паролю.
-        if (await userManager.FindByEmailAsync(address) is { } existingUser && await IsStaffAsync(existingUser))
-            throw new ConflictException("Эта почта принадлежит сотруднику. Войдите на вкладке «Сотрудник»");
-
-        // Лимиты кодов проверяются до того, как появится карточка: иначе регистрацией можно было бы заваливать базу.
-        var limits = authOptions.Value;
-        await EnsureEmailCodeLimitAsync(c => c.Email == address, Now, limits, ct);
-        if (!string.IsNullOrEmpty(requestIp))
-            await EnsureEmailCodeLimitAsync(c => c.RequestIp == requestIp, Now, limits, ct);
-
-        var organizationId = await ResolveRegistrationOrganizationAsync(request.Organization, ct);
-        var existing = await db.Customers.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(c => c.OrganizationId == organizationId && (c.Email == address || c.Phone == phone), ct);
-        if (existing is null)
-        {
-            var customer = new Customer { OrganizationId = organizationId, FullName = fullName, Phone = phone, Email = address };
-            db.Customers.Add(customer);
-            audit.Record(nameof(Customer), customer.Id, "Registered", null,
-                new { customer.FullName, customer.Phone, customer.Email }, organizationId);
-            try
-            {
-                await db.SaveChangesAsync(ct);
-            }
-            catch (DbUpdateException e) when (e.IsUniqueViolation())
-            {
-                throw new ConflictException(PhoneTaken);
-            }
-
-            var user = await GetOrCreateCustomerUserByEmailAsync(address, ct);
-            audit.Record(nameof(AppUser), user.Id, "Registered", null, new { user.Email, user.FullName }, organizationId);
-            await db.SaveChangesAsync(ct);
-            await SendWelcomeAsync(address, fullName, ct);
-        }
-        // Телефон из чужой карточки не привязывается к новой почте: иначе по одному номеру можно было бы
-        // получить доступ к чужим сделкам.
-        else if (existing.Email != address)
-            throw new ConflictException(PhoneTaken);
-
-        return await SendEmailCodeAsync(new EmailSendRequest(address), requestIp, ct);
-    }
-
-    // Приветствие от имени застройщика; сбой почты регистрацию не отменяет (код для входа уйдёт отдельным письмом).
-    private async Task SendWelcomeAsync(string address, string fullName, CancellationToken ct)
-    {
-        var brand = await brands.NameForEmailAsync(address, ct);
-        try
-        {
-            await email.SendAsync(new EmailMessage(address, $"Добро пожаловать в {brand}",
-                $"Здравствуйте, {fullName}!\n\nВы зарегистрировались в личном кабинете {brand}. " +
-                "Входите по почте: на неё придёт код, пароль не нужен. В кабинете — ваши сделки, график платежей, документы и чат с менеджером.\n\n" +
-                "Следующим письмом придёт код для первого входа."), ct);
-        }
-        catch (Exception e) when (e is not OperationCanceledException)
-        {
-            logger.LogError(e, "Приветственное письмо покупателю не отправлено");
-        }
-    }
 
     private const string PhoneTaken =
         "Этот телефон уже указан в договоре с другой почтой. Войдите по почте из договора или обратитесь к менеджеру";

@@ -20,10 +20,14 @@ public interface IAuthService
     Task LogoutAsync(LogoutRequest request, CancellationToken ct = default);
     Task<CurrentUserResponse> GetCurrentUserAsync(Guid userId, CancellationToken ct = default);
 
-    // Вход по коду из почты — только для покупателей. Ответ на отправку одинаковый, есть учётная запись или нет.
-    Task<EmailSendResponse> SendEmailCodeAsync(EmailSendRequest request, string? requestIp, CancellationToken ct = default);
-    Task<AuthResponse> VerifyEmailCodeAsync(EmailVerifyRequest request, CancellationToken ct = default);
-    Task<EmailSendResponse> RegisterCustomerAsync(RegisterCustomerRequest request, string? requestIp, CancellationToken ct = default);
+    // Покупатель: свой 6-значный код входа (PIN, хранится как пароль Identity). Регистрация и сброс подтверждаются
+    // кодом из почты; ответы на запросы кода одинаковые, есть учётная запись или нет.
+    Task<EmailSendResponse> RegisterCustomerAsync(CustomerRegisterRequest request, string? requestIp, CancellationToken ct = default);
+    Task<EmailSendResponse> ResendConfirmationAsync(CustomerEmailRequest request, string? requestIp, CancellationToken ct = default);
+    Task<AuthResponse> ConfirmCustomerAsync(CustomerConfirmRequest request, CancellationToken ct = default);
+    Task<AuthResponse> CustomerLoginAsync(CustomerLoginRequest request, CancellationToken ct = default);
+    Task<EmailSendResponse> RequestPinResetAsync(CustomerEmailRequest request, string? requestIp, CancellationToken ct = default);
+    Task<AuthResponse> ResetPinAsync(CustomerPinResetRequest request, CancellationToken ct = default);
 
     Task<InvitationInfoResponse> GetInvitationInfoAsync(string token, CancellationToken ct = default);
     Task<AuthResponse> AcceptInvitationAsync(AcceptInvitationRequest request, CancellationToken ct = default);

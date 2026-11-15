@@ -163,7 +163,7 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public string ConnectionString => _connectionString;
 
-    // Входит как покупатель с этим телефоном по коду из почты. Если у клиента нет почты, задаёт её.
+    // Входит как покупатель с этим телефоном (по почте и коду входа). Если у клиента нет почты, задаёт её.
     public async Task<HttpClient> CreateCustomerClientAsync(string phone)
     {
         var email = await WithDbAsync(async db =>
@@ -178,13 +178,18 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         return await CreateEmailClientAsync(email);
     }
 
-    // Вход покупателя по коду из почты.
+    // Код входа покупателя в тестах (6 цифр, не подряд и не одинаковые).
+    public const string CustomerTestPin = "482915";
+
+    // Вход покупателя: «Забыли код?» (код из письма) задаёт CustomerTestPin и сразу выдаёт токены —
+    // так входит и покупатель, которого завёл менеджер.
     public async Task<HttpClient> CreateEmailClientAsync(string email)
     {
         var client = CreateClient();
-        var sent = await client.PostAsJsonAsync("/api/v1/auth/email/send", new EmailSendRequest(email));
+        var sent = await client.PostAsJsonAsync("/api/v1/auth/customer/pin/reset-request", new CustomerEmailRequest(email));
         sent.EnsureSuccessStatusCode();
-        var response = await client.PostAsJsonAsync("/api/v1/auth/email/verify", new EmailVerifyRequest(email, Email.LastCode(email)!));
+        var response = await client.PostAsJsonAsync("/api/v1/auth/customer/pin/reset",
+            new CustomerPinResetRequest(email, Email.LastCode(email)!, CustomerTestPin));
         response.EnsureSuccessStatusCode();
         var auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);

@@ -53,18 +53,18 @@ public class LoginChannelsNotConfiguredTests(StubSmsStagingFactory factory) : IC
     [Theory]
     [InlineData("client1@example.com")]
     [InlineData("nobody-at-all@example.com")]
-    public async Task EmailSend_Is503_ForAnyAddress(string address)
+    public async Task PinResetRequest_Is503_ForAnyAddress(string address)
     {
         // Одинаково для существующей и несуществующей почты: по ответу нельзя узнать, есть ли покупатель.
-        var response = await factory.CreateClient().PostAsJsonAsync("/api/v1/auth/email/send", new { email = address });
+        var response = await factory.CreateClient().PostAsJsonAsync("/api/v1/auth/customer/pin/reset-request", new { email = address });
         await AssertProblemAsync(response, "email_not_configured", "Письма с кодами не отправляются: почтовый сервис не настроен");
     }
 
     [Fact]
     public async Task Register_Is503_BeforeCreatingCustomer()
     {
-        var response = await factory.CreateClient().PostAsJsonAsync("/api/v1/auth/register",
-            new { email = "new-buyer@example.com", firstName = "Тест", lastName = "Покупатель", phone = "+992900001234" });
+        var response = await factory.CreateClient().PostAsJsonAsync("/api/v1/auth/customer/register",
+            new { name = "Тест Покупатель", email = "new-buyer@example.com", phone = "+992900001234", pin = "482915" });
         await AssertProblemAsync(response, "email_not_configured", "Письма с кодами не отправляются: почтовый сервис не настроен");
     }
 
@@ -80,7 +80,7 @@ public class LoginChannelsNotConfiguredTests(StubSmsStagingFactory factory) : IC
     {
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("Accept-Language", "tg");
-        var response = await client.PostAsJsonAsync("/api/v1/auth/email/send", new { email = "client1@example.com" });
+        var response = await client.PostAsJsonAsync("/api/v1/auth/customer/pin/reset-request", new { email = "client1@example.com" });
         await AssertProblemAsync(response, "email_not_configured", "Мактубҳо бо код фиристода намешаванд: хизматрасонии почта танзим нашудааст");
     }
 

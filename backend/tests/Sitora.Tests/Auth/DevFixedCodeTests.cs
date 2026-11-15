@@ -5,18 +5,20 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Sitora.Domain.DTOs.Auth;
 using Sitora.Domain.DTOs.Sales;
+using Sitora.Domain.Entities;
 using Sitora.Tests.Infrastructure;
 using Sitora.Tests.Security;
 
 namespace Sitora.Tests.Auth;
 
-// Development: для почт из Auth:DevFixedCodeEmails подходит код 123456. Список задаётся в user-secrets разработчика
-// (личная почта в репозиторий не попадает); тест задаёт свою тестовую почту.
+// Development: для почт из Auth:DevFixedCodeEmails код из письма (подтверждение регистрации, «Забыли код?») можно
+// заменить на 123456. Список задаётся в user-secrets разработчика (личная почта в репозиторий не попадает);
+// тест задаёт свою тестовую почту.
 public class DevFixedCodeEmailFactory : SitoraApiFactory
 {
     public const string DevEmail = "dev-fixed-code@mail.test";
 
-    protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
         builder.UseSetting("Auth:DevFixedCodeEmails:0", DevEmail);
@@ -28,14 +30,15 @@ public class DevFixedCodeTests(DevFixedCodeEmailFactory factory) : IClassFixture
     private const string DevEmail = DevFixedCodeEmailFactory.DevEmail;
 
     [Fact]
-    public async Task ConfiguredEmail_SignsInWith123456_OtherEmailsDoNot()
+    public async Task ConfiguredEmail_SetsPinWith123456_OtherEmailsDoNot()
     {
         var manager = await factory.CreateManagerClientAsync();
         (await manager.PostAsJsonAsync("/api/v1/customers",
             new CreateCustomerRequest("Разработчик", SitoraApiFactory.RandomPhone(), DevEmail, null, null))).EnsureSuccessStatusCode();
         var client = factory.CreateClient();
 
-        var fixedCode = await client.PostAsJsonAsync("/api/v1/auth/email/verify", new EmailVerifyRequest(DevEmail, "123456"));
+        var fixedCode = await client.PostAsJsonAsync("/api/v1/auth/customer/pin/reset",
+            new CustomerPinResetRequest(DevEmail, "123456", SitoraApiFactory.CustomerTestPin));
         Assert.Equal(HttpStatusCode.OK, fixedCode.StatusCode);
         Assert.Equal("Customer", (await fixedCode.Content.ReadFromJsonAsync<AuthResponse>(TestJson.Options))!.User.Role);
 
@@ -43,10 +46,11 @@ public class DevFixedCodeTests(DevFixedCodeEmailFactory factory) : IClassFixture
         var other = $"other-{Guid.NewGuid():N}@mail.test";
         (await manager.PostAsJsonAsync("/api/v1/customers",
             new CreateCustomerRequest("Другой", SitoraApiFactory.RandomPhone(), other, null, null))).EnsureSuccessStatusCode();
-        (await client.PostAsJsonAsync("/api/v1/auth/email/send", new EmailSendRequest(other))).EnsureSuccessStatusCode();
+        (await client.PostAsJsonAsync("/api/v1/auth/customer/pin/reset-request", new CustomerEmailRequest(other))).EnsureSuccessStatusCode();
         var code = factory.Email.LastCode(other);
         var wrong = code == "123456" ? "654321" : "123456";
-        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/v1/auth/email/verify", new EmailVerifyRequest(other, wrong))).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/v1/auth/customer/pin/reset",
+            new CustomerPinResetRequest(other, wrong, SitoraApiFactory.CustomerTestPin))).StatusCode);
     }
 }
 
@@ -66,14 +70,15 @@ public class StagingFixedCodeTests(StagingFixedCodeFactory factory) : IClassFixt
     [Fact]
     public async Task OutsideDevelopment_FixedCodeIsRejected()
     {
-        var response = await factory.CreateClient().PostAsJsonAsync("/api/v1/auth/email/verify",
-            new EmailVerifyRequest(StagingFactory.BootstrapEmail, "123456"));
+        var response = await factory.CreateClient().PostAsJsonAsync("/api/v1/auth/customer/pin/reset",
+            new CustomerPinResetRequest(StagingFactory.BootstrapEmail, "123456", SitoraApiFactory.CustomerTestPin));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 }
 
-// Development с Auth:DevFixedCodeForAnyEmail: 123456 подходит для любой почты, неизвестная почта становится покупателем.
+// Development с Auth:DevFixedCodeForAnyEmail: 123456 подтверждает регистрацию с любой почтой; сотрудникам код
+// входа так не задать.
 public class AnyEmailFixedCodeFactory : SitoraApiFactory
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -86,34 +91,32 @@ public class AnyEmailFixedCodeFactory : SitoraApiFactory
 public class AnyEmailFixedCodeTests(AnyEmailFixedCodeFactory factory) : IClassFixture<AnyEmailFixedCodeFactory>
 {
     [Fact]
-    public async Task UnknownEmail_BecomesCustomer_StaffAndSuperAdminStillNeedPassword()
+    public async Task AnyEmail_ConfirmsWith123456_StaffAndSuperAdminCannotGetPin()
     {
         var client = factory.CreateClient();
-        var email = $"New-{Guid.NewGuid():N}@Mail.Test";
+        var email = $"new-{Guid.NewGuid():N}@mail.test";
+        (await client.PostAsJsonAsync("/api/v1/auth/customer/register", new CustomerRegisterRequest("Новый Покупатель", email,
+            SitoraApiFactory.RandomPhone(), SitoraApiFactory.CustomerTestPin, Organization.DefaultSlug))).EnsureSuccessStatusCode();
 
-        var created = await client.PostAsJsonAsync("/api/v1/auth/email/verify", new EmailVerifyRequest(email, "123456"));
-        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
-        Assert.Equal("Customer", (await created.Content.ReadFromJsonAsync<AuthResponse>(TestJson.Options))!.User.Role);
-        var card = await factory.WithDbAsync(db => db.Customers.IgnoreQueryFilters().SingleAsync(c => c.Email == email.ToLowerInvariant()));
-        Assert.Equal(Sitora.Domain.Entities.Organization.DefaultId, card.OrganizationId);
+        var confirmed = await client.PostAsJsonAsync("/api/v1/auth/customer/confirm", new CustomerConfirmRequest(email, "123456"));
+        Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
+        Assert.Equal("Customer", (await confirmed.Content.ReadFromJsonAsync<AuthResponse>(TestJson.Options))!.User.Role);
 
-        // Второй вход той же почтой не создаёт ещё одну карточку.
-        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/v1/auth/email/verify", new EmailVerifyRequest(email, "123456"))).StatusCode);
-        Assert.Equal(1, await factory.WithDbAsync(db => db.Customers.IgnoreQueryFilters().CountAsync(c => c.Email == email.ToLowerInvariant())));
-
-        // Код разработки не открывает вход сотрудникам и создателю платформы и не делает из них покупателей.
+        // Код разработки не задаёт код входа сотрудникам и создателю платформы и не делает из них покупателей.
         foreach (var staff in new[] { SitoraApiFactory.ManagerEmail, SitoraApiFactory.SuperAdminEmail })
-            Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/v1/auth/email/verify", new EmailVerifyRequest(staff, "123456"))).StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/v1/auth/customer/pin/reset",
+                new CustomerPinResetRequest(staff, "123456", SitoraApiFactory.CustomerTestPin))).StatusCode);
         Assert.False(await factory.WithDbAsync(db => db.Customers.IgnoreQueryFilters().AnyAsync(c => c.Email == SitoraApiFactory.ManagerEmail)));
+        // Сотрудник по-прежнему входит паролем.
+        await factory.CreateManagerClientAsync();
 
-        // Неверный код по-прежнему не подходит.
-        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/v1/auth/email/verify",
-            new EmailVerifyRequest($"x-{Guid.NewGuid():N}@mail.test", "654321"))).StatusCode);
+        // Незнакомая почта без карточки клиента кодом разработки покупателем не становится.
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/v1/auth/customer/pin/reset",
+            new CustomerPinResetRequest($"x-{Guid.NewGuid():N}@mail.test", "123456", SitoraApiFactory.CustomerTestPin))).StatusCode);
     }
 }
 
 // Production с Auth:DevFixedCodeForAnyEmail и Auth:DevFixedCodeEmails: оба флага игнорируются полностью.
-// Почта покупателя, а не сотрудника: в Development такая почта с 123456 вошла бы и стала покупателем.
 public class ProductionFixedCodeFactory : ProductionFactory
 {
     public const string BuyerEmail = "prod-fixed-code@mail.test";
@@ -135,12 +138,13 @@ public class ProductionFixedCodeTests(ProductionFixedCodeFactory factory) : ICla
     {
         var client = factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://api.sitora.test") });
 
-        var response = await client.PostAsJsonAsync("/api/v1/auth/email/verify", new EmailVerifyRequest(email, "123456"));
+        var reset = await client.PostAsJsonAsync("/api/v1/auth/customer/pin/reset",
+            new CustomerPinResetRequest(email, "123456", SitoraApiFactory.CustomerTestPin));
+        var confirm = await client.PostAsJsonAsync("/api/v1/auth/customer/confirm", new CustomerConfirmRequest(email, "123456"));
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        // Покупатель по коду разработки не создан.
+        Assert.Equal((HttpStatusCode.Unauthorized, HttpStatusCode.Unauthorized), (reset.StatusCode, confirm.StatusCode));
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<Sitora.Infrastructure.Data.AppDbContext>();
-        Assert.False(await db.Customers.IgnoreQueryFilters().AnyAsync(c => c.Email == email));
+        Assert.False(await db.Users.AnyAsync(u => u.Email == email));
     }
 }

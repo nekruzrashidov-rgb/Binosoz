@@ -14,7 +14,8 @@ public partial class ErrorContractTests(SitoraApiFactory factory) : IClassFixtur
     public static TheoryData<string, string, string?, string, HttpStatusCode, string> Cases => new()
     {
         // метод, адрес, тело (null — без тела), тип содержимого, ожидаемый код ответа, ожидаемый code
-        { "POST", "/api/v1/auth/email/send", "{}", "application/json", HttpStatusCode.BadRequest, "validation_failed" },
+        { "POST", "/api/v1/auth/customer/pin/reset-request", "{}", "application/json", HttpStatusCode.BadRequest, "validation_failed" },
+        { "POST", "/api/v1/auth/customer/login", "{}", "application/json", HttpStatusCode.BadRequest, "validation_failed" },
         { "POST", "/api/v1/leads", "{}", "application/json", HttpStatusCode.BadRequest, "validation_failed" },
         { "POST", "/api/v1/auth/login", "{}", "application/json", HttpStatusCode.BadRequest, "validation_failed" },
         { "POST", "/api/v1/leads", "{bad json", "application/json", HttpStatusCode.BadRequest, "malformed_request" },
