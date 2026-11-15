@@ -724,6 +724,8 @@
       ].filter(Boolean);
       whyGrid.replaceChildren(...feats.map(([ic, k, d2]) => h('article', { class: 'nr-why-item reveal' },
         h('span', { class: 'nr-why-ic' }, landIcon(ic)), h('h3', null, t(k)), h('p', null, d2 || t(k + '.d')))));
+      // The cards are rebuilt when the data arrives: the observer set up at mount does not know them, so watch them here.
+      revealIn(whyGrid);
 
       layouts.hidden = !d.types.length;
       layoutGrid.replaceChildren(...d.types.map(layoutCard));
