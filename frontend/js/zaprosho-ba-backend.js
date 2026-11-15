@@ -607,7 +607,6 @@
     // AI reading of documents and receipts (Claude); nothing in the deal changes until a person acts on the result.
     verifyDocument(id) { return request('POST', '/documents/' + id + '/verify'); },
     readReceipt(dealId, file) { const f = new FormData(); f.append('file', file); return request('POST', '/deals/' + dealId + '/payments/read-receipt', { form: f, file }); },
-    async health() { return S.isDemo() ? request('GET', '/health/ready', { auth: false }) : request('GET', '/health/ready', { auth: false, absolute: true }); },
 
     /* Opens a PDF in a tab or downloads Excel: real API -> file from the server; demo -> in-page preview */
     async openDoc(path, query, title) {
