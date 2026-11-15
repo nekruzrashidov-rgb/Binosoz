@@ -85,10 +85,15 @@
   // extra: an optional row under the languages (the public site puts the theme switch there: on phones it leaves the header).
   function buildMobileOverlay(navItems, extra) {
     if (overlay) overlay.remove();
+    // Escape closes the menu wherever the focus is (focus moves into the menu only after a moment).
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
     const close = () => {
-      overlay.classList.remove('open');
+      if (!el.classList.contains('open')) return;
+      el.classList.remove('open');
       document.body.classList.remove('menu-open');
       btn.setAttribute('aria-expanded', 'false');
+      document.removeEventListener('keydown', onKey);
+      btn.focus();
     };
     const navEls = navItems.map(([href, label, active]) => h('a', { href, class: active ? 'on' : '', 'aria-current': active ? 'page' : null, onclick: close }, label));
     const langRow = h('div', { class: 'mob-lang', role: 'group', 'aria-label': 'Language' },
@@ -99,12 +104,11 @@
       langRow,
       extra || null,
       h('div', { class: 'mob-contact' }, h('a', { href: PHONE_HREF, class: 'mob-phone' }, PHONE)));
-    el.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
     overlay = el;
     document.body.appendChild(el);
     document.body.classList.remove('menu-open');
     const btn = h('button', { class: 'icon-btn menu-btn', type: 'button', 'aria-label': t('nav.menu'), 'aria-expanded': 'false',
-      onclick: () => { el.classList.add('open'); document.body.classList.add('menu-open'); btn.setAttribute('aria-expanded', 'true'); setTimeout(() => el.querySelector('.mob-close').focus(), 30); } }, S.icon('menu'));
+      onclick: () => { el.classList.add('open'); document.body.classList.add('menu-open'); btn.setAttribute('aria-expanded', 'true'); document.addEventListener('keydown', onKey); setTimeout(() => el.querySelector('.mob-close').focus(), 30); } }, S.icon('menu'));
     return { btn, overlay: el };
   }
 
