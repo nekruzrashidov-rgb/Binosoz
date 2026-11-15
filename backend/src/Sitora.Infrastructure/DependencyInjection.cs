@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Sitora.Domain.Entities;
 using Sitora.Domain.Interfaces;
@@ -39,6 +40,9 @@ public static class DependencyInjection
             .AddEntityFrameworkStores<AppDbContext>()
             // TOTP-коды приложения-аутентификатора — второй фактор создателя платформы.
             .AddTokenProvider<AuthenticatorTokenProvider<AppUser>>(TokenOptions.DefaultAuthenticatorProvider);
+        // Вместо стандартного PasswordValidator: у покупателя — 6-значный код (PinRules), у сотрудников — прежние правила.
+        services.RemoveAll<IPasswordValidator<AppUser>>();
+        services.AddScoped<IPasswordValidator<AppUser>, PinAwarePasswordValidator>();
 
         services.AddOptions<JwtOptions>()
             .BindConfiguration(JwtOptions.SectionName)

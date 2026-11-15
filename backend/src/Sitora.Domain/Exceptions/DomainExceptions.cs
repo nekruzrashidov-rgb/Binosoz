@@ -1,6 +1,10 @@
 namespace Sitora.Domain.Exceptions;
 
-public abstract class DomainException(string message) : Exception(message);
+public abstract class DomainException(string message) : Exception(message)
+{
+    // Дополнительные поля ответа Problem Details (например, attemptsLeft, lockedUntil): фронт показывает их без разбора текста.
+    public Dictionary<string, object?> Extensions { get; } = new(StringComparer.Ordinal);
+}
 
 public class NotFoundException(string message = "Объект не найден") : DomainException(message);
 

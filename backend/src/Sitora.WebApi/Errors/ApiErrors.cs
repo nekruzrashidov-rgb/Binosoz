@@ -76,6 +76,11 @@ public static partial class ApiErrors
         problem.Status = status;
         var (defaultTitle, defaultCode) = ForStatus(status);
 
+        // Поля, которые сервис приложил к ошибке (attemptsLeft, lockedUntil…), — в ответ как есть.
+        if (context.Exception is DomainException { Extensions.Count: > 0 } withExtensions)
+            foreach (var (key, value) in withExtensions.Extensions)
+                problem.Extensions[key] = value;
+
         if (!problem.Extensions.ContainsKey(CodeKey))
             problem.Extensions[CodeKey] = context.Exception is DomainException domain ? CodeFor(domain)
                 : status == 404 && IsUnknownRoute(http) ? "route_not_found"
