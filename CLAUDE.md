@@ -75,8 +75,8 @@ Binosoz/
 │   │   │   │   PaymentService.cs   (платежи, сторно, пересчёт по курсу)
 │   │   │   │   StatementService.cs (акт сверки, PDF)
 │   │   │   │   ...
-│   │   │   ├── Integrations/       ← Telegram (заглушка→лог), SMS (заглушка),
-│   │   │   │                          курс НБТ (заглушка), QuestPDF, файлы (диск)
+│   │   │   ├── Integrations/       ← Telegram (TelegramNotifier, Bot API), SMS (заглушка),
+│   │   │   │                          курс НБТ (NbtRateProvider, XML nbt.tj), QuestPDF, файлы (диск/S3)
 │   │   │   ├── Jobs/               ← ExpireBookingsJob, UpdateRatesJob (Hangfire)
 │   │   │   └── Security/           ← JwtTokenService, EncryptionService (AES-256-GCM)
 │   │   └── Sitora.WebApi/          ← HTTP-слой
@@ -87,7 +87,7 @@ Binosoz/
 │   │       ├── Validators/         ← FluentValidation
 │   │       └── Program.cs          ← точка входа, DI, пайплайн
 │   ├── tests/
-│   │   └── Sitora.Tests/           ← 380 тестов, Testcontainers, покрывают:
+│   │   └── Sitora.Tests/           ← 435 тестов, Testcontainers, покрывают:
 │   │                                  auth, catalog, chat, payments, sales, security
 │   └── scripts/                    ← backup.sh/restore.sh, seed.sql (демо для прода), smoke.sh, load/ (k6),
 │                                      gmail-token.mjs (refresh token Gmail), set-resend-key.ps1
@@ -209,9 +209,14 @@ Logging__File__Enabled=true      # файлы логов (только VPS; на
 ```
 
 ## Что сейчас заглушки (нужно заменить перед продакшеном)
-- **SMS** — `SmsStubSender`: пишет код в лог. Заменить на реального провайдера.
-- **Telegram** — `TelegramStubSender`: пишет в лог. Заменить на `TelegramBotClient`.
-- **Курс НБТ** — `NbtRateStubProvider`: ничего не загружает. Заменить на парсинг nbt.tj.
+- **SMS** — `SmsSender`: в Development пишет код в лог, вне его ничего не отправляет. Нужен реальный провайдер.
+- **Платёжный шлюз** — `MockPaymentGateway` (тестовый банк): Development или `Payments__MockEnabled=true`. Нужен банк (Alif, Корти Миллӣ).
+
+Работают по-настоящему:
+- **Telegram** — `TelegramNotifier` + `TelegramBotTransport` (Bot API): работает при заданных `Telegram__BotToken` и
+  `Telegram__ChatId`; без токена — предупреждение в лог, заявка всё равно сохраняется.
+- **Курс НБТ** — `NbtRateProvider` (XML nbt.tj): загружается задачей Hangfire `UpdateRatesJob` (04:00 и 06:00 UTC);
+  ручной курс бухгалтера не перезаписывается.
 - **Файлы** — `Storage__Provider=Local` (диск) или `S3`. На Render диск временный — нужен S3/R2 или Render Disk (см. `docs/DEPLOY.md`).
 
 ## Деплой
@@ -222,5 +227,4 @@ Logging__File__Enabled=true      # файлы логов (только VPS; на
 
 ## Что планируется (следующие шаги)
 - Реальный SMS-провайдер (Tcell/Megafon Таджикистан)
-- Реальный курс НБТ
 - Онлайн-оплата (Alif, Корти Миллӣ)
