@@ -38,6 +38,7 @@ Binosoz/
 │   ├── SECURITY.md            ← модель угроз и меры защиты
 │   ├── DEPLOY.md              ← инструкция по деплою
 │   ├── DEMO_SCRIPT.md         ← сценарий показа жюри на 3 минуты (RU + TJ)
+│   ├── design/                ← макет «Некруз Резиденс» (7 экранов, HTML) — образец дизайна сайта
 │   └── exam/                  ← разбор проекта по частям (таджикский), для защиты
 ├── backend/
 │   ├── Sitora.sln
@@ -96,10 +97,11 @@ Binosoz/
     │   404.html, offline.html     ← вход, кабинет, CRM, платформа, тестовый банк, ошибки
     ├── manifest.json, sw.js       ← PWA (Service Worker «сначала сеть»), robots.txt, sitemap.xml
     ├── img/gallery/               ← виды Душанбе с Wikimedia Commons (WebP 400/800/1200), авторы — CREDITS.md
-    ├── css/styles.css             ← 171 КБ: токены (:root и [data-theme='dark']), все компоненты
+    ├── img/renders/               ← кадры 3D-модели дома (WebP 800/1600/2400), подпись «Визуализация 3D-модели»
+    ├── css/styles.css             ← токены (:root и [data-theme='dark']), все компоненты; новый дизайн — классы nr-*
     └── js/
         ├── tanzimot-api-url.js        ← config: API_BASE ('/api/v1'; Vercel → Render), ORG_SLUG, CONTACT, INSTALLMENT
-        ├── i18n/ru.js, tg.js, en.js   ← тексты (по 1702 ключа); ru — на каждой странице и запасной
+        ├── i18n/ru.js, tg.js, en.js   ← тексты (по 1758 ключей); ru — на каждой странице и запасной
         ├── tarjumaho-ru-tg-en.js      ← S.t(), S.initLang()/S.setLang() (грузит tg/en по требованию), S.bus
         ├── komponentho-modal-toast-tabs.js ← h() DOM-builder, иконки, модалки, тосты
         ├── zaprosho-ba-backend.js     ← все вызовы API, токены (localStorage sitora.auth)
@@ -119,20 +121,25 @@ Binosoz/
         ├── serve-web.mjs          статик-сервер: node frontend/tools/serve-web.mjs 5500
         ├── check-contrast.js      проверка контраста WCAG AA
         ├── qr/                    QR-код сайта в SVG: cd frontend/tools/qr && npm ci && npm run build
+        ├── renders/               кадры 3D-модели для сайта: serve-web на 5500, затем node frontend/tools/renders/render.mjs
         └── e2e/                   Playwright: cd frontend/tools/e2e && npm ci && npm test
 ```
 
 ## Frontend: правила
+- **Дизайн** — по макету `docs/design/`: заголовки Cormorant Garamond (500), текст Manrope, углы 2 px, кнопки `nr-btn`
+  (заглавные, 56 px), надзаголовки `nr-kicker`. Цифры — обычные (`lnum`), не старинные.
 - **CSP** `script-src 'self' https://cdnjs.cloudflare.com`: никаких inline-скриптов и `onclick=` в HTML; все `<script src>` с `defer` (тест `FrontendTests`).
 - **Цвета — только токены**: `--ink/--ink-2/--muted` (текст), `--bg/--surface/--surface-2` (фоны), `--accent` (фон кнопок),
   `--accent-text` (медный текст и ссылки), `--accent-2` (градиенты), статусы `--good/--warn/--bad/--info` и их `-soft`.
   Полупрозрачность — `color-mix(in srgb, var(--accent) 20%, transparent)`. Хардкод цвета текста ломает тёмную тему.
-- **Тёмные секции** на светлом сайте (hero главной, рассрочка, «Остались вопросы?», футер, 3D-сцена, итог калькулятора,
+- **Тёмные секции** на светлом сайте (класс `.nr-dark`: hero главной и «О проекте», «Всё, что важно при покупке»,
+  калькулятор каталога, «История строительства», «Остались вопросы?», левая колонка входа и регистрации; ещё футер и
   «Зелёный эффект Binosoz» — `.lux-green`)
   переопределяют `--ink/--ink-2/--muted` локально — компоненты внутри сами светлые. Новую тёмную секцию добавлять в этот список.
 - **Тёмная тема**: `[data-theme='dark']` меняет токены; проверка — `frontend/tools/check-contrast.js` (0 текстов ниже AA в обеих темах).
-- **Честные данные**: цифры, цены, свободные квартиры — только из API; `DEFAULT_*` в config — только для demo; пустой API —
-  карточка «Продажи скоро откроются». Ничего не выдумывать (даты, отзывы, фото).
+- **Честные данные**: цифры, цены, свободные квартиры, удобства, условия рассрочки, ход стройки — только из API (в config
+  чисел о доме нет); пустой API — карточка «Продажи скоро откроются». Ничего не выдумывать (даты, отзывы, фото, людей).
+  Картинки дома — только рендеры 3D-модели с подписью; e2e-тест «no invented claims» ловит вернувшиеся выдумки.
 - **Переводы**: новый ключ — во все три файла `js/i18n/*.js`.
 - **Фото галереи** — только CC0 / общественное достояние / CC BY / CC BY-SA (без NC и ND), под каждым «Фото: автор, лицензия»
   со ссылкой на страницу файла, запись в `img/gallery/CREDITS.md`. Подписи честные: это виды города, не здания комплекса.

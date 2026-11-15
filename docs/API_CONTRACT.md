@@ -409,6 +409,8 @@ TwoFactorRequired = { requiresTwoFactor: true, tempToken, expiresAt }
 
 Сайт пишет удобства и условия рассрочки только из этих полей: чего нет — того на сайте нет.
 
+| GET | `/public/buildings/{id}/progress` | все, кэш каталога | ход стройки для сайта: `{ overallPercent, stages: [{ name, percent, updatedAt }] }` без фото; неизвестный дом или неактивная организация — 404 |
+
 ### Планы этажей
 
 | Метод | Путь | Роли | Примечание |
