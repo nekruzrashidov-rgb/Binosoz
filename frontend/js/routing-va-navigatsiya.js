@@ -169,9 +169,9 @@
     const siteBrand = page === 'register' ? 'BINOSOZ' : t('brand.name');
     // The wordmark of the design: the first word in large spaced capitals, the rest small in copper under it.
     const words = siteBrand.split(/\s+/);
-    const mark = h('span', { class: 'brand-word' }, h('b', null, words[0]), words.length > 1 ? h('small', null, words.slice(1).join(' ')) : null);
+    const mark = h('span', { class: 'brand-word' }, h('b', null, words[0]), words.length > 1 ? ' ' : null, words.length > 1 ? h('small', null, words.slice(1).join(' ')) : null);
     header.className = 'top lux-top' + (S.api.isAuthed ? ' authed' : '');
-    header.replaceChildren(h('div', { class: 'wrap top-in' }, h('a', { class: 'brand', href: '/', 'aria-label': siteBrand }, S.towerLogo(), mark), menu, h('span', { class: 'spacer' }),
+    header.replaceChildren(h('div', { class: 'wrap top-in' }, h('a', { class: 'brand', href: '/' }, S.towerLogo(), mark), menu, h('span', { class: 'spacer' }),
       phone, lang, themeToggle, accountLink(), menuBtn));
   }
 

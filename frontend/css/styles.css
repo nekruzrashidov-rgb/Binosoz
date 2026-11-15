@@ -733,7 +733,7 @@ body:has(.lux) { background: var(--bg); }
 .foot-brand a.row:hover { text-decoration: none; }
 .foot-brand p { margin: 14px 0 18px; max-width: 32ch; }
 .foot-col { display: flex; flex-direction: column; gap: 10px; }
-.foot-col h4 { color: #fff; font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+.foot-col h3, .foot-col h4 { color: #fff; font-family: var(--font); font-size: 14px; font-weight: 700; margin-bottom: 4px; }
 .lux-footer a { color: rgba(240,220,190,0.6); }
 .lux-footer a:hover { color: var(--accent-text); text-decoration: none; }
 .lux-footer .btn.ghost { color: #fff; border-color: rgba(255,255,255,0.25); }
@@ -2658,7 +2658,7 @@ a:hover > .nr-arrow, button:hover > .nr-arrow { transform: translateX(4px); }
 .lux-footer { background: var(--espresso); color: var(--muted); }
 :root[data-theme='dark'] .lux-footer { background: #0d0b0a; }
 .lux-footer .foot-brand b { font-family: var(--display); font-size: 30px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink); }
-.lux-footer .foot-col h4 { font-size: 12px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent-text); }
+.lux-footer .foot-col :is(h3, h4) { font-size: 12px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent-text); }
 .lux-footer a { color: var(--ink-2); }
 .lux-footer a:hover { color: var(--accent-text); }
 
@@ -2754,7 +2754,7 @@ body { font-variant-numeric: lining-nums; font-feature-settings: 'lnum' 1; } /* 
 .nr-unit { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; text-align: left; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 2px; cursor: pointer; font-size: 14px; }
 .nr-unit:hover { border-color: var(--ink); }
 .nr-unit[aria-pressed='true'] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-.nr-unit.st-sold { opacity: 0.72; }
+.nr-unit.st-sold { background: var(--surface-2); }
 .nr-unit-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .nr-unit-top b { font-size: 15px; }
 .nr-unit-st { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
@@ -2937,3 +2937,13 @@ button.nr-layout { width: 100%; padding: 0; text-align: left; font: inherit; cur
 body:is([data-page='crm'], [data-page='cabinet'], [data-page='platform']) :is(.card, .btn, .inp, .modal, .kpi, .icon-btn, .seg, .seg button, .tbl-wrap, .drawer, .panel, .userchip, .cab-welcome, .tabs, .toolbar .inp, .eco-card, .util-card, .green-card) { border-radius: 3px; }
 body:is([data-page='crm'], [data-page='cabinet'], [data-page='platform']) h1, body:is([data-page='crm'], [data-page='cabinet'], [data-page='platform']) h2 { font-weight: 500; }
 .modal, .overlay .modal { border-radius: 3px; }
+
+/* Home and catalog replace a static first paint (index.html, apartments.html) with the same markup: no entrance animation,
+   so the picture does not blink. */
+.nr-home.page-in, .nr-cat.page-in { animation: none; }
+.nr-stat.is-wait dd, .nr-stat.is-wait dt { visibility: hidden; }
+
+/* The numbers line of the catalog head keeps its height before the data (no layout shift). */
+.nr-cat-stats { min-height: 62px; }
+/* The energy-class badge: dark text on its tinted background (copper on green was 4.48:1). */
+.eco-badge-link .eco-badge, .nr .eco-badge { color: var(--ink); }

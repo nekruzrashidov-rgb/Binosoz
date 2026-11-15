@@ -221,7 +221,7 @@
         cc.address ? h('li', null, S.icon('pin'), S.brandAddress(cc.address)) : null,
         cc.phone ? h('li', null, S.icon('phone'), h('a', { href: 'tel:' + cc.phone.replace(/[^\d+]/g, '') }, cc.phone)) : null);
       const hero = h('aside', { class: 'lg-hero nr-dark' }, pic, h('div', { class: 'lg-shade', 'aria-hidden': 'true' }), h('span', { class: 'nr-render-note lg-note' }, t('nr.render')),
-        h('div', { class: 'lg-hero-top' }, h('a', { class: 'lg-brand', href: '/', 'aria-label': t('login.toSite') }, S.towerLogo(), h('span', { class: 'brand-word' }, h('b', null, words[0]), words.length > 1 ? h('small', null, words.slice(1).join(' ')) : null)), lang),
+        h('div', { class: 'lg-hero-top' }, h('a', { class: 'lg-brand', href: '/', title: t('login.toSite') }, S.towerLogo(), h('span', { class: 'brand-word' }, h('b', null, words[0]), words.length > 1 ? ' ' : null, words.length > 1 ? h('small', null, words.slice(1).join(' ')) : null)), lang),
         h('div', { class: 'lg-hero-text' }, h('p', { class: 'lg-eyebrow' }, t('login.heroEyebrow')), h('h1', { class: 'lg-name' }, t('login.heroTitle')), h('p', { class: 'lg-sub' }, t('login.heroSub')), facts));
       return h('div', { class: 'lg-split' }, hero, h('main', { class: 'lg-side' }, h('div', { class: 'lg-frame' }, c), demoChips()));
     }

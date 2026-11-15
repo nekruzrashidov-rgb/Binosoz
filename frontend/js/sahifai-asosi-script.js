@@ -147,7 +147,7 @@
 
   function siteFooter() {
     const c = contacts();
-    const col = (title, ...items) => h('div', { class: 'foot-col' }, h('h4', null, title), ...items);
+    const col = (title, ...items) => h('div', { class: 'foot-col' }, h('h3', null, title), ...items);
     return h('footer', { class: 'footer lux-footer' }, h('div', { class: 'wrap' },
       h('div', { class: 'foot-grid' },
         h('div', { class: 'foot-brand' }, h('a', { class: 'row', href: '/', style: { gap: '12px' } }, S.towerLogo(), h('b', null, t('brand.name'))), h('p', null, t('foot.tagline')),
@@ -200,7 +200,7 @@
     page.appendChild(h('section', { class: 'nr-pagehead' }, h('div', { class: 'nr-wrap nr-pagehead-in' },
       h('div', null,
         h('nav', { class: 'nr-crumbs', 'aria-label': t('cat.crumbs') }, h('a', { href: '/' }, t('nav.home')), h('span', { 'aria-hidden': 'true' }, '/'), h('span', { 'aria-current': 'page' }, t('nav.apartments'))),
-        h('h1', { class: 'nr-page-title' }, t('cat.title')), h('p', { class: 'nr-page-sub' }, t('nr.cat.sub')), topStats),
+        (() => { const el = fromShell('catTitle') || h('h1', { class: 'nr-page-title' }); el.textContent = t('cat.title'); return el; })(), h('p', { class: 'nr-page-sub' }, t('nr.cat.sub')), topStats),
       (cc.phone || cc.telegram) ? h('div', { class: 'nr-pagehead-contact' },
         cc.phone ? h('a', { class: 'nr-phone', href: 'tel:+' + phoneDigits(cc.phone) }, landIcon('phone'), cc.phone) : null,
         cc.telegram ? h('a', { class: 'btn nr-btn nr-btn--primary', href: telegramUrl(cc.telegram), target: '_blank', rel: 'noopener' }, landIcon('send'), 'Telegram') : null) : null)));
@@ -554,7 +554,7 @@
     function renderCard(a) {
       const plan = h('canvas', { class: 'nr-unit-plan', width: 320, height: 180, 'aria-hidden': 'true' });
       drawFloorPlan(plan, Math.min(3, a.rooms));
-      return h('button', { class: 'nr-unit-card', type: 'button', onclick: () => { pickApt(a); scrollTo('home'); }, 'aria-label': t('apt.title', { n: a.number }) + ', ' + t('status.' + a.status) },
+      return h('button', { class: 'nr-unit-card', type: 'button', onclick: () => { pickApt(a); scrollTo('home'); } },
         h('span', { class: 'nr-unit-card-pic' }, plan),
         h('span', { class: 'nr-unit-card-body' },
           h('span', { class: 'nr-unit-top' }, h('b', null, t('nr.cat.aptN', { n: a.number })), h('span', { class: 'nr-unit-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status))),
@@ -591,6 +591,14 @@
   function termText(months) {
     return months % 12 === 0 ? counted(months / 12, 'plan.years') : counted(months, 'nr.months');
   }
+  // Elements of the static first paint (index.html, apartments.html), taken while they are still in the page.
+  const SHELL = {
+    heroImg: document.querySelector('[data-shell] ~ #view .nr-hero-media img, #app .nr-hero-media img'),
+    catTitle: document.querySelector('#app .nr-cat .nr-page-title'),
+    heroTitle: document.querySelector('#app .nr-hero-title'),
+    heroSub: document.querySelector('#app .nr-hero-sub'),
+  };
+  const fromShell = (key) => { const el = SHELL[key]; SHELL[key] = null; return el; };
   const kicker = (text) => h('div', { class: 'nr-kicker' }, h('span', { class: 'nr-kicker-line', 'aria-hidden': 'true' }), text);
   const arrow = () => { const s = landIcon('arrow'); s.classList.add('nr-arrow'); return s; };
 
@@ -604,14 +612,16 @@
 
     // 1. Hero: the render of the 3D model on the whole width, the name, two actions and a band of live numbers.
     const heroKicker = h('div', { class: 'nr-kicker nr-kicker--light' });
-    const heroTitle = h('h1', { class: 'nr-hero-title' });
+    const heroTitle = fromShell('heroTitle') || h('h1', { class: 'nr-hero-title' });
+    const heroSub = fromShell('heroSub') || h('p', { class: 'nr-hero-sub' });
+    heroSub.textContent = t('nr.hero.sub');
     const heroStats = h('dl', { class: 'nr-hero-stats', hidden: true });
     const hero = h('section', { class: 'nr-hero nr-dark', id: 'top' },
-      h('figure', { class: 'nr-hero-media' }, renderImg('tower-dusk-wide', '100vw', t('nr.render.alt'), true),
+      h('figure', { class: 'nr-hero-media' }, fromShell('heroImg') || renderImg('tower-dusk-wide', '100vw', t('nr.render.alt'), true),
         h('figcaption', { class: 'nr-render-note' }, t('nr.render'))),
       h('div', { class: 'nr-hero-shade', 'aria-hidden': 'true' }),
       h('div', { class: 'nr-wrap nr-hero-in' },
-        h('div', { class: 'nr-hero-text' }, heroKicker, heroTitle, h('p', { class: 'nr-hero-sub' }, t('nr.hero.sub')),
+        h('div', { class: 'nr-hero-text' }, heroKicker, heroTitle, heroSub,
           h('div', { class: 'nr-actions' },
             h('a', { class: 'btn nr-btn nr-btn--primary', href: '/apartments' }, t('wow.hero.pick'), arrow()),
             h('a', { class: 'btn nr-btn nr-btn--light', href: '/apartments#hero-top' }, t('wow.hero.3d')))),
@@ -689,14 +699,17 @@
         stat(S.fmt.n(free), t('nr.freeNow')),
         year ? stat(String(year), t('nr.yearDone')) : null,
       ].filter(Boolean) : [];
-      heroStats.replaceChildren(...stats);
-      heroStats.hidden = !stats.length;
+      // While loading: four empty cells keep the band's height, so nothing below jumps when the numbers arrive.
+      const wait = d.state === 'loading';
+      heroStats.replaceChildren(...(wait ? [0, 1, 2, 3].map(() => h('div', { class: 'nr-stat is-wait', 'aria-hidden': 'true' }, h('dt', null, ' '), h('dd', null, ' '))) : stats));
+      heroStats.hidden = !wait && !stats.length;
 
       // No building or no apartments: one card instead of the house blocks.
       const none = d.state === 'empty' || d.state === 'error';
       soonHost.hidden = !none;
       soonHost.replaceChildren(none ? soonCard(d.state, () => { d.state = 'loading'; renderData(); load(); }) : '');
-      about.hidden = !b;
+      // Shown while loading too (the render keeps its height): hidden only when there is no building at all.
+      about.hidden = d.state === 'empty' || d.state === 'error';
       aboutText.textContent = (b && b.description) || '';
       aboutText.hidden = !aboutText.textContent;
       amenList.replaceChildren(...((b && b.amenities) || []).map((k) => h('li', null, landIcon(AMEN_ICON[k] || 'check'), h('span', null, t('amen.' + k)))));

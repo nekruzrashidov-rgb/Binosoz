@@ -25,6 +25,9 @@ window.SITORA_CONFIG = {
   // The API must allow the site in Cors:AllowedOrigins (on Render: Cors__AllowedOrigins__0=https://binosoz.vercel.app).
   API_BASE_BY_HOST: { 'binosoz.vercel.app': 'https://binosoz-1.onrender.com/api/v1' },
 };
+// The web fonts are linked with media="print" so they never hold up the first paint (index.html etc.); this first deferred
+// script turns them on. They are preloaded, so they apply at once; until then the fallback fonts show (display=swap).
+document.querySelectorAll('link[data-fonts]').forEach((l) => { l.media = 'all'; });
 (function () {
   const cfg = window.SITORA_CONFIG;
   const api = cfg.API_BASE_BY_HOST[location.hostname];

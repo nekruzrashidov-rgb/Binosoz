@@ -39,15 +39,38 @@ test('320px phone: no horizontal scroll on the public pages', async ({ browser }
 test('home without data: no invented numbers, an honest "sales open soon" block', async ({ page }) => {
   await open(page, '/');
   await expect(page.locator('.soon-block')).toBeVisible();
-  await expect(page.locator('.wow-stats')).toBeHidden();
-  await expect(page.locator('.float-card')).toBeHidden();
+  // No numbers, layouts, installment or «about» block without the API; the hero picture is signed as a render.
+  await expect(page.locator('.nr-hero-stats')).toBeHidden();
+  await expect(page.locator('#layouts')).toBeHidden();
+  await expect(page.locator('#installment')).toBeHidden();
+  await expect(page.locator('#about')).toBeHidden();
+  await expect(page.locator('.nr-hero .nr-render-note')).toHaveText('Визуализация 3D-модели');
   await expect(page.locator('h1')).toHaveText('Некруз Резиденс');
+});
+
+// Claims that are not in the data must not come back on any public page (the redesign removed them).
+const INVENTED = ['бизнес-класса', 'Элитный', '10 лет на рынке', '5 минут от', 'Ключи в срок', 'Штрафные санкции', 'Охрана 24/7',
+  'Бассейн на крыше', 'Otis', 'в течение 15 минут', 'за 15 минут', 'Варзоб', 'Руководитель проекта', '[Имя'];
+test('no invented claims on the public pages (without data)', async ({ page }) => {
+  for (const url of ['/', '/apartments', '/about', '/gallery', '/contact', '/login', '/register']) {
+    await open(page, url);
+    const text = await page.evaluate(() => document.body.innerText + ' ' + document.title + ' ' + (document.querySelector('meta[name=description]') || {}).content);
+    for (const phrase of INVENTED) expect(text, url + ': «' + phrase + '»').not.toContain(phrase);
+  }
+});
+
+test('about without data: no amenities, no construction progress, no team', async ({ page }) => {
+  await open(page, '/about');
+  await expect(page.locator('#amenities')).toBeHidden();
+  await expect(page.locator('#timeline')).toBeHidden();
+  await expect(page.locator('#team')).toHaveCount(0);
 });
 
 test('catalog without data: one empty card, no 3D stage', async ({ page }) => {
   await open(page, '/apartments');
   await expect(page.locator('.soon-block')).toHaveCount(1);
   await expect(page.locator('#hero-top')).toBeHidden();
+  await expect(page.locator('#calc')).toBeHidden();
   expect(await page.evaluate(() => !!window.THREE)).toBe(false);
 });
 

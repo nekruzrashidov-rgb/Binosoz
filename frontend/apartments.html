@@ -22,11 +22,20 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" media="print" data-fonts>
 <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body data-page="apartments">
-<div id="app"></div>
+<div id="app"><!-- First paint before the scripts (the same page head S.views.apartments draws); replaced by the scripts. -->
+<header class="top lux-top" data-shell>
+<div class="wrap top-in"><a class="brand" href="/"><svg viewBox="0 0 34 34" width="34" height="34" aria-hidden="true" class="tower-logo"><rect x="9" y="6" width="16" height="26" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M13 11h8M13 16h8M13 21h8M13 26h8" stroke="var(--accent-text)" stroke-width="1.4"/><path d="M17 2v4" stroke="currentColor" stroke-width="1.6"/></svg><span class="brand-word"><b>Некруз</b> <small>Резиденс</small></span></a>
+<nav class="nav lux-nav" aria-label="Главное меню"><a href="/">Главная</a><a href="/apartments" class="on" aria-current="page">Квартиры</a><a href="/gallery">Галерея</a><a href="/about">О проекте</a><a href="/contact">Контакты</a></nav>
+<span class="spacer"></span><a class="top-phone desk-only" href="tel:+992983637070">+992 98 363 70 70</a><a class="btn sm gold" href="/login">Войти</a></div>
+</header>
+<div id="view"><div class="nr nr-cat"><section class="nr-pagehead"><div class="nr-wrap nr-pagehead-in"><div>
+<nav class="nr-crumbs" aria-label="Навигация"><a href="/">Главная</a><span aria-hidden="true">/</span><span aria-current="page">Квартиры</span></nav>
+<h1 class="nr-page-title">Каталог квартир</h1>
+<p class="nr-page-sub">Выберите этаж на 3D-модели дома, посмотрите планировку и забронируйте квартиру онлайн.</p><dl class="nr-cat-stats"></dl></div><div class="nr-pagehead-contact"><a class="nr-phone" href="tel:+992983637070"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3.5h3l1.5 4.5-2 1.5a11 11 0 0 0 5 5l1.5-2 4.5 1.5v3A2 2 0 0 1 17 21 15 15 0 0 1 3 5.5a2 2 0 0 1 2-2z"/></svg>+992 98 363 70 70</a><a class="btn nr-btn nr-btn--primary" href="https://t.me/nekru01" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.5 3-19 7.5 7 2.5 2.5 7z"/><path d="m9.5 13 5-5"/></svg>Telegram</a></div></div></section></div></div></div>
 <!-- Three.js and the 3D model (modeli-3d-bino-script.js) are loaded by sahifai-asosi-script.js only when the catalog has a building to show. -->
 <script src="/js/tanzimot-api-url.js" defer></script>
 <script src="/js/pwa-sabt.js" defer></script>
