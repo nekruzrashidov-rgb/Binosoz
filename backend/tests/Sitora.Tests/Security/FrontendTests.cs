@@ -33,6 +33,26 @@ public class FrontendTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFa
         Assert.Contains("connect-src 'self'", policy);
     }
 
+    [Fact]
+    public async Task StaticFiles_AreCompressed_ApiJson_IsNot()
+    {
+        var client = factory.CreateClient();
+        foreach (var path in new[] { "/css/styles.css", "/js/routing-va-navigatsiya.js" })
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, path);
+            request.Headers.AcceptEncoding.ParseAdd("gzip");
+            var response = await client.SendAsync(request);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Contains("gzip", response.Content.Headers.ContentEncoding);
+        }
+        // JSON of the API is never compressed (no BREACH-style leaks of data behind a login).
+        using var api = new HttpRequestMessage(HttpMethod.Get, "/api/v1/buildings?organization=nekruz");
+        api.Headers.AcceptEncoding.ParseAdd("gzip");
+        var json = await client.SendAsync(api);
+        Assert.Equal(HttpStatusCode.OK, json.StatusCode);
+        Assert.Empty(json.Content.Headers.ContentEncoding);
+    }
+
     [Theory]
     [InlineData("/js/routing-va-navigatsiya.js")]
     [InlineData("/css/styles.css")]

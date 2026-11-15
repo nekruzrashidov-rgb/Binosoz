@@ -56,6 +56,17 @@ builder.Services.AddSerilog((services, logger) =>
 
 builder.Services.AddInfrastructure();
 builder.Services.AddHttpContextAccessor();
+// Сжатие только статики сайта (CSS, JS, HTML, SVG): ответы API (JSON) не сжимаются — так нет риска BREACH для данных со
+// входом. Уровень Fastest: сжатие на лету не должно тормозить ответ.
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<Microsoft.AspNetCore.ResponseCompression.BrotliCompressionProvider>();
+    options.Providers.Add<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProvider>();
+    options.MimeTypes = ["text/css", "text/javascript", "application/javascript", "text/html", "image/svg+xml", "application/manifest+json"];
+});
+builder.Services.Configure<Microsoft.AspNetCore.ResponseCompression.BrotliCompressionProviderOptions>(o => o.Level = System.IO.Compression.CompressionLevel.Fastest);
+builder.Services.Configure<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProviderOptions>(o => o.Level = System.IO.Compression.CompressionLevel.Fastest);
 builder.Services.AddScoped<HubCaller>();
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 builder.Services.AddSignalR();
@@ -241,7 +252,10 @@ if (app.Environment.IsProduction())
 // Скрипты, стили и иконка сайта — до локализации, CORS и авторизации: им они не нужны.
 var hasFrontend = app.HasFrontend();
 if (hasFrontend)
+{
+    app.UseResponseCompression();
     app.UseStaticFiles();
+}
 
 app.UseRequestLocalization(options => options
     .SetDefaultCulture("ru")
