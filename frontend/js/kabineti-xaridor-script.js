@@ -1,4 +1,4 @@
-/* Login by a code from e-mail (everyone), staff invitations and the buyer cabinet. */
+/* Login (buyers: e-mail + own 6-digit code; staff: password), staff invitations and the buyer cabinet. */
 (function () {
   const S = (window.S = window.S || {});
   const h = (...a) => S.h(...a);
@@ -30,10 +30,84 @@
     return { field, input };
   }
 
-  // Two tabs: staff sign in with e-mail and password (then a 2FA code if it is on), buyers with a code by e-mail or SMS.
-  // GET /auth/methods says which codes really reach people: the «По почте / По телефону» switch appears only when SMS
-  // really work (sms: true); until the answer comes, and without an SMS provider, there is only e-mail — no flicker.
-  // /login#reset=<token> from the "forgot password" letter opens the new-password form.
+  // The same rules as the server (PinRules): 6 digits, not all the same, not consecutive (123456, 654321, 012345…).
+  // Returns the i18n key of the problem or ''.
+  S.pinProblem = (v) => {
+    if (!/^\d{6}$/.test(v || '')) return 'pin.need6';
+    if (/^(\d)\1{5}$/.test(v)) return 'pin.weakSame';
+    const step = (d) => [...v].every((c, i) => !i || c.charCodeAt(0) - v.charCodeAt(i - 1) === d);
+    return step(1) || step(-1) ? 'pin.weakSeq' : '';
+  };
+
+  // Six cells for a 6-digit code: digits only, a typed digit moves to the next cell, Backspace in an empty cell goes back,
+  // pasting (or the phone's autofill of) 6 digits fills them all. secret — the buyer's own code: hidden, with
+  // a «Показать код» button; otherwise the code from the e-mail. Returns { field, value(), clear(), focus() }.
+  S.pinCells = function (name, label, o) {
+    o = o || {};
+    const id = 'f-' + name + '-' + Math.random().toString(36).slice(2, 6);
+    const cells = Array.from({ length: 6 }, (_, i) => h('input', {
+      class: 'pin-cell', id: i ? id + '-' + i : id, type: o.secret ? 'password' : 'text', inputmode: 'numeric', pattern: '[0-9]*',
+      autocomplete: i ? 'off' : o.autocomplete || 'off', 'aria-label': t('pin.digit', { n: i + 1 }), 'data-pin': name, enterkeyhint: i === 5 ? 'done' : 'next',
+    }));
+    const value = () => cells.map((c) => c.value).join('');
+    const changed = () => {
+      const v = value();
+      if (o.onChange) o.onChange(v);
+      if (v.length === 6 && o.onComplete) o.onComplete(v);
+    };
+    const fill = (from, digits) => {
+      let i = from;
+      for (const d of digits) { if (i > 5) break; cells[i].value = d; i++; }
+      cells[Math.min(i, 5)].focus();
+      changed();
+    };
+    cells.forEach((c, i) => {
+      c.addEventListener('input', () => {
+        const d = c.value.replace(/\D/g, '');
+        if (d.length > 1) { c.value = ''; fill(d.length >= 6 ? 0 : i, d.slice(0, 6)); return; }
+        c.value = d;
+        if (d && i < 5) cells[i + 1].focus();
+        changed();
+      });
+      c.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && !c.value && i > 0) { e.preventDefault(); cells[i - 1].value = ''; cells[i - 1].focus(); changed(); }
+        else if (e.key === 'ArrowLeft' && i > 0) { e.preventDefault(); cells[i - 1].focus(); }
+        else if (e.key === 'ArrowRight' && i < 5) { e.preventDefault(); cells[i + 1].focus(); }
+        else if (e.key.length === 1 && !/\d/.test(e.key) && !e.ctrlKey && !e.metaKey) e.preventDefault();
+      });
+      c.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const d = ((e.clipboardData || window.clipboardData).getData('text') || '').replace(/\D/g, '');
+        if (d) fill(d.length >= 6 ? 0 : i, d.slice(0, 6));
+      });
+      c.addEventListener('focus', () => c.select());
+    });
+    const row = h('div', { class: 'pin-cells', role: 'group', 'aria-label': label }, cells);
+    let eye = null;
+    if (o.secret) {
+      eye = h('button', { type: 'button', class: 'pin-eye', 'aria-pressed': 'false' }, t('pin.show'));
+      eye.addEventListener('click', () => {
+        const show = cells[0].type === 'password';
+        cells.forEach((c) => { c.type = show ? 'text' : 'password'; });
+        eye.setAttribute('aria-pressed', String(show)); eye.textContent = t(show ? 'pin.hide' : 'pin.show');
+      });
+    }
+    const hint = h('div', { class: 'hint pin-hint', 'aria-live': 'polite' }, o.hint || '');
+    const field = h('div', { class: 'field pin-field', dataset: { name } },
+      h('div', { class: 'pin-head' }, h('label', { for: id }, label), eye), row, hint, h('div', { class: 'ferr' }));
+    return {
+      field, cells, value,
+      hint: (text, bad) => { hint.textContent = text || o.hint || ''; hint.classList.toggle('bad', !!bad); },
+      clear: () => { cells.forEach((c) => { c.value = ''; }); changed(); },
+      focus: () => (cells.find((c) => !c.value) || cells[5]).focus(),
+    };
+  };
+
+  // Two tabs: staff sign in with e-mail and password (then a 2FA code if it is on), buyers with their e-mail and own
+  // 6-digit code. A new buyer registers (name, e-mail, phone, the code twice) and confirms the e-mail with a code
+  // from a letter; «Забыли код?» sends such a code too, then the buyer sets a new code. GET /auth/methods: the
+  // «По почте / По телефону» switch appears only when SMS really work, «Войти как демо-покупатель» — with demo: true.
+  // /login#reset=<token> from the staff "forgot password" letter opens the new-password form.
   S.views.login = function (root) {
     const card = h('div', { class: 'card login-card login' });
     // /login gets the split page (the building and the form); the cabinet's own fallback keeps the plain card.
@@ -43,8 +117,10 @@
     // Buyers sign in far more often than staff: their tab is the default; the last choice is remembered.
     let who = resetToken || S.store.get('sitora.loginAs') === 'staff' ? 'staff' : 'buyer';
     let step = resetToken ? 'reset' : who, emailVal = '', timer = 0, tick = null, challenge = null, notice = '';
+    // The buyer's registration (kept for «Изменить почту»), the code from the e-mail for «Забыли код?», the last sign-in error.
+    let reg = { first: '', last: '', phone: '+992', pin: '' }, resetCode = '', pinError = null;
     const isEmail = (v) => /^\S+@\S+\.\S+$/.test(v);
-    // How a buyer gets the code: 'email' or 'phone' (remembered); methods — { email, sms } from the server.
+    // How a buyer signs in: 'email' (own code) or 'phone' (SMS, only when the server has it on); methods — from the server.
     let by = S.store.get('sitora.loginBy') === 'phone' ? 'phone' : 'email', phoneVal = '+992', methods = null;
     const smsOn = () => !!methods && !!methods.sms;
     const DEMO_BUYER = 'demo-buyer@binosoz.tj';
@@ -52,7 +128,7 @@
       methods = m || null;
       if ((smsOn() || (methods && methods.demo)) && step === 'buyer') draw();
     }).catch(() => {});
-    // Server codes for «the code cannot be delivered» → a clear text in the page language.
+    // Server codes → a clear text in the page language.
     const humanError = (er) => {
       if (er && er.code === 'email_not_configured') er.message = t('login.emailOff');
       if (er && er.code === 'sms_not_configured') er.message = t('login.smsOff');
@@ -62,10 +138,11 @@
     const tabs = () => h('div', { class: 'login-tabs', role: 'tablist', 'aria-label': t('login.as') }, [['buyer', 'login.buyer'], ['staff', 'login.staff']].map(([k, key]) =>
       h('button', { type: 'button', role: 'tab', class: who === k ? 'on' : '', 'aria-selected': String(who === k), onclick: () => {
         if (who === k && step === k) return;
-        who = k; S.store.set('sitora.loginAs', k); step = k; notice = ''; clearInterval(tick); draw();
+        who = k; S.store.set('sitora.loginAs', k); step = k; notice = ''; pinError = null; clearInterval(tick); draw();
       } }, t(key))));
-    const link = (label, onclick) => h('button', { class: 'btn ghost sm', type: 'button', onclick }, label);
-    // «По почте» / «По телефону» on the buyer's tab; the phone option is marked when SMS cannot be sent.
+    const link = (label, onclick, cls) => h('button', { class: 'btn ghost sm' + (cls ? ' ' + cls : ''), type: 'button', onclick }, label);
+    const go = (next, o) => { o = o || {}; notice = o.notice || ''; pinError = null; if (o.stopTick) clearInterval(tick); step = next; draw(); };
+    // «По почте» / «По телефону» on the buyer's tab — only when SMS really work.
     const byToggle = () => !smsOn() ? null : h('div', { class: 'seg login-by', role: 'group', 'aria-label': t('login.howTo') }, [['email', 'login.byEmail'], ['phone', 'login.byPhone']].map(([k, key]) =>
       h('button', { type: 'button', class: by === k ? 'on' : '', 'aria-pressed': String(by === k), onclick: () => {
         if (by === k) return;
@@ -83,9 +160,25 @@
       }, 1000);
     };
     const byPhoneNow = () => by === 'phone' && smsOn();
-    const send = async () => { await (byPhoneNow() ? S.api.smsSend(phoneVal) : S.api.emailSend(emailVal)); startTick(); };
-
+    // «Отправить ещё раз» under a code: what it sends depends on the screen (SMS, registration, «Забыли код?»).
+    const resendButton = (send) => h('button', { class: 'btn ghost sm', type: 'button', 'data-resend': '', disabled: timer > 0, onclick: async () => {
+      try { await send(); startTick(); S.toast(t('login.sent'), 'ok'); } catch (er) { S.err(humanError(er)); }
+    } }, timer > 0 ? t('login.resendIn', { s: timer }) : t('login.resend'));
     const codeInput = (name) => S.input(name, { inputmode: 'numeric', maxlength: 6, placeholder: '••••••', autocomplete: 'one-time-code', style: { letterSpacing: '.4em', fontSize: '20px', textAlign: 'center', fontWeight: 800 } });
+    // A new code twice with the weakness shown before sending; returns { fields, check() → the code or null }.
+    const newPinPair = (form) => {
+      const second = S.pinCells('pinRepeat', t('pin.repeat'), { secret: true, autocomplete: 'new-password' });
+      const first = S.pinCells('pin', t('pin.new'), { secret: true, autocomplete: 'new-password', hint: t('pin.rules'),
+        onChange: (v) => { const p = v.length === 6 ? S.pinProblem(v) : ''; first.hint(p ? t(p) : '', !!p); },
+        onComplete: (v) => { if (!S.pinProblem(v)) second.focus(); } });
+      const check = () => {
+        const a = first.value(), b = second.value(), p = S.pinProblem(a);
+        if (p) { S.showErrors(form, { message: t(p), errors: { pin: [t(p)] } }); first.focus(); return null; }
+        if (a !== b) { S.showErrors(form, { message: t('pin.mismatch'), errors: { pinRepeat: [t('pin.mismatch')] } }); second.clear(); second.focus(); return null; }
+        return a;
+      };
+      return { first, second, check };
+    };
 
     function draw() {
       const form = h('form', { class: 'stack', novalidate: true });
@@ -96,17 +189,17 @@
         const email = S.input('email', { type: 'email', value: emailVal, placeholder: 'name@mail.tj', autocomplete: 'username', inputmode: 'email' });
         const pass = passwordField(t('login.password'), 'password', 'current-password');
         form.append(h('h2', null, t('login.staffTitle')), h('p', { class: 'muted' }, t('login.staffHint')), info, S.field(t('login.email'), email), pass.field, btn,
-          h('p', { style: { textAlign: 'center', margin: 0 } }, link(t('login.forgot'), () => { emailVal = email.value.trim(); notice = ''; step = 'forgot'; draw(); })));
+          h('p', { style: { textAlign: 'center', margin: 0 } }, link(t('login.forgot'), () => { emailVal = email.value.trim(); go('forgot'); })));
         submit = async () => {
           emailVal = email.value.trim();
           if (!isEmail(emailVal)) { badEmail(form); return; }
           try {
             const r = await S.api.passwordLogin(emailVal, pass.input.value);
-            if (r.challenge) { challenge = r.challenge; notice = ''; step = '2fa'; draw(); return; }
+            if (r.challenge) { challenge = r.challenge; go('2fa'); return; }
             enter(r);
           } catch (er) {
-            // A buyer's address: they sign in with a code — open that tab with the address already filled in.
-            if (er.status === 400 && who === 'staff') { who = 'buyer'; S.store.set('sitora.loginAs', 'buyer'); step = 'buyer'; notice = t('login.useCode'); draw(); return; }
+            // A buyer's address: they sign in with their own code — open that tab with the address already filled in.
+            if (er.status === 400 && who === 'staff') { who = 'buyer'; S.store.set('sitora.loginAs', 'buyer'); go('buyer', { notice: t('login.useCode') }); return; }
             throw er;
           }
         };
@@ -114,14 +207,14 @@
       } else if (step === '2fa') {
         const code = codeInput('code');
         form.append(h('h2', null, t('login.twoFaTitle')), h('p', { class: 'muted' }, t('login.twoFaSub')), S.field(t('login.twoFaLabel'), code), btn,
-          link(t('login.again'), () => { challenge = null; step = 'staff'; draw(); }));
+          link(t('login.again'), () => { challenge = null; go('staff'); }));
         submit = async () => enter(await S.api.twoFactorVerify(challenge.token, code.value.replace(/\s/g, '')));
         focus = code;
       } else if (step === 'forgot') {
         const email = S.input('email', { type: 'email', value: emailVal, placeholder: 'name@mail.tj', autocomplete: 'email', inputmode: 'email' });
         btn.textContent = t('login.forgotSend');
         form.append(h('h2', null, t('login.forgotTitle')), h('p', { class: 'muted' }, t('login.forgotSub')), info, S.field(t('login.email'), email), btn,
-          link(t('login.forgotBack'), () => { notice = ''; step = 'staff'; draw(); }));
+          link(t('login.forgotBack'), () => go('staff')));
         submit = async () => {
           emailVal = email.value.trim();
           if (!isEmail(emailVal)) { badEmail(form); return; }
@@ -134,21 +227,20 @@
         const again = passwordField(t('login.repeatPassword'), 'repeat', 'new-password');
         btn.textContent = t('login.resetSave');
         form.append(h('h2', null, t('login.resetTitle')), pass.field, again.field, btn,
-          link(t('login.forgotBack'), () => { history.replaceState(null, '', location.pathname); step = 'staff'; draw(); }));
+          link(t('login.forgotBack'), () => { history.replaceState(null, '', location.pathname); go('staff'); }));
         submit = async () => {
           if (pass.input.value !== again.input.value) { S.showErrors(form, { message: t('login.mismatch'), errors: { repeat: [t('login.mismatch')] } }); return; }
           await S.api.passwordReset(resetToken, pass.input.value);
           history.replaceState(null, '', location.pathname);
-          notice = t('login.resetDone'); step = 'staff'; draw();
+          go('staff', { notice: t('login.resetDone') });
         };
         focus = pass.input;
       } else if (step === 'demo') {
         // Demo buyer for the jury (only when GET /auth/methods says demo: true): the password is given by the presenter.
         const email = S.input('email', { type: 'email', value: DEMO_BUYER, readonly: true, autocomplete: 'username' });
         const pass = passwordField(t('login.password'), 'password', 'current-password');
-        btn.textContent = t('login.enter');
         form.append(h('h2', null, t('demo.loginTitle')), h('p', { class: 'muted' }, t('demo.loginHint')), S.field(t('login.email'), email), pass.field, btn,
-          link(t('login.forgotBack'), () => { step = 'buyer'; draw(); }));
+          link(t('login.forgotBack'), () => go('buyer')));
         submit = async () => enter(await S.api.passwordLogin(DEMO_BUYER, pass.input.value));
         focus = pass.input;
       } else if (step === 'buyer' && byPhoneNow()) {
@@ -157,54 +249,126 @@
         form.append(h('h2', null, t('login.buyerTitle')), byToggle(), h('p', { class: 'muted' }, t('login.hintPhone')), info, S.field(t('f.phone'), phone, t('f.phoneHint')), btn);
         submit = async () => {
           phoneVal = phone.value.replace(/[\s()-]/g, '');
-          await send(); notice = ''; step = 'code'; draw();
+          await S.api.smsSend(phoneVal); startTick(); go('code');
         };
         focus = phone;
       } else if (step === 'buyer') {
+        // E-mail and the buyer's own 6-digit code. A wrong code shows the attempts left and highlights «Забыли код?».
+        const email = S.input('email', { type: 'email', value: emailVal, placeholder: 'name@mail.tj', autocomplete: 'username', inputmode: 'email' });
+        const pin = S.pinCells('pin', t('pin.label'), { secret: true, autocomplete: 'current-password' });
+        const forgot = link(t('pin.forgot'), () => { emailVal = email.value.trim(); go('pinForgot'); }, 'pin-forgot' + (pinError ? ' hot' : ''));
+        const problem = pinError ? h('div', { class: 'pin-problem', role: 'alert' }, pinError.text, pinError.resend
+          ? h('div', null, link(t('pin.resendConfirm'), async () => {
+            try { await S.api.customerResend(emailVal); startTick(); go('confirm'); } catch (er) { S.err(humanError(er)); }
+          })) : null) : null;
+        form.append(h('h2', null, t('login.buyerTitle')), byToggle(), h('p', { class: 'muted' }, t('login.hintBuyer')), info, problem,
+          S.field(t('login.email'), email), pin.field, btn,
+          h('div', { class: 'row between pin-links' }, forgot, link(t('pin.register'), () => { emailVal = email.value.trim(); go('register'); })));
+        submit = async () => {
+          emailVal = email.value.trim();
+          pinError = null;
+          if (!isEmail(emailVal)) { badEmail(form); return; }
+          if (!/^\d{6}$/.test(pin.value())) { S.showErrors(form, { message: t('pin.need6'), errors: { pin: [t('pin.need6')] } }); pin.focus(); return; }
+          try {
+            enter(await S.api.customerLogin(emailVal, pin.value()));
+          } catch (er) {
+            const d = er.data || {};
+            if (er.code === 'invalid_pin') pinError = { text: t('pin.wrong', { n: d.attemptsLeft !== undefined ? d.attemptsLeft : '…' }) };
+            else if (er.code === 'pin_locked') pinError = { text: t('pin.locked', { m: Math.max(1, Math.ceil((d.retryAfterSeconds || 900) / 60)) }) };
+            else if (er.code === 'email_not_confirmed') pinError = { text: t('pin.notConfirmed'), resend: true };
+            // Created by a manager: no code yet — «Забыли код?» is how the first code is set.
+            else if (er.code === 'pin_not_set') { go('pinForgot', { notice: t('pin.notSet') }); return; }
+            else throw er;
+            draw();
+          }
+        };
+        focus = emailVal ? pin : email;
+      } else if (step === 'register') {
+        const first = S.input('firstName', { autocomplete: 'given-name', value: reg.first });
+        const last = S.input('lastName', { autocomplete: 'family-name', value: reg.last });
         const email = S.input('email', { type: 'email', value: emailVal, placeholder: 'name@mail.tj', autocomplete: 'email', inputmode: 'email' });
-        btn.textContent = t('login.sendCode');
-        // The server answers the same for known and unknown addresses, so registration is offered as a link, not detected.
-        form.append(h('h2', null, t('login.buyerTitle')), byToggle(), h('p', { class: 'muted' }, t('login.hintBuyer')), info, S.field(t('login.email'), email), btn,
-          h('p', { class: 'muted', style: { textAlign: 'center', margin: 0 } }, t('reg.ask'), ' ', link(t('reg.link'), () => { emailVal = email.value.trim(); notice = ''; step = 'register'; draw(); })));
+        const phone = S.input('phone', { type: 'tel', value: reg.phone, autocomplete: 'tel' });
+        const pins = newPinPair(form);
+        btn.textContent = t('pin.continue');
+        form.append(h('h2', null, t('reg.title')), h('p', { class: 'muted' }, t('reg.sub')), S.field(t('reg.firstName'), first), S.field(t('reg.lastName'), last),
+          S.field(t('login.email'), email), S.field(t('f.phone'), phone, t('f.phoneHint')), pins.first.field, pins.second.field, btn, S.privacyNote(),
+          link(t('reg.haveAccount'), () => go('buyer')));
+        submit = async () => {
+          emailVal = email.value.trim();
+          reg = { first: first.value.trim(), last: last.value.trim(), phone: phone.value.replace(/[\s()-]/g, ''), pin: '' };
+          if (!reg.first || !reg.last) { S.showErrors(form, { message: t('reg.nameRequired'), errors: Object.assign({}, reg.first ? {} : { firstName: [t('reg.nameRequired')] }, reg.last ? {} : { lastName: [t('reg.nameRequired')] }) }); return; }
+          if (!isEmail(emailVal)) { badEmail(form); return; }
+          const code = pins.check();
+          if (!code) return;
+          reg.pin = code;
+          await S.api.customerRegister({ name: reg.first + ' ' + reg.last, email: emailVal, phone: reg.phone, pin: code });
+          startTick(); go('confirm');
+        };
+        focus = reg.first ? email : first;
+      } else if (step === 'confirm') {
+        // «Мы отправили код на …»: 6 cells for the code from the letter; complete — sent at once.
+        const code = S.pinCells('code', t('pin.otp'), { autocomplete: 'one-time-code', hint: t('login.codeHint'), onComplete: () => form.requestSubmit() });
+        btn.textContent = t('pin.confirm');
+        form.append(h('h2', null, t('pin.confirmTitle')), h('p', { class: 'muted' }, t('pin.confirmSub', { p: emailVal })), info, code.field, btn,
+          h('div', { class: 'row between pin-links' }, link(t('pin.changeEmail'), () => go('register', { stopTick: true })), resendButton(() => S.api.customerResend(emailVal))));
+        submit = async () => {
+          if (!/^\d{6}$/.test(code.value())) { S.showErrors(form, { message: t('pin.need6'), errors: { code: [t('pin.need6')] } }); code.focus(); return; }
+          try { enter(await S.api.customerConfirm(emailVal, code.value())); } catch (er) { code.clear(); code.focus(); throw er; }
+        };
+        focus = code;
+      } else if (step === 'pinForgot') {
+        const email = S.input('email', { type: 'email', value: emailVal, placeholder: 'name@mail.tj', autocomplete: 'email', inputmode: 'email' });
+        btn.textContent = t('pin.forgotSend');
+        form.append(h('h2', null, t('pin.forgotTitle')), h('p', { class: 'muted' }, t('pin.forgotSub')), info, S.field(t('login.email'), email), btn,
+          link(t('login.forgotBack'), () => go('buyer')));
         submit = async () => {
           emailVal = email.value.trim();
           if (!isEmail(emailVal)) { badEmail(form); return; }
-          await send(); notice = ''; step = 'code'; draw();
+          await S.api.pinResetRequest(emailVal);
+          resetCode = ''; startTick(); go('pinCode');
         };
         focus = email;
-      } else if (step === 'register') {
-        const first = S.input('firstName', { autocomplete: 'given-name' });
-        const last = S.input('lastName', { autocomplete: 'family-name' });
-        const email = S.input('email', { type: 'email', value: emailVal, placeholder: 'name@mail.tj', autocomplete: 'email', inputmode: 'email' });
-        const phone = S.input('phone', { type: 'tel', value: '+992', autocomplete: 'tel' });
-        btn.textContent = t('login.sendCode');
-        form.append(h('h2', null, t('reg.title')), h('p', { class: 'muted' }, t('reg.sub')), S.field(t('reg.firstName'), first), S.field(t('reg.lastName'), last),
-          S.field(t('login.email'), email), S.field(t('f.phone'), phone, t('f.phoneHint')), btn, S.privacyNote(),
-          link(t('reg.haveAccount'), () => { step = 'buyer'; draw(); }));
+      } else if (step === 'pinCode') {
+        const code = S.pinCells('code', t('pin.otp'), { autocomplete: 'one-time-code', hint: t('login.codeHint'), onComplete: () => form.requestSubmit() });
+        btn.textContent = t('pin.next');
+        form.append(h('h2', null, t('pin.codeTitle')), h('p', { class: 'muted' }, t('pin.codeSub', { p: emailVal })), info, code.field, btn,
+          h('div', { class: 'row between pin-links' }, link(t('pin.changeEmail'), () => go('pinForgot', { stopTick: true })), resendButton(() => S.api.pinResetRequest(emailVal))));
+        // The server checks the code together with the new sign-in code (next screen).
         submit = async () => {
-          emailVal = email.value.trim();
-          if (!first.value.trim() || !last.value.trim()) { S.showErrors(form, { message: t('reg.nameRequired'), errors: Object.assign({}, first.value.trim() ? {} : { firstName: [t('reg.nameRequired')] }, last.value.trim() ? {} : { lastName: [t('reg.nameRequired')] }) }); return; }
-          if (!isEmail(emailVal)) { badEmail(form); return; }
-          await S.api.register({ email: emailVal, firstName: first.value.trim(), lastName: last.value.trim(), phone: phone.value.replace(/[\s()-]/g, '') });
-          startTick(); step = 'code'; draw();
+          if (!/^\d{6}$/.test(code.value())) { S.showErrors(form, { message: t('pin.need6'), errors: { code: [t('pin.need6')] } }); code.focus(); return; }
+          resetCode = code.value(); go('pinNew');
         };
-        focus = first;
+        focus = code;
+      } else if (step === 'pinNew') {
+        const pins = newPinPair(form);
+        btn.textContent = t('pin.save');
+        form.append(h('h2', null, t('pin.newTitle')), h('p', { class: 'muted' }, t('pin.newSub')), pins.first.field, pins.second.field, btn,
+          link(t('login.forgotBack'), () => go('buyer', { stopTick: true })));
+        submit = async () => {
+          const code = pins.check();
+          if (!code) return;
+          try {
+            const r = await S.api.pinReset(emailVal, resetCode, code);
+            S.toast(t('pin.saved'), 'ok'); enter(r);
+          } catch (er) {
+            // A wrong or expired code from the letter: back to it, with the server's text.
+            if (er.code === 'invalid_code') { notice = ''; step = 'pinCode'; draw(); S.showErrors(S.$('form', card), humanError(er)); return; }
+            throw er;
+          }
+        };
+        focus = pins.first;
       } else {
+        // The SMS code (only when the server has SMS sign-in on).
         const code = codeInput('code');
-        const resend = h('button', { class: 'btn ghost sm', type: 'button', 'data-resend': '', disabled: timer > 0, onclick: async () => { try { await send(); S.toast(t('login.sent'), 'ok'); } catch (er) { S.err(humanError(er)); } } }, timer > 0 ? t('login.resendIn', { s: timer }) : t('login.resend'));
-        const byPhone = byPhoneNow();
-        form.append(h('h2', null, t('login.codeTitle')), h('p', { class: 'muted' }, byPhone ? t('login.codeSubPhone', { p: phoneVal }) : t('login.codeSub', { p: emailVal })), S.field(t('login.code'), code, t('login.codeHint')), btn,
-          h('div', { class: 'row between' }, link(t(byPhone ? 'login.changePhone' : 'login.changeEmail'), () => { step = 'buyer'; clearInterval(tick); draw(); }), resend));
-        submit = async () => {
-          const value = code.value.replace(/\s/g, '');
-          enter(await (byPhone ? S.api.smsVerify(phoneVal, value) : S.api.emailVerify(emailVal, value)));
-        };
+        form.append(h('h2', null, t('login.codeTitle')), h('p', { class: 'muted' }, t('login.codeSubPhone', { p: phoneVal })), S.field(t('login.code'), code, t('login.codeHint')), btn,
+          h('div', { class: 'row between' }, link(t('login.changePhone'), () => go('buyer', { stopTick: true })), resendButton(() => S.api.smsSend(phoneVal))));
+        submit = async () => enter(await S.api.smsVerify(phoneVal, code.value.replace(/\s/g, '')));
         focus = code;
       }
       form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await submit(); } catch (er) { S.showErrors(form, humanError(er)); } }); });
-      // Tabs only on the first screens; the code, 2FA and password-reset steps keep their own "back" link.
+      // Tabs only on the first screens; the code, 2FA and reset steps keep their own "back" link.
       // «Войти как демо-покупатель» under the buyer's form — only when the server has the demo login on.
-      if (step === 'buyer' && methods && methods.demo) form.append(h('button', { class: 'btn ghost block demo-login', type: 'button', onclick: () => { step = 'demo'; notice = ''; draw(); } }, t('demo.loginButton')));
+      if (step === 'buyer' && methods && methods.demo) form.append(h('button', { class: 'btn ghost block demo-login', type: 'button', onclick: () => go('demo') }, t('demo.loginButton')));
       card.replaceChildren(step === 'staff' || step === 'buyer' || step === 'register' ? tabs() : null, form);
       setTimeout(() => focus && focus.focus(), 30);
     }
@@ -227,11 +391,11 @@
     }
 
     // Development only (this computer): the seeded accounts as chips that fill the form. No passwords here:
-    // the buyer's code in development is 123456, the super admin's password is in user-secrets.
+    // the code from a letter in development is 123456 («Забыли код?» sets the buyer's code), the super admin's password is in user-secrets.
     function demoChips() {
       if (!/^(localhost|127.0.0.1|[::1])$|.localhost$/.test(location.hostname)) return null;
       const chip = (tab, email, key) => h('button', { type: 'button', class: 'lg-chip', onclick: () => {
-        who = tab; S.store.set('sitora.loginAs', tab); step = tab; emailVal = email; notice = ''; clearInterval(tick); draw();
+        who = tab; S.store.set('sitora.loginAs', tab); emailVal = email; go(tab, { stopTick: true });
       } }, h('b', null, t(key)), h('span', null, email));
       return h('div', { class: 'lg-demo' }, h('p', null, t('login.demo')),
         h('div', { class: 'lg-chips' }, chip('buyer', 'client1@example.com', 'login.demoBuyer'), chip('staff', 'superadmin@binosoz.tj', 'login.demoAdmin')),
@@ -240,7 +404,7 @@
 
     draw();
     // The reset link opened while this page is already on screen changes only the hash.
-    const onHash = () => { const token = tokenInHash(); if (token) { resetToken = token; who = 'staff'; notice = ''; step = 'reset'; draw(); } };
+    const onHash = () => { const token = tokenInHash(); if (token) { resetToken = token; who = 'staff'; go('reset'); } };
     window.addEventListener('hashchange', onHash);
     return () => { clearInterval(tick); window.removeEventListener('hashchange', onHash); };
   };

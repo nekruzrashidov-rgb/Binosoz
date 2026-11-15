@@ -1072,6 +1072,20 @@ a.float-card.tg:hover { border-color: rgba(34, 158, 217, 0.75); background: rgba
 .pass-wrap .inp { padding-right: 46px; }
 .pass-eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; border: 0; border-radius: 8px; background: none; cursor: pointer; font-size: 17px; line-height: 1; opacity: 0.6; }
 .pass-eye:hover, .pass-eye[aria-pressed='true'] { opacity: 1; background: var(--surface-2); }
+/* The buyer's 6-digit code and the code from a letter: six cells (kabineti-xaridor-script.js, S.pinCells). */
+.pin-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; }
+.pin-head > label { font-size: 12.5px; font-weight: 700; color: var(--ink-2); letter-spacing: 0.01em; }
+.pin-eye { min-height: 44px; margin: -10px 0; padding: 0 4px; border: 0; background: none; color: var(--accent-text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.pin-eye:hover { text-decoration: underline; }
+.pin-cells { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: clamp(6px, 1.6vw, 10px); max-width: 360px; }
+.pin-cell { width: 100%; min-width: 0; height: 56px; padding: 0; border: 1px solid var(--line); border-radius: 2px; background: var(--surface); color: var(--ink); font: inherit; font-size: 24px; font-weight: 700; font-variant-numeric: lining-nums tabular-nums; text-align: center; caret-color: var(--accent-text); transition: border-color 0.15s, box-shadow 0.15s; }
+.pin-cell:focus, .pin-cell:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.field.err .pin-cell { border-color: var(--bad); }
+.pin-hint.bad { color: var(--bad); font-weight: 600; }
+.pin-problem { background: var(--bad-soft); color: var(--bad); border-radius: var(--r-sm); padding: 10px 13px; font-weight: 600; font-size: 13.5px; }
+.pin-problem .btn { margin-top: 6px; color: var(--bad); padding-inline: 0; }
+.pin-links { flex-wrap: wrap; gap: 8px; }
+.pin-forgot.hot { background: var(--warn-soft); color: var(--ink); font-weight: 800; }
 /* super admin panel */
 .plat-chart { position: relative; height: 280px; }
 .stars { color: var(--gold); letter-spacing: 2px; white-space: nowrap; font-size: 15px; }

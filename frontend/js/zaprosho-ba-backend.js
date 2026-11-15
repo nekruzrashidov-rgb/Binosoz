@@ -205,7 +205,9 @@
     if (res.status === 429) { const ra = res.headers.get('Retry-After'); msg = msg || (S.t ? S.t('err.429') : 'Слишком много запросов') + (ra ? ' (' + ra + ' c)' : ''); } // TODO: i18n
     // Titles of generic ProblemDetails are English ("Unauthorized", "One or more validation errors occurred.") — not shown to people.
     if (!msg) msg = S.t ? S.t('err.' + (res.status >= 500 ? '500' : res.status), {}, S.t('err.unknown')) : 'Ошибка ' + res.status; // TODO: i18n
-    return new ApiError(res.status, msg, errs, data && data.title, data && data.code);
+    const er = new ApiError(res.status, msg, errs, data && data.title, data && data.code);
+    er.data = data || null;
+    return er;
   }
 
   async function demoCall(method, path, o) {
@@ -325,17 +327,21 @@
     isOwner() { return role() === 'Owner'; },
     get impersonating() { return !!(auth && (auth.platform || (auth.user && auth.user.impersonation))); },
     has(...roles) { return !!(auth && auth.user && (api.isLeader() || auth.user.roles.some((r) => roles.includes(r)))); },
-    // Buyers sign in with a code from e-mail; staff (and the super admin) with a password, then a 2FA code if it is on.
-    emailSend(email) { return request('POST', '/auth/email/send', { auth: false, body: { email } }); },
-    // Which code sign-ins really reach people: { email, sms } (a mail or SMS provider is configured on the server).
+    // Buyers sign in with their e-mail and own 6-digit code (PIN); staff (and the super admin) with a password, then a 2FA code.
+    // Which sign-ins work: { pin, email, sms, demo } (email — confirmation codes reach people, a mail provider is configured).
     authMethods() { return request('GET', '/auth/methods', { auth: false }); },
     // A buyer by the phone from the contract: SMS with a code (503 sms_not_configured while there is no SMS provider).
     smsSend(phone) { return request('POST', '/auth/sms/send', { auth: false, body: { phone } }); },
     async smsVerify(phone, code) { return signedIn(await request('POST', '/auth/sms/verify', { auth: false, body: { phone, code } })); },
-    // A buyer registers on the developer's site (ORG_SLUG) without a password; the code then comes by e-mail.
-    register(b) { return request('POST', '/auth/register', { auth: false, body: { email: b.email, firstName: b.firstName, lastName: b.lastName, phone: b.phone, organization: cfgSlug() || null } }); },
+    // A buyer registers on the developer's site (ORG_SLUG) with their own 6-digit code; a confirmation code comes by e-mail.
+    customerRegister(b) { return request('POST', '/auth/customer/register', { auth: false, body: { name: b.name, email: b.email, phone: b.phone, pin: b.pin, organization: cfgSlug() || null } }); },
+    customerResend(email) { return request('POST', '/auth/customer/confirm/resend', { auth: false, body: { email } }); },
+    async customerConfirm(email, code) { return signedIn(await request('POST', '/auth/customer/confirm', { auth: false, body: { email, code } })); },
+    async customerLogin(email, pin) { return signedIn(await request('POST', '/auth/customer/login', { auth: false, body: { email, pin } })); },
+    // «Забыли код?»: a confirmation code by e-mail, then the new 6-digit code (all other sessions are closed).
+    pinResetRequest(email) { return request('POST', '/auth/customer/pin/reset-request', { auth: false, body: { email } }); },
+    async pinReset(email, code, newPin) { return signedIn(await request('POST', '/auth/customer/pin/reset', { auth: false, body: { email, code, newPin } })); },
     async passwordLogin(email, password) { return signedIn(await request('POST', '/auth/login', { auth: false, body: { email, password } })); },
-    async emailVerify(email, code) { return signedIn(await request('POST', '/auth/email/verify', { auth: false, body: { email, code } })); },
     async twoFactorVerify(tempToken, code) { return signedIn(await request('POST', '/auth/2fa/verify', { auth: false, body: { tempToken, code } })); },
     // "Forgot password?": a link by e-mail (24 hours), then the new password with the token from that link.
     passwordResetRequest(email) { return request('POST', '/auth/password/reset-request', { auth: false, body: { email } }); },
