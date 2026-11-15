@@ -1,4 +1,4 @@
-/* Russian interface texts (1758 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* Russian interface texts (1759 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -1762,5 +1762,6 @@
     "reg2.perk1.d": "Покупатель выбирает квартиру на модели дома.",
     "reg2.perk2.d": "Вся воронка продаж в одном кабинете.",
     "reg2.perk3.d": "Статус брони и график платежей онлайн.",
+    "pay.mockBanner": "Тестовый банк: деньги не списываются",
   };
 })();

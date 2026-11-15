@@ -2947,3 +2947,7 @@ body:is([data-page='crm'], [data-page='cabinet'], [data-page='platform']) h1, bo
 .nr-cat-stats { min-height: 62px; }
 /* The energy-class badge: dark text on its tinted background (copper on green was 4.48:1). */
 .eco-badge-link .eco-badge, .nr .eco-badge { color: var(--ink); }
+
+/* Test bank on (payment.html): a strip on top, no money is charged. */
+.pay-testbar { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 12px 16px; background: var(--warn-soft); color: var(--ink); border-bottom: 2px solid var(--warn); font-size: 15px; text-align: center; }
+.pay-testbar svg { width: 20px; height: 20px; flex: none; color: var(--warn); }

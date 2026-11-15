@@ -11,8 +11,11 @@ namespace Sitora.WebApi.Controllers;
 [ApiController]
 [Route("api/v1")]
 [Produces("application/json")]
-public class PaymentGatewayController(IOnlinePaymentService online, IHostEnvironment environment) : ControllerBase
+public class PaymentGatewayController(IOnlinePaymentService online, IHostEnvironment environment, IConfiguration configuration) : ControllerBase
 {
+    // Тестовый банк: в Development всегда, в других окружениях — только с флагом Payments__MockEnabled=true (показ жюри).
+    private bool MockAllowed => environment.IsDevelopment() || configuration.GetValue("Payments:MockEnabled", false);
+
     /// <summary>
     /// Начать оплату картой: покупатель — по своей сделке (чужая — 404), сотрудники — по сделкам своих домов.
     /// amount — сумма в валюте договора (без неё — ближайший неоплаченный платёж графика, не больше остатка);
@@ -38,9 +41,15 @@ public class PaymentGatewayController(IOnlinePaymentService online, IHostEnviron
     public Task<OnlinePaymentStatusResponse> Status(Guid dealId, string gatewayPaymentId, CancellationToken ct) =>
         online.GetStatusAsync(dealId, gatewayPaymentId, ct);
 
+    /// <summary>Включён ли тестовый банк (страница /payment/mock-card показывает плашку «деньги не списываются»).</summary>
+    [HttpGet("payment/mock/status")]
+    [AllowAnonymous]
+    public IActionResult MockStatus() => Ok(new { enabled = MockAllowed });
+
     /// <summary>
-    /// Только в Development и с тестовым шлюзом: «банк» принял (success = true) или отклонил платёж. Вне Development — 404.
-    /// Вызывает страница /payment/mock-card вместо настоящего банка.
+    /// Тестовый шлюз: «банк» принял (success = true) или отклонил платёж. Только в Development или с флагом
+    /// Payments__MockEnabled=true, иначе 404. Меняет только онлайн-платежи тестового шлюза (ручные платежи бухгалтера —
+    /// нет), пишет журнал; незнакомый платёж — 404. Вызывает страница /payment/mock-card вместо настоящего банка.
     /// </summary>
     [HttpPost("payment/mock/simulate")]
     [AllowAnonymous]
@@ -48,7 +57,7 @@ public class PaymentGatewayController(IOnlinePaymentService online, IHostEnviron
     [ProducesResponseType<OnlinePaymentStatusResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Simulate(SimulatePaymentRequest request, CancellationToken ct) =>
-        environment.IsDevelopment() ? Ok(await online.SimulateAsync(request, ct)) : NotFound();
+        MockAllowed ? Ok(await online.SimulateAsync(request, ct)) : NotFound();
 
     // Банки, уведомления которых будут приниматься. Остальные адреса — 404: строка из URL в ответ не попадает.
     private static readonly Dictionary<string, string> WebhookProviders = new(StringComparer.OrdinalIgnoreCase)

@@ -34,8 +34,12 @@
   };
   const brand = (n) => (/^4/.test(n) ? 'VISA' : /^(5[1-5]|2[2-7])/.test(n) ? 'Mastercard' : /^9762/.test(n) ? 'Корти Миллӣ' : '');
 
+  // A strip that cannot be missed while the test bank is on (GET /payment/mock/status): no money is charged.
+  const testBanner = h('div', { class: 'pay-testbar', role: 'note', hidden: true }, S.icon('shield'), h('b', null, t('pay.mockBanner')));
+  if (S.api.mockBankStatus) S.api.mockBankStatus().then((r) => { testBanner.hidden = !(r && r.enabled); }).catch(() => {});
+
   function shell(...children) {
-    app.replaceChildren(h('div', { class: 'pay-wrap' },
+    app.replaceChildren(testBanner, h('div', { class: 'pay-wrap' },
       h('div', { class: 'pay-head' }, h('a', { class: 'brand', href: '/', 'aria-label': 'Binosoz' }, S.logo(), h('span', null, 'BINOSOZ')),
         h('span', { class: 'pay-secure' }, S.icon('lock'), t('pay.secure'))),
       ...children));

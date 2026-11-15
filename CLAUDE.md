@@ -204,6 +204,7 @@ Health__Key=                     # ключ X-Health-Key для /health/ready с
 Auth__RefreshCookie__Mode=Dual
 Auth__DemoPasswordLogin=false    # true — вход демо-покупателя (demo-buyer@binosoz.tj) паролем для жюри
 SEED_DEMO_ACCOUNTS=false         # true + SEED_DEMO_BUYER_PASSWORD / SEED_DEMO_MANAGER_PASSWORD — демо-доступ (--migrate)
+Payments__MockEnabled=false      # true — тестовый банк вне Development (только на время показа; деньги не списываются)
 Logging__File__Enabled=true      # файлы логов (только VPS; на Render — stdout)
 ```
 

@@ -578,6 +578,8 @@
     initiatePayment(id, b) { return request('POST', '/deals/' + id + '/payment/initiate', { body: b || {} }); },
     paymentStatus(id, gatewayId) { return request('GET', '/deals/' + id + '/payment/' + encodeURIComponent(gatewayId) + '/status'); },
     // Only the test bank (Development): the bank page reports "paid" or "declined" — without the buyer's token, like a real bank.
+    // Is the test bank on (Development, or Payments__MockEnabled=true for a demo)?
+    mockBankStatus() { return request('GET', '/payment/mock/status', { auth: false }); },
     simulatePayment(gatewayId, success) { return request('POST', '/payment/mock/simulate', { auth: false, body: { gatewayPaymentId: gatewayId, success: !!success } }); },
     async messages(id) { return arr(await request('GET', '/deals/' + id + '/messages', { query: real() ? { page: 1, pageSize: 100 } : undefined })).map(M.message); },
     sendMessage(id, text) { return request('POST', '/deals/' + id + '/messages', { body: { text } }); },

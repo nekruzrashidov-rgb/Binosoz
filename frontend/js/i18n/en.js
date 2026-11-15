@@ -1,4 +1,4 @@
-/* English interface texts (1758 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* English interface texts (1759 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -1762,5 +1762,6 @@
     "reg2.perk1.d": "Buyers pick an apartment on the model of the house.",
     "reg2.perk2.d": "The whole sales funnel in one workspace.",
     "reg2.perk3.d": "Booking status and payment schedule online.",
+    "pay.mockBanner": "Test bank: no money is charged",
   };
 })();

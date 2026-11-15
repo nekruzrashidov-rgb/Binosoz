@@ -89,6 +89,7 @@ services:
       Logging__File__Enabled: "true"
       Sentry__Dsn: ${SENTRY_DSN:-}
       Health__Key: ${HEALTH_KEY:-}
+      Payments__MockEnabled: ${PAYMENTS_MOCK_ENABLED:-false}
       Auth__RefreshCookie__Mode: ${AUTH_REFRESH_COOKIE_MODE:-Dual}
       # Хранилище файлов: Local — том files ниже; S3 — RustFS / MinIO / Cloudflare R2 / Backblaze B2 / AWS (docs/DEPLOY.md, «Файлы»).
       Storage__Provider: ${STORAGE_PROVIDER:-Local}
