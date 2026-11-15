@@ -30,6 +30,8 @@ echo "OK: $API_URL/health/live = 200"
 # Версия прода: короткий SHA коммита, из которого собран работающий API.
 version=$(printf '%s' "$live" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
 echo "Версия на проде: ${version:-неизвестна}"
+# В GitHub Actions — понятная строка в summary запуска (поведение — коды выхода — не меняется).
+summary() { [ -n "${GITHUB_STEP_SUMMARY:-}" ] && echo "$1" >> "$GITHUB_STEP_SUMMARY"; return 0; }
 if [ -n "$EXPECTED_SHA" ]; then
     expected=$(printf '%s' "$EXPECTED_SHA" | cut -c1-7)
     if [ "$version" != "$expected" ]; then
@@ -37,6 +39,7 @@ if [ -n "$EXPECTED_SHA" ]; then
         echo "Прод отстаёт от main: на проде ${version:-неизвестно}, ожидается $expected" >&2
         echo "Проверьте деплой на Render (docs/DEPLOY.md, «Render: деплой»)." >&2
         echo "##############################################################################" >&2
+        summary "### ❌ На Render старая версия ${version:-неизвестна}, в main — $expected: задеплойте (docs/DEPLOY.md, «Render: деплой»)"
         exit 3
     fi
     echo "OK: версия совпадает с main ($expected)"
@@ -53,6 +56,7 @@ if [ "$count" -lt 1 ]; then
     echo "ВНИМАНИЕ: в каталоге организации «$ORG» нет ни одного дома — сайт показывает пустой каталог." >&2
     echo "Заполните базу (docs/DEPLOY.md, «Демо-данные в пустой базе»): psql \"\$DATABASE_URL\" -f backend/scripts/seed.sql" >&2
     echo "##############################################################################" >&2
+    summary "### ⚠️ База пустая: запустите Actions → Seed prod (docs/DEPLOY.md)"
     [ "$STRICT_CATALOG" = "0" ] && exit 0
     exit 2
 fi

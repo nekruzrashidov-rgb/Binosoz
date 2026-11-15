@@ -157,17 +157,41 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           docker buildx imagetools create --tag "$IMAGE:latest" "$IMAGE:${{ github.sha }}"
 
+      # Production API не применяет миграции сам и не стартует, если они есть: сначала миграции образом этого коммита
+      # (секрет PROD_DATABASE_URL — External Database URL из Render, как в seed-prod.yml), потом деплой. Ошибка миграции —
+      # шаг падает, деплой не запускается. Строка подключения маскируется в логе.
+      - name: Миграции продакшен-базы
+        id: migrate
+        env:
+          PROD_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          IMAGE_REF: ${{ needs.docker.outputs.image }}:${{ github.sha }}
+        run: |
+          if [ -z "$PROD_DATABASE_URL" ]; then
+            echo "Секрет PROD_DATABASE_URL не задан — миграции перед деплоем на Render не применяются."
+            echo "### ⚠️ Миграции не применены: задайте секрет PROD_DATABASE_URL (docs/DEPLOY.md, «Render: деплой»)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          cs=$(python3 -c 'import os,urllib.parse as u; r=u.urlparse(os.environ["PROD_DATABASE_URL"]); print(f"Host={r.hostname};Port={r.port or 5432};Database={r.path.lstrip(chr(47))};Username={u.unquote(r.username or chr(32)).strip()};Password={u.unquote(r.password or chr(32)).strip()};SSL Mode=Require")')
+          echo "::add-mask::$cs"
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker run --rm -e ASPNETCORE_ENVIRONMENT=Production -e "ConnectionStrings__Default=$cs" "$IMAGE_REF" --migrate
+          echo "Миграции применены образом $IMAGE_REF"
+
       # Render: Deploy Hook из секрета RENDER_DEPLOY_HOOK_URL (docs/DEPLOY.md, «Render: деплой»). Сервис, переведённый на
       # готовый образ из GHCR (переменная репозитория RENDER_DEPLOY_MODE=image), получает образ этого коммита (?imgURL=…),
-      # сервис со сборкой из репозитория — просто команду собрать последний коммит. Нет секрета — шаг ничего не делает.
+      # сервис со сборкой из репозитория — просто команду собрать последний коммит. Нет секрета — крупное предупреждение
+      # в summary. После hook — ждём до 10 минут, пока /health/live не отдаст версию этого коммита.
       - name: Деплой на Render
         env:
           RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
           RENDER_DEPLOY_MODE: ${{ vars.RENDER_DEPLOY_MODE }}
           IMAGE_REF: ${{ needs.docker.outputs.image }}:${{ github.sha }}
+          API_URL: ${{ vars.SMOKE_API_URL || 'https://binosoz-1.onrender.com' }}
         run: |
           if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
             echo "Секрет RENDER_DEPLOY_HOOK_URL не задан — деплой на Render не запускается (Render деплоит сам, если включён Auto-Deploy)."
+            echo "# ⚠️ Render не деплоится автоматически: задайте секрет RENDER_DEPLOY_HOOK_URL" >> "$GITHUB_STEP_SUMMARY"
+            echo "Где взять: Render → сервис → Settings → Deploy Hook (docs/DEPLOY.md, «Render: деплой»)." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           url="$RENDER_DEPLOY_HOOK_URL"
@@ -179,7 +203,17 @@ jobs:
             echo "Render: сборка последнего коммита из репозитория"
           fi
           curl -fsS -X POST "$url" -o /dev/null
-          echo "Render принял деплой. Проверка версии: /health/live → version = ${GITHUB_SHA:0:7}"
+          want="${GITHUB_SHA:0:7}"
+          echo "Render принял деплой. Жду версию $want на $API_URL/health/live (до 10 минут)…"
+          for i in $(seq 1 40); do
+            got=$(curl -s --max-time 20 "$API_URL/health/live" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
+            if [ "$got" = "$want" ]; then echo "Render: работает версия $want"; exit 0; fi
+            echo "Попытка $i: на Render версия ${got:-нет ответа}, жду 15 с"
+            sleep 15
+          done
+          echo "::error::Render за 10 минут не перешёл на версию $want (сейчас: ${got:-нет ответа}). Проверьте логи деплоя в Render (docs/DEPLOY.md)."
+          echo "# ❌ Render не перешёл на версию $want за 10 минут (сейчас: ${got:-нет ответа})" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
 
       # Пока секреты сервера не заданы (VPS_HOST, VPS_USER, VPS_SSH_KEY), шаг пропускается и CI остаётся зелёным.
       # На сервере: свежие compose-файлы из git, образ этого коммита, бэкап, миграции отдельной командой, перезапуск.
