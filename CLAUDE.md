@@ -87,7 +87,7 @@ Binosoz/
 │   │       ├── Validators/         ← FluentValidation
 │   │       └── Program.cs          ← точка входа, DI, пайплайн
 │   ├── tests/
-│   │   └── Sitora.Tests/           ← 435 тестов, Testcontainers, покрывают:
+│   │   └── Sitora.Tests/           ← 455 тестов, Testcontainers, покрывают:
 │   │                                  auth, catalog, chat, payments, sales, security
 │   └── scripts/                    ← backup.sh/restore.sh, seed.sql (демо для прода), smoke.sh, load/ (k6),
 │                                      gmail-token.mjs (refresh token Gmail), set-resend-key.ps1
@@ -101,7 +101,7 @@ Binosoz/
     ├── css/styles.css             ← токены (:root и [data-theme='dark']), все компоненты; новый дизайн — классы nr-*
     └── js/
         ├── tanzimot-api-url.js        ← config: API_BASE ('/api/v1'; Vercel → Render), ORG_SLUG, CONTACT, INSTALLMENT
-        ├── i18n/ru.js, tg.js, en.js   ← тексты (по 1758 ключей); ru — на каждой странице и запасной
+        ├── i18n/ru.js, tg.js, en.js   ← тексты (по 1795 ключей); ru — на каждой странице и запасной
         ├── tarjumaho-ru-tg-en.js      ← S.t(), S.initLang()/S.setLang() (грузит tg/en по требованию), S.bus
         ├── komponentho-modal-toast-tabs.js ← h() DOM-builder, иконки, модалки, тосты
         ├── zaprosho-ba-backend.js     ← все вызовы API, токены (localStorage sitora.auth)
@@ -177,13 +177,20 @@ Binosoz/
 
 ## Auth-флоу
 - **Сотрудники:** `POST /auth/login` (почта + пароль) → (если включена 2FA) `POST /auth/2fa/verify`
-- **Покупатели:** `POST /auth/email/send` → `POST /auth/email/verify` (код из почты); по телефону — `/auth/sms/send` → `/auth/sms/verify`
-  (только при `Auth__SmsLoginEnabled=true` и подключённом SMS-провайдере)
-- **Какие способы работают:** `GET /auth/methods` → `{ email, sms }`; без почтового провайдера вне Development
-  `/auth/email/send` → 503 `email_not_configured`, без SMS-провайдера `/auth/sms/send` → 503 `sms_not_configured`
+- **Покупатели:** почта + свой 6-значный код (PIN) — `POST /auth/customer/login`. PIN хранится как пароль Identity (хеш);
+  правила — `PinAwarePasswordValidator` только для роли Customer (6 цифр, не одинаковые, не подряд), у сотрудников — прежние.
+  Неверный PIN и чужая почта — одинаково 401 `invalid_pin` (`attemptsLeft`); 5 ошибок — 429 `pin_locked` на 15 мин.
+  - Регистрация: `POST /auth/customer/register` (имя, почта, телефон, PIN) → код на почту → `POST /auth/customer/confirm` → токены
+    (`/auth/customer/confirm/resend` — новый код). До подтверждения вход — 403 `email_not_confirmed`.
+  - «Забыли код?»: `POST /auth/customer/pin/reset-request` → код на почту → `POST /auth/customer/pin/reset` (новый PIN, все
+    refresh-токены отозваны). Покупатель, заведённый менеджером, при входе получает 409 `pin_not_set` и задаёт код так же.
+  - Коды из почты: 6 цифр, 10 мин, 5 попыток, не чаще раза в минуту и 5 в час на почту и на IP.
+  - По телефону — `/auth/sms/send` → `/auth/sms/verify` (только при `Auth__SmsLoginEnabled=true` и подключённом SMS-провайдере)
+- **Какие способы работают:** `GET /auth/methods` → `{ pin, email, sms, demo }`; без почтового провайдера вне Development
+  регистрация и «Забыли код?» → 503 `email_not_configured` (вход по PIN работает), без SMS-провайдера `/auth/sms/send` → 503 `sms_not_configured`
 - **Токены:** access (JWT, 15 мин) + refresh (64 байта, SHA-256 в БД, 30 дней, ротация)
 - **Refresh-cookie:** `sitora_rt` (HttpOnly, SameSite=Strict, `Path=/api/v1/auth`), режим `Auth__RefreshCookie__Mode` = Dual|Cookie|Body
-- **Dev-режим:** фиксированный код `123456` для тестирования (только `IsDevelopment()`); почты задаются в user-secrets:
+- **Dev-режим:** код из письма (подтверждение, «Забыли код?») можно заменить на `123456` (только `IsDevelopment()`); почты задаются в user-secrets:
   `dotnet user-secrets set "Auth:DevFixedCodeEmails:0" "почта" --project src/Sitora.WebApi`
 
 ## Конфигурация (переменные окружения)
