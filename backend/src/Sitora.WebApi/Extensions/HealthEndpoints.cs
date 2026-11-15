@@ -10,19 +10,23 @@ public static class HealthEndpoints
     // /health/ready и /health — база, хранилище файлов и, где включён, сервер фоновых задач.
     public const string KeyHeader = "X-Health-Key";
 
-    // /health/live — публичный (Docker, Caddy, Render, uptime-мониторинг): только «жив», без подробностей.
-    // /health/ready и /health перечисляют зависимости — только из внутренней сети (loopback, частные адреса после
-    // UseForwardedHeaders) или с заголовком X-Health-Key = Health__Key. Остальным — 404, как будто адреса нет.
+    // /health/live — публичный (Docker, Caddy, Render, uptime-мониторинг): статус и версия, без подробностей.
+    // /health/ready и /health: список проверок (база, хранилище, почта…) — только с заголовком X-Health-Key = Health__Key
+    // или, вне Production, из внутренней сети (loopback, частные адреса). В Production адрес не в счёт: на Render все запросы
+    // приходят через прокси с внутреннего адреса. Остальным — только общий статус { status }, без checks.
+    private const string BriefItem = "sitora.health.brief";
+
     public static void MapSitoraHealthChecks(this WebApplication app)
     {
         var key = app.Configuration["Health:Key"];
+        var production = app.Environment.IsProduction();
         app.UseWhen(http => http.Request.Path.StartsWithSegments("/health") && !http.Request.Path.StartsWithSegments("/health/live"), branch =>
             branch.Use((http, next) =>
             {
-                if (IsInternal(http.Connection.RemoteIpAddress) || KeyMatches(http.Request.Headers[KeyHeader], key))
-                    return next(http);
-                http.Response.StatusCode = StatusCodes.Status404NotFound;
-                return Task.CompletedTask;
+                var full = KeyMatches(http.Request.Headers[KeyHeader], key) || (!production && IsInternal(http.Connection.RemoteIpAddress));
+                if (!full)
+                    http.Items[BriefItem] = true;
+                return next(http);
             }));
 
         // Живой процесс и его версия (короткий SHA коммита, время сборки) — без проверок зависимостей.
@@ -53,9 +57,11 @@ public static class HealthEndpoints
         context.Response.WriteAsJsonAsync(new { status = report.Status.ToString(), version = BuildInfo.Version, builtAt = BuildInfo.BuiltAt });
 
     // Имена, статусы и наши собственные пояснения проверок («Почта: Gmail настроен», «Файлы хранятся на временном
-    // диске…»); исключения и их текст наружу не отдаются, они есть в логе. Отвечает только изнутри или с X-Health-Key.
+    // диске…»); исключения и их текст наружу не отдаются, они есть в логе. Без ключа (в Production) — только статус.
     private static Task WriteAsync(HttpContext context, HealthReport report) =>
-        context.Response.WriteAsJsonAsync(new
+        context.Items.ContainsKey(BriefItem)
+            ? context.Response.WriteAsJsonAsync(new { status = report.Status.ToString() })
+            : context.Response.WriteAsJsonAsync(new
         {
             status = report.Status.ToString(),
             checks = report.Entries.Select(e => new
