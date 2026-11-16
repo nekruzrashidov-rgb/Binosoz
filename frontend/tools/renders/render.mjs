@@ -29,8 +29,8 @@ for (const [name, cam, aspect] of SHOTS.filter((x) => !ONLY || ONLY.includes(x[0
   page.on('pageerror', (e) => console.error(name, e.message));
   const qs = new URLSearchParams(Object.entries(cam).map(([k, v]) => [k, String(v)])).toString();
   await page.goto(BASE + '/tools/renders/render.html?' + qs);
-  await page.waitForFunction(() => window.__ready === true, null, { timeout: 120000 });
-  const png = await page.screenshot({ type: 'png' });
+  await page.waitForFunction(() => window.__ready === true, null, { timeout: 900000 });
+  const png = await page.screenshot({ type: 'png', timeout: 300000 }); // software WebGL at 2400 px is slow
   // PNG → WebP in three widths, in the browser itself (no image libraries).
   const webps = await page.evaluate(async ({ b64, sizes }) => {
     const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode();

@@ -130,8 +130,9 @@
     const r = rnd(seed);
     for (let y = 0; y < 32; y++) for (let x = 0; x < 16; x++) cells.push([r(), r(), r()]);
     const alb = canvasTex(256, 512, (g, w, h) => {
-      g.fillStyle = '#8a8f99'; g.fillRect(0, 0, w, h);
-      cells.forEach((c, i) => { const x = (i % 16) * 16, y = Math.floor(i / 16) * 16; g.fillStyle = '#1d2433'; g.fillRect(x + 3, y + 3, 10, 10); });
+      g.fillStyle = '#7d828c'; g.fillRect(0, 0, w, h);
+      // Windows a little darker than the wall: far away a high-contrast grid turned into grey-white noise.
+      cells.forEach((c, i) => { const x = (i % 16) * 16, y = Math.floor(i / 16) * 16; g.fillStyle = '#4b5261'; g.fillRect(x + 3, y + 4, 10, 8); });
     });
     const em = canvasTex(256, 512, (g, w, h) => {
       g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
@@ -314,7 +315,8 @@
       neighbourMat = [];
       spots.forEach(([x, z, w, h, d], i) => {
         const tx = skylineTextures(40 + i);
-        const mk = (rx) => { const a = tx.alb.clone(), e = tx.em.clone(); a.needsUpdate = e.needsUpdate = true; a.repeat.set(rx / 24, h / 32); e.repeat.copy(a.repeat); return new T.MeshStandardMaterial({ map: a, emissiveMap: e, emissive: new T.Color(0xffffff), emissiveIntensity: 0.05, roughness: 0.75 }); };
+        // The texture is 16 × 32 windows: one every 3 m across and one floor every 3 m up (denser read as noise far away).
+        const mk = (rx) => { const a = tx.alb.clone(), e = tx.em.clone(); a.needsUpdate = e.needsUpdate = true; a.repeat.set(rx / 48, h / 96); e.repeat.copy(a.repeat); return new T.MeshStandardMaterial({ map: a, emissiveMap: e, emissive: new T.Color(0xffffff), emissiveIntensity: 0.05, roughness: 0.75 }); };
         const mA = mk(w), mB = mk(d); neighbourMat.push(mA, mB);
         const b = new T.Mesh(new T.BoxGeometry(w, h, d), [mB, mB, roofM, roofM, mA, mA]);
         b.position.set(x, h / 2 - 3, z); b.castShadow = true; b.receiveShadow = true; scene.add(b);
@@ -965,8 +967,10 @@
       });
       clouds.forEach((c) => { c.position.x += c.userData.v * dt; if (c.position.x > 900) c.position.x = -900; });
       renderer.render(scene, camera);
+      // The first frame is on screen: the page can take away its placeholder picture.
+      if (!drawnOnce) { drawnOnce = true; container.classList.add('is-ready'); if (opts.onReady) opts.onReady(); }
     }
-    var animIdx;
+    var animIdx, drawnOnce = false;
 
     function resize() {
       const w = container.clientWidth || 800, h = container.clientHeight || 500;
