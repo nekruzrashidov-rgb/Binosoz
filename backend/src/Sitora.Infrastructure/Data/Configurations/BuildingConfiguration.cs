@@ -16,6 +16,10 @@ public class BuildingConfiguration : IEntityTypeConfiguration<Building>
         builder.Property(b => b.DescriptionTg).HasMaxLength(4000);
         builder.Property(b => b.ModelUrl).HasMaxLength(500);
         // Удобства — массив ключей (text[]), по умолчанию пустой.
+        // Координаты — 6 знаков после запятой (≈ 0,1 м), высота этажа — до сантиметра.
+        builder.Property(b => b.Latitude).HasPrecision(9, 6);
+        builder.Property(b => b.Longitude).HasPrecision(9, 6);
+        builder.Property(b => b.FloorHeight).HasPrecision(4, 2);
         builder.Property(b => b.Amenities).HasColumnType("text[]").HasDefaultValueSql("'{}'::text[]").IsRequired();
 
         // Эко-паспорт — в той же таблице, столбцы Eco*; все необязательные (не заполнен — Eco = null).

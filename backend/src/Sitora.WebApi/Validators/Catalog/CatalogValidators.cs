@@ -38,6 +38,22 @@ public class SaveBuildingAmenitiesRequestValidator : AbstractValidator<SaveBuild
     }
 }
 
+// Координаты — парой и в пределах WGS 84; высота этажа — от 2,4 до 6 м.
+public class SaveBuildingLocationRequestValidator : AbstractValidator<SaveBuildingLocationRequest>
+{
+    public SaveBuildingLocationRequestValidator()
+    {
+        RuleFor(x => x).Must(x => (x.Latitude is null) == (x.Longitude is null))
+            .WithName("latitude").WithMessage("Укажите широту и долготу вместе");
+        RuleFor(x => x.Latitude).InclusiveBetween(-90m, 90m).When(x => x.Latitude is not null)
+            .WithMessage("Широта — от -90 до 90");
+        RuleFor(x => x.Longitude).InclusiveBetween(-180m, 180m).When(x => x.Longitude is not null)
+            .WithMessage("Долгота — от -180 до 180");
+        RuleFor(x => x.FloorHeight).InclusiveBetween(2.4m, 6m).When(x => x.FloorHeight is not null)
+            .WithMessage("Высота этажа — от 2,4 до 6 м");
+    }
+}
+
 public class SaveBuildingEcoRequestValidator : AbstractValidator<SaveBuildingEcoRequest>
 {
     public SaveBuildingEcoRequestValidator()

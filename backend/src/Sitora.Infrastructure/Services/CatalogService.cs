@@ -254,6 +254,20 @@ public class CatalogService(
         return await GetBuildingAsync(id, ct);
     }
 
+    // Точка дома на карте и высота этажа: заменяются целиком, пустое — «не задано». Пару координат проверяет валидатор.
+    public async Task<BuildingResponse> UpdateBuildingLocationAsync(Guid id, SaveBuildingLocationRequest request, CancellationToken ct = default)
+    {
+        var building = await db.Buildings.FirstOrDefaultAsync(b => b.Id == id, ct)
+            ?? throw new NotFoundException(BuildingNotFound);
+        var before = new { building.Latitude, building.Longitude, building.FloorHeight };
+        building.Latitude = request.Latitude;
+        building.Longitude = request.Longitude;
+        building.FloorHeight = request.FloorHeight;
+        audit.Record(nameof(Building), building.Id, "LocationUpdated", before, new { building.Latitude, building.Longitude, building.FloorHeight });
+        await SaveAsync("Такой дом уже есть", ct);
+        return await GetBuildingAsync(id, ct);
+    }
+
     private static object EcoSnapshot(BuildingEcoInfo e) => new
     {
         e.EnergyClass, e.WallInsulationRu, e.WallInsulationTg, e.WindowsRu, e.WindowsTg, e.SolarPanelsKw,
@@ -442,7 +456,10 @@ public class CatalogService(
         b.Amenities,
         b.Organization.Installment.DownPaymentMinPct == null && b.Organization.Installment.MaxMonths == null && !b.Organization.Installment.NoOverpayment
             ? null
-            : new InstallmentTermsResponse(b.Organization.Installment.DownPaymentMinPct, b.Organization.Installment.MaxMonths, b.Organization.Installment.NoOverpayment));
+            : new InstallmentTermsResponse(b.Organization.Installment.DownPaymentMinPct, b.Organization.Installment.MaxMonths, b.Organization.Installment.NoOverpayment),
+        b.Latitude,
+        b.Longitude,
+        b.FloorHeight);
 
     private static readonly Expression<Func<Floor, FloorResponse>> ToFloorResponse = f => new FloorResponse(
         f.Id,

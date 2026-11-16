@@ -25,5 +25,12 @@ public class Building : BaseEntity
     // Меняются только через PUT /buildings/{id}/amenities.
     public List<string> Amenities { get; set; } = [];
 
+    // Точка дома на карте (WGS 84) и высота этажа от пола до пола в метрах — для 3D-модели на сайте:
+    // окружение из OpenStreetMap и метки расстояний есть только при заданных координатах; высота не задана — сайт
+    // считает 3,0 м и пишет «оценка». Меняются только через PUT /buildings/{id}/location.
+    public decimal? Latitude { get; set; }
+    public decimal? Longitude { get; set; }
+    public decimal? FloorHeight { get; set; }
+
     public List<Floor> Floors { get; set; } = [];
 }

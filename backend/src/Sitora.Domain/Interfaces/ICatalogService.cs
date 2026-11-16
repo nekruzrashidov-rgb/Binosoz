@@ -19,6 +19,7 @@ public interface ICatalogService
     Task<BuildingResponse> UpdateBuildingAsync(Guid id, SaveBuildingRequest request, CancellationToken ct = default);
     Task<BuildingResponse> UpdateBuildingEcoAsync(Guid id, SaveBuildingEcoRequest request, CancellationToken ct = default);
     Task<BuildingResponse> UpdateBuildingAmenitiesAsync(Guid id, SaveBuildingAmenitiesRequest request, CancellationToken ct = default);
+    Task<BuildingResponse> UpdateBuildingLocationAsync(Guid id, SaveBuildingLocationRequest request, CancellationToken ct = default);
     Task<FloorResponse> CreateFloorAsync(CreateFloorRequest request, CancellationToken ct = default);
     Task<FloorResponse> UpdateFloorAsync(Guid id, UpdateFloorRequest request, CancellationToken ct = default);
     Task<ApartmentResponse> CreateApartmentAsync(CreateApartmentRequest request, CancellationToken ct = default);

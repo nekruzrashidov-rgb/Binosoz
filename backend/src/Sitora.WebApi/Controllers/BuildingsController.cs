@@ -84,4 +84,12 @@ public class BuildingsController(ICatalogService catalog) : ControllerBase
     [ProducesResponseType<BuildingResponse>(StatusCodes.Status200OK)]
     public Task<BuildingResponse> UpdateAmenities(Guid id, SaveBuildingAmenitiesRequest request, CancellationToken ct) =>
         catalog.UpdateBuildingAmenitiesAsync(id, request, ct);
+
+    /// <summary>Точка дома на карте (широта, долгота — парой) и высота этажа в метрах (контент-менеджер и руководители).
+    /// Без координат сайт не показывает окружение и расстояния; без высоты этажа считает 3,0 м с пометкой «оценка».</summary>
+    [HttpPut("{id:guid}/location")]
+    [Authorize(Roles = Roles.CatalogEditors)]
+    [ProducesResponseType<BuildingResponse>(StatusCodes.Status200OK)]
+    public Task<BuildingResponse> UpdateLocation(Guid id, SaveBuildingLocationRequest request, CancellationToken ct) =>
+        catalog.UpdateBuildingLocationAsync(id, request, ct);
 }

@@ -26,7 +26,14 @@ public record BuildingResponse(
     // Удобства дома (ключи BuildingAmenities); пустой список в JSON не попадает.
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? Amenities = null,
     // Условия рассрочки застройщика; не заданы — поля нет.
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] InstallmentTermsResponse? Installment = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] InstallmentTermsResponse? Installment = null,
+    // Точка дома на карте и высота этажа (м); не заданы — полей нет (на сайте нет окружения, высота — оценка 3,0 м).
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? Latitude = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? Longitude = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? FloorHeight = null);
+
+// PUT /buildings/{id}/location: координаты задаются парой (обе или ни одной), пустое значение — «не задано».
+public record SaveBuildingLocationRequest(decimal? Latitude = null, decimal? Longitude = null, decimal? FloorHeight = null);
 
 // PUT /buildings/{id}/amenities: весь список целиком (ключи BuildingAmenities); пустой — удобств на сайте нет.
 public record SaveBuildingAmenitiesRequest(List<string>? Amenities = null);

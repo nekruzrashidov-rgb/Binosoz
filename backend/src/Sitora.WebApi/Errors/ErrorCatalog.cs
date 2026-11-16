@@ -79,6 +79,10 @@ public static class ErrorCatalog
 
         // ---------- удобства дома и условия рассрочки ----------
         E("Неизвестное удобство дома", "invalid_amenity", "Қулайии номаълуми бино");
+        E("Укажите широту и долготу вместе", "location_pair_required", "Арз ва тӯли ҷуғрофиро якҷоя нишон диҳед");
+        E("Широта — от -90 до 90", "invalid_latitude", "Арзи ҷуғрофӣ — аз -90 то 90");
+        E("Долгота — от -180 до 180", "invalid_longitude", "Тӯли ҷуғрофӣ — аз -180 то 180");
+        E("Высота этажа — от 2,4 до 6 м", "invalid_floor_height", "Баландии ошёна — аз 2,4 то 6 м");
         E("Первоначальный взнос — от 0 до 100%", "invalid_down_payment", "Пардохти аввалия — аз 0 то 100%");
         E(Validators.Settings.SaveInstallmentSettingsRequestValidator.MonthsMessage, "invalid_installment_term",
             $"Мӯҳлати муҳлатдиҳӣ — аз 1 то {Sitora.Infrastructure.Services.PaymentScheduleCalculator.MaxMonths} моҳ");
