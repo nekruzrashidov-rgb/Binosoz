@@ -96,6 +96,46 @@ test('login: the buyer tab is chosen by default', async ({ page }) => {
   await expect(page.locator('.login-tabs button.on')).toHaveText('Покупатель');
 });
 
+// «1 документ, 2 документа, 5 документов»: one rule for every number before a word (S.plural; ru, tg, en).
+test('plural forms: Russian, Tajik and English', async ({ page }) => {
+  await open(page, '/');
+  const forms = await page.evaluate(() => {
+    const f = ['документ', 'документа', 'документов'];
+    const ru = [1, 2, 5, 11, 12, 21, 22, 25, 101, 111].map((n) => window.S.plural(n, f));
+    window.S.lang = 'en';
+    const en = [1, 2, 0].map((n) => window.S.plural(n, ['document', 'documents']));
+    window.S.lang = 'tg';
+    const tg = window.S.plural(5, ['ҳуҷҷат']);
+    window.S.lang = 'ru';
+    const viaT = window.S.t('green.pagesN', { n: 3 });
+    return { ru, en, tg, viaT };
+  });
+  expect(forms.ru).toEqual(['документ', 'документа', 'документов', 'документов', 'документов', 'документ', 'документа', 'документов', 'документ', 'документов']);
+  expect(forms.en).toEqual(['document', 'documents', 'documents']);
+  expect(forms.tg).toBe('ҳуҷҷат');
+  expect(forms.viaT).toBe('3 листа');
+});
+
+// Keyboard and screen readers: the content is the <main> landmark, the first Tab shows «Перейти к содержимому».
+test('landmark: <main> and a skip link on the public pages', async ({ page }) => {
+  for (const url of ['/', '/apartments', '/contact']) {
+    await open(page, url);
+    await expect(page.locator('main#view')).toHaveCount(1);
+    await page.keyboard.press('Tab');
+    await expect(page.locator('.skip-link')).toBeFocused();
+    await expect(page.locator('.skip-link')).toHaveAttribute('href', '#view');
+  }
+});
+
+test('footer: every link is at least 44 px high on a phone', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'touch targets are measured at the phone width');
+  await open(page, '/contact');
+  const small = await page.evaluate(() => [...document.querySelectorAll('.lux-footer a')]
+    .filter((a) => a.offsetParent !== null).map((a) => [a.textContent.trim().slice(0, 30), Math.round(a.getBoundingClientRect().height)])
+    .filter(([, hgt]) => hgt < 44));
+  expect(small).toEqual([]);
+});
+
 // The buyer signs in with e-mail and an own 6-digit code: six cells, digits only, paste fills all, Backspace goes back.
 test('login: the buyer form has an e-mail and six digit cells', async ({ page }) => {
   await open(page, '/login');
