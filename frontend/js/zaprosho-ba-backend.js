@@ -153,7 +153,22 @@
   const sleepyGateway = (res) => res.status === 502 || res.status === 504
     || (res.status === 503 && !(res.headers.get('content-type') || '').includes('json'));
 
+  // A POST/PUT/DELETE is never repeated (it could create a record twice). So before the first one, while the API has
+  // not answered yet, it is woken with GET /health/live (repeated like any GET); only then the real request goes out.
+  // Otherwise a form sent to a sleeping API gets the gateway's answer without CORS headers — «Нет связи с сервером».
+  let waking = null;
+  function wakeUp() {
+    if (awake) return Promise.resolve();
+    if (!waking) {
+      waking = doFetch('GET', '/health/live', { absolute: true, auth: false })
+        .catch(() => null)
+        .finally(() => { waking = null; });
+    }
+    return waking;
+  }
+
   async function doFetch(method, path, o) {
+    if (method !== 'GET' && !awake) await wakeUp();
     const base = apiBase(); const headers = { 'Accept-Language': langHeader() };
     if (o.auth !== false && auth && auth.accessToken) headers.Authorization = 'Bearer ' + auth.accessToken;
     let body;

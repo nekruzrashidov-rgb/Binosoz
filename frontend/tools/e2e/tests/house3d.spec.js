@@ -96,6 +96,9 @@ test.describe('3D on the whole screen', () => {
   });
 
   test('a chosen apartment opens the card with TJS and ≈ $; inside and the walk switch on and off', async ({ page, isMobile }) => {
+    // On CI the scene runs on SwiftShader (no GPU): building the apartment takes far longer than on a real
+    // machine (on the site — under a second), so this test gets more time instead of failing on speed.
+    test.slow();
     const errors = await openFull(page);
     await showList(page, isMobile);
     const item = page.locator('.h3d-item').first();
@@ -107,7 +110,7 @@ test.describe('3D on the whole screen', () => {
     await expect(card.locator('.h3d-card-usd')).toContainText('оценочно по курсу');
     await expect.poll(async () => (await state(page)).selected).not.toBeNull();
     await card.locator('[data-act="inside"]').click();
-    await expect.poll(async () => (await state(page)).mode, { timeout: 20000 }).toBe('inside');
+    await expect.poll(async () => (await state(page)).mode, { timeout: 90000 }).toBe('inside');
     await expect(page.locator('.h3d-note')).toContainText('Планировка типовая');
     await expect(page.locator('.h3d-tag--room').first()).toBeAttached();
     await page.locator('.h3d-chip', { hasText: 'С мебелью' }).click();
