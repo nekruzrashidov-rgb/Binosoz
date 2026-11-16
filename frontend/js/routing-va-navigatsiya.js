@@ -49,6 +49,9 @@
     const v = S.store.get('sitora.theme'); if (v === 'dark' || v === 'light') document.documentElement.dataset.theme = v; else delete document.documentElement.dataset.theme;
   }
   function isDark() { const v = document.documentElement.dataset.theme; return v ? v === 'dark' : window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches; }
+  // For pages that draw their own top bar (the login page): the same switch as in the header.
+  S.isDark = isDark;
+  S.toggleTheme = () => { S.store.set('sitora.theme', isDark() ? 'light' : 'dark'); applyTheme(); if (S.bus) S.bus.emit('theme'); };
 
   const PHONE = '+992 98 363 70 70';
   const PHONE_HREF = 'tel:+992983637070';
@@ -231,13 +234,41 @@
     && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   if (motionOk) document.documentElement.classList.add('motion-ok');
   S.motionOk = motionOk;
+  // One reveal for the whole page: .reveal gets .in, .section-reveal gets .visible when it scrolls into view.
+  // A MutationObserver picks up every block drawn later (data arrived, language switched, filters), so none of them
+  // can stay at opacity 0; what is already on screen or above it (after a jump to /#why) is shown at once.
+  const PENDING = '.reveal:not(.in), .section-reveal:not(.visible)';
+  const showEl = (el) => {
+    el.classList.add(el.classList.contains('section-reveal') ? 'visible' : 'in');
+    if (el.classList.contains('reveal')) setTimeout(() => { el.style.transitionDelay = ''; }, 900);
+  };
   const revealer = motionOk
-    ? new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('visible'); revealer.unobserve(e.target); } }), { threshold: 0.05, rootMargin: '0px 0px -50px 0px' })
+    ? new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { showEl(e.target); revealer.unobserve(e.target); } }), { threshold: 0.05, rootMargin: '0px 0px -40px 0px' })
     : null;
-  S.revealSections = (root) => S.$$('.section-reveal:not(.visible)', root || document).forEach((el) => {
-    if (!revealer || el.getBoundingClientRect().top < window.innerHeight) el.classList.add('visible');
+  const track = (el) => {
+    if (!revealer || el.getBoundingClientRect().top < window.innerHeight) showEl(el);
     else revealer.observe(el);
-  });
+  };
+  S.revealSections = (root) => {
+    const r = root || document;
+    const list = S.$$(PENDING, r);
+    if (r.matches && r.matches(PENDING)) list.unshift(r);
+    // After the first frame, so the fade still plays for what is on screen.
+    if (list.length) requestAnimationFrame(() => list.forEach(track));
+  };
+  if ('MutationObserver' in window) {
+    let queued = [], scheduled = false;
+    new MutationObserver((records) => {
+      records.forEach((r) => r.addedNodes.forEach((n) => { if (n.nodeType === 1) queued.push(n); }));
+      if (scheduled || !queued.length) return;
+      scheduled = true;
+      requestAnimationFrame(() => { scheduled = false; const nodes = queued; queued = []; nodes.forEach((n) => { if (n.isConnected) S.revealSections(n); }); });
+    }).observe(document.documentElement, { childList: true, subtree: true });
+  }
+  // A link to an anchor (/#why, /apartments#calc): everything up to the new position is shown right away.
+  const revealToHere = () => setTimeout(() => S.$$(PENDING).forEach((el) => { if (el.getBoundingClientRect().top < window.innerHeight) showEl(el); }), 60);
+  window.addEventListener('hashchange', revealToHere);
+  window.addEventListener('load', () => { if (location.hash) revealToHere(); });
   window.addEventListener('beforeprint', () => S.$$('.section-reveal, .reveal').forEach((el) => el.classList.add('visible', 'in')));
 
   // Button ripple: a circle spreads from the point of the press (styles.css, .ripple-active). One listener for every
