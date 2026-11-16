@@ -62,7 +62,7 @@ Binosoz/
 │   │   │   ├── Data/
 │   │   │   │   ├── AppDbContext.cs
 │   │   │   │   ├── Configurations/ ← EF конфигурации сущностей
-│   │   │   │   ├── Migrations/     ← миграции EF Core (24)
+│   │   │   │   ├── Migrations/     ← миграции EF Core (25)
 │   │   │   │   └── Seed/           ← сидер (Development-данные)
 │   │   │   ├── Services/           ← вся бизнес-логика:
 │   │   │   │   AuthService.cs      (675 строк: email OTP, SMS, JWT, refresh, lockout)
@@ -98,16 +98,21 @@ Binosoz/
     ├── manifest.json, sw.js       ← PWA (Service Worker «сначала сеть»), robots.txt, sitemap.xml
     ├── img/gallery/               ← виды Душанбе с Wikimedia Commons (WebP 400/800/1200), авторы — CREDITS.md
     ├── img/renders/               ← кадры 3D-модели дома (WebP 800/1600/2400), подпись «Визуализация 3D-модели»
+    ├── data/                      ← context-<buildingId>.json — окружение дома из OpenStreetMap (ODbL, CREDITS.md); только при координатах
     ├── css/styles.css             ← токены (:root и [data-theme='dark']), все компоненты; новый дизайн — классы nr-*
     └── js/
         ├── tanzimot-api-url.js        ← config: API_BASE ('/api/v1'; Vercel → Render), ORG_SLUG, CONTACT, INSTALLMENT
-        ├── i18n/ru.js, tg.js, en.js   ← тексты (по 1802 ключа); ru — на каждой странице и запасной
+        ├── i18n/ru.js, tg.js, en.js   ← тексты (по 1855 ключей); ru — на каждой странице и запасной
         ├── tarjumaho-ru-tg-en.js      ← S.t(), S.initLang()/S.setLang() (грузит tg/en по требованию), S.bus
         ├── komponentho-modal-toast-tabs.js ← h() DOM-builder, иконки, модалки, тосты
         ├── zaprosho-ba-backend.js     ← все вызовы API, токены (localStorage sitora.auth)
         ├── routing-va-navigatsiya.js  ← запуск страницы: шапка, тема, язык, мобильное меню, reveal
         ├── sahifai-asosi-script.js    ← публичный сайт: главная, каталог, калькулятор, контакты, футер
-        ├── modeli-3d-bino-script.js   ← 3D-дом каталога (Three.js r128, грузится лениво; единственный 3D-движок)
+        ├── modeli-3d-bino-script.js   ← 3D-дом каталога (Three.js r128, грузится лениво; единственный 3D-движок): камера,
+        │                                 солнце Душанбе, окружение OSM, «внутри», «прогулка», FPS; хук window.__house3d
+        ├── modeli-3d-rejim-script.js  ← «3D на весь экран» (/apartments#3d): ракурсы, время суток, список, карточка цены
+        ├── modeli-3d-kvartira-script.js ← квартира изнутри (стены, проёмы, мебель-пример); грузится по «Посмотреть внутри»
+        ├── planirovki-data.js         ← типовые планировки в метрах — один источник для 2D-плана и 3D-квартиры
         ├── galereya-script.js, dar-borai-mo-script.js ← /gallery (фото Душанбе + планировки), /about
         ├── eko-pasport-script.js   ← «зелёная» часть (S.eco): эко-паспорт, расходы на энергию, «Зелёный эффект», формы CRM
         ├── siyosati-mahfiyat-script.js ← /privacy: политика конфиденциальности (тексты privacy.*; сверять с кодом при изменениях)
@@ -122,6 +127,7 @@ Binosoz/
         ├── check-contrast.js      проверка контраста WCAG AA
         ├── qr/                    QR-код сайта в SVG: cd frontend/tools/qr && npm ci && npm run build
         ├── renders/               кадры 3D-модели для сайта: serve-web на 5500, затем node frontend/tools/renders/render.mjs
+        ├── context/build.mjs      окружение дома из OSM: node frontend/tools/context/build.mjs --id <id> --lat .. --lon ..
         └── e2e/                   Playwright: cd frontend/tools/e2e && npm ci && npm test
 ```
 
@@ -133,12 +139,15 @@ Binosoz/
   `--accent-text` (медный текст и ссылки), `--accent-2` (градиенты), статусы `--good/--warn/--bad/--info` и их `-soft`.
   Полупрозрачность — `color-mix(in srgb, var(--accent) 20%, transparent)`. Хардкод цвета текста ломает тёмную тему.
 - **Тёмные секции** на светлом сайте (класс `.nr-dark`: hero главной и «О проекте», «Всё, что важно при покупке»,
-  калькулятор каталога, «История строительства», «Остались вопросы?», левая колонка входа и регистрации; ещё футер)
+  калькулятор каталога, «История строительства», «Остались вопросы?», левая колонка входа и регистрации, 3D на весь экран
+  `.h3d-full`; ещё футер)
   переопределяют `--ink/--ink-2/--muted` локально — компоненты внутри сами светлые. Новую тёмную секцию добавлять в этот список.
 - **Тёмная тема**: `[data-theme='dark']` меняет токены; рамки полей и кнопок-контуров — `--field-line` (контраст ≥ 3:1, WCAG 1.4.11); проверка — `frontend/tools/check-contrast.js` (0 текстов ниже AA в обеих темах).
 - **Честные данные**: цифры, цены, свободные квартиры, удобства, условия рассрочки, ход стройки — только из API (в config
   чисел о доме нет); пустой API — карточка «Продажи скоро откроются». Ничего не выдумывать (даты, отзывы, фото, людей).
   Картинки дома — только рендеры 3D-модели с подписью; e2e-тест «no invented claims» ловит вернувшиеся выдумки.
+  3D: окружение и расстояния — только при координатах дома (OSM, по прямой); планировки — типовые, мебель — пример;
+  высота этажа не задана — 3,0 м с пометкой «оценка»; $ — по курсу НБТ с подписью «оценочно по курсу».
 - **Переводы**: новый ключ — во все три файла `js/i18n/*.js`.
 - **Фото галереи** — только CC0 / общественное достояние / CC BY / CC BY-SA (без NC и ND), под каждым «Фото: автор, лицензия»
   со ссылкой на страницу файла, запись в `img/gallery/CREDITS.md`. Подписи честные: это виды города, не здания комплекса.
