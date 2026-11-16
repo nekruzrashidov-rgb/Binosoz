@@ -76,14 +76,24 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Тесты
-        run: npm test
+        run: npx playwright test --grep-invert "3D on the whole screen"
+
+      # 3D-сцена в CI рисуется на SwiftShader (без видеокарты): параллельно с другими тестами кадр идёт секунды и
+      # тесты падают по времени. Поэтому 3D — отдельным шагом, в один поток.
+      - name: Тесты 3D (в один поток)
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_HTML_REPORT: playwright-report-3d
+        run: npx playwright test tests/house3d.spec.js --workers=1
 
       - name: Отчёт при ошибке
         if: failure()
         uses: actions/upload-artifact@v5
         with:
           name: playwright-report
-          path: frontend/tools/e2e/playwright-report
+          path: |
+            frontend/tools/e2e/playwright-report
+            frontend/tools/e2e/playwright-report-3d
 
   docker:
     name: Docker-образ и compose
