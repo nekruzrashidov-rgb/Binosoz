@@ -12,7 +12,11 @@
   const isPublic = page === 'home' || page === 'apartments' || page === 'gallery' || page === 'about' || page === 'contact' || page === 'privacy' || page === 'register' || page === 'accept-invite' || page === 'notfound';
   const app = document.getElementById('app');
   const header = h('header', { class: 'top' });
-  const main = h('div', { id: 'view' });
+  // The page content is the <main> landmark — except where the view draws its own (the login page, the CRM and platform workspaces).
+  const ownMain = page === 'login' || page === 'crm' || page === 'platform';
+  const main = h(ownMain ? 'div' : 'main', { id: 'view', tabindex: ownMain ? null : '-1' });
+  // «Перейти к содержимому»: the first stop of the keyboard, shown only when it has the focus.
+  const skip = ownMain ? null : h('a', { class: 'skip-link', href: '#view' }, t('a11y.skip'));
   let cleanup = null;
 
   // The pages are served by the API itself and carry no demo backend (mock.js), so the API is on this origin.
@@ -283,7 +287,7 @@
     startProgress();
     // Login and invitation pages draw no top bar (drawHeader skips them): an empty <header> left a blank 68px strip.
     if (page === 'login' || page === 'accept-invite') app.replaceChildren(main);
-    else app.replaceChildren(header, main);
+    else app.replaceChildren(...[skip, header, main].filter(Boolean));
     // The real height of the top bar (taller with the "as owner" banner): sticky bars under it (CRM tabs) start there.
     if ('ResizeObserver' in window) new ResizeObserver(() => document.documentElement.style.setProperty('--hdr-h', header.offsetHeight + 'px')).observe(header);
     await S.api.restore();

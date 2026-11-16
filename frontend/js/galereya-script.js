@@ -1,6 +1,6 @@
 /* Gallery (/gallery, design docs/design/Gallery.dc.html): renders of the site's 3D model (signed as renders), views of
    Dushanbe from Wikimedia Commons (S.site.galleryPhotos, each with author and licence) and the four floor plans drawn on
-   a canvas. Filters by category; a click opens a lightbox with a larger picture, arrows and the keyboard (← → Esc).
+   a canvas — only the types the building really has (from the API; without data there are none). Filters by category; a click opens a lightbox with a larger picture, arrows and the keyboard (← → Esc).
    No photos of the complex: there are none yet, and a picture of another building must not pass for it. */
 (function () {
   const S = (window.S = window.S || {});
@@ -12,14 +12,14 @@
   // Renders of the 3D model (frontend/tools/renders): name and the caption key of the time of day.
   const RENDERS = [['tower-dusk-tall', 'nr.render.dusk'], ['tower-day-tall', 'nr.render.day'], ['tower-night-tall', 'nr.render.night']]
     .map(([render, time]) => ({ render, time, cat: 'renders', cap: 'nr.render' }));
-  const PLANS = [0, 1, 2, 3].map((n) => ({ plan: n, cat: 'plans', cap: 'layouts.type' + n }));
+  const plansOf = (types) => types.map((n) => ({ plan: n, cat: 'plans', cap: 'layouts.type' + n }));
 
   // A floor plan on a canvas of W×H CSS pixels.
   function paintPlan(canvas, n, W, H) { canvas.setAttribute('width', W); canvas.setAttribute('height', H); S.site.drawFloorPlan(canvas, n); }
 
   S.views.gallery = function (root) {
     const site = S.site;
-    let filter = 'all', lightbox = null;
+    let filter = 'all', lightbox = null, opener = null, planTypes = [];
     const page = h('div', { class: 'page-in nr gallery-page' });
     root.appendChild(page);
 
@@ -29,8 +29,8 @@
 
     const bar = h('div', { class: 'nr-pills', role: 'group', 'aria-label': t('galpg.filters') });
     const grid = h('div', { class: 'galpg-grid' });
-    const items = RENDERS.concat(site.galleryPhotos.map((p) => ({ photo: p, cat: 'city', cap: 'galpg.p.' + p.id })), PLANS);
-    const shown = () => items.filter((it) => filter === 'all' || it.cat === filter);
+    const items = () => RENDERS.concat(site.galleryPhotos.map((p) => ({ photo: p, cat: 'city', cap: 'galpg.p.' + p.id })), plansOf(planTypes));
+    const shown = () => items().filter((it) => filter === 'all' || it.cat === filter);
     // Caption: the title and, for a photo, «Фото: автор, лицензия» with a link to the file page.
     // A render: «Визуализация 3D-модели · закат»; a photo — its place and «Фото: автор, лицензия».
     const title = (it) => (it.render ? t('nr.render') + ' · ' + t(it.time) : t(it.cap));
@@ -38,7 +38,7 @@
     const picture = (it, sizes, cls) => (it.render ? site.renderImg(it.render, sizes, t('nr.render.alt') + ' — ' + t(it.time)) : site.galleryImg(it.photo, sizes, cls));
 
     function drawBar() {
-      bar.replaceChildren(...FILTERS.map(([k, key]) => h('button', { type: 'button', class: 'nr-pill', 'aria-pressed': String(filter === k), onclick: () => { filter = k; drawBar(); drawGrid(); } }, t(key))));
+      bar.replaceChildren(...FILTERS.filter(([k]) => k !== 'plans' || planTypes.length).map(([k, key]) => h('button', { type: 'button', class: 'nr-pill', 'aria-pressed': String(filter === k), onclick: () => { filter = k; drawBar(); drawGrid(); } }, t(key))));
     }
     function drawGrid() {
       const list = shown();
@@ -56,6 +56,7 @@
     // Lightbox over the page: the photo (or the plan at 600×400), scaled down on a phone; caption, arrows, Esc.
     function open(index) {
       close();
+      opener = document.activeElement;
       let i = index;
       const list = shown();
       const stage = h('div', { class: 'lb-pic' });
@@ -86,10 +87,23 @@
       if (!lightbox) return;
       lightbox.remove(); lightbox = null;
       document.body.classList.remove('menu-open');
+      if (opener && opener.isConnected) opener.focus();
+      opener = null;
     }
 
     drawBar(); drawGrid();
+    let alive = true;
+    (async () => {
+      try {
+        const id = await site.building();
+        if (!id) return;
+        const apts = await S.api.allApartments(await S.api.floors(id));
+        if (!alive) return;
+        planTypes = [0, 1, 2, 3].filter((n) => apts.some((a) => (n === 3 ? a.rooms >= 3 : a.rooms === n)));
+        if (planTypes.length) { drawBar(); drawGrid(); }
+      } catch (e) { /* no API: renders and city views only */ }
+    })();
     page.append(head, h('section', { class: 'nr-sec nr-gallery' }, h('div', { class: 'nr-wrap' }, bar, grid, h('p', { class: 'nr-note' }, t('galpg.note')))), site.footer());
-    return () => close();
+    return () => { alive = false; close(); };
   };
 })();

@@ -70,7 +70,7 @@
           apts ? t('aboutpg.chip.apts', { n: apts }) : null,
           b.completionYear ? t('aboutpg.chip.delivery', { y: b.completionYear }) : null,
         ].filter(Boolean).map((x) => h('li', null, x)));
-        const desc = S.lang === 'tg' && b.descriptionTg ? b.descriptionTg : b.description;
+        const desc = S.lang === 'tg' ? b.descriptionTg || b.description : b.descriptionRu || b.description;
         const address = S.brandAddress(b.address) || site.contacts().address;
         text.replaceChildren(...[desc ? h('p', { class: 'nr-lead' }, desc) : null,
           address ? h('p', { class: 'nr-about-address' }, site.icon('pin'), h('span', null, t('nr.about.address', { a: address }))) : null].filter(Boolean));

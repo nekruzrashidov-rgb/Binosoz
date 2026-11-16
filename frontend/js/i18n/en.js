@@ -1,4 +1,4 @@
-/* English interface texts (1795 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* English interface texts (1796 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -29,8 +29,8 @@
     "nav.project": "About",
     "common.delete": "Delete",
     "aboutpg.hero.sub": "A residential complex in Dushanbe. Apartments are sold online on the Binosoz platform.",
-    "aboutpg.chip.floors": "{n} floors",
-    "aboutpg.chip.apts": "{n} apartments",
+    "aboutpg.chip.floors": "{n} floor|{n} floors",
+    "aboutpg.chip.apts": "{n} apartment|{n} apartments",
     "aboutpg.chip.delivery": "Delivery {y}",
     "aboutpg.complex": "About the complex",
     "aboutpg.timeline": "Construction history",
@@ -104,7 +104,7 @@
     "cimp.title": "Import customers",
     "cimp.hint": "An .xlsx file, the first row holds the headers. Columns: Name | Phone | Email | Comment. Customers whose phone is already known are skipped; the comment is not saved to the card.",
     "cimp.file": "Excel file",
-    "cimp.load": "Import {n} customers",
+    "cimp.load": "Import {n} customer|Import {n} customers",
     "cimp.summary": "New: {a} · duplicates: {s} · with errors: {i}",
     "cimp.status": "Status",
     "cimp.st.new": "New",
@@ -1065,16 +1065,16 @@
     "green.kicker": "Green model",
     "green.title": "Binosoz green impact",
     "green.sub": "What has already been done online instead of paper and trips to the office — from the platform’s real data.",
-    "green.docs": "documents issued online",
-    "green.pages": "sheets of paper not printed",
+    "green.docs": "document issued online|documents issued online",
+    "green.pages": "sheet of paper not printed|sheets of paper not printed",
     "green.paper": "of paper saved",
     "green.co2": "of CO₂ not emitted",
-    "green.actions": "actions without an office visit",
+    "green.actions": "action without an office visit|actions without an office visit",
     "green.kgV": "{n} kg",
     "green.note": "Sheets come from the pages of issued PDFs (schedules, reconciliation statements, contracts); one A4 sheet weighs 5 g.",
     "green.co2Source": "CO₂ coefficient: {s}.",
     "green.paperTitle": "Paper saved",
-    "green.pagesN": "{n} sheets",
+    "green.pagesN": "{n} sheet|{n} sheets",
     "green.chartLabel": "Sheets by month over the last year",
     "green.cardNote": "Without an office visit: bookings on the site — {b}, online payments — {p}, chat messages — {c}.",
     "aboutpg.green.title": "Why this is a green model",
@@ -1480,7 +1480,7 @@
     "ct.agree": "I agree to the processing of my personal data",
     "ct.send": "Send request",
     "ct.errName": "Enter your name",
-    "ct.errPhone": "Number in the format +992 XX XXX XX XX",
+    "ct.errPhone": "Invalid phone number, e.g. +992 90 123 45 67",
     "ct.errAgree": "Consent to data processing is required",
     "ct.done": "We will contact you shortly.",
     "ct.again": "Send another one",
@@ -1651,7 +1651,7 @@
     "faq.down": "What is the minimum down payment?",
     "faq.down.a": "From {down}% of the apartment price{term}.{zero}",
     "faq.delivery": "When will the building be completed?",
-    "faq.delivery.a": "Planned completion is {year}, according to the developer. Construction progress is on the «About» page and in the personal account.",
+    "faq.delivery.a": "Planned completion is {year}, according to the developer.",
     "faq.booking": "How do I make a reservation online?",
     "faq.booking.a": "Choose an apartment in the catalog, press “Reserve” and enter your name and phone. The reservation lasts 48 hours — during this time a manager will contact you.",
     "faq.fees": "Are there any hidden fees?",
@@ -1799,5 +1799,6 @@
     "pin.save": "Save and sign in",
     "pin.saved": "Sign-in code saved",
     "pin.digitsOnly": "Digits only",
+    "a11y.skip": "Skip to content",
   };
 })();

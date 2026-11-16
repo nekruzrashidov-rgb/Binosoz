@@ -1072,6 +1072,10 @@ a.float-card.tg:hover { border-color: rgba(34, 158, 217, 0.75); background: rgba
 .pass-wrap .inp { padding-right: 46px; }
 .pass-eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; border: 0; border-radius: 8px; background: none; cursor: pointer; font-size: 17px; line-height: 1; opacity: 0.6; }
 .pass-eye:hover, .pass-eye[aria-pressed='true'] { opacity: 1; background: var(--surface-2); }
+/* «Перейти к содержимому»: off screen until it gets the keyboard focus. */
+.skip-link { position: absolute; left: 16px; top: -200px; z-index: var(--z-toast); display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 2px; background: var(--surface); color: var(--ink); font-weight: 700; box-shadow: var(--shadow-lg); }
+.skip-link:focus { top: calc(8px + env(safe-area-inset-top, 0px)); }
+#view:focus { outline: none; }
 /* The buyer's 6-digit code and the code from a letter: six cells (kabineti-xaridor-script.js, S.pinCells). */
 .pin-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; }
 .pin-head > label { font-size: 12.5px; font-weight: 700; color: var(--ink-2); letter-spacing: 0.01em; }
@@ -2517,8 +2521,8 @@ h1, h2 { font-weight: 500; letter-spacing: -0.01em; }
   .tower-logo { width: 28px; height: 28px; }
 }
 
-/* «Сервер просыпается»: a strip under the header, not over it. */
-.wake-bar { top: calc(var(--hdr-h, var(--top-h)) + 10px + env(safe-area-inset-top, 0px)); border-radius: 2px; }
+/* «Сервер просыпается»: a small toast in the bottom-left corner — it covers no heading or text and goes away as soon as the API answers. */
+.wake-bar { top: auto; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); left: 16px; transform: none; max-width: min(380px, calc(100% - 96px)); width: auto; border-radius: 2px; font-size: 13px; }
 
 /* ---------- buttons of the public pages ---------- */
 .nr .btn, .lux-footer .btn, .nr-btn { border-radius: 2px; }
@@ -2558,6 +2562,7 @@ a:hover > .nr-arrow, button:hover > .nr-arrow { transform: translateX(4px); }
 /* ---------- hero ---------- */
 .nr-hero { position: relative; overflow: hidden; min-height: min(92vh, 860px); display: flex; }
 .nr-hero-media { position: absolute; inset: 0; margin: 0; }
+.nr-hero-media picture { display: contents; }
 .nr-hero-media img { width: 100%; height: 100%; object-fit: cover; object-position: 72% 40%; display: block; }
 .nr-hero-shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(20, 17, 15, 0.9) 0%, rgba(20, 17, 15, 0.62) 42%, rgba(20, 17, 15, 0.08) 80%), linear-gradient(0deg, rgba(20, 17, 15, 0.7) 0%, transparent 35%); }
 .nr-render-note { position: absolute; top: 16px; right: 16px; z-index: 1; padding: 6px 12px; background: rgba(20, 17, 15, 0.72); color: #e9e1d3; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
@@ -2572,7 +2577,7 @@ a:hover > .nr-arrow, button:hover > .nr-arrow { transform: translateX(4px); }
 .nr-stat dd { margin: 0; font-family: var(--display); font-size: 48px; font-weight: 500; line-height: 1; color: var(--ink); font-variant-numeric: lining-nums tabular-nums; }
 @media (max-width: 700px) {
   .nr-hero { min-height: 0; }
-  .nr-hero-media img { object-position: 78% 30%; }
+  .nr-hero-media img { object-position: 50% 30%; }
   .nr-hero-shade { background: linear-gradient(180deg, rgba(20, 17, 15, 0.55) 0%, rgba(20, 17, 15, 0.82) 55%, rgba(20, 17, 15, 0.95) 100%); }
   .nr-hero-in { gap: 40px; padding-top: 56px; }
   .nr-hero-sub { font-size: 17px; }
@@ -2703,7 +2708,12 @@ body { font-variant-numeric: lining-nums; font-feature-settings: 'lnum' 1; } /* 
   .lux-footer .soc { width: 44px; height: 44px; }
 }
 .nr-contact-lines a { display: inline-flex; align-items: center; min-height: 44px; }
-@media (max-width: 560px) { .lux-footer .foot-dev a, .lux-footer .foot-privacy { display: inline-flex; align-items: center; min-height: 44px; } }
+/* Footer links on touch screens and narrow windows: at least 44 px high (WCAG 2.5.5). */
+@media (pointer: coarse), (max-width: 768px) {
+  .lux-footer .foot-col a, .lux-footer .foot-col span, .lux-footer .foot-brand > a, .lux-footer .foot-dev a, .lux-footer .foot-privacy, .lux-footer .foot-demo a { display: inline-flex; align-items: center; min-height: 44px; }
+  .lux-footer .foot-col { gap: 0; }
+  .lux-footer .foot-social .btn { min-height: 44px; }
+}
 
 /* ---------- inner page head (catalog, gallery, contacts…) ---------- */
 .nr-pagehead { background: var(--surface-3); border-bottom: 1px solid var(--line); padding-block: clamp(36px, 5vw, 56px); }
@@ -2736,6 +2746,11 @@ body { font-variant-numeric: lining-nums; font-feature-settings: 'lnum' 1; } /* 
 .nr-stage { position: relative; height: clamp(440px, 64vh, 680px); background: #1b1815; overflow: hidden; }
 .nr-house { position: absolute; inset: 0; }
 .nr-house canvas { display: block; }
+/* Placeholder render until the 3D scene has drawn its first frame; the canvas stays transparent until then. */
+.nr-3d-poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 40%; transition: opacity 0.4s; pointer-events: none; }
+.nr-house:not(.is-ready) canvas { opacity: 0; }
+.nr-house.is-ready .nr-3d-poster { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .nr-3d-poster { transition: none; } }
 .nr-stage .tip { z-index: 4; }
 .nr-stage-loading { position: absolute; inset: 0; display: grid; place-items: center; color: #e9e1d3; font-weight: 600; }
 .nr-rail { position: absolute; top: 12px; right: 12px; bottom: 64px; z-index: 3; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; padding-right: 2px; scrollbar-width: thin; }

@@ -42,8 +42,10 @@
     if (!filled(eco)) return null;
     const o = opts || {};
     const facts = [];
-    if (has(eco.wallInsulation)) facts.push([t('eco.wall'), eco.wallInsulation]);
-    if (has(eco.windows)) facts.push([t('eco.windows'), eco.windows]);
+    // Texts in two languages: Tajik for TJ, Russian for RU and EN (there is no English text).
+    const text = (k) => (S.lang === 'tg' ? eco[k + 'Tg'] || eco[k] : eco[k + 'Ru'] || eco[k]);
+    if (has(text('wallInsulation'))) facts.push([t('eco.wall'), text('wallInsulation')]);
+    if (has(text('windows'))) facts.push([t('eco.windows'), text('windows')]);
     if (has(eco.heatingType)) facts.push([t('eco.heating'), t('eco.heat.' + eco.heatingType)]);
     if (has(eco.estimatedKwhPerM2Year)) facts.push([t('eco.kwh'), t('eco.kwhValue', { n: nf(eco.estimatedKwhPerM2Year) })]);
     if (has(eco.solarPanelsKw)) facts.push([t('eco.solar'), t('eco.kw', { n: nf(eco.solarPanelsKw) })]);
@@ -201,10 +203,10 @@
       sec.replaceChildren(h('div', { class: 'wrap' },
         h('div', { class: 'lux-head' }, h('span', { class: 'green-kicker' }, icon('leaf'), t('green.kicker')), h('h2', null, t('green.title')), h('p', null, t('green.sub')), g.isDemo ? h('span', { class: 'demo-badge' }, t('demo.badge')) : null),
         h('div', { class: 'green-tiles' },
-          tile(S.fmt.n(g.documentsDigital), t('green.docs')),
-          tile(S.fmt.n(g.pagesSaved), t('green.pages')),
+          tile(S.fmt.n(g.documentsDigital), S.plural(g.documentsDigital, 'green.docs')),
+          tile(S.fmt.n(g.pagesSaved), S.plural(g.pagesSaved, 'green.pages')),
           tile(paper(g), t('green.paper')),
-          g.co2KgSaved !== undefined && g.co2KgSaved !== null ? tile(weight(g.co2KgSaved), t('green.co2')) : tile(S.fmt.n(g.onlineActions), t('green.actions'))),
+          g.co2KgSaved !== undefined && g.co2KgSaved !== null ? tile(weight(g.co2KgSaved), t('green.co2')) : tile(S.fmt.n(g.onlineActions), S.plural(g.onlineActions, 'green.actions'))),
         h('p', { class: 'green-note' }, t('green.note'), g.co2Source ? ' ' + t('green.co2Source', { s: g.co2Source }) : '')));
       sec.hidden = false;
     }).catch(() => {});
@@ -232,9 +234,9 @@
       const kpi = (v, l) => h('div', null, h('b', null, v), h('span', null, l));
       card.replaceChildren(
         h('div', { class: 'eco-head' }, h('span', { class: 'eco-ic' }, icon('leaf')), h('h3', null, t('green.paperTitle')), g.isDemo ? h('span', { class: 'demo-badge' }, t('demo.badge')) : null),
-        h('div', { class: 'green-kpis' }, kpi(S.fmt.n(g.pagesSaved), t('green.pages')), kpi(paper(g), t('green.paper')),
+        h('div', { class: 'green-kpis' }, kpi(S.fmt.n(g.pagesSaved), S.plural(g.pagesSaved, 'green.pages')), kpi(paper(g), t('green.paper')),
           g.co2KgSaved !== undefined && g.co2KgSaved !== null ? kpi(weight(g.co2KgSaved), t('green.co2')) : null,
-          kpi(S.fmt.n(g.onlineActions), t('green.actions'))),
+          kpi(S.fmt.n(g.onlineActions), S.plural(g.onlineActions, 'green.actions'))),
         svg,
         h('p', { class: 'hint' }, t('green.cardNote', { b: s.onlineBookings, p: s.onlinePayments, c: s.chatMessages }), g.co2Source ? ' ' + t('green.co2Source', { s: g.co2Source }) : ''));
       card.hidden = false;

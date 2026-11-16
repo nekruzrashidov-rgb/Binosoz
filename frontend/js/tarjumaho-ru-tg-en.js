@@ -11,10 +11,25 @@
   S.bus = (function () { const h = {}; return { on(n, f) { (h[n] = h[n] || []).push(f); return () => { h[n] = (h[n] || []).filter((x) => x !== f); }; }, emit(n, d) { (h[n] || []).slice().forEach((f) => { try { f(d); } catch (e) { S.logError(e); } }); } }; })();
   const dict = S.I18N;
   S.lang = 'ru';
+  // The form of a word by the number: forms — "one|few|many" (an i18n key or an array). Russian: 1 документ,
+  // 2 документа, 5 документов (21 — one, 11–14 — many); English: one for 1, otherwise the last form; Tajik keeps
+  // the noun singular after a number — the first form.
+  S.plural = function (n, forms) {
+    const f = Array.isArray(forms) ? forms : String(S.t(forms)).split('|');
+    if (f.length < 2) return f[0];
+    const lang = S.lang || 'ru';
+    if (lang === 'tg') return f[0];
+    const abs = Math.abs(Math.trunc(Number(n) || 0));
+    if (lang === 'en') return abs === 1 ? f[0] : f[f.length - 1];
+    const m10 = abs % 10, m100 = abs % 100;
+    return m10 === 1 && m100 !== 11 ? f[0] : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? f[1] : f[f.length - 1];
+  };
   S.t = function (key, params, fallback) {
     let s = (dict[S.lang] && dict[S.lang][key]);
     if (s === undefined && dict.ru) s = dict.ru[key];
     if (s === undefined) s = fallback !== undefined && fallback !== null ? fallback : key;
+    // "{n} лист|{n} листа|{n} листов": with a numeric n the form is picked by the number.
+    if (params && typeof params.n === 'number' && String(s).includes('|') && String(s).includes('{n}')) s = S.plural(params.n, String(s).split('|'));
     if (params) s = String(s).replace(/\{(\w+)\}/g, (m, k) => (params[k] !== undefined ? params[k] : m));
     return s;
   };

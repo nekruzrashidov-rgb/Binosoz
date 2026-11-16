@@ -24,7 +24,8 @@
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" media="print" data-fonts>
 <link rel="stylesheet" href="/css/styles.css">
-<link rel="preload" as="image" href="/img/renders/tower-dusk-wide-1600.webp" imagesrcset="/img/renders/tower-dusk-wide-800.webp 800w, /img/renders/tower-dusk-wide-1600.webp 1600w, /img/renders/tower-dusk-wide-2400.webp 2400w" imagesizes="100vw" fetchpriority="high">
+<link rel="preload" as="image" media="(min-width: 701px)" href="/img/renders/tower-dusk-wide-1600.webp" imagesrcset="/img/renders/tower-dusk-wide-800.webp 800w, /img/renders/tower-dusk-wide-1600.webp 1600w, /img/renders/tower-dusk-wide-2400.webp 2400w" imagesizes="100vw" fetchpriority="high">
+<link rel="preload" as="image" media="(max-width: 700px)" href="/img/renders/tower-dusk-tall-800.webp" imagesrcset="/img/renders/tower-dusk-tall-800.webp 800w, /img/renders/tower-dusk-tall-1600.webp 1600w, /img/renders/tower-dusk-tall-2400.webp 2400w" imagesizes="100vw" fetchpriority="high">
 </head>
 <body data-page="home">
 <div id="app"><!-- First paint before the scripts (the same markup S.views.home draws); replaced by the scripts. -->
@@ -34,7 +35,7 @@
 <span class="spacer"></span><a class="top-phone desk-only" href="tel:+992983637070">+992 98 363 70 70</a><a class="btn sm gold" href="/login">Войти</a></div>
 </header>
 <div id="view"><div class="nr nr-home"><section class="nr-hero nr-dark" id="top">
-<figure class="nr-hero-media"><img src="/img/renders/tower-dusk-wide-1600.webp" srcset="/img/renders/tower-dusk-wide-800.webp 800w, /img/renders/tower-dusk-wide-1600.webp 1600w, /img/renders/tower-dusk-wide-2400.webp 2400w" sizes="100vw" width="2400" height="1350" alt="Дом на 3D-модели — визуализация" fetchpriority="high" decoding="async"><figcaption class="nr-render-note">Визуализация 3D-модели</figcaption></figure>
+<figure class="nr-hero-media"><picture><source media="(max-width: 700px)" srcset="/img/renders/tower-dusk-tall-800.webp 800w, /img/renders/tower-dusk-tall-1600.webp 1600w, /img/renders/tower-dusk-tall-2400.webp 2400w" sizes="100vw"><img src="/img/renders/tower-dusk-wide-1600.webp" srcset="/img/renders/tower-dusk-wide-800.webp 800w, /img/renders/tower-dusk-wide-1600.webp 1600w, /img/renders/tower-dusk-wide-2400.webp 2400w" sizes="100vw" width="2400" height="1350" alt="Дом на 3D-модели — визуализация" fetchpriority="high" decoding="async"></picture><figcaption class="nr-render-note">Визуализация 3D-модели</figcaption></figure>
 <div class="nr-hero-shade" aria-hidden="true"></div>
 <div class="nr-wrap nr-hero-in"><div class="nr-hero-text"><div class="nr-kicker nr-kicker--light"><span class="nr-kicker-line" aria-hidden="true"></span>Душанбе</div>
 <h1 class="nr-hero-title">Некруз Резиденс</h1>

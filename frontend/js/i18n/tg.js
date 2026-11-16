@@ -1,4 +1,4 @@
-/* Tajik interface texts (1795 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* Tajik interface texts (1796 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. Tajik strings should be proof-read by a native speaker before launch. */
 (function () {
   const S = (window.S = window.S || {});
@@ -1480,7 +1480,7 @@
     "ct.agree": "Ба коркарди маълумоти шахсӣ розӣ ҳастам",
     "ct.send": "Фиристодани дархост",
     "ct.errName": "Номро нависед",
-    "ct.errPhone": "Рақам дар шакли +992 XX XXX XX XX",
+    "ct.errPhone": "Рақами телефон нодуруст аст, масалан: +992 90 123 45 67",
     "ct.errAgree": "Розигӣ ба коркарди маълумот лозим аст",
     "ct.done": "Мо ба зудӣ бо шумо тамос мегирем.",
     "ct.again": "Боз як дархост",
@@ -1652,7 +1652,7 @@
     "faq.down": "Пардохти ҳадди ақали аввалия чанд аст?",
     "faq.down.a": "Аз {down}% аз нархи хона{term}.{zero}",
     "faq.delivery": "Бино кай супорида мешавад?",
-    "faq.delivery.a": "Супоридани нақшавӣ — соли {year}, аз рӯи маълумоти сохтмончӣ. Рафти сохтмон — дар саҳифаи «Дар бораи лоиҳа» ва дар кабинети шахсӣ.",
+    "faq.delivery.a": "Супоридани нақшавӣ — соли {year}, аз рӯи маълумоти сохтмончӣ.",
     "faq.booking": "Чӣ тавр онлайн брон кардан мумкин?",
     "faq.booking.a": "Дар феҳрист манзилро интихоб кунед, «Брон кардан»-ро пахш кунед ва ном ва телефонро нависед. Брон 48 соат амал мекунад — дар ин муддат менеҷер бо шумо тамос мегирад.",
     "faq.fees": "Оё пардохтҳои пинҳонӣ ҳастанд?",
@@ -1799,5 +1799,6 @@
     "pin.save": "Нигоҳ доштан ва ворид шудан",
     "pin.saved": "Рамзи воридшавӣ нигоҳ дошта шуд",
     "pin.digitsOnly": "Танҳо рақамҳо",
+    "a11y.skip": "Гузариш ба мундариҷа",
   };
 })();
