@@ -61,7 +61,9 @@
     building(b) {
       return { id: b.id, name: pick(b, ['name', 'title'], '') || pick(b, ['nameRu'], ''), nameRu: pick(b, ['nameRu'], ''), nameTg: pick(b, ['nameTg'], ''), description: pick(b, ['description'], '') || pick(b, ['descriptionRu'], ''), descriptionRu: pick(b, ['descriptionRu'], ''), descriptionTg: pick(b, ['descriptionTg'], ''), address: pick(b, ['address'], ''), deliveryDate: pick(b, ['deliveryDate', 'completionDate', 'deadline'], ''), floorsCount: num(pick(b, ['floorsCount', 'floors', 'floorCount'], 0)), modelUrl: pick(b, ['modelUrl'], null), total: num(pick(b, ['totalApartments', 'apartmentsCount', 'total'], 0)), free: num(pick(b, ['freeApartments', 'freeCount', 'free'], 0)), completionYear: pick(b, ['completionYear'], null), plannedApartments: pick(b, ['plannedApartments'], null), eco: b.eco || null, isDemo: !!b.isDemo,
         // Amenities (keys of BuildingAmenities) and the developer's installment terms: only what the API has.
-        amenities: Array.isArray(b.amenities) ? b.amenities : [], installment: b.installment || null };
+        amenities: Array.isArray(b.amenities) ? b.amenities : [], installment: b.installment || null,
+        // The point on the map and the floor height (3D model): null — not set (no surroundings; the height is an estimate).
+        latitude: b.latitude == null ? null : num(b.latitude), longitude: b.longitude == null ? null : num(b.longitude), floorHeight: b.floorHeight == null ? null : num(b.floorHeight) };
     },
     floor(f) { return { id: f.id, number: num(pick(f, ['number', 'floorNumber', 'level'], 0)), commercial: !!pick(f, ['isCommercial', 'commercial'], false), total: num(pick(f, ['totalApartments', 'apartmentsCount', 'total'], 0)), free: num(pick(f, ['freeApartments', 'freeCount', 'free'], 0)) }; },
     apt(a, floorNo) {
@@ -436,6 +438,7 @@
     publicProgress(buildingId) { return request('GET', '/public/buildings/' + buildingId + '/progress'); },
     installmentSettings() { return request('GET', '/owner/installment-settings'); },
     saveInstallmentSettings(b) { return request('PUT', '/owner/installment-settings', { body: b }); },
+    saveBuildingLocation(id, body) { return request('PUT', '/buildings/' + id + '/location', { body }).then(M.building); },
     saveBuildingAmenities(id, keys) { return request('PUT', '/buildings/' + id + '/amenities', { body: { amenities: keys } }).then(M.building); },
     // Eco passport of a building (Content and leaders): the whole passport, empty fields — «not filled».
     saveBuildingEco(id, eco) { return request('PUT', '/buildings/' + id + '/eco', { body: eco }).then(M.building); },

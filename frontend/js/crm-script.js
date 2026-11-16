@@ -413,7 +413,7 @@
         const ecoForm = S.eco ? S.eco.form(b, (r) => { b.eco = r && r.eco; }) : null;
         // Amenities of the building: the site lists only these (Content and leaders).
         const amenForm = S.eco ? S.eco.amenitiesForm(b, (r) => { b.amenities = (r && r.amenities) || []; }) : null;
-        body.replaceChildren(buildingBar(bs, bid, 'catalog'), bform, amenForm, ecoForm, h('h3', { style: { marginTop: '10px' } }, t('cat.apts')), tools, holder);
+        body.replaceChildren(buildingBar(bs, bid, 'catalog'), bform, locationForm(b), amenForm, ecoForm, h('h3', { style: { marginTop: '10px' } }, t('cat.apts')), tools, holder);
         async function drawApts() {
           const fl = floors.find((f) => String(f.id) === String(floorId)); holder.replaceChildren(S.skeleton(4, 38));
           const list = (await S.api.floorApartments(fl)).sort((a, c) => (a.planSlot || 0) - (c.planSlot || 0));
@@ -422,6 +422,7 @@
         drawApts();
       },
 
+      // The point on the map and the floor height — for the 3D model of the site (surroundings, height label).
       async construction(body) {
         const holder = h('div', { class: 'stack' }); const bs = await S.api.buildings();
         if (!bs.length) { body.replaceChildren(S.empty(t('cat.noBuildings'), 'building')); return; }
@@ -1206,6 +1207,25 @@
   /* ---------- first sign-in of a new owner ---------- */
   // Welcome → the first building (with its floors, so apartments can be added at once) → invite a manager and an accountant.
   const CITIES = ['dushanbe', 'khujand', 'bokhtar', 'other'];
+  // The point of the building on the map and its floor height (Content and leaders): the 3D model of the site shows the
+  // real surroundings and the distances only with the coordinates; without the floor height it counts 3,0 m as an estimate.
+  function locationForm(b) {
+    const num = (name, v, attrs) => S.input(name, Object.assign({ type: 'number', inputmode: 'decimal', value: v == null ? '' : v }, attrs));
+    const lat = num('latitude', b.latitude, { step: 'any', min: -90, max: 90, placeholder: '38.5598' });
+    const lon = num('longitude', b.longitude, { step: 'any', min: -180, max: 180, placeholder: '68.7870' });
+    const fh = num('floorHeight', b.floorHeight, { step: '0.05', min: 2.4, max: 6, placeholder: '3.0' });
+    const btn = h('button', { class: 'btn', type: 'submit' }, t('common.save'));
+    const f = h('form', { class: 'card stack loc-form', novalidate: true }, h('h3', null, t('locf.title')), h('p', { class: 'muted' }, t('locf.hint')),
+      h('div', { class: 'grid g3' }, S.field(t('locf.lat'), lat), S.field(t('locf.lon'), lon), S.field(t('locf.floorH'), fh, t('locf.floorHint'))), h('div', null, btn));
+    const val = (el) => (el.value.trim() === '' ? null : Number(el.value.replace(',', '.')));
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault(); S.showErrors(f, null);
+      await S.busy(btn, async () => {
+        try { const r = await S.api.saveBuildingLocation(b.id, { latitude: val(lat), longitude: val(lon), floorHeight: val(fh) }); Object.assign(b, { latitude: r.latitude, longitude: r.longitude, floorHeight: r.floorHeight }); S.toast(t('common.saved'), 'ok'); } catch (er) { S.showErrors(f, er); }
+      });
+    });
+    return f;
+  }
   function wizard(box, finish) {
     const u = S.api.user;
     let building = null, floorsDone = 0;

@@ -100,8 +100,16 @@
     const add = (src) => new Promise((ok, fail) => { const el = document.createElement('script'); el.src = src; el.onload = ok; el.onerror = fail; document.head.appendChild(el); });
     threeLoading = (window.THREE ? Promise.resolve() : add('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'))
       .then(() => add('/js/modeli-3d-bino-script.js'))
+      .then(() => add('/js/modeli-3d-rejim-script.js'))
       .catch((e) => { threeLoading = null; throw e; });
     return threeLoading;
+  }
+  // The apartment inside (walls, furniture) — only when someone opens «Посмотреть внутри».
+  let interiorLoading = null;
+  function loadInterior() {
+    if (S.House3D && S.House3D.interior) return Promise.resolve();
+    if (!interiorLoading) interiorLoading = new Promise((ok, fail) => { const el = document.createElement('script'); el.src = '/js/modeli-3d-kvartira-script.js'; el.onload = ok; el.onerror = () => { interiorLoading = null; fail(); }; document.head.appendChild(el); });
+    return interiorLoading;
   }
 
   // Section headings are plain text: the old "first word in copper" on every title carried no meaning.
@@ -189,7 +197,7 @@
   S.views.apartments = function (root) {
     const cfg = window.SITORA_CONFIG || {};
     const st = { building: null, floors: [], apts: [], rate: null, sel: null, floor: null, floorRooms: 'all', rooms: 'all', maxPrice: 0, priceCap: 0, sort: 'price', onlyFree: true, shown: 12, time: 'dusk', calcApt: null };
-    let house = null, alive = true;
+    let house = null, alive = true, full = null, wantFull = location.hash === '#3d', pushedFull = false;
     const page = h('div', { class: 'page-in nr nr-cat' });
     root.appendChild(page);
 
@@ -218,11 +226,13 @@
       h('button', { class: 'nr-icon-btn', type: 'button', title: t('hero.zoomIn'), 'aria-label': t('hero.zoomIn'), onclick: () => house && house.zoom(0.8) }, S.icon('zin')),
       h('button', { class: 'nr-icon-btn', type: 'button', title: t('hero.zoomOut'), 'aria-label': t('hero.zoomOut'), onclick: () => house && house.zoom(1.25) }, S.icon('zout')),
       h('button', { class: 'nr-icon-btn', type: 'button', title: t('hero.reset'), 'aria-label': t('hero.reset'), onclick: () => { house && (house.clearSelection(), house.resetView()); } }, S.icon('rotate')));
+    // «Открыть 3D»: the same model on the whole screen (/apartments#3d) with the views, the time of day and the apartments.
+    const open3d = h('button', { class: 'btn nr-btn nr-btn--dark nr-open3d', type: 'button', onclick: () => openFull(true) }, landIcon('cube'), t('h3d.open'));
     const legend = h('div', { class: 'nr-legend' }, ['free', 'booked', 'sold', 'onrequest'].map((k) => h('span', null, h('i', { class: 'nr-dot ' + k }), t('status.' + k))));
     const panel = h('div', { class: 'nr-floorpanel', 'aria-live': 'polite' });
     const stage = h('section', { class: 'nr-sec nr-stage-sec', id: 'hero-top' }, h('div', { class: 'nr-wrap nr-stage-grid' },
       h('div', { class: 'nr-model' },
-        h('div', { class: 'nr-model-head' }, h('span', { class: 'nr-model-title' }, t('nr.cat.model')), timeSeg),
+        h('div', { class: 'nr-model-head' }, h('span', { class: 'nr-model-title' }, t('nr.cat.model')), h('div', { class: 'nr-model-acts' }, timeSeg, open3d)),
         h('div', { class: 'nr-stage' }, houseBox, tip, loading, rail, tools),
         legend),
       panel));
@@ -284,9 +294,9 @@
 
     function initHouse() {
       // The 3D engine is loaded now (once): when the stage comes near the screen.
-      if (!S.House3D) {
-        const go = () => loadHouse3D().then(() => { if (alive && S.House3D) initHouse(); }).catch(() => { houseWait.remove(); /* no 3D: the render stays, the floor list and the apartments still work */ });
-        if ('IntersectionObserver' in window) {
+      if (!S.House3D || !S.House3DMode) {
+        const go = () => loadHouse3D().then(() => { if (alive && S.House3D) initHouse(); }).catch(() => { houseWait.remove(); open3d.hidden = true; /* no 3D: the render stays, the floor list and the apartments still work */ });
+        if ('IntersectionObserver' in window && !wantFull) {
           const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); go(); } }, { rootMargin: '200px' });
           io.observe(stage);
         } else go();
@@ -296,7 +306,7 @@
         house = S.House3D.create(houseBox, {
           floors: Math.max(...st.floors.map((f) => f.number), 1), time: st.time,
           onReady: () => setTimeout(() => { housePoster.remove(); houseWait.remove(); }, 400),
-          onSelectApartment: (a) => { const apt = st.apts.find((x) => x.id === a.id); if (apt) pickApt(apt, true); },
+          onSelectApartment: modelSelect,
           onSelectFloor: (n) => { if (n === null) return; selectFloor(n, true); },
           onHover: (a, x, y) => {
             if (!a) { tip.hidden = true; return; }
@@ -310,8 +320,48 @@
         houseBox.replaceChildren(h('div', { class: 'empty', style: { padding: '60px 16px', textAlign: 'center' } }, t('house.no3d')));
         return;
       }
+      window.__house3d = house;
       pushToHouse();
+      if (wantFull) openFull(false);
     }
+    // ---------- 3D on the whole screen ----------
+    // A filter of the catalog (rooms, price, only free) — the same in the list below and in the 3D mode.
+    function passes(a) {
+      if (st.onlyFree && a.status !== 'free') return false;
+      if (st.rooms !== 'all' && !(st.rooms === '3' ? a.rooms >= 3 : a.rooms === +st.rooms)) return false;
+      return !st.priceCap || a.price <= st.priceCap;
+    }
+    function openFull(push) {
+      if (full) return;
+      if (!house) {
+        wantFull = true;
+        if (!S.House3D) initHouse();
+        // No WebGL: the catalog says so and stays as it is.
+        else if (houseBox.querySelector('.empty')) S.toast(t('house.no3d'), 'err');
+        return;
+      }
+      wantFull = false;
+      if (push && location.hash !== '#3d') { history.pushState({ h3d: 1 }, '', location.pathname + location.search + '#3d'); pushedFull = true; }
+      full = S.House3DMode.open({
+        house, box: houseBox, st, building: st.building, rate: st.rate, phone: cc.phone, selected: st.sel,
+        apts: () => st.apts, matches: passes, roomOptions,
+        onFilter: () => { st.shown = 12; renderApartments(); },
+        onPick: (a) => pickApt(a, true),
+        onModelSelect: modelSelect,
+        book: (a) => bookModal(a),
+        loadInterior,
+        requestClose: () => { if (pushedFull) history.back(); else { closeFull(); history.replaceState(null, '', location.pathname + location.search); } },
+      });
+    }
+    function closeFull() {
+      if (!full) return;
+      full.close(); full = null; pushedFull = false;
+      house.setTime(st.time, true);
+      if (st.sel) house.selectApartment(st.sel.id); else house.resetView();
+    }
+    const onPop = () => { if (location.hash === '#3d') openFull(false); else closeFull(); };
+    window.addEventListener('popstate', onPop);
+    function modelSelect(a) { const apt = st.apts.find((x) => x.id === a.id); if (apt) pickApt(apt, true); }
     function pushToHouse() {
       if (!house) return;
       house.setData(st.apts.map((a) => ({ id: a.id, floor: a.floor, planSlot: a.planSlot, number: a.number, status: a.status, rooms: a.rooms, area: a.area, price: a.price })));
@@ -436,13 +486,13 @@
         await S.busy(btn, async () => {
           try {
             const r = await S.api.book(a.id, { name: name.value.trim(), phone: phone.value.replace(/[\s()-]/g, '') });
-            md.close(); a.status = 'booked'; pushToHouse(); renderPanel(); renderRail(); renderApartments(); renderTopStats();
+            md.close(); a.status = 'booked'; pushToHouse(); renderPanel(); renderRail(); renderApartments(); renderTopStats(); if (full) full.refresh();
             S.modal({ title: t('book.doneTitle'), body: h('div', { class: 'stack' }, h('p', null, t('book.doneText', { n: a.number })), r && r.expiresAt ? h('div', { class: 'next' }, h('span', null, t('book.until')), h('b', null, S.fmt.dt(r.expiresAt))) : null, h('p', { class: 'muted' }, t('book.doneNote'))), actions: [h('button', { class: 'btn', onclick: (ev) => ev.target.closest('.overlay').querySelector('.x').click() }, t('common.ok'))] });
           } catch (er) { S.showErrors(form, er); if (er.status === 409) { refreshApts(); } }
         });
       });
     }
-    async function refreshApts() { try { st.apts = await S.api.allApartments(st.floors); pushToHouse(); renderPanel(); renderRail(); renderApartments(); renderTopStats(); } catch (e) { /* ignore */ } }
+    async function refreshApts() { try { st.apts = await S.api.allApartments(st.floors); pushToHouse(); renderPanel(); renderRail(); renderApartments(); renderTopStats(); if (full) full.refresh(); } catch (e) { /* ignore */ } }
 
     function leadModal(preset, aptId) {
       const name = S.input('name', { placeholder: t('f.namePh'), autocomplete: 'name' });
@@ -584,7 +634,7 @@
     S.scrollTo = scrollTo;
 
     load();
-    return () => { alive = false; if (house) house.destroy(); };
+    return () => { alive = false; window.removeEventListener('popstate', onPop); if (full) { full.close(); full = null; } if (house) { house.destroy(); if (window.__house3d === house) delete window.__house3d; } };
   };
 
   /* ---------- landing (design «Некруз Резиденс», docs/design/Main.dc.html) ----------
@@ -647,7 +697,7 @@
         h('div', { class: 'nr-hero-text' }, heroKicker, heroTitle, heroSub,
           h('div', { class: 'nr-actions' },
             h('a', { class: 'btn nr-btn nr-btn--primary', href: '/apartments' }, t('wow.hero.pick'), arrow()),
-            h('a', { class: 'btn nr-btn nr-btn--light', href: '/apartments#hero-top' }, t('wow.hero.3d')))),
+            h('a', { class: 'btn nr-btn nr-btn--light', href: '/apartments#3d' }, t('wow.hero.3d')))),
         heroStats));
 
     // 2. About the house: the description, amenities and the eco passport from the API; the render on the right.
@@ -1108,45 +1158,52 @@
   };
   /* ---------- floor plans drawn on a canvas (catalog) ---------- */
   const PLAN_TYPES = [0, 1, 2, 3];
-  const PLAN_AREAS = { 0: 28, 1: 42, 2: 65, 3: 88 };
-  // Rooms as parts of the plan (x, y, w, h from 0 to 1) and the i18n key of their name.
-  const PLAN_ROOMS = {
-    0: [[0, 0, 0.62, 0.72, 'living'], [0.62, 0, 0.38, 0.42, 'kitchen'], [0.62, 0.42, 0.38, 0.3, 'bath'], [0, 0.72, 0.62, 0.28, 'hall'], [0.62, 0.72, 0.38, 0.28, 'balcony']],
-    1: [[0, 0, 0.5, 0.62, 'bedroom'], [0.5, 0, 0.5, 0.45, 'kitchen'], [0.5, 0.45, 0.25, 0.27, 'bath'], [0.75, 0.45, 0.25, 0.27, 'wc'], [0, 0.62, 0.5, 0.38, 'hall'], [0.5, 0.72, 0.5, 0.28, 'balcony']],
-    2: [[0, 0, 0.42, 0.58, 'living'], [0.42, 0, 0.3, 0.58, 'bedroom'], [0.72, 0, 0.28, 0.42, 'kitchen'], [0.72, 0.42, 0.28, 0.3, 'bath'], [0, 0.58, 0.72, 0.42, 'hall'], [0.72, 0.72, 0.28, 0.28, 'balcony']],
-    3: [[0, 0, 0.36, 0.55, 'living'], [0.36, 0, 0.32, 0.55, 'bedroom'], [0.68, 0, 0.32, 0.55, 'bedroom2'], [0, 0.55, 0.3, 0.45, 'kitchen'], [0.3, 0.55, 0.3, 0.45, 'hall'], [0.6, 0.55, 0.2, 0.25, 'bath'], [0.8, 0.55, 0.2, 0.25, 'wc'], [0.6, 0.8, 0.4, 0.2, 'balcony']]
-  };
   // An architect's plan as in the design: walls in the ink colour on the paper of the card, windows and the balcony in copper,
-  // room names in the middle. Colours come from the page tokens, so the plan follows the light and the dark theme;
-  // sharp on high-density screens.
-  function drawFloorPlan(canvas, type) {
+  // doors as gaps with a thin swing, room names in the middle. The rooms, doors and windows come from S.plans
+  // (planirovki-data.js) — the same layout the 3D model builds inside; with the area the plan is scaled to it.
+  // Colours come from the page tokens, so the plan follows the light and the dark theme; sharp on high-density screens.
+  function drawFloorPlan(canvas, type, area) {
     const W = +canvas.getAttribute('width'), H = +canvas.getAttribute('height'), dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = W * dpr; canvas.height = H * dpr;
-    const g = canvas.getContext('2d'); if (!g) return;
+    const g = canvas.getContext('2d'); if (!g || !S.plans) return;
     g.scale(dpr, dpr);
     const css = getComputedStyle(canvas.isConnected ? canvas : document.documentElement);
     const tok = (n, f) => (css.getPropertyValue(n) || '').trim() || f;
     const paper = tok('--surface', '#fbf8f2'), room = tok('--bg', '#f4efe7'), ink = tok('--ink', '#1b1815'), copper = tok('--accent-text', '#8a4e2a');
     g.fillStyle = paper; g.fillRect(0, 0, W, H);
-    const pad = 14, x0 = pad, y0 = pad, w = W - pad * 2, ht = H - pad * 2 - 18;
+    const lay = S.plans.layout(type, area);
+    const top = lay.balcony.y, spanY = lay.d - top, pad = 12;
+    const s = Math.min((W - pad * 2) / lay.w, (H - pad * 2) / spanY);
+    const ox = (W - lay.w * s) / 2, oy = (H - spanY * s) / 2 - top * s;
+    const X = (x) => ox + x * s, Y = (y) => oy + y * s;
     g.font = '600 10.5px Manrope, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    (PLAN_ROOMS[type] || PLAN_ROOMS[1]).forEach(([rx, ry, rw, rh, key]) => {
-      const x = x0 + rx * w, y = y0 + ry * ht, ww = rw * w, hh = rh * ht;
-      const label = t('plans.room.' + key);
-      if (key === 'balcony') {
-        // The balcony: a dashed copper outline, as in the design.
-        g.setLineDash([5, 4]); g.strokeStyle = copper; g.lineWidth = 1.5; g.strokeRect(x + 1, y + 1, ww - 2, hh - 2); g.setLineDash([]);
-        g.fillStyle = copper;
-      } else {
-        g.fillStyle = room; g.fillRect(x, y, ww, hh);
-        g.strokeStyle = ink; g.lineWidth = 2.5; g.strokeRect(x, y, ww, hh);
-        g.fillStyle = ink;
-      }
-      if (ww > 30 && hh > 18) g.fillText(label.length * 6 > ww - 6 ? label.slice(0, Math.max(3, Math.floor((ww - 6) / 6) - 1)) + '.' : label, x + ww / 2, y + hh / 2);
+    lay.rooms.forEach((r) => { g.fillStyle = room; g.fillRect(X(r.x), Y(r.y), r.w * s, r.h * s); });
+    // The balcony: a dashed copper outline, as in the design.
+    const b = lay.balcony;
+    g.setLineDash([5, 4]); g.strokeStyle = copper; g.lineWidth = 1.5; g.strokeRect(X(b.x) + 1, Y(b.y) + 1, b.w * s - 2, b.h * s - 1); g.setLineDash([]);
+    g.strokeStyle = ink; g.lineWidth = 2.5; g.lineCap = 'square';
+    S.plans.walls(lay).forEach(([x1, y1, x2, y2]) => { g.beginPath(); g.moveTo(X(x1), Y(y1)); g.lineTo(X(x2), Y(y2)); g.stroke(); });
+    // Door swings: a quarter circle from one side of the opening.
+    g.lineWidth = 0.8; g.lineCap = 'butt';
+    lay.doors.forEach((d) => {
+      if (d.open) return;
+      const r = (d.to - d.from) * s;
+      g.beginPath();
+      if (d.axis === 'x') { g.moveTo(X(d.from), Y(d.at)); g.arc(X(d.from), Y(d.at), r, 0, d.entrance ? -Math.PI / 2 : Math.PI / 2, d.entrance); }
+      else { g.moveTo(X(d.at), Y(d.from)); g.arc(X(d.at), Y(d.from), r, Math.PI / 2, 0, true); }
+      g.stroke();
     });
-    // Windows: thick copper strokes on the top wall.
-    g.strokeStyle = copper; g.lineWidth = 5;
-    [[0.1, 0.3], [0.55, 0.85]].forEach(([a1, a2]) => { g.beginPath(); g.moveTo(x0 + w * a1, y0); g.lineTo(x0 + w * a2, y0); g.stroke(); });
+    // Windows: thick copper strokes on the facade.
+    g.strokeStyle = copper; g.lineWidth = 4;
+    lay.windows.forEach((w) => { g.beginPath(); g.moveTo(X(w.from), Y(0)); g.lineTo(X(w.to), Y(0)); g.stroke(); });
+    const fit = (label, ww) => (label.length * 6 > ww - 6 ? label.slice(0, Math.max(3, Math.floor((ww - 6) / 6) - 1)) + '.' : label);
+    lay.rooms.forEach((r) => {
+      if (r.part) return;
+      const ww = r.w * s, hh = r.h * s;
+      g.fillStyle = ink;
+      if (ww > 30 && hh > 18) g.fillText(fit(t('plans.room.' + r.key), ww), X(r.x) + ww / 2, Y(r.y) + hh / 2);
+    });
+    if (b.w * s > 36 && b.h * s > 12) { g.fillStyle = copper; g.fillText(fit(t('plans.room.balcony'), b.w * s), X(b.x) + b.w * s / 2, Y(b.y) + b.h * s / 2); }
   }
 
   // For the other public pages (about.js, gallery.js): the same footer, reveal on scroll, icons and headings.
