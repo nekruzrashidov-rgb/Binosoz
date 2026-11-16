@@ -20,6 +20,9 @@ public class SeedSqlTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
         await using var tx = await connection.BeginTransactionAsync();
         await ExecAsync(connection, tx, "UPDATE \"Buildings\" SET \"NameRu\" = 'Некруз Резиденс (сидер)' WHERE \"NameRu\" = 'Некруз Резиденс'");
 
+        // Демо-сделки «Зелёного эффекта» добавляются, только если у демо-организации ещё нет выданных PDF.
+        var demoDealsExpected = await ScalarAsync<long>(connection, tx, $"SELECT count(*) FROM \"IssuedPdfs\" WHERE \"OrganizationId\" = '{Organization.DefaultId}'") == 0;
+
         await ExecAsync(connection, tx, sql);
 
         var buildingId = await ScalarAsync<Guid>(connection, tx,
@@ -66,8 +69,19 @@ public class SeedSqlTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
         Assert.Equal(description[0], fixedDescription[0]);
         Assert.Equal(description[1], fixedDescription[1]);
 
+        if (demoDealsExpected && await ScalarAsync<bool>(connection, tx, $"SELECT \"GreenIsDemo\" FROM \"Organizations\" WHERE \"Id\" = '{Organization.DefaultId}'"))
+        {
+            // 6 проданных квартир — 6 завершённых демо-сделок, по 5 выданных PDF (8 страниц) на каждую.
+            Assert.Equal(6L, await ScalarAsync<long>(connection, tx, "SELECT count(*) FROM \"Deals\" d JOIN \"Apartments\" a ON a.\"Id\" = d.\"ApartmentId\" JOIN \"Floors\" f ON f.\"Id\" = a.\"FloorId\" " +
+                $"WHERE f.\"BuildingId\" = '{buildingId}' AND a.\"Status\" = 'Sold' AND d.\"Stage\" = 'Completed'"));
+            Assert.Equal(30L, await ScalarAsync<long>(connection, tx, $"SELECT count(*) FROM \"IssuedPdfs\" WHERE \"OrganizationId\" = '{Organization.DefaultId}'"));
+            Assert.Equal(48L, await ScalarAsync<long>(connection, tx, $"SELECT sum(\"PageCount\") FROM \"IssuedPdfs\" WHERE \"OrganizationId\" = '{Organization.DefaultId}'"));
+        }
+
         // Повторный запуск ничего не добавляет.
+        var issuedBefore = await ScalarAsync<long>(connection, tx, "SELECT count(*) FROM \"IssuedPdfs\"");
         await ExecAsync(connection, tx, sql);
+        Assert.Equal(issuedBefore, await ScalarAsync<long>(connection, tx, "SELECT count(*) FROM \"IssuedPdfs\""));
         Assert.Equal(1L, await ScalarAsync<long>(connection, tx,
             $"SELECT count(*) FROM \"Buildings\" WHERE \"NameRu\" = 'Некруз Резиденс' AND \"OrganizationId\" = '{Organization.DefaultId}'"));
 

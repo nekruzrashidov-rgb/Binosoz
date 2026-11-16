@@ -16,6 +16,8 @@
 -- * A second DO block (any run, never overwrites): the demo eco passport and amenities of the building, the organization
 --   tariffs and installment terms, marked as demo data — the same values as GreenDemoSeeder.cs. It also replaces the old
 --   description «…бизнес-класса…» (an unverified claim) of an already seeded building and fills the Tajik description if empty.
+-- * A third DO block (organization marked demo, no issued PDFs yet): demo completed deals for the sold apartments with
+--   issued PDFs (3 schedules × 2 pages, 2 statements × 1 page each), so «Зелёный эффект» shows meaningful demo numbers.
 DO $$
 DECLARE
   org        constant uuid := '01a20000-0000-7000-8000-000000000001';
@@ -167,4 +169,64 @@ BEGIN
   WHERE "Id" = org AND "InstallmentDownPaymentMinPct" IS NULL AND "InstallmentMaxMonths" IS NULL AND NOT "InstallmentNoOverpayment";
   GET DIAGNOSTICS n = ROW_COUNT;
   IF n > 0 THEN RAISE NOTICE 'Условия рассрочки заполнены демо-значениями'; END IF;
+END $$;
+
+-- Демо-сделки для «Зелёного эффекта» (только у организации, помеченной демо: на сайте бейдж «Демо-данные»).
+-- У проданных квартир «Некруз Резиденс» без сделки появляется завершённая демо-сделка с демо-клиентом, и по каждой —
+-- выданные онлайн PDF: 3 графика платежей (по 2 страницы) и 2 акта сверки (по 1 странице) за последние месяцы.
+-- Ничего не перезаписывает: запускается, только если у организации ещё нет ни одного выданного PDF.
+-- Менеджер сделки — первый сотрудник организации; если сотрудников нет, блок пропускается.
+DO $$
+DECLARE
+  org      constant uuid := '01a20000-0000-7000-8000-000000000001';
+  manager  uuid;
+  apt      record;
+  cust_id  uuid;
+  deal_id  uuid;
+  i        int;
+  deals_n  int := 0;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM "Organizations" WHERE "Id" = org AND "GreenIsDemo") THEN
+    RAISE NOTICE 'Организация не помечена демо — демо-сделки не добавляются'; RETURN;
+  END IF;
+  IF EXISTS (SELECT 1 FROM "IssuedPdfs" WHERE "OrganizationId" = org) THEN
+    RAISE NOTICE 'Выданные PDF уже есть — демо-сделки не добавляются'; RETURN;
+  END IF;
+  SELECT u."Id" INTO manager FROM "Users" u
+  WHERE u."OrganizationId" = org AND u."IsActive"
+    AND NOT EXISTS (SELECT 1 FROM "UserRoles" ur JOIN "Roles" r ON r."Id" = ur."RoleId" WHERE ur."UserId" = u."Id" AND r."Name" = 'Customer')
+  ORDER BY u."Email" LIMIT 1;
+  IF manager IS NULL THEN RAISE NOTICE 'Нет сотрудников организации — демо-сделки не добавляются'; RETURN; END IF;
+
+  FOR apt IN
+    SELECT a."Id", a."Number", a."Price", a."Currency" FROM "Apartments" a
+    JOIN "Floors" f ON f."Id" = a."FloorId" JOIN "Buildings" b ON b."Id" = f."BuildingId"
+    WHERE b."OrganizationId" = org AND b."NameRu" = 'Некруз Резиденс' AND a."Status" = 'Sold'
+      AND NOT EXISTS (SELECT 1 FROM "Deals" d WHERE d."ApartmentId" = a."Id")
+    ORDER BY a."Number"
+  LOOP
+    cust_id := gen_random_uuid();
+    deal_id := gen_random_uuid();
+    INSERT INTO "Customers" ("Id", "OrganizationId", "FullName", "Phone", "CreatedAt", "UpdatedAt")
+    VALUES (cust_id, org, 'Демо-покупатель кв. ' || apt."Number", '+99290009' || lpad(apt."Number"::text, 4, '0'),
+            now() - interval '150 days', now());
+    INSERT INTO "Deals" ("Id", "ApartmentId", "CustomerId", "ManagerId", "Stage", "StageReason", "Price", "Discount",
+                         "Currency", "CreatedAt", "UpdatedAt")
+    VALUES (deal_id, apt."Id", cust_id, manager, 'Completed', 'Демо-данные', apt."Price", 0, apt."Currency",
+            now() - interval '150 days', now());
+    FOR i IN 1..3 LOOP
+      INSERT INTO "IssuedPdfs" ("Id", "OrganizationId", "DealId", "Kind", "PageCount", "CreatedAt", "UpdatedAt")
+      VALUES (gen_random_uuid(), org, deal_id, 'Schedule', 2, now() - (i * 35 || ' days')::interval, now());
+    END LOOP;
+    FOR i IN 1..2 LOOP
+      INSERT INTO "IssuedPdfs" ("Id", "OrganizationId", "DealId", "Kind", "PageCount", "CreatedAt", "UpdatedAt")
+      VALUES (gen_random_uuid(), org, deal_id, 'Statement', 1, now() - (i * 50 || ' days')::interval, now());
+    END LOOP;
+    INSERT INTO "AuditLog" ("Id", "UserId", "OrganizationId", "ImpersonatedById", "Entity", "EntityId", "Action", "Before", "After",
+                            "At", "Ip", "CreatedAt", "UpdatedAt")
+    VALUES (gen_random_uuid(), NULL, org, NULL, 'Deal', deal_id, 'Seeded', NULL,
+            jsonb_build_object('source', 'scripts/seed.sql', 'demo', true, 'apartment', apt."Number"), now(), NULL, now(), now());
+    deals_n := deals_n + 1;
+  END LOOP;
+  IF deals_n > 0 THEN RAISE NOTICE 'Демо-сделок с выданными PDF: % (по 5 документов, 8 страниц)', deals_n; END IF;
 END $$;
