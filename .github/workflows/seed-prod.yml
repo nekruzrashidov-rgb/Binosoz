@@ -105,6 +105,25 @@ jobs:
           docker run --rm -e ASPNETCORE_ENVIRONMENT=Production -e "ConnectionStrings__Default=$CS" \
             -e SEED_DEMO_ACCOUNTS=true -e SEED_DEMO_BUYER_PASSWORD -e SEED_DEMO_MANAGER_PASSWORD "$image" --migrate
 
+      # Первый владелец организации (Admin) и суперадмин платформы — только если заданы секреты.
+      # Владелец создаётся, пока в организации нет владельцев; существующим паролям ничего не делается.
+      # Бухгалтера и контент-менеджера владелец потом приглашает из CRM (письмо со ссылкой).
+      - name: Владелец и суперадмин
+        env:
+          CS: ${{ steps.cs.outputs.value }}
+          BOOTSTRAP_ADMIN_EMAIL: ${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}
+          BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.BOOTSTRAP_ADMIN_PASSWORD }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          if [ -z "$BOOTSTRAP_ADMIN_EMAIL$ADMIN_EMAIL" ]; then
+            echo "Секреты BOOTSTRAP_ADMIN_EMAIL и ADMIN_EMAIL не заданы — владелец и суперадмин не создаются."
+            exit 0
+          fi
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/binosoz-api:latest"
+          docker run --rm -e ASPNETCORE_ENVIRONMENT=Production -e "ConnectionStrings__Default=$CS" \
+            -e BOOTSTRAP_ADMIN_EMAIL -e BOOTSTRAP_ADMIN_PASSWORD -e ADMIN_EMAIL -e ADMIN_PASSWORD "$image" --migrate
+
       # Каталог кэшируется до 30 секунд: ждём, чтобы smoke увидел новые дома.
       - name: Проверка каталога
         env:
