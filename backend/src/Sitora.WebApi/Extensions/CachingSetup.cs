@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.OutputCaching;
+using Microsoft.Net.Http.Headers;
 using Sitora.Infrastructure.Integrations;
 
 namespace Sitora.WebApi.Extensions;
@@ -59,6 +60,10 @@ public static class CachingSetup
                 var cacheable = !authenticated && HttpMethods.IsGet(context.Request.Method) && context.Response.StatusCode == StatusCodes.Status200OK
                     && context.GetEndpoint()?.Metadata.GetMetadata<OutputCacheAttribute>() is not null;
                 headers.CacheControl = cacheable ? $"public, max-age={BrowserMaxAgeSeconds}" : "private, no-store";
+                // Ответ зависит от языка (названия, описание, эко-паспорт): без Vary браузер после переключения
+                // TJ → EN отдавал бы из кэша таджикский ответ.
+                if (cacheable && !headers.Vary.ToString().Contains("Accept-Language", StringComparison.OrdinalIgnoreCase))
+                    headers.Append(HeaderNames.Vary, "Accept-Language");
                 return Task.CompletedTask;
             });
         }

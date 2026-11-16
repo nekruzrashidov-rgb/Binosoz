@@ -17,6 +17,8 @@ public class OutputCacheTests(SitoraApiFactory factory) : IClassFixture<SitoraAp
         var first = await guest.GetAsync($"/api/v1/apartments/{id}");
         first.EnsureSuccessStatusCode();
         Assert.Equal("public, max-age=15", first.Headers.CacheControl?.ToString());
+        // Ответ зависит от языка: браузер не должен отдавать таджикский ответ на запрос на английском.
+        Assert.Contains("Accept-Language", first.Headers.Vary);
         Assert.Null(first.Headers.Age);
 
         var second = await guest.GetAsync($"/api/v1/apartments/{id}");
