@@ -1,4 +1,4 @@
-/* Tajik interface texts (1796 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* Tajik interface texts (1802 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. Tajik strings should be proof-read by a native speaker before launch. */
 (function () {
   const S = (window.S = window.S || {});
@@ -1800,5 +1800,11 @@
     "pin.saved": "Рамзи воридшавӣ нигоҳ дошта шуд",
     "pin.digitsOnly": "Танҳо рақамҳо",
     "a11y.skip": "Гузариш ба мундариҷа",
+    "foot.verSite": "сомона",
+    "hero.loading3d": "Модели 3D бор мешавад…",
+    "errp.k.notFound": "Хатои 404",
+    "errp.k.network": "Пайвастшавӣ нест",
+    "errp.k.server": "Хатои сервер",
+    "errp.catalog": "Феҳристи манзилҳо",
   };
 })();

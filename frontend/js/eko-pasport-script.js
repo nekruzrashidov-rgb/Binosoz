@@ -193,21 +193,26 @@
   const paper = (g) => weight(g.pagesSaved * 0.005);
   const anything = (g) => !!g && (g.documentsDigital > 0 || g.pagesSaved > 0 || g.onlineActions > 0);
 
-  // Landing: a dark section with 3–4 counters from GET /public/green-impact. Nothing to show (all zeros or the API did
-  // not answer) — the section stays hidden. CO₂ only when the developer set a coefficient with its source.
+  // Landing: a section in the language of the design (kicker, a large heading, big Cormorant numbers as in the hero),
+  // 3–4 counters from GET /public/green-impact; green is only an accent (the leaf, the line over the numbers).
+  // Nothing to show (all zeros or the API did not answer) — the section stays hidden. CO₂ only with the developer's
+  // coefficient and its source.
   function impactSection() {
-    const sec = h('section', { class: 'lux-green section', id: 'green', hidden: true });
+    const sec = h('section', { class: 'nr-sec nr-green', id: 'green', hidden: true });
     S.api.greenImpact().then((g) => {
       if (!anything(g)) return;
-      const tile = (v, l) => h('div', { class: 'green-tile' }, h('b', null, v), h('span', null, l));
-      sec.replaceChildren(h('div', { class: 'wrap' },
-        h('div', { class: 'lux-head' }, h('span', { class: 'green-kicker' }, icon('leaf'), t('green.kicker')), h('h2', null, t('green.title')), h('p', null, t('green.sub')), g.isDemo ? h('span', { class: 'demo-badge' }, t('demo.badge')) : null),
-        h('div', { class: 'green-tiles' },
+      const tile = (v, l) => h('div', { class: 'green-tile' }, h('dt', null, l), h('dd', null, v));
+      sec.replaceChildren(h('div', { class: 'nr-wrap' },
+        h('div', { class: 'nr-head-row' },
+          h('div', null, h('div', { class: 'nr-kicker nr-green-kicker' }, h('span', { class: 'nr-kicker-line', 'aria-hidden': 'true' }), icon('leaf'), t('green.kicker')),
+            h('h2', { class: 'nr-h2' }, t('green.title'))),
+          h('div', { class: 'nr-head-note' }, h('p', null, t('green.sub')), g.isDemo ? h('span', { class: 'demo-badge' }, t('demo.badge')) : null)),
+        h('dl', { class: 'green-tiles' },
           tile(S.fmt.n(g.documentsDigital), S.plural(g.documentsDigital, 'green.docs')),
           tile(S.fmt.n(g.pagesSaved), S.plural(g.pagesSaved, 'green.pages')),
           tile(paper(g), t('green.paper')),
           g.co2KgSaved !== undefined && g.co2KgSaved !== null ? tile(weight(g.co2KgSaved), t('green.co2')) : tile(S.fmt.n(g.onlineActions), S.plural(g.onlineActions, 'green.actions'))),
-        h('p', { class: 'green-note' }, t('green.note'), g.co2Source ? ' ' + t('green.co2Source', { s: g.co2Source }) : '')));
+        h('p', { class: 'nr-note green-note' }, t('green.note'), g.co2Source ? ' ' + t('green.co2Source', { s: g.co2Source }) : '')));
       sec.hidden = false;
     }).catch(() => {});
     return sec;

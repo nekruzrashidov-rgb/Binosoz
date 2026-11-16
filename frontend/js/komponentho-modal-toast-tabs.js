@@ -221,13 +221,15 @@
   S.errorCard = (e) => {
     const status = e && e.status;
     const kind = !e || status === 404 ? 'notFound' : status === 0 ? 'network' : 'server';
-    const face = h('div', { class: 'err-face', 'aria-hidden': 'true' });
-    face.innerHTML = '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="32" cy="32" r="27"/><circle cx="23" cy="26" r="1.6" fill="currentColor"/><circle cx="41" cy="26" r="1.6" fill="currentColor"/><path d="M21 44c3-4.5 7-6.5 11-6.5s8 2 11 6.5"/></svg>';
-    const action = kind === 'notFound'
-      ? h('a', { class: 'btn gold', href: '/' }, t('errp.home'))
-      : h('button', { class: 'btn gold', type: 'button', onclick: () => location.reload() }, t('errp.reload'));
-    return h('div', { class: 'wrap err-wrap page-in' }, h('div', { class: 'err-card', role: 'alert' }, face,
-      h('h1', null, t('errp.' + kind)), h('p', { class: 'err-msg' }, kind === 'notFound' && e && e.message ? e.message : t('errp.' + kind + 'Text')), action));
+    // In the language of the design: a kicker («Ошибка 404»), a large heading, plain text and the nr-btn buttons.
+    const actions = kind === 'notFound'
+      ? [h('a', { class: 'btn nr-btn nr-btn--primary', href: '/' }, t('errp.home')), h('a', { class: 'btn nr-btn nr-btn--dark', href: '/apartments' }, t('errp.catalog'))]
+      : [h('button', { class: 'btn nr-btn nr-btn--primary', type: 'button', onclick: () => location.reload() }, t('errp.reload')), h('a', { class: 'btn nr-btn nr-btn--dark', href: '/' }, t('errp.home'))];
+    return h('section', { class: 'nr nr-sec nr-err page-in', role: 'alert' }, h('div', { class: 'nr-wrap' },
+      h('div', { class: 'nr-kicker' }, h('span', { class: 'nr-kicker-line', 'aria-hidden': 'true' }), t('errp.k.' + kind)),
+      h('h1', { class: 'nr-page-title' }, t('errp.' + kind)),
+      h('p', { class: 'nr-err-text' }, kind === 'notFound' && e && e.message ? e.message : t('errp.' + kind + 'Text')),
+      h('div', { class: 'nr-err-actions' }, actions)));
   };
   S.empty = (title, icon) => h('div', { class: 'empty' }, (() => { const i = S.icon(icon || 'inbox'); i.setAttribute('width', 54); i.setAttribute('height', 54); i.setAttribute('stroke-width', 1.2); return i; })(), h('div', null, title));
   S.ring = (pct, size) => {

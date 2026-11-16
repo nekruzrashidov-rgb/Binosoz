@@ -381,11 +381,16 @@
         h('img', { src: src(1600), srcset: [800, 1600, 2400].map((w) => src(w) + ' ' + w + 'w').join(', '), sizes: '(max-width: 768px) 100vw, 55vw', width: 2400, height: 3000, alt: '', decoding: 'async' }));
       const words = t('brand.name').split(/\s+/);
       const lang = h('div', { class: 'seg lg-lang', role: 'group', 'aria-label': 'Language' }, S.LANGS.map(([k, l]) => h('button', { type: 'button', class: S.lang === k ? 'on' : '', 'aria-pressed': String(S.lang === k), onclick: () => { if (S.lang !== k) S.setLang(k); } }, l)));
+      // The theme switch, as in the header of the other pages.
+      const theme = h('button', { type: 'button', class: 'lg-theme' });
+      const drawTheme = () => { const dark = S.isDark && S.isDark(); theme.replaceChildren(S.icon(dark ? 'sun' : 'moon')); const l = t(dark ? 'nav.themeLight' : 'nav.themeDark'); theme.setAttribute('aria-label', l); theme.title = l; };
+      theme.addEventListener('click', () => { if (S.toggleTheme) S.toggleTheme(); drawTheme(); });
+      drawTheme();
       const facts = h('ul', { class: 'lg-facts' },
         cc.address ? h('li', null, S.icon('pin'), S.brandAddress(cc.address)) : null,
         cc.phone ? h('li', null, S.icon('phone'), h('a', { href: 'tel:' + cc.phone.replace(/[^\d+]/g, '') }, cc.phone)) : null);
       const hero = h('aside', { class: 'lg-hero nr-dark' }, pic, h('div', { class: 'lg-shade', 'aria-hidden': 'true' }), h('span', { class: 'nr-render-note lg-note' }, t('nr.render')),
-        h('div', { class: 'lg-hero-top' }, h('a', { class: 'lg-brand', href: '/', title: t('login.toSite') }, S.towerLogo(), h('span', { class: 'brand-word' }, h('b', null, words[0]), words.length > 1 ? ' ' : null, words.length > 1 ? h('small', null, words.slice(1).join(' ')) : null)), lang),
+        h('div', { class: 'lg-hero-top' }, h('a', { class: 'lg-brand', href: '/', title: t('login.toSite') }, S.towerLogo(), h('span', { class: 'brand-word' }, h('b', null, words[0]), words.length > 1 ? ' ' : null, words.length > 1 ? h('small', null, words.slice(1).join(' ')) : null)), h('div', { class: 'lg-tools' }, lang, theme)),
         h('div', { class: 'lg-hero-text' }, h('p', { class: 'lg-eyebrow' }, t('login.heroEyebrow')), h('h1', { class: 'lg-name' }, t('login.heroTitle')), h('p', { class: 'lg-sub' }, t('login.heroSub')), facts));
       return h('div', { class: 'lg-split' }, hero, h('main', { class: 'lg-side' }, h('div', { class: 'lg-frame' }, c), demoChips()));
     }

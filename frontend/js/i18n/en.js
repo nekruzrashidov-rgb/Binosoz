@@ -1,4 +1,4 @@
-/* English interface texts (1796 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* English interface texts (1802 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -1800,5 +1800,11 @@
     "pin.saved": "Sign-in code saved",
     "pin.digitsOnly": "Digits only",
     "a11y.skip": "Skip to content",
+    "foot.verSite": "site",
+    "hero.loading3d": "Loading the 3D model…",
+    "errp.k.notFound": "Error 404",
+    "errp.k.network": "No connection",
+    "errp.k.server": "Server error",
+    "errp.catalog": "Apartment catalog",
   };
 })();

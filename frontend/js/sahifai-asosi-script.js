@@ -127,9 +127,10 @@
   }
 
 
-  // Blocks with .reveal fade in as they scroll into view; without IntersectionObserver they are simply shown.
-  // onShow runs for each block once it is in (counters start there). Returns the cleanup.
+  // Blocks with .reveal fade in as they scroll into view: the page-wide reveal (routing-va-navigatsiya.js) watches every
+  // block, also those drawn later. Kept for the pages that still call it; onShow runs for each block once it is in.
   function revealIn(root, onShow) {
+    if (S.revealSections && !onShow) { S.revealSections(root); return () => {}; }
     const els = S.$$('.reveal', root);
     const show = (el) => { el.classList.add('in'); if (onShow) onShow(el); setTimeout(() => { el.style.transitionDelay = ''; }, 900); };
     // Same rule as page.js (S.motionOk): no observer, a robot or less motion — everything at once.
@@ -161,17 +162,20 @@
       h('p', { class: 'foot-demo' }, t('foot.demo'), frontendVersion())));
   }
 
-  // Which build of the site is served: version.txt holds the short commit SHA (written by the Docker build and by the
-  // Vercel build command; «dev» in the repository). Shown small in the footer and in the console, so it is visible
-  // whether Render and Vercel serve the same frontend.
+  // Which builds are served: the site (version.txt — the short commit SHA written by the Docker build and by the Vercel
+  // build command; «dev» in the repository) and the API (/health/live of the API's own origin). On Vercel they are two
+  // deploys and can differ for a while, so both are shown: «сайт v 1e394f0 · API v c29bfc1».
   function frontendVersion() {
     const el = h('span', { class: 'foot-ver' });
-    fetch('/version.txt', { cache: 'no-store' }).then((r) => (r.ok ? r.text() : '')).then((v) => {
-      v = (v || '').trim().toLowerCase();
-      if (!/^([0-9a-f]{7}|dev)$/.test(v)) v = 'dev';
-      el.textContent = ' · v ' + v;
-      console.info('Binosoz frontend ' + v);
-    }).catch(() => {});
+    const clean = (v) => { v = String(v || '').trim().toLowerCase(); return /^([0-9a-f]{7}|dev)$/.test(v) ? v : 'dev'; };
+    const site = fetch('/version.txt', { cache: 'no-store' }).then((r) => (r.ok ? r.text() : '')).then(clean).catch(() => 'dev');
+    let apiOrigin = '';
+    try { apiOrigin = new URL(S.apiBase ? S.apiBase() : '/api/v1', location.href).origin; } catch (e) { /* no API address */ }
+    const api = apiOrigin ? fetch(apiOrigin + '/health/live', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((j) => (j && j.version ? clean(j.version) : null)).catch(() => null) : Promise.resolve(null);
+    Promise.all([site, api]).then(([sv, av]) => {
+      el.textContent = ' · ' + t('foot.verSite') + ' v ' + sv + (av ? ' · API v ' + av : '');
+      console.info('Binosoz: ' + t('foot.verSite') + ' ' + sv + (av ? ', API ' + av : ''));
+    });
     return el;
   }
 
@@ -203,7 +207,8 @@
     // 2. The model and the floor panel.
     // Until the scene draws its first frame (3–5 s on a phone), a render of the same model instead of a black box.
     const housePoster = h('img', { class: 'nr-3d-poster', src: '/img/renders/tower-dusk-tall-800.webp', srcset: '/img/renders/tower-dusk-tall-800.webp 800w, /img/renders/tower-dusk-tall-1600.webp 1600w', sizes: '(max-width: 900px) 100vw, 60vw', alt: '', 'aria-hidden': 'true', decoding: 'async' });
-    const houseBox = h('div', { class: 'house3d nr-house', id: 'house3d' }, housePoster);
+    const houseWait = h('div', { class: 'nr-3d-wait', role: 'status' }, t('hero.loading3d'));
+    const houseBox = h('div', { class: 'house3d nr-house', id: 'house3d' }, housePoster, houseWait);
     const tip = h('div', { class: 'tip', hidden: true });
     const loading = h('div', { class: 'nr-stage-loading' }, t('hero.loading'));
     const rail = h('div', { class: 'nr-rail', role: 'group', 'aria-label': t('hero.floors') });
@@ -280,7 +285,7 @@
     function initHouse() {
       // The 3D engine is loaded now (once): when the stage comes near the screen.
       if (!S.House3D) {
-        const go = () => loadHouse3D().then(() => { if (alive && S.House3D) initHouse(); }).catch(() => { /* no 3D: the floor list and the apartments still work */ });
+        const go = () => loadHouse3D().then(() => { if (alive && S.House3D) initHouse(); }).catch(() => { houseWait.remove(); /* no 3D: the render stays, the floor list and the apartments still work */ });
         if ('IntersectionObserver' in window) {
           const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); go(); } }, { rootMargin: '200px' });
           io.observe(stage);
@@ -290,7 +295,7 @@
       try {
         house = S.House3D.create(houseBox, {
           floors: Math.max(...st.floors.map((f) => f.number), 1), time: st.time,
-          onReady: () => setTimeout(() => housePoster.remove(), 400),
+          onReady: () => setTimeout(() => { housePoster.remove(); houseWait.remove(); }, 400),
           onSelectApartment: (a) => { const apt = st.apts.find((x) => x.id === a.id); if (apt) pickApt(apt, true); },
           onSelectFloor: (n) => { if (n === null) return; selectFloor(n, true); },
           onHover: (a, x, y) => {
@@ -314,7 +319,12 @@
     }
 
     // ---------- render ----------
-    function renderAll() { renderTopStats(); renderRail(); renderPanel(); renderCalc(); renderPlans(); renderEco(); renderApartments(); }
+    // Each block on its own: an error in one (logged) must not leave the calculator, layouts and list empty.
+    function renderAll() {
+      [renderTopStats, renderRail, renderPanel, renderCalc, renderPlans, renderEco, renderApartments].forEach((fn) => {
+        try { fn(); } catch (e) { console.error('Каталог: блок ' + fn.name + ' не отрисован', e); if (S.logError) S.logError(e); }
+      });
+    }
     function renderTopStats() {
       const free = st.apts.filter((a) => a.status === 'free');
       const prices = (free.length ? free : st.apts).map((a) => a.price).filter((p) => p > 0);
@@ -506,7 +516,7 @@
       plansSection.hidden = !cards.length;
       plansSection.replaceChildren(h('div', { class: 'nr-wrap' },
         h('div', { class: 'nr-head-row' }, h('div', null, kicker(t('nr.layouts.kicker')), h('h2', { class: 'nr-h2' }, t('plans.title'))), h('p', { class: 'nr-head-note' }, t('nr.cat.plansSub'))),
-        h('div', { class: 'nr-layouts' }, cards)));
+        h('div', { class: 'nr-layouts', style: { '--n': String(Math.max(1, cards.length)) } }, cards)));
     }
 
     // ---------- the whole list with filters ----------
@@ -737,11 +747,10 @@
       ].filter(Boolean);
       whyGrid.replaceChildren(...feats.map(([ic, k, d2]) => h('article', { class: 'nr-why-item reveal' },
         h('span', { class: 'nr-why-ic' }, landIcon(ic)), h('h3', null, t(k)), h('p', null, d2 || t(k + '.d')))));
-      // The cards are rebuilt when the data arrives: the observer set up at mount does not know them, so watch them here.
-      revealIn(whyGrid);
+      // The cards are rebuilt when the data arrives: the page-wide reveal picks them up (MutationObserver).
 
       layouts.hidden = !d.types.length;
-      layoutGrid.replaceChildren(...d.types.map(layoutCard));
+      layoutGrid.replaceChildren(...d.types.map(layoutCard)); layoutGrid.style.setProperty('--n', String(Math.max(1, d.types.length)));
       renderPlan(terms);
     }
     // «Взнос от 10%, срок до 10 лет, без переплаты» — only the terms the developer has set.
