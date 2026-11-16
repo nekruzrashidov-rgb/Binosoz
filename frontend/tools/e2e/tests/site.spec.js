@@ -96,6 +96,74 @@ test('login: the buyer tab is chosen by default', async ({ page }) => {
   await expect(page.locator('.login-tabs button.on')).toHaveText('Покупатель');
 });
 
+// Blocks that fade in (.reveal) must never stay invisible: none at opacity 0 inside the screen, also after /#why.
+for (const url of ['/', '/#why', '/apartments', '/about']) {
+  test(`reveal: nothing on screen stays invisible (${url})`, async ({ page }) => {
+    // The site turns the fade-in off for robots (navigator.webdriver): pretend to be a person, or nothing would be tested.
+    await page.addInitScript(() => Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false }));
+    await open(page, url);
+    await expect(page.locator('html')).toHaveClass(/motion-ok/);
+    await page.waitForTimeout(1200);
+    const hidden = async () => page.evaluate(() => [...document.querySelectorAll('.reveal, .section-reveal')].filter((el) => {
+      const r = el.getBoundingClientRect();
+      return r.height > 0 && r.top < innerHeight && r.bottom > 0 && getComputedStyle(el).opacity === '0';
+    }).map((el) => el.className));
+    expect(await hidden()).toEqual([]);
+    // Scrolled to the bottom step by step: whatever came into view has appeared.
+    for (let y = 0; y < 12; y++) {
+      await page.mouse.wheel(0, 700);
+      await page.waitForTimeout(250);
+    }
+    await page.waitForTimeout(900);
+    expect(await hidden()).toEqual([]);
+  });
+}
+
+// WCAG 1.4.11: the borders of fields, PIN cells and outline buttons — at least 3:1 against what is behind them.
+for (const theme of ['light', 'dark']) {
+  test(`login: field borders have 3:1 contrast (${theme} theme)`, async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate((t) => localStorage.setItem('sitora.theme', t), theme);
+    await open(page, '/login');
+    const low = await page.evaluate(() => {
+      const rgb = (c) => (c.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+      const lum = (c) => { const v = rgb(c).map((x) => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
+      const bgOf = (el) => { for (let e = el.parentElement; e; e = e.parentElement) { const b = getComputedStyle(e).backgroundColor; if (b && !/rgba\(.*, 0\)$/.test(b) && b !== 'transparent') return b; } return 'rgb(255,255,255)'; };
+      return [...document.querySelectorAll('.card.login input.inp, .card.login .pin-cell, .card.login .btn.ghost')].map((el) => {
+        const a = lum(getComputedStyle(el).borderTopColor), b = lum(bgOf(el));
+        return [el.className, Math.round(((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)) * 100) / 100];
+      }).filter(([, ratio]) => ratio < 3);
+    });
+    expect(low).toEqual([]);
+  });
+}
+
+test('login: the six code cells fill the whole row', async ({ page }) => {
+  await open(page, '/login');
+  const widths = await page.evaluate(() => {
+    const row = document.querySelector('.pin-cells').getBoundingClientRect();
+    const cells = [...document.querySelectorAll('.pin-cells .pin-cell')].map((c) => c.getBoundingClientRect());
+    return { row: Math.round(row.width), field: Math.round(document.querySelector('.card.login input[name=email]').getBoundingClientRect().width), right: Math.round(cells[5].right - row.left), first: Math.round(cells[0].width), last: Math.round(cells[5].width) };
+  });
+  expect(Math.abs(widths.row - widths.field)).toBeLessThanOrEqual(2);
+  expect(Math.abs(widths.right - widths.row)).toBeLessThanOrEqual(1);
+  expect(widths.first).toBe(widths.last);
+});
+
+test('login: a theme switch in the top bar', async ({ page }) => {
+  await open(page, '/login');
+  const before = await page.locator('html').getAttribute('data-theme');
+  await page.locator('.lg-theme').click();
+  await expect(page.locator('html')).not.toHaveAttribute('data-theme', before || 'light');
+});
+
+test('404: the page in the language of the design', async ({ page }) => {
+  await open(page, '/404.html');
+  await expect(page.locator('.nr-err .nr-kicker')).toHaveText('Ошибка 404');
+  await expect(page.locator('.nr-err h1')).toHaveText('Страница не найдена');
+  await expect(page.locator('.nr-err .nr-btn')).toHaveCount(2);
+});
+
 // «1 документ, 2 документа, 5 документов»: one rule for every number before a word (S.plural; ru, tg, en).
 test('plural forms: Russian, Tajik and English', async ({ page }) => {
   await open(page, '/');
