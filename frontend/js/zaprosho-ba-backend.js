@@ -658,4 +658,10 @@
   S.fileSrc = (u) => (S.isDemo() ? u : fileHref(u));
   S.hubUrl = () => origin() + '/hubs/chat';
   S.accessToken = () => (auth && auth.accessToken) || '';
+
+  // Wake the API as soon as any page opens: on the free Render plan it sleeps after 15 idle minutes, and waking takes
+  // 30–50 s. One quiet request at load starts that while the visitor is still looking at the page.
+  try {
+    if (!(S.isDemo && S.isDemo()) && origin()) fetch(origin() + '/health/live', { cache: 'no-store', credentials: 'omit' }).catch(() => {});
+  } catch (e) { /* no fetch — nothing to wake */ }
 })();
