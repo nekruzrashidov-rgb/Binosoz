@@ -14,7 +14,8 @@
 --   so managers can cancel, extend or turn it into a deal in the CRM. Sold apartments have no deal: they are catalog data only.
 -- * The seed itself is recorded in AuditLog (Building / Seeded).
 -- * A second DO block (any run, never overwrites): the demo eco passport and amenities of the building, the organization
---   tariffs and installment terms, marked as demo data — the same values as GreenDemoSeeder.cs.
+--   tariffs and installment terms, marked as demo data — the same values as GreenDemoSeeder.cs. It also replaces the old
+--   description «…бизнес-класса…» (an unverified claim) of an already seeded building and fills the Tajik description if empty.
 DO $$
 DECLARE
   org        constant uuid := '01a20000-0000-7000-8000-000000000001';
@@ -46,7 +47,7 @@ BEGIN
   INSERT INTO "Buildings" ("Id", "OrganizationId", "NameRu", "NameTg", "Address", "FloorsCount", "DescriptionRu", "DescriptionTg",
                            "ModelUrl", "CompletionYear", "PlannedApartments", "CreatedAt", "UpdatedAt")
   VALUES (building, org, 'Некруз Резиденс', 'Некруз Резиденс', 'г. Душанбе, пр. Борбад, 15', 20,
-          'Жилой комплекс бизнес-класса с коммерческим первым этажом', NULL, NULL, 2026, 160, ts, ts);
+          'Жилой дом на 20 этажей с коммерческим первым этажом', 'Бинои истиқоматии 20-ошёна бо ошёнаи якуми тиҷоратӣ', NULL, 2026, 160, ts, ts);
 
   -- Commercial floor: no apartments.
   INSERT INTO "Floors" ("Id", "BuildingId", "Number", "PlanImageUrl", "CreatedAt", "UpdatedAt")
@@ -110,6 +111,18 @@ DECLARE
   org constant uuid := '01a20000-0000-7000-8000-000000000001';
   n   int;
 BEGIN
+  -- Описание без непроверенного «бизнес-класса» и его перевод; описание, заданное застройщиком, не трогаем.
+  UPDATE "Buildings" SET "DescriptionRu" = 'Жилой дом на 20 этажей с коммерческим первым этажом', "UpdatedAt" = now()
+  WHERE "OrganizationId" = org AND "NameRu" = 'Некруз Резиденс'
+    AND "DescriptionRu" = 'Жилой комплекс бизнес-класса с коммерческим первым этажом';
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n > 0 THEN RAISE NOTICE 'Описание дома заменено на нейтральное'; END IF;
+
+  UPDATE "Buildings" SET "DescriptionTg" = 'Бинои истиқоматии 20-ошёна бо ошёнаи якуми тиҷоратӣ', "UpdatedAt" = now()
+  WHERE "OrganizationId" = org AND "NameRu" = 'Некруз Резиденс' AND "DescriptionTg" IS NULL AND "DescriptionRu" = 'Жилой дом на 20 этажей с коммерческим первым этажом';
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n > 0 THEN RAISE NOTICE 'Описание дома на таджикском заполнено'; END IF;
+
   UPDATE "Buildings" SET
     "EcoEnergyClass" = 'A',
     "EcoWallInsulationRu" = 'Минеральная вата 100 мм',

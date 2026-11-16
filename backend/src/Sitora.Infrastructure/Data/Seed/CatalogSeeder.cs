@@ -48,8 +48,9 @@ public static class CatalogSeeder
             Address = "г. Душанбе",
             FloorsCount = ResidentialFloors,
             PlannedApartments = ResidentialFloors * Layout.Length,
-            // Перевод описания на таджикский не выдумываем: его задаёт контент-менеджер.
-            DescriptionRu = "Жилой комплекс с коммерческим первым этажом"
+            // Нейтральное описание без оценок («бизнес-класс» и т. п. — только если их подтвердит застройщик) и его перевод.
+            DescriptionRu = "Жилой дом с коммерческим первым этажом",
+            DescriptionTg = "Бинои истиқоматӣ бо ошёнаи якуми тиҷоратӣ"
         };
 
         building.Floors.Add(new Floor { Number = Floor.CommercialFloorNumber });

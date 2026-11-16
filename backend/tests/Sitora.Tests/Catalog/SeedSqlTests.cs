@@ -26,6 +26,11 @@ public class SeedSqlTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
             $"SELECT \"Id\" FROM \"Buildings\" WHERE \"NameRu\" = 'Некруз Резиденс' AND \"OrganizationId\" = '{Organization.DefaultId}'");
         Assert.Equal(20, await ScalarAsync<int>(connection, tx, $"SELECT \"FloorsCount\" FROM \"Buildings\" WHERE \"Id\" = '{buildingId}'"));
         Assert.Equal(21L, await ScalarAsync<long>(connection, tx, $"SELECT count(*) FROM \"Floors\" WHERE \"BuildingId\" = '{buildingId}'"));
+        // Описание — без непроверенных оценок («бизнес-класс») и с переводом на таджикский.
+        var description = await RowAsync(connection, tx, $"SELECT \"DescriptionRu\", \"DescriptionTg\" FROM \"Buildings\" WHERE \"Id\" = '{buildingId}'");
+        Assert.DoesNotContain("бизнес", (string)description[0], StringComparison.OrdinalIgnoreCase);
+        Assert.False(string.IsNullOrWhiteSpace(description[1] as string));
+
 
         const string apartments = "FROM \"Apartments\" a JOIN \"Floors\" f ON f.\"Id\" = a.\"FloorId\" WHERE f.\"BuildingId\" = '{0}'";
         string Where(string extra) => string.Format(apartments, buildingId) + extra;
@@ -53,6 +58,13 @@ public class SeedSqlTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
             $"JOIN \"Leads\" l ON l.\"Id\" = b.\"LeadId\" WHERE f.\"BuildingId\" = '{buildingId}' AND b.\"Status\" = 'Active' AND a.\"Status\" = 'Booked' AND l.\"OrganizationId\" = '{Organization.DefaultId}'"));
         Assert.Equal(1L, await ScalarAsync<long>(connection, tx,
             $"SELECT count(*) FROM \"AuditLog\" WHERE \"EntityId\" = '{buildingId}' AND \"Action\" = 'Seeded'"));
+
+        // Уже засеянная база со старым описанием «бизнес-класса»: повторный запуск заменяет его и заполняет перевод.
+        await ExecAsync(connection, tx, $"UPDATE \"Buildings\" SET \"DescriptionRu\" = 'Жилой комплекс бизнес-класса с коммерческим первым этажом', \"DescriptionTg\" = NULL WHERE \"Id\" = '{buildingId}'");
+        await ExecAsync(connection, tx, sql);
+        var fixedDescription = await RowAsync(connection, tx, $"SELECT \"DescriptionRu\", \"DescriptionTg\" FROM \"Buildings\" WHERE \"Id\" = '{buildingId}'");
+        Assert.Equal(description[0], fixedDescription[0]);
+        Assert.Equal(description[1], fixedDescription[1]);
 
         // Повторный запуск ничего не добавляет.
         await ExecAsync(connection, tx, sql);
