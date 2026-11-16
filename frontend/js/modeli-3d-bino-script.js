@@ -39,11 +39,11 @@
       sunColor: 0xffa860, sunI: 2.1, sunPos: [-120, 26, 70], hemiSky: 0x6f86c9, hemiGround: 0x4a4a55, hemiI: 0.6,
       glow: 0.85, lamp: 1.0, stars: 0.35, cloud: 0.55, exposure: 1.05, env: 1.0,
     },
-    // Dushanbe night: deep navy sky, windows glow warmly, street lamps orange
+    // Dushanbe night: deep navy sky, windows glow warmly, street lamps orange; bright enough that the house reads on a phone
     night: {
-      top: 0x030810, horizon: 0x142040, bottom: 0x08100e, fog: 0x081220,
-      sunColor: 0x7090d0, sunI: 0.3, sunPos: [60, 70, 40], hemiSky: 0x1a2a60, hemiGround: 0x060a08, hemiI: 0.25,
-      glow: 1.4, lamp: 1.9, stars: 1, cloud: 0.08, exposure: 1.05, env: 0.6,
+      top: 0x050c1a, horizon: 0x1e2c56, bottom: 0x0b1512, fog: 0x0c1830,
+      sunColor: 0x7d9ad8, sunI: 0.5, sunPos: [60, 70, 40], hemiSky: 0x2a3c78, hemiGround: 0x0c120e, hemiI: 0.5,
+      glow: 1.8, lamp: 2.4, stars: 1, cloud: 0.08, exposure: 1.45, env: 0.8,
     },
   };
 
@@ -967,10 +967,11 @@
       });
       clouds.forEach((c) => { c.position.x += c.userData.v * dt; if (c.position.x > 900) c.position.x = -900; });
       renderer.render(scene, camera);
-      // The first frame is on screen: the page can take away its placeholder picture.
-      if (!drawnOnce) { drawnOnce = true; container.classList.add('is-ready'); if (opts.onReady) opts.onReady(); }
+      // The picture is on screen (a dozen frames: the very first ones can still be black while the GPU compiles the
+      // shaders and builds the shadows) — the page can take away its placeholder render.
+      if (!drawnOnce && ++framesDrawn >= 12) { drawnOnce = true; container.classList.add('is-ready'); if (opts.onReady) opts.onReady(); }
     }
-    var animIdx, drawnOnce = false;
+    var animIdx, drawnOnce = false, framesDrawn = 0;
 
     function resize() {
       const w = container.clientWidth || 800, h = container.clientHeight || 500;
