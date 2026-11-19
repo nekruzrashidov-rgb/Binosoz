@@ -1,4 +1,4 @@
-/* English interface texts (1802 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* English interface texts (1857 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -1293,7 +1293,9 @@
     "cat.importedN": "Import done: {c} created, {u} updated",
     "audit.system": "system",
     "dash.usdNoRate": "Dollar sales are not included: the USD rate has not been entered",
-    "err.network": "No connection to the server. Check the API address and your connection.",
+    "unit.kb": "KB",
+    "unit.mb": "MB",
+    "err.network": "No connection to the server. Check your internet and try again.",
     "err.429": "Too many requests. Please wait a moment.",
     "err.unknown": "Something went wrong",
     "err.noBuildings": "There are no buildings in the catalog yet",

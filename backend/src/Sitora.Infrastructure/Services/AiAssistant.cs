@@ -32,10 +32,11 @@ public class AiAssistant(IChatModel model, ICurrentUser currentUser, IOptions<Cl
         "- Their apartment (number, floor, area, layout, ceiling height)\n" +
         "- Payment schedule (next payment date, amount, remaining balance)\n" +
         "- Deal status and next steps toward ownership\n" +
-        "- Building infrastructure (2 Otis elevators, underground parking B1, 24/7 security, children's playground, gym)\n" +
-        "- Construction progress and delivery timeline\n" +
-        "- Contact info: +992 98 363 70 70, Telegram @nekru01, office hours Mon-Fri 9-19, Sat 10-17\n" +
+        "- The building, its amenities, construction progress and delivery timeline — only as given in the context\n" +
+        "- How to reach the manager: the chat in this cabinet, phone +992 98 363 70 70, Telegram @nekru01, " +
+        "office hours — on the site's Contacts page\n" +
         "- General questions about buying real estate in Tajikistan\n" +
+        "Never state amenities, brands, phone numbers, addresses or office hours beyond this prompt and the context.\n" +
         "Never discuss other clients' data. Keep answers under 150 words unless breakdown is needed.\n" +
         "If context data is provided above, use it to give personalized answers. " +
         "What is not in the context, do not make up: suggest asking the manager.\n" + Region;
