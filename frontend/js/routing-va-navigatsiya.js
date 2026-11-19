@@ -141,7 +141,7 @@
       ? h('a', { class: 'btn sm', href: '/login' }, t('nav.login'))
       : h('div', { class: 'row', style: { gap: '8px', flexWrap: 'nowrap' } },
         h('span', { class: 'userchip', title: [u.email || u.phone, t('role.' + u.role, null, u.role), u.organizationName].filter(Boolean).join(' · ') }, h('span', { class: 'avatar' }, S.fmt.initials(u.name)), h('span', { class: 'nm' }, u.name, u.organizationName ? h('small', { class: 'org' }, u.organizationName) : null)),
-        h('button', { class: 'icon-btn', title: t('nav.logout'), 'aria-label': t('nav.logout'), onclick: async () => { await S.api.logout(); location.href = '/'; } }, S.icon('out')));
+        h('button', { class: 'icon-btn', title: t('nav.logout'), 'aria-label': t('nav.logout'), onclick: async () => { S.leaving = true; await S.api.logout(); location.href = '/'; } }, S.icon('out')));
     header.replaceChildren(impBanner(), h('div', { class: 'wrap top-in' }, h('a', { class: 'brand', href: '/', 'aria-label': 'Binosoz' }, S.logo(), h('span', null, 'BINOSOZ')), menu, h('span', { class: 'spacer' }),
       S.api.isCustomer() ? null : liveClock(), lang, theme, u && !S.isDemo() ? S.notifBell() : null, who, menuBtn));
   }
@@ -330,7 +330,8 @@
     // /#why from the footer of another page: the section exists only after render.
     if (location.hash.length > 1) { const el = document.getElementById(location.hash.slice(1)); if (el) setTimeout(() => el.scrollIntoView(), 50); }
     S.bus.on('lang', render);
-    S.bus.on('auth', () => { if (guarded && !S.api.isAuthed) location.replace('/login'); else drawHeader(); });
+    // «Выйти» сам уводит на главную: второй переход на /login оборвал бы первый.
+    S.bus.on('auth', () => { if (S.leaving) return; if (guarded && !S.api.isAuthed) location.replace('/login'); else drawHeader(); });
   }
   if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', boot); else boot();
 })();
