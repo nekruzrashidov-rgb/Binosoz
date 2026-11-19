@@ -254,6 +254,28 @@
     "ai.chip.platformStats": "📊 Platform statistics",
     "ai.chip.tariffs": "📦 Tariff plans",
     "ai.chip.users": "👥 Users",
+
+    "ai.helloGuest": "Hello! I'm the online consultant of this residential complex. Ask about apartments, prices, installments or booking — I answer from the catalog data.",
+
+    "ai.chip.free": "🏠 Which apartments are free?",
+
+    "ai.chip.installment": "💳 How does the installment plan work?",
+
+    "ai.chip.book": "🔑 How do I book an apartment?",
+
+    "ai.chip.price2": "📐 How much is a 2-room apartment?",
+
+    "ai.publicNote": "The AI assistant can make mistakes. Prices and availability are in the catalog.",
+
+    "ai.privacyLink": "Privacy",
+
+    "ai.busyContacts": "Contact the manager:",
+
+    "ai.call": "Call",
+
+    "ai.email": "Write",
+
+    "ai.contactPage": "Contacts",
     "top.days": "Sun,Mon,Tue,Wed,Thu,Fri,Sat",
     "top.months": "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec",
     "common.cancel": "Cancel",
@@ -1138,7 +1160,7 @@
     "demo.badge": "Demo data",
     "privacy.title": "Privacy policy",
     "privacy.link": "Privacy policy",
-    "privacy.updated": "Version of 15 November 2026",
+    "privacy.updated": "Version of 19 November 2026",
     "privacy.consent": "By submitting, you agree to the",
     "privacy.consentLink": "privacy policy",
     "meta.privacy": "What data the Nekruz Residence site and the Binosoz platform process, why, where it is stored and how to delete it.",
@@ -1169,6 +1191,8 @@
     "privacy.s4.li5": "If the Sentry error reporting service is connected, reports contain no emails, phone numbers, passport details or tokens.",
     "privacy.s4.li6": "Fonts are loaded from Google Fonts and the 3D model library from cdnjs (Cloudflare); these services see your IP address.",
     "privacy.s4.li7": "The site has no analytics counters, advertising trackers or pixels.",
+
+    "privacy.s4.li8": "The AI assistant on the website pages (for guests, without sign-in): the text of your question and the last turns of the conversation are sent to Anthropic (a processor) only to get an answer; only public data of the residential complex from the catalog goes with them. The conversation history is not stored on our server — it exists only in the browser tab and disappears when you close it. Do not enter personal data in the chat: passport details, passwords, card numbers.",
     "privacy.s5.h": "Google and the Gmail API",
     "privacy.s5.p1": "The binosoz27@gmail.com account is connected through the Gmail API with the `gmail.send` permission only: the platform sends sign-in codes and notifications from it. The platform does not read or store emails or any other Gmail data, does not share it with third parties and does not use it for advertising or model training.",
     "privacy.s5.p2": "Use and transfer of information received from Google APIs adhere to the Google API Services User Data Policy, including the Limited Use requirements.",

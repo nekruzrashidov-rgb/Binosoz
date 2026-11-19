@@ -551,8 +551,9 @@ body.has-demo-bar .settings-fab { bottom: calc(52px + env(safe-area-inset-bottom
 .ai-list { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
 .ai-msg { max-width: 85%; padding: 9px 12px; border-radius: 14px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
 .ai-msg.bot { align-self: flex-start; background: var(--surface-3); border-bottom-left-radius: 4px; }
-.ai-msg.me { align-self: flex-end; background: var(--gold); color: #1b1405; border-bottom-right-radius: 4px; }
-.ai-msg.err { align-self: flex-start; background: var(--bad-soft); color: var(--bad); }
+/* Own message: the accent with its own text colour (AA in both themes); an error: ink text on the soft red, red edge. */
+.ai-msg.me { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 4px; }
+.ai-msg.err { align-self: flex-start; background: var(--bad-soft); color: var(--ink); border-left: 3px solid var(--bad); }
 .ai-msg.rich { white-space: normal; }
 .ai-msg.rich p { margin: 0 0 6px; }
 .ai-msg.rich ol, .ai-msg.rich ul { margin: 0 0 6px; padding-left: 20px; }
@@ -562,6 +563,22 @@ body.has-demo-bar .settings-fab { bottom: calc(52px + env(safe-area-inset-bottom
 .ai-msg.typing { color: var(--muted); font-style: italic; }
 .ai-form { display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); }
 .ai-input { resize: none; min-height: 42px; }
+/* Public site assistant (.ai-public): the disclaimer under the field, links in replies, the manager's contacts on "busy" */
+.ai-public .ai-form { padding-bottom: 6px; }
+.ai-note { margin: 0; padding: 0 12px calc(10px + env(safe-area-inset-bottom, 0px)); font-size: 12px; line-height: 1.45; color: var(--muted); }
+.ai-note a, .ai-msg .ai-link { color: var(--accent-text); text-decoration: underline; text-underline-offset: 2px; }
+.ai-contacts { align-self: flex-start; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: 100%; font-size: 13px; color: var(--ink-2); }
+.ai-contacts > span { width: 100%; }
+.ai-contact {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 12px;
+  border: 1px solid var(--field-line); border-radius: 2px; background: var(--surface); color: var(--ink);
+  font-weight: 600; text-decoration: none;
+}
+.ai-contact svg { width: 16px; height: 16px; }
+.ai-contact:hover { border-color: var(--accent-text); color: var(--accent-text); }
+.ai-public .ai-chip { white-space: normal; text-align: left; }
+/* The full-screen 3D view has its own controls in the corners, and the open mobile menu covers the page: no bubble there. */
+body:has(.h3d-full) :is(.ai-fab, .ai-panel), body.menu-open .ai-fab { display: none; }
 
 /* ---------- public site: landing, catalog, contact. Warm premium — cream base, copper accent ---------- */
 .lux {

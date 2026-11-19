@@ -627,6 +627,10 @@
     async audit(entity) { return (await all('/audit', { entity: entity || undefined }, 1)).map(M.audit); },
     // AI assistant: the server chooses the prompt by role; history = [{ role: 'user'|'assistant', content }].
     // dealId — only for staff: the deal's buyer, apartment, price, stage and payments go into the assistant's prompt.
+    // The guest assistant of the public site (ORG_SLUG): no token is sent, the server limits it by IP and per day.
+    // Without ORG_SLUG the site shows several developers, so there is no one complex to answer about: no assistant.
+    aiPublicStatus() { return cfgSlug() && !S.isDemo() ? request('GET', '/public/' + encodeURIComponent(cfgSlug()) + '/ai/status', { auth: false }) : Promise.resolve({ enabled: false }); },
+    aiPublicChat(message, history) { return request('POST', '/public/' + encodeURIComponent(cfgSlug()) + '/ai/chat', { auth: false, body: { message, history: history || [] } }); },
     aiChat(message, history, dealId) { return request('POST', '/ai/chat', { body: { message, history: history || [] }, query: dealId ? { dealId } : undefined }); },
     // AI reading of documents and receipts (Claude); nothing in the deal changes until a person acts on the result.
     verifyDocument(id) { return request('POST', '/documents/' + id + '/verify'); },
