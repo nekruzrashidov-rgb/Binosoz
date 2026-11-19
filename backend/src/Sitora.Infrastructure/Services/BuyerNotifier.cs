@@ -95,9 +95,14 @@ public class BuyerNotifier(
 
         if (wantsPayments && r.ByEmail && r.EmailConfirmed && !string.IsNullOrWhiteSpace(r.Email))
         {
-            var brand = await BrandNameAsync(n.OrganizationId, ct);
+            var org = await db.Organizations.IgnoreQueryFilters().AsNoTracking().Where(o => o.Id == n.OrganizationId)
+                .Select(o => new { o.Name, o.Phone, o.Email, o.Telegram, o.Address }).FirstOrDefaultAsync(ct);
+            var brand = string.IsNullOrWhiteSpace(org?.Name) ? "Застройщик" : org.Name.Trim();
+            // Подпись письма — контакты организации, только заполненные (без выдуманных по умолчанию).
+            var contacts = new[] { org?.Phone, org?.Email, org?.Telegram, org?.Address }
+                .Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c!.Trim()).ToList();
             var unsubscribeUrl = $"{ApiOrigin}/api/v1/public/unsubscribe?t={unsubscribe.Create(r.Id)}";
-            var letter = EmailTemplates.PaymentReminder(r.Email, lang, brand, r.Name, title, text, CabinetUrl, unsubscribeUrl);
+            var letter = EmailTemplates.PaymentReminder(r.Email, lang, brand, r.Name, title, text, CabinetUrl, unsubscribeUrl, contacts);
             var m = Message(BuyerChannels.Email, BuyerMessageStatus.Pending);
             (m.Subject, m.Text, m.Html) = (letter.Subject, letter.Text, letter.Html);
             if (await TryAddAsync(m, null, ct))
@@ -109,9 +114,6 @@ public class BuyerNotifier(
         return count;
     }
 
-    private async Task<string> BrandNameAsync(Guid organizationId, CancellationToken ct) =>
-        await db.Organizations.IgnoreQueryFilters().Where(o => o.Id == organizationId).Select(o => o.Name).FirstOrDefaultAsync(ct)
-        ?? "Застройщик";
 
     // ---------- события сделки: только Telegram ----------
 

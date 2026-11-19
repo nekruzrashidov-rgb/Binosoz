@@ -105,6 +105,13 @@ public partial class BuyerNotificationTests(SitoraApiFactory factory) : IClassFi
         Assert.Contains("Открыть кабинет", letter.Html);
         Assert.Contains("/api/v1/public/unsubscribe?t=", letter.Text);
         Assert.DoesNotContain("Binosoz", letter.Text);
+        // Подпись — контакты организации из базы, только заполненные.
+        var org = await factory.WithDbAsync(db => db.Deals.IgnoreQueryFilters().Where(d => d.Id == b.Deal.DealId)
+            .Select(d => new { d.Apartment.Floor.Building.Organization.Phone, d.Apartment.Floor.Building.Organization.Email }).SingleAsync());
+        if (!string.IsNullOrWhiteSpace(org.Phone))
+            Assert.Contains(org.Phone.Trim(), letter.Text);
+        if (!string.IsNullOrWhiteSpace(org.Email))
+            Assert.Contains(org.Email.Trim(), letter.Text);
 
         // В колокольчике — одно уведомление «Сегодня срок платежа».
         var bell = (await b.Client.GetFromJsonAsync<NotificationListResponse>("/api/v1/notifications", TestJson.Options))!;

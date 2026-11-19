@@ -44,15 +44,16 @@ public static class EmailTemplates
     // Напоминание о платеже покупателю: на его языке, от имени застройщика (brand), кнопка «Открыть кабинет»
     // и ссылка «Отписаться» (без входа). Только сумма, номер квартиры и срок — без паспортных данных.
     public static EmailMessage PaymentReminder(string to, string lang, string brand, string name, string title, string body,
-        string? cabinetUrl, string unsubscribeUrl)
+        string? cabinetUrl, string unsubscribeUrl, IReadOnlyList<string>? contacts = null)
     {
+        var contactLine = contacts is { Count: > 0 } ? string.Join(" · ", contacts) : null;
         var intro = Services.BuyerTexts.EmailIntro(lang, name);
         var paid = Services.BuyerTexts.AlreadyPaid(lang);
         var footer = Services.BuyerTexts.EmailFooter(lang, brand);
         var open = Services.BuyerTexts.OpenCabinet(lang);
         var unsubscribe = Services.BuyerTexts.Unsubscribe(lang);
         var text = $"{intro}\n\n{body}.\n\n" + (cabinetUrl is null ? "" : $"{open}: {cabinetUrl}\n\n") +
-                   $"{paid}\n\n— {brand}\n{footer}\n{unsubscribe}: {unsubscribeUrl}";
+                   $"{paid}\n\n— {brand}\n" + (contactLine is null ? "" : contactLine + "\n") + $"{footer}\n{unsubscribe}: {unsubscribeUrl}";
 
         string E(string s) => WebUtility.HtmlEncode(s);
         var button = cabinetUrl is null ? "" : $"""
@@ -66,7 +67,7 @@ public static class EmailTemplates
               <p style="line-height:1.6; font-size:17px;"><strong>{E(body)}</strong></p>
               {button}
               <p style="line-height:1.6; color:#555555;">{E(paid)}</p>
-              <p style="color:#555555; margin-top:32px;">— {E(brand)}</p>
+              <p style="color:#555555; margin-top:32px;">— {E(brand)}{(contactLine is null ? "" : "<br>" + E(contactLine))}</p>
               <p style="font-size:12px; color:#777777; line-height:1.5;">{E(footer)}<br><a href="{E(unsubscribeUrl)}" style="color:#777777;">{E(unsubscribe)}</a></p>
             </div>
             """;
