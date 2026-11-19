@@ -1953,5 +1953,10 @@
     "rem.ev.deal_stage": "Deal stage",
     "rem.ev.document_added": "New document",
     "rem.ev.chat_message": "Manager's message",
+    "login.byTelegram": "By phone (code in Telegram)",
+    "login.hintTelegram": "Enter the number from your contract — the code comes to Telegram on this number.",
+    "login.codeSubTelegram": "If the number belongs to a buyer, the code was sent to Telegram on {p}. It is valid for 10 minutes.",
+    "login.noTelegram": "There is no Telegram on this number — sign in by e-mail",
+    "login.tgCodesOff": "Codes in Telegram are not being sent right now. Sign in by e-mail",
   };
 })();

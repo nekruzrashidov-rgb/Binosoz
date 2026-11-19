@@ -101,3 +101,21 @@ test('«Устройства»: this device is marked, «Выйти на все�
   expect(s.revokedAll).toBe(1);
   await expect(page.locator('input[name=email]')).toHaveAttribute('type', 'email');
 });
+
+test('by phone with a code in Telegram: the switch says so, «no Telegram on this number» is explained', async ({ page }) => {
+  await page.route('**/health/live', (route) => route.fulfill({ status: 200, contentType: 'text/plain', body: 'Healthy' }));
+  await page.route('**/api/v1/**', (route) => {
+    const p = new URL(route.request().url()).pathname.replace(/^\/api\/v1/, '');
+    if (p === '/auth/methods') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ pin: true, email: true, sms: false, demo: false, telegram: true }) });
+    if (p === '/auth/sms/send') return route.fulfill({ status: 422, contentType: 'application/problem+json', body: JSON.stringify({ status: 422, detail: 'На этот номер нет Telegram — войдите по почте', code: 'telegram_no_account' }) });
+    return route.fulfill({ status: 404, contentType: 'application/problem+json', body: '{}' });
+  });
+  await page.goto('/login');
+  const toggle = page.getByRole('button', { name: 'По телефону (код в Telegram)' });
+  await expect(toggle).toBeVisible();
+  await toggle.click();
+  await expect(page.locator('.login-card')).toContainText('код придёт в Telegram');
+  await page.locator('input[name=phone]').fill('+992900000001');
+  await page.getByRole('button', { name: 'Отправить код' }).click();
+  await expect(page.locator('.form-err')).toContainText('На этот номер нет Telegram — войдите по почте');
+});

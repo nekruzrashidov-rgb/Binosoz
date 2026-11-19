@@ -125,7 +125,9 @@
     const isEmail = (v) => /^\S+@\S+\.\S+$/.test(v);
     // How a buyer signs in: 'email' (own code) or 'phone' (SMS, only when the server has it on); methods — from the server.
     let by = S.store.get('sitora.loginBy') === 'phone' ? 'phone' : 'email', phoneVal = '+992', methods = null;
-    const smsOn = () => !!methods && !!methods.sms;
+    // By phone: a code in Telegram (Telegram Gateway, methods.telegram) or an SMS (methods.sms).
+    const smsOn = () => !!methods && (!!methods.sms || !!methods.telegram);
+    const viaTelegram = () => !!methods && !!methods.telegram;
     const DEMO_BUYER = 'demo-buyer@binosoz.tj';
     S.api.authMethods().then((m) => {
       methods = m || null;
@@ -135,6 +137,8 @@
     const humanError = (er) => {
       if (er && er.code === 'email_not_configured') er.message = t('login.emailOff');
       if (er && er.code === 'sms_not_configured') er.message = t('login.smsOff');
+      if (er && er.code === 'telegram_no_account') er.message = t('login.noTelegram');
+      if (er && (er.code === 'telegram_gateway_limit' || er.code === 'telegram_gateway_failed')) er.message = t('login.tgCodesOff');
       return er;
     };
     const badEmail = (form) => S.showErrors(form, { message: t('val.email'), errors: { email: [t('val.email')] } });
@@ -146,7 +150,7 @@
     const link = (label, onclick, cls) => h('button', { class: 'btn ghost sm' + (cls ? ' ' + cls : ''), type: 'button', onclick }, label);
     const go = (next, o) => { o = o || {}; notice = o.notice || ''; pinError = null; if (o.stopTick) clearInterval(tick); step = next; draw(); };
     // «По почте» / «По телефону» on the buyer's tab — only when SMS really work.
-    const byToggle = () => !smsOn() ? null : h('div', { class: 'seg login-by', role: 'group', 'aria-label': t('login.howTo') }, [['email', 'login.byEmail'], ['phone', 'login.byPhone']].map(([k, key]) =>
+    const byToggle = () => !smsOn() ? null : h('div', { class: 'seg login-by', role: 'group', 'aria-label': t('login.howTo') }, [['email', 'login.byEmail'], ['phone', viaTelegram() ? 'login.byTelegram' : 'login.byPhone']].map(([k, key]) =>
       h('button', { type: 'button', class: by === k ? 'on' : '', 'aria-pressed': String(by === k), onclick: () => {
         if (by === k) return;
         by = k; S.store.set('sitora.loginBy', k); notice = ''; draw();
@@ -249,7 +253,7 @@
       } else if (step === 'buyer' && byPhoneNow()) {
         const phone = S.input('phone', { type: 'tel', value: phoneVal, autocomplete: 'tel', inputmode: 'tel' });
         btn.textContent = t('login.sendCode');
-        form.append(h('h2', null, t('login.buyerTitle')), byToggle(), h('p', { class: 'muted' }, t('login.hintPhone')), info, S.field(t('f.phone'), phone, t('f.phoneHint')), btn);
+        form.append(h('h2', null, t('login.buyerTitle')), byToggle(), h('p', { class: 'muted' }, t(viaTelegram() ? 'login.hintTelegram' : 'login.hintPhone')), info, S.field(t('f.phone'), phone, t('f.phoneHint')), btn);
         submit = async () => {
           phoneVal = phone.value.replace(/[\s()-]/g, '');
           await S.api.smsSend(phoneVal); startTick(); go('code');
@@ -366,7 +370,7 @@
       } else {
         // The SMS code (only when the server has SMS sign-in on).
         const code = codeInput('code');
-        form.append(h('h2', null, t('login.codeTitle')), h('p', { class: 'muted' }, t('login.codeSubPhone', { p: phoneVal })), S.field(t('login.code'), code, t('login.codeHint')), btn,
+        form.append(h('h2', null, t('login.codeTitle')), h('p', { class: 'muted' }, t(viaTelegram() ? 'login.codeSubTelegram' : 'login.codeSubPhone', { p: phoneVal })), S.field(t('login.code'), code, t('login.codeHint')), btn,
           h('div', { class: 'row between' }, link(t('login.changePhone'), () => go('buyer', { stopTick: true })), resendButton(() => S.api.smsSend(phoneVal))));
         submit = async () => enter(await S.api.smsVerify(phoneVal, code.value.replace(/\s/g, '')));
         focus = code;

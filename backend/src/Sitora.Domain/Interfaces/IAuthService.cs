@@ -40,6 +40,6 @@ public interface IAuthService
     Task<AuthResponse> AcceptInvitationAsync(AcceptInvitationRequest request, CancellationToken ct = default);
 
     // Старый вход по SMS (выключен флагом Auth:SmsLoginEnabled).
-    Task<SmsSendResponse> SendSmsCodeAsync(SmsSendRequest request, CancellationToken ct = default);
+    Task<SmsSendResponse> SendSmsCodeAsync(SmsSendRequest request, string? requestIp = null, CancellationToken ct = default);
     Task<AuthResponse> VerifySmsCodeAsync(SmsVerifyRequest request, CancellationToken ct = default);
 }

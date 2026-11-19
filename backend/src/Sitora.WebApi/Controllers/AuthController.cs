@@ -25,7 +25,7 @@ public class AuthController(IAuthService auth, IOptions<AuthOptions> options, IH
     [HttpGet("methods")]
     [AllowAnonymous]
     [ProducesResponseType<AuthMethodsResponse>(StatusCodes.Status200OK)]
-    public AuthMethodsResponse Methods() => new(channels.EmailWorks, channels.SmsWorks, channels.DemoLogin);
+    public AuthMethodsResponse Methods() => new(channels.EmailWorks, channels.SmsWorks, channels.DemoLogin, Telegram: channels.TelegramWorks);
 
     /// <summary>
     /// Регистрация покупателя: имя, почта, телефон и свой 6-значный код входа (не одинаковые цифры и не подряд — иначе 422).
@@ -260,14 +260,20 @@ public class AuthController(IAuthService auth, IOptions<AuthOptions> options, IH
         return new SessionsRevokedResponse(revoked);
     }
 
-    /// <summary>Старый вход покупателя по SMS. Выключен (404), пока Auth:SmsLoginEnabled = false.</summary>
+    /// <summary>
+    /// Вход покупателя по телефону из договора: код в Telegram (Telegram Gateway, если задан Telegram__Gateway__Token) или SMS
+    /// (Auth:SmsLoginEnabled). Ни того ни другого — 404. Коды в Telegram: 6 цифр, 10 минут, 5 попыток, не чаще раза в минуту
+    /// и 5 в час на номер и на IP; номера без Telegram — 422 telegram_no_account; суточный лимит — 503 telegram_gateway_limit.
+    /// </summary>
     [HttpPost("sms/send")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicies.Sms)]
     [ProducesResponseType<SmsSendResponse>(StatusCodes.Status202Accepted)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> SendSms(SmsSendRequest request, CancellationToken ct) =>
-        options.Value.SmsLoginEnabled ? Accepted(await auth.SendSmsCodeAsync(request, ct)) : NotFound();
+        PhoneLogin ? Accepted(await auth.SendSmsCodeAsync(request, HttpContext.Connection.RemoteIpAddress?.ToString(), ct)) : NotFound();
+
+    private bool PhoneLogin => options.Value.SmsLoginEnabled || channels.TelegramWorks;
 
     [HttpPost("sms/verify")]
     [AllowAnonymous]
@@ -275,7 +281,7 @@ public class AuthController(IAuthService auth, IOptions<AuthOptions> options, IH
     [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> VerifySms(SmsVerifyRequest request, CancellationToken ct) =>
-        options.Value.SmsLoginEnabled ? Ok(await auth.VerifySmsCodeAsync(request, ct)) : NotFound();
+        PhoneLogin ? Ok(await auth.VerifySmsCodeAsync(request, ct)) : NotFound();
 
     /// <summary>Текущий пользователь: роли, главная роль, организация, дома и режим «войти как владелец».</summary>
     [HttpGet("me")]

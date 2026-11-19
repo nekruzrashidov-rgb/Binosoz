@@ -40,7 +40,8 @@ public record ImpersonationInfo(Guid ImpersonatedBy, Guid? OrganizationId);
 public record EmailSendResponse(string Message, int ExpiresInSeconds, int ResendAfterSeconds = 60);
 
 // GET /auth/methods: какие способы входа сейчас работают. Pin — вход покупателя по своему 6-значному коду (всегда).
-public record AuthMethodsResponse(bool Email, bool Sms, bool Demo = false, bool Pin = true);
+// Telegram — вход по телефону кодом в Telegram (Telegram Gateway настроен).
+public record AuthMethodsResponse(bool Email, bool Sms, bool Demo = false, bool Pin = true, bool Telegram = false);
 
 // Регистрация покупателя: имя, почта, телефон (для карточки клиента) и свой 6-значный код входа.
 // Organization — короткое имя застройщика (slug); без него — единственный застройщик платформы.

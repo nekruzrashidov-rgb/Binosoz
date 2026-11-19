@@ -1953,5 +1953,10 @@
     "rem.ev.deal_stage": "Марҳилаи аҳд",
     "rem.ev.document_added": "Ҳуҷҷати нав",
     "rem.ev.chat_message": "Паёми менеҷер",
+    "login.byTelegram": "Бо телефон (рамз дар Telegram)",
+    "login.hintTelegram": "Рақами шартномаро ворид кунед — рамз ба Telegram-и ин рақам меояд.",
+    "login.codeSubTelegram": "Агар рақам дар байни харидорон бошад, рамз ба Telegram-и {p} фиристода шуд. Рамз 10 дақиқа амал мекунад.",
+    "login.noTelegram": "Дар ин рақам Telegram нест — бо почта ворид шавед",
+    "login.tgCodesOff": "Рамзҳо дар Telegram ҳоло фиристода намешаванд. Бо почта ворид шавед",
   };
 })();

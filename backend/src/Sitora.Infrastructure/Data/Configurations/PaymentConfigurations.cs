@@ -74,7 +74,13 @@ public class SmsCodeConfiguration : IEntityTypeConfiguration<SmsCode>
         builder.ToTable("SmsCodes");
         builder.Property(c => c.Phone).HasMaxLength(20).IsRequired();
         builder.Property(c => c.CodeHash).HasMaxLength(64).IsRequired();
+        builder.Property(c => c.Channel).HasMaxLength(16).IsRequired();
+        builder.Property(c => c.RequestIp).HasMaxLength(64);
+        builder.Property(c => c.GatewayRequestId).HasMaxLength(100);
+        builder.Property(c => c.DeliveryStatus).HasMaxLength(32);
         builder.HasIndex(c => new { c.Phone, c.CreatedAt });
+        builder.HasIndex(c => new { c.RequestIp, c.CreatedAt });
+        builder.HasIndex(c => c.GatewayRequestId).HasFilter("\"GatewayRequestId\" IS NOT NULL");
     }
 }
 

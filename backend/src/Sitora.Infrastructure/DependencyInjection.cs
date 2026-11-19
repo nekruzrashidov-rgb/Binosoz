@@ -135,6 +135,8 @@ public static class DependencyInjection
         services.AddHttpClient(TelegramBotTransport.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(15)).RemoveAllLoggers();
         services.AddSingleton<ITelegramTransport, TelegramBotTransport>();
         services.AddSingleton<ITelegramNotifier, TelegramNotifier>();
+        // Токен Gateway в заголовке Authorization: без журнала HttpClient он не попадает в логи.
+        services.AddHttpClient<ITelegramGateway, TelegramGatewayClient>(c => c.Timeout = TimeSpan.FromSeconds(15)).RemoveAllLoggers();
         services.AddScoped<TelegramAlertService>();
         services.AddSingleton<ISmsSender, SmsSender>();
         services.AddScoped<LoginChannels>();

@@ -1953,5 +1953,10 @@
     "rem.ev.deal_stage": "Этап сделки",
     "rem.ev.document_added": "Новый документ",
     "rem.ev.chat_message": "Сообщение менеджера",
+    "login.byTelegram": "По телефону (код в Telegram)",
+    "login.hintTelegram": "Введите номер из договора — код придёт в Telegram на этот номер.",
+    "login.codeSubTelegram": "Если номер есть среди покупателей, код отправлен в Telegram на {p}. Код действует 10 минут.",
+    "login.noTelegram": "На этот номер нет Telegram — войдите по почте",
+    "login.tgCodesOff": "Коды в Telegram сейчас не отправляются. Войдите по почте",
   };
 })();

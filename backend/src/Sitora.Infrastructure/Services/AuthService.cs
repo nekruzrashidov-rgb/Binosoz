@@ -35,6 +35,8 @@ public partial class AuthService(
     TimeProvider timeProvider,
     IHostEnvironment environment,
     LoginChannels channels,
+    ITelegramGateway gateway,
+    IOptions<TelegramOptions> gatewayOptions,
     ILogger<AuthService> logger) : IAuthService
 {
     private const string InvalidCredentials = "Неверная почта или пароль";
@@ -382,10 +384,12 @@ public partial class AuthService(
     // ---------- Старый вход по SMS ----------
 
     // Ответ одинаковый для любого номера, чтобы по нему нельзя было узнать, кто покупатель.
-    public async Task<SmsSendResponse> SendSmsCodeAsync(SmsSendRequest request, CancellationToken ct = default)
+    public async Task<SmsSendResponse> SendSmsCodeAsync(SmsSendRequest request, string? requestIp = null, CancellationToken ct = default)
     {
         var phone = PhoneNumber.Normalize(request.Phone)
             ?? throw new BusinessRuleException("Неверный номер телефона");
+        if (channels.TelegramWorks)
+            return await SendTelegramCodeAsync(phone, requestIp, ct);
         // SMS-провайдер не подключён (заглушка вне Development): код не дойдёт — 503 для любого номера.
         if (!channels.SmsProviderConnected)
             throw new ServiceUnavailableException(LoginChannels.SmsNotConfigured);
@@ -431,6 +435,9 @@ public partial class AuthService(
         }
 
         smsCode.UsedAt = now;
+        // Telegram Gateway: сообщить, что код введён (статистика доставки); сбой не мешает входу.
+        if (smsCode.GatewayRequestId is { } gatewayRequest)
+            await gateway.CheckStatusAsync(gatewayRequest, request.Code.Trim(), ct);
         var customers = await db.Customers.IgnoreQueryFilters().Where(c => c.Phone == phone).ToListAsync(ct);
         if (customers.Count == 0)
             throw new UnauthorizedException(InvalidSmsCode);
@@ -441,6 +448,74 @@ public partial class AuthService(
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Покупатель {UserId} вошёл по SMS", user.Id);
         return await IssueTokensAsync(user, ct);
+    }
+
+    // Код входа в Telegram (Telegram Gateway): лимиты как у кодов из почты — раз в минуту и 5 в час на номер и на IP;
+    // суточный лимит отправок на платформу (Telegram:Gateway:DailyLimit) — расходы под контролем.
+    // Незнакомый номер — тот же ответ, без отправки (и без оплаты).
+    private async Task<SmsSendResponse> SendTelegramCodeAsync(string phone, string? requestIp, CancellationToken ct)
+    {
+        var now = Now;
+        var limits = authOptions.Value;
+        await EnsurePhoneCodeLimitAsync(c => c.Phone == phone, now, limits, ct);
+        if (!string.IsNullOrEmpty(requestIp))
+            await EnsurePhoneCodeLimitAsync(c => c.RequestIp == requestIp, now, limits, ct);
+
+        if (await db.Customers.IgnoreQueryFilters().AnyAsync(c => c.Phone == phone, ct))
+        {
+            var dayStart = DateTime.SpecifyKind(DushanbeTime.Today(now).ToDateTime(TimeOnly.MinValue).Add(-DushanbeTime.Offset), DateTimeKind.Utc);
+            var sentToday = await db.SmsCodes.CountAsync(c => c.Channel == SmsCode.ChannelTelegram && c.GatewayRequestId != null && c.CreatedAt >= dayStart, ct);
+            if (sentToday >= gatewayOptions.Value.Gateway.DailyLimit)
+            {
+                logger.LogWarning("Telegram Gateway: суточный лимит {Limit} кодов исчерпан", gatewayOptions.Value.Gateway.DailyLimit);
+                throw new ServiceUnavailableException(LoginChannels.GatewayLimit);
+            }
+
+            var code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+            var row = new SmsCode
+            {
+                Phone = phone, Channel = SmsCode.ChannelTelegram, RequestIp = requestIp,
+                CodeHash = HashCode(phone, code), ExpiresAt = now.Add(SmsCode.TelegramLifetime)
+            };
+            db.SmsCodes.Add(row);
+            await db.SaveChangesAsync(ct);
+
+            var result = await gateway.SendCodeAsync(phone, code, (int)SmsCode.TelegramLifetime.TotalSeconds, ct);
+            row.GatewayRequestId = result.RequestId;
+            row.DeliveryStatus = result.Status == GatewaySendStatus.Sent ? "sent" : result.Error;
+            if (result.Status != GatewaySendStatus.Sent)
+                row.UsedAt = now; // недоставленный код не принимаем
+            await db.SaveChangesAsync(ct);
+            if (result.Status == GatewaySendStatus.NoTelegram)
+                throw new BusinessRuleException(LoginChannels.NoTelegram);
+            if (result.Status == GatewaySendStatus.Failed)
+            {
+                logger.LogWarning("Telegram Gateway не отправил код: {Error}", result.Error);
+                throw new ServiceUnavailableException(LoginChannels.GatewayFailed);
+            }
+        }
+        else
+        {
+            db.SmsCodes.Add(new SmsCode
+            {
+                Phone = phone, Channel = SmsCode.ChannelTelegram, RequestIp = requestIp, CodeHash = "-", ExpiresAt = now, UsedAt = now
+            });
+            await db.SaveChangesAsync(ct);
+            logger.LogInformation("Код в Telegram не отправлен: номер не найден среди покупателей");
+        }
+
+        return new SmsSendResponse("Если номер есть среди покупателей, мы отправили код в Telegram",
+            (int)SmsCode.TelegramLifetime.TotalSeconds);
+    }
+
+    private async Task EnsurePhoneCodeLimitAsync(System.Linq.Expressions.Expression<Func<SmsCode, bool>> who, DateTime now,
+        AuthOptions limits, CancellationToken ct)
+    {
+        var recent = db.SmsCodes.Where(c => c.Channel == SmsCode.ChannelTelegram).Where(who);
+        if (await recent.CountAsync(c => c.CreatedAt > now.AddMinutes(-1), ct) >= limits.EmailCodesPerMinute)
+            throw new TooManyRequestsException("Код уже отправлен. Запросить новый можно через минуту");
+        if (await recent.CountAsync(c => c.CreatedAt > now.AddHours(-1), ct) >= limits.EmailCodesPerHour)
+            throw new TooManyRequestsException("Слишком много запросов кода. Попробуйте позже");
     }
 
     private async Task<AppUser> GetOrCreateCustomerUserByPhoneAsync(List<Customer> customers)

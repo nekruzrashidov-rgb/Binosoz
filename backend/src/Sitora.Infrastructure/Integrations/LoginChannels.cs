@@ -11,8 +11,17 @@ namespace Sitora.Infrastructure.Integrations;
 // никуда не уходит (Dev и заглушка SMS пишут его в лог только в Development), и вместо «код отправлен», который
 // не придёт, API честно отвечает 503 (email_not_configured / sms_not_configured), а GET /auth/methods говорит сайту,
 // какой способ предлагать.
-public class LoginChannels(IConfiguration configuration, IHostEnvironment environment, ISmsSender sms, IOptions<AuthOptions> auth)
+public class LoginChannels(IConfiguration configuration, IHostEnvironment environment, ISmsSender sms, IOptions<AuthOptions> auth, ITelegramGateway gateway)
 {
+    // Коды входа на номер через Telegram Gateway: работают, когда задан Telegram__Gateway__Token.
+    public bool TelegramWorks => gateway.Configured;
+
+    // Вход «по телефону» (/auth/sms/*): кодом в Telegram или SMS.
+    public bool PhoneLoginWorks => TelegramWorks || SmsWorks;
+
+    public const string NoTelegram = "На этот номер нет Telegram — войдите по почте";
+    public const string GatewayLimit = "Коды в Telegram на сегодня закончились. Войдите по почте";
+    public const string GatewayFailed = "Telegram не принял код. Попробуйте позже или войдите по почте";
     public const string EmailNotConfigured = "Письма с кодами не отправляются: почтовый сервис не настроен";
     public const string SmsNotConfigured = "SMS с кодами пока не отправляются. Войдите по почте";
     public const string EmailNotConfiguredLog = "Письма с кодами не отправляются: задайте Email__Provider (Smtp, Resend или Gmail с Email__Gmail__*)";

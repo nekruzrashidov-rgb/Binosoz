@@ -19,6 +19,9 @@ public class TelegramOptions
     public string? BotUsername { get; set; }
     public string? WebhookSecret { get; set; }
 
+    // Telegram Gateway — коды входа на номер телефона (раздел Telegram:Gateway).
+    public TelegramGatewayOptions Gateway { get; set; } = new();
+
     public bool BotConfigured => !string.IsNullOrWhiteSpace(BotToken) && !string.IsNullOrWhiteSpace(BotUsername);
 
     // Повторы при сбое сети: сколько раз повторить и с какой паузой.
