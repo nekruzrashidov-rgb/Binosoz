@@ -65,7 +65,8 @@ test('«Выйти»: the sign-in form again, the refresh token revoked, the e-m
   await signIn(page);
   expect(await page.evaluate(() => localStorage.getItem('sitora.lastEmail'))).toBe(EMAIL);
   await page.getByRole('button', { name: 'Выйти', exact: true }).first().click();
-  await expect(page).not.toHaveURL(/\/cabinet/);
+  // «Выйти» ждёт ответа /auth/logout и уходит на главную — только потом проверяем.
+  await page.waitForURL((u) => u.pathname === '/', { timeout: 30000 });
   await page.goto('/cabinet');
   await expect(page.locator('.login-card input[name=email]')).toBeVisible();
   await expect(page.locator('[data-known]')).toHaveCount(0);
