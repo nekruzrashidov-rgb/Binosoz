@@ -120,7 +120,7 @@ Binosoz/
         ├── crm-script.js, panelho-crm-script.js ← CRM и её боковые панели
         ├── superadmin-platform-script.js ← раздел PlatformOwner
         ├── pardoxt-script.js          ← payment.html (тестовый банк)
-        ├── ai-assistent.js, pwa-sabt.js ← AI-ассистент, регистрация Service Worker
+        ├── ai-assistent.js, pwa-sabt.js ← AI-ассистент (кабинет/CRM/платформа и публичный режим на страницах ЖК), регистрация Service Worker
         └── namunavi-malumot-mock.js   ← demo-бэкенд; сейчас ни одна страница его не подключает
     └── tools/                  ← только разработка, НЕ публикуется (.vercelignore, .dockerignore):
         ├── serve-web.mjs          статик-сервер: node frontend/tools/serve-web.mjs 5500
@@ -183,6 +183,8 @@ Binosoz/
 - Публичный каталог кэшируется (Output Cache, 15–30 с); изменения каталога сбрасывают тег `catalog`
 - Все эндпоинты: `docs/API_CONTRACT.md`
 
+- AI-помощник гостя: `/public/{orgSlug}/ai/chat` и `/ai/status` — контекст ЖК только из базы (`EstateContext`, кэш 60 с,
+  без клиентов и сделок; он же у покупателя в кабинете), вопрос ≤ 500, история 10, 429 `ai_public_busy` с контактами
 ## Auth-флоу
 - **Сотрудники:** `POST /auth/login` (почта + пароль) → (если включена 2FA) `POST /auth/2fa/verify`
 - **Покупатели:** почта + свой 6-значный код (PIN) — `POST /auth/customer/login`. PIN хранится как пароль Identity (хеш);
@@ -223,6 +225,8 @@ Payments__MockEnabled=false      # true — тестовый банк вне Dev
 Logging__File__Enabled=true      # файлы логов (только VPS; на Render — stdout)
 ```
 
+Claude__ApiKey=                  # ключ Anthropic: AI-помощник в кабинете, CRM и на публичном сайте; пусто — помощника нет (сайт его не показывает)
+Claude__PublicDailyLimit=300     # вопросов гостей к помощнику на сайте в сутки на организацию; на IP — RateLimiting__AiPublicPerMinute/PerDay (6/40)
 ## Что сейчас заглушки (нужно заменить перед продакшеном)
 - **SMS** — `SmsSender`: в Development пишет код в лог, вне его ничего не отправляет. Нужен реальный провайдер.
 - **Платёжный шлюз** — `MockPaymentGateway` (тестовый банк): Development или `Payments__MockEnabled=true`. Нужен банк (Alif, Корти Миллӣ).
