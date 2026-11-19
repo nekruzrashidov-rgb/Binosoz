@@ -33,7 +33,7 @@
 
 | Метод | Путь | Тело | Ответ |
 | --- | --- | --- | --- |
-| GET | `/auth/methods` | — | 200 `{ email, sms, demo, pin }` (`pin` — вход покупателя по своему коду, всегда `true`; `demo` — включён вход демо-покупателя паролем, `Auth__DemoPasswordLogin`) — какие способы входа реально работают: `email` — письма уходят (Development или `Email__Provider` = Smtp/Resend, или Gmail со всеми тремя `Email__Gmail__*`), `sms` — вход по SMS включён (`Auth__SmsLoginEnabled`) и SMS-провайдер подключён. Публичный |
+| GET | `/auth/methods` | — | 200 `{ email, sms, demo, pin, telegram }` (`pin` — вход покупателя по своему коду, всегда `true`; `demo` — включён вход демо-покупателя паролем, `Auth__DemoPasswordLogin`) — какие способы входа реально работают: `email` — письма уходят (Development или `Email__Provider` = Smtp/Resend, или Gmail со всеми тремя `Email__Gmail__*`), `sms` — вход по SMS включён (`Auth__SmsLoginEnabled`) и SMS-провайдер подключён, `telegram` — вход по телефону кодом в Telegram (задан `Telegram__Gateway__Token`). Публичный |
 | POST | `/auth/customer/register` | `{ name, email, phone, pin, organization? }` | 200 `{ message, expiresInSeconds, resendAfterSeconds }`. Покупатель сам придумывает 6-значный код входа (PIN): ровно 6 цифр, не одинаковые и не подряд (`123456`, `654321`, `012345`…) — иначе 422 `pin_format` / `pin_weak`. Создаются карточка клиента у застройщика `organization` (slug; без него — единственный застройщик платформы) и учётная запись с неподтверждённой почтой, PIN — хешем Identity; на почту уходит код подтверждения. Неподтверждённую регистрацию можно повторить (новое имя и PIN). Почта подтверждена и есть PIN — 409 `email_taken`; подтверждена без PIN — 409 `pin_not_set`; почта сотрудника — 409 `email_is_staff`; телефон из карточки с другой почтой — 409; неверный телефон, имя короче 2 символов — 422; неизвестный застройщик — 404; без почтового сервиса — 503 `email_not_configured` до создания карточки |
 | POST | `/auth/customer/confirm/resend` | `{ email }` | 200, как `register`, — одинаковый для любой почты; письмо — только если регистрация ждёт подтверждения |
 | POST | `/auth/customer/confirm` | `{ email, code }` | 200 `AuthResponse`: почта подтверждена, карточки клиента с этой почтой привязаны. Неверный, устаревший (10 мин) или исчерпанный (5 попыток) код — 401 `invalid_code` |
@@ -42,8 +42,11 @@
 | POST | `/auth/customer/pin/reset` | `{ email, code, newPin }` | 200 `AuthResponse`: новый PIN, блокировка снята, **все refresh-токены покупателя отозваны**, выданы новые; почта считается подтверждённой. Слабый PIN — 422 (до проверки кода, попытка не тратится); неверный или устаревший код — 401 `invalid_code`. Код регистрации для сброса не подходит (и наоборот) |
 | GET | `/auth/invitations/{token}` | — | `{ organizationName, fullName, email, role, expiresAt }` — что показать на странице приглашения; 404 — недействительно, использовано или просрочено |
 | POST | `/auth/invitations/accept` | `{ token, password }` | только ссылки из старых писем: `AuthResponse`; 401 — приглашение недействительно или использовано. Пароль обязателен (от 8 символов, цифра, строчная и заглавная буквы; иначе 422) |
-| POST | `/auth/refresh` | `{ refreshToken }` | `AuthResponse` |
-| POST | `/auth/logout` | `{ refreshToken }` | 204 |
+| POST | `/auth/refresh` | `{ refreshToken }` или без тела (токен из cookie `sitora_rt`) | `AuthResponse`. Сессия **скользящая**: новый refresh-токен живёт ещё `Jwt__RefreshTokenDays` (30) дней от этого обновления и наследует вход (устройство, дату входа). Отозванный выходом или «закрыть вход» токен — 401; повторно предъявленный токен, уже **заменённый ротацией**, — 401 и отзыв всех сессий пользователя (кража) |
+| POST | `/auth/logout` | `{ refreshToken }` или без тела (cookie) | 204: отозван refresh-токен этого устройства, cookie стёрта |
+| GET | `/auth/sessions` | — | любой вошедший: «Устройства» — активные входы `[{ id, device, startedAt, lastActiveAt, expiresAt, current }]`; `device` — «Chrome · Windows», «Safari · iPhone» по User-Agent (null — не распознано); `current` — вход этого access-токена (claim `sid`); текущий первый |
+| DELETE | `/auth/sessions/{id}` | — | 204: вход закрыт (его refresh-токены отозваны, устройство выйдет не позже чем через 15 минут); чужой или уже закрытый — 404 `session_not_found`. Аудит `SessionRevoked` |
+| POST | `/auth/sessions/revoke-all` | — | 200 `{ revoked }`: «Выйти на всех устройствах» — отозваны все refresh-токены пользователя, включая этот; cookie стёрта. Аудит `SessionsRevokedAll` |
 | GET | `/auth/me` | — | `CurrentUser` |
 | POST | `/auth/login` | `{ email, password }` | сотрудник: 200 `AuthResponse`, с включённой 2FA — 200 `TwoFactorRequired`. Покупатель — 400 «Используйте вход по коду». Неверный пароль или незнакомая почта — 401 «Неверная почта или пароль»; после 5 ошибок подряд — блокировка на 15 минут (401 «Слишком много неудачных попыток…», даже с верным паролем) |
 | POST | `/auth/2fa/verify` | `{ tempToken, code }` | `AuthResponse`. `tempToken` живёт 5 минут, 5 попыток; неверный код — 401 |
@@ -52,7 +55,8 @@
 | GET | `/auth/2fa/setup` | — | сотрудник: `{ qrCodeUri, manualKey }`, `qrCodeUri = otpauth://totp/Binosoz:{email}?secret={key}&issuer=Binosoz`. 2FA уже включена — 409; покупатель — 403 |
 | POST | `/auth/2fa/enable` | `{ code }` | 204; дальше вход по паролю спрашивает код. Неверный код — 422. Аудит `TwoFactorEnabled` |
 | POST | `/auth/2fa/disable` | `{ code }` | 204, ключ сбрасывается. Неверный код или 2FA не включена — 422. Аудит `TwoFactorDisabled` |
-| POST | `/auth/sms/send`, `/auth/sms/verify` | `{ phone }`, `{ phone, code }` | выключены (404), включаются `Auth__SmsLoginEnabled=true`; без SMS-провайдера (заглушка вне Development) `/sms/send` — 503 `sms_not_configured` |
+| POST | `/auth/sms/send`, `/auth/sms/verify` | `{ phone }`, `{ phone, code }` | вход покупателя по телефону из договора. С `Telegram__Gateway__Token` код приходит **в Telegram** (Telegram Gateway): 6 цифр, 10 минут (`expiresInSeconds: 600`), 5 попыток, не чаще раза в минуту (429 `code_cooldown`) и 5 в час (429 `code_rate_limited`) на номер и на IP; незнакомый номер — тот же ответ без отправки; номер без Telegram — 422 `telegram_no_account` «На этот номер нет Telegram — войдите по почте»; суточный лимит `Telegram__Gateway__DailyLimit` (200) — 503 `telegram_gateway_limit`; сбой шлюза — 503 `telegram_gateway_failed`. Без Gateway — SMS: выключены (404), включаются `Auth__SmsLoginEnabled=true`; без SMS-провайдера (заглушка вне Development) `/sms/send` — 503 `sms_not_configured` |
+| POST | `/telegram/gateway/report` | отчёт Telegram Gateway | только с верной подписью `X-Request-Timestamp` + `X-Request-Signature` (HMAC-SHA256, ключ — SHA-256 токена), иначе 404; статус доставки пишется к коду. Адрес задаётся `Telegram__Gateway__CallbackUrl` |
 
 Код из почты:
 - 6 цифр, действует 10 минут;
@@ -201,6 +205,14 @@ TwoFactorRequired = { requiresTwoFactor: true, tempToken, expiresAt }
 | code | Русский текст (примеры) |
 | --- | --- |
 | `account_blocked` | Учётная запись заблокирована |
+| `telegram_not_configured` | Бот Telegram не настроен: уведомления в Telegram пока недоступны (503) |
+| `telegram_no_account` | На этот номер нет Telegram — войдите по почте (422) |
+| `telegram_gateway_limit` | Коды в Telegram на сегодня закончились. Войдите по почте (503) |
+| `telegram_gateway_failed` | Telegram не принял код. Попробуйте позже или войдите по почте (503) |
+| `reminder_too_soon` | Напоминание по этому платежу уже отправляли сегодня… (429) |
+| `reminder_item_paid` | Этот платёж уже оплачен или его нет в графике (422) |
+| `reminder_no_cabinet` | У покупателя нет входа в кабинет: напоминание некуда отправить (422) |
+| `session_not_found` | Вход не найден или уже закрыт (404) |
 | `address_required` | Укажите адрес |
 | `ai_no_answer` | AI не прислал ответ, попробуйте ещё раз |
 | `ai_not_configured` | AI помощник не настроен; Проверка документов ИИ не настроена |
@@ -514,17 +526,34 @@ TwoFactorRequired = { requiresTwoFactor: true, tempToken, expiresAt }
 | GET | `/notifications` | любой вошедший | `{ unreadCount, items[] }` — последние 50 своих уведомлений, новые сверху: `{ id, title, text, kind, dealId, isRead, createdAt }`. `kind`: `overdue_payment` (просрочка), `payment_reminder` (за 3 дня до срока) или null (сообщения о платежах, документах, чате) |
 | POST | `/notifications/{id}/read` | любой вошедший | 204; чужое уведомление — 404 |
 | POST | `/notifications/read-all` | любой вошедший | 204 — все свои отмечены прочитанными |
-| POST | `/profile/telegram` | любой вошедший | `{ chatId }` → 204: личный чат Telegram для уведомлений (chatId — из @userinfobot; сначала написать боту /start). `null` — отвязать, `0` — 422 |
+| POST | `/profile/telegram` | любой вошедший | `{ chatId }` → 204: личный чат Telegram вручную (для сотрудников; chatId — из @userinfobot; сначала написать боту /start). `null` — отвязать, `0` — 422 |
+| POST | `/profile/telegram/link` | любой вошедший | 200 `{ url, expiresAt }`: «Получать уведомления в Telegram» — `https://t.me/<Telegram__BotUsername>?start=<токен>`, одноразовый, 15 минут. Бот не настроен (`Telegram__BotToken` + `Telegram__BotUsername`) — 503 `telegram_not_configured`. Язык сообщений — `Accept-Language` |
+| DELETE | `/profile/telegram` | любой вошедший | 204: чат отвязан (то же — команда `/stop` в боте). Аудит `TelegramUnlinked` |
+| GET | `/profile/notifications` | любой вошедший | `{ telegram, email, events: { bookings, deal, payments, documents, chat }, telegramLinked, telegramAvailable, emailAvailable, language }` — каналы (по умолчанию оба), галочки событий, что подключено |
+| PUT | `/profile/notifications` | любой вошедший | `{ telegram, email, events }` → то же; язык сообщений (ru, tg, en) — из `Accept-Language` |
+| POST | `/telegram/webhook/{secret}` | Telegram | webhook бота: секрет `Telegram__WebhookSecret` в адресе **и** в заголовке `X-Telegram-Bot-Api-Secret-Token`, иначе 404. `/start <токен>` — привязать чат к покупателю (чужой, просроченный или использованный токен — ответ «Ссылка устарела»), `/stop` — отвязать. Всегда 200 |
+| GET, POST | `/public/unsubscribe?t=<токен>` | без входа | ссылка «Отписаться» из письма (подпись HMAC, 90 дней): GET — страница с кнопкой (сканеры почты ничего не выключат), POST — письма-напоминания выключены (кабинет и Telegram остаются). Неверная ссылка — 404 |
+| GET | `/deals/{dealId}/reminders` | DealStaff | журнал сообщений покупателю по сделке, новые сверху (200): `[{ id, event, channel, status, dueDate, createdAt, sentAt, error, createdBy, customer, apartment }]`; `channel`: `InApp`, `Telegram`, `Email`; `status`: `Pending`, `Sent`, `Failed`, `Skipped`. Чужая сделка — 404, покупатель — 403 |
+| POST | `/deals/{dealId}/reminders` | DealStaff | `{ dueDate }` → 200 `{ queued }`: «Напомнить сейчас» по пункту графика — кабинет, Telegram и почта по настройкам покупателя. Не чаще раза в сутки на пункт — 429 `reminder_too_soon`; оплаченный или несуществующий пункт — 422 `reminder_item_paid`; покупатель без кабинета — 422 `reminder_no_cabinet` |
 
-Telegram (в дополнение к колокольчику, только тем, у кого привязан чат; токен бота — `Telegram__BotToken`, без него сообщения не уходят и ничего не падает):
+Покупателю (`BuyerNotifier`, очередь Hangfire `BuyerMessageJob` с повторами через 1, 5, 15 и 60 минут, до 5 попыток; журнал — таблица `BuyerMessages`):
+- напоминания о платежах — в кабинет (колокольчик), Telegram и на почту, как выбрал покупатель: 🟡 за 3 дня, 🔔 в день срока
+  («Сегодня срок платежа: 12 500 TJS по кв. №…»), 🔴 на 1-й день просрочки и ещё раз через 6 дней (7-й день), 🔔 «Напомнить сейчас»;
+  одно событие по одному пункту графика и каналу — один раз (`DedupeKey`);
+- только в Telegram: 🏠 бронь создана, ⏳ бронь закончится через 6 часов (задача `booking-expiry-notices` раз в 15 минут),
+  🔓 бронь снята, 📋 новый этап сделки, ✅ платёж принят, 📄 новый документ (ссылка на кабинет, не на файл),
+  💬 сообщение менеджера, если покупателя нет в кабинете (без текста сообщения);
+- на языке покупателя (ru, tg, en), без паспортных данных; письмо — от имени застройщика, кнопка «Открыть кабинет», ссылка «Отписаться»;
+- Telegram ответил 403 (бот заблокирован) или «chat not found» — чат отвязывается, сообщение `Skipped`.
+
+Сотрудникам в Telegram (в дополнение к колокольчику, только тем, у кого привязан чат; токен бота — `Telegram__BotToken`, без него сообщения не уходят и ничего не падает):
 - 💰 новый платёж — владельцу (Owner) и бухгалтерам дома;
-- 🔴 просрочка — покупателю и бухгалтерам дома, один раз на пункт графика (как в колокольчике);
-- 🟡 напоминание за 3 дня — покупателю;
+- 🔴 просрочка — бухгалтерам дома, один раз на пункт графика (как в колокольчике);
 - 🏠 новая бронь и 📝 новая заявка — владельцу и менеджерам дома;
 - 📊 еженедельный отчёт готов (по расписанию) — владельцу, со ссылкой на CRM (адрес сайта — из `Email__InviteUrl`).
 «Дома» — сотрудник без закреплённых домов получает по всем домам организации. Markdown; имена экранируются. Сбой сети — 2 повтора через 2 секунды.
 
-Фоновые задачи (Hangfire, время UTC): `update-rates` — 04:00 и 06:00 (09:00 и 11:00 Душанбе), курс USD с nbt.tj (`export_xml.php?date=ГГГГ-ММ-ДД&export=xmlout`), ручной курс не перезаписывается; `overdue-payments` — 05:00, уведомления о просрочке покупателю и бухгалтерам дома; `payment-reminders` — 05:00, напоминание покупателю за 3 дня. Каждое напоминание — один раз на пункт графика и получателя.
+Фоновые задачи (Hangfire, время UTC): `update-rates` — 04:00 и 06:00 (09:00 и 11:00 Душанбе), курс USD с nbt.tj (`export_xml.php?date=ГГГГ-ММ-ДД&export=xmlout`), ручной курс не перезаписывается; `overdue-payments` — 05:00 (10:00 Душанбе), просрочка: покупателю на 1-й и 7-й день, бухгалтерам дома — один раз; `payment-reminders` — 05:00, покупателю за 3 дня и в день срока; `booking-expiry-notices` — каждые 15 минут, «бронь закончится через 6 часов». Каждое напоминание — один раз на пункт графика, событие и канал.
 
 Еженедельный отчёт (Hangfire): `weekly-owner-report` — понедельник 04:00 UTC (09:00 Душанбе), за прошлую неделю для каждого дома организации, где есть активный владелец (Owner); дом, у которого отчёт за эту неделю уже есть, пропускается. Excel и PDF хранятся в таблице `WeeklyReports` (`bytea`), диск не нужен.
 

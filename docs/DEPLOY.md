@@ -331,6 +331,84 @@ Render закрывает исходящий SMTP (порты 587/465), поэт
 - после смены пароля Google или отзыва доступа нужен новый refresh token (в логе API: «Refresh token Gmail отозван или
   истёк — получите новый (backend/scripts/gmail-token.mjs)»).
 
+## Почта для реального застройщика: свой домен, SPF и DKIM
+
+Gmail с личного ящика годится для начала (лимит Google — около 500 писем в сутки), но письма с `@gmail.com` от имени
+компании чаще попадают в «Спам». Для застройщика — свой адрес `no-reply@<домен>` через `Resend` или `Smtp`.
+
+**Имя отправителя** берётся из организации: письма покупателю (коды, напоминания о платежах) и сотрудникам
+(приглашение, смена пароля) уходят как `«<название организации>» <Email__From>` и подписаны этим названием, а не
+«Binosoz». Название меняет владелец в CRM («Бренд»). `Email__FromName` — только для писем самой платформы
+(заявки застройщиков, сотрудники без организации).
+
+### Resend (HTTPS, работает на бесплатном Render)
+
+1. resend.com → **Domains** → Add domain → `<домен>` (или поддомен `mail.<домен>`), регион ближе к Европе.
+2. Resend покажет записи DNS — добавить их у регистратора домена **как есть**:
+   - **SPF**: TXT на поддомене `send` (например `send.<домен>`) со значением `v=spf1 include:amazonses.com ~all`
+     и MX-запись на тот же поддомен (её Resend тоже показывает — для писем о недоставке);
+   - **DKIM**: TXT `resend._domainkey.<домен>` с длинным ключом `p=…`;
+   - **DMARC** (рекомендуется): TXT `_dmarc.<домен>` = `v=DMARC1; p=none; rua=mailto:dmarc@<домен>` — через пару недель
+     без проблем можно ужесточить до `p=quarantine`.
+3. Дождаться в Resend статуса **Verified** (обычно минуты, до 48 часов). Пока домен не подтверждён, Resend принимает письма
+   только на адрес владельца аккаунта.
+4. API Keys → Create (права только «Sending access», только этот домен).
+5. Render → Environment: `Email__Provider=Resend`, `Email__Resend__ApiKey=<ключ>`, `Email__From=no-reply@<домен>`.
+   Удалить `Smtp__*` и при желании `Email__Gmail__*`.
+6. Проверка: «Забыли код?» на свою почту на Gmail → «Показать оригинал»: `SPF: PASS`, `DKIM: PASS`, `DMARC: PASS`,
+   отправитель — название организации.
+
+### SMTP (почта хостинга или Яндекс 360 / Google Workspace домена)
+
+Только на VPS (на бесплатном Render исходящий SMTP закрыт). `Email__Provider=Smtp`, `Email__Smtp__Host`, `Email__Smtp__Port`
+(587), `Email__Smtp__Username`, `Email__Smtp__Password`, `Email__From=no-reply@<домен>`. SPF и DKIM настраиваются у
+почтового провайдера: SPF — TXT на самом домене (`v=spf1 include:<что даёт провайдер> ~all`, **одна** запись SPF на домен —
+если уже есть, дописать `include:` в неё), DKIM — TXT-запись с селектором провайдера; DMARC — как выше.
+
+## Как подключить бота Telegram и Telegram Gateway
+
+### Бот для уведомлений (бесплатно, Bot API)
+
+1. В Telegram у @BotFather: `/newbot` → имя (например «Некруз Резиденс») и username (`nekruz_notify_bot`) → токен.
+   Там же `/setdescription` и `/setuserpic` — описание и логотип застройщика.
+2. Придумать секрет webhook — 32+ случайных символа `[A-Za-z0-9_-]` (например `openssl rand -hex 24`).
+3. Render → Environment:
+
+   | Переменная | Значение |
+   | --- | --- |
+   | `Telegram__BotToken` | токен от @BotFather |
+   | `Telegram__BotUsername` | username бота без `@` |
+   | `Telegram__WebhookSecret` | секрет из шага 2 |
+   | `Telegram__ChatId` | (как раньше) чат менеджеров для заявок |
+   | `Email__ApiUrl` | адрес API для ссылки «Отписаться», если сайт на другом домене (`https://binosoz-1.onrender.com`) |
+
+4. Зарегистрировать webhook (один раз, с своего ПК; токен и секрет — из панели, не из чата):
+
+   ```bash
+   curl -s "https://api.telegram.org/bot$BOT_TOKEN/setWebhook" \
+     --data-urlencode "url=https://<api>/api/v1/telegram/webhook/$WEBHOOK_SECRET" \
+     --data-urlencode "secret_token=$WEBHOOK_SECRET" \
+     --data-urlencode 'allowed_updates=["message"]'
+   curl -s "https://api.telegram.org/bot$BOT_TOKEN/getWebhookInfo"
+   ```
+
+   Без совпадающего секрета в адресе **и** в заголовке `X-Telegram-Bot-Api-Secret-Token` API отвечает 404.
+5. Проверка: кабинет покупателя → «Настройки» → «Получать уведомления в Telegram» → «Открыть Telegram» → «Старт» →
+   бот отвечает «Готово!», в кабинете «Telegram подключён». Команда `/stop` отвязывает чат.
+6. Напоминания о платежах уходят задачами Hangfire в 10:00 по Душанбе (`Hangfire__ServerEnabled=true`); бронь «за 6 часов» —
+   каждые 15 минут. Журнал — в CRM, карточка сделки → «График» → «Напоминания покупателю».
+
+### Telegram Gateway (коды входа на номер телефона, платно)
+
+1. https://gateway.telegram.org → войти по номеру → пополнить баланс (около $0.01 за доставленный код; за недоставленные
+   деньги возвращаются) → **API** → токен.
+2. Render → Environment: `Telegram__Gateway__Token=<токен>`, `Telegram__Gateway__DailyLimit=200` (суточный лимит
+   отправок на всю платформу; при превышении вход по телефону отвечает 503 `telegram_gateway_limit`, в логе — предупреждение).
+   Необязательно: `Telegram__Gateway__CallbackUrl=https://<api>/api/v1/telegram/gateway/report` — отчёты о доставке
+   (подпись проверяется токеном).
+3. Проверка: `GET /api/v1/auth/methods` → `telegram: true`; на `/login` появляется «По телефону (код в Telegram)».
+   Номер без Telegram — «На этот номер нет Telegram — войдите по почте». Без токена канал выключен.
+
 ## За 15 минут до выступления
 
 Секреты и переменные для демо (только названия; значения — в панелях, не в репозитории и не в чате):

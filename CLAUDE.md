@@ -75,9 +75,9 @@ Binosoz/
 │   │   │   │   PaymentService.cs   (платежи, сторно, пересчёт по курсу)
 │   │   │   │   StatementService.cs (акт сверки, PDF)
 │   │   │   │   ...
-│   │   │   ├── Integrations/       ← Telegram (TelegramNotifier, Bot API), SMS (заглушка),
+│   │   │   ├── Integrations/       ← Telegram (TelegramNotifier, Bot API; TelegramGatewayClient — коды входа), SMS (заглушка),
 │   │   │   │                          курс НБТ (NbtRateProvider, XML nbt.tj), QuestPDF, файлы (диск/S3)
-│   │   │   ├── Jobs/               ← ExpireBookingsJob, UpdateRatesJob (Hangfire)
+│   │   │   ├── Jobs/               ← ExpireBookingsJob, UpdateRatesJob, PaymentReminderJob, OverduePaymentJob, BookingExpiryNoticeJob (Hangfire)
 │   │   │   └── Security/           ← JwtTokenService, EncryptionService (AES-256-GCM)
 │   │   └── Sitora.WebApi/          ← HTTP-слой
 │   │       ├── Controllers/        ← 37 тонких контроллеров (принял DTO → сервис → ответ)
@@ -87,7 +87,7 @@ Binosoz/
 │   │       ├── Validators/         ← FluentValidation
 │   │       └── Program.cs          ← точка входа, DI, пайплайн
 │   ├── tests/
-│   │   └── Sitora.Tests/           ← 455 тестов, Testcontainers, покрывают:
+│   │   └── Sitora.Tests/           ← 509 тестов, Testcontainers, покрывают:
 │   │                                  auth, catalog, chat, payments, sales, security
 │   └── scripts/                    ← backup.sh/restore.sh, seed.sql (демо для прода), smoke.sh, load/ (k6),
 │                                      gmail-token.mjs (refresh token Gmail), set-resend-key.ps1
@@ -102,7 +102,7 @@ Binosoz/
     ├── css/styles.css             ← токены (:root и [data-theme='dark']), все компоненты; новый дизайн — классы nr-*
     └── js/
         ├── tanzimot-api-url.js        ← config: API_BASE ('/api/v1'; Vercel → Render), ORG_SLUG, CONTACT, INSTALLMENT
-        ├── i18n/ru.js, tg.js, en.js   ← тексты (по 1857 ключей); ru — на каждой странице и запасной
+        ├── i18n/ru.js, tg.js, en.js   ← тексты (по 1946 ключей); ru — на каждой странице и запасной
         ├── tarjumaho-ru-tg-en.js      ← S.t(), S.initLang()/S.setLang() (грузит tg/en по требованию), S.bus
         ├── komponentho-modal-toast-tabs.js ← h() DOM-builder, иконки, модалки, тосты
         ├── zaprosho-ba-backend.js     ← все вызовы API, токены (localStorage sitora.auth)
@@ -195,11 +195,21 @@ Binosoz/
   - «Забыли код?»: `POST /auth/customer/pin/reset-request` → код на почту → `POST /auth/customer/pin/reset` (новый PIN, все
     refresh-токены отозваны). Покупатель, заведённый менеджером, при входе получает 409 `pin_not_set` и задаёт код так же.
   - Коды из почты: 6 цифр, 10 мин, 5 попыток, не чаще раза в минуту и 5 в час на почту и на IP.
-  - По телефону — `/auth/sms/send` → `/auth/sms/verify` (только при `Auth__SmsLoginEnabled=true` и подключённом SMS-провайдере)
-- **Какие способы работают:** `GET /auth/methods` → `{ pin, email, sms, demo }`; без почтового провайдера вне Development
+  - По телефону — `/auth/sms/send` → `/auth/sms/verify`: код **в Telegram** (Telegram Gateway, `TelegramGatewayClient`) при
+    `Telegram__Gateway__Token` — 6 цифр, 10 мин, 5 попыток, раз в минуту и 5 в час на номер и на IP, суточный лимит
+    `Telegram__Gateway__DailyLimit` (503 `telegram_gateway_limit`), номер без Telegram — 422 `telegram_no_account`;
+    без Gateway — SMS (только при `Auth__SmsLoginEnabled=true` и подключённом SMS-провайдере)
+- **Какие способы работают:** `GET /auth/methods` → `{ pin, email, sms, demo, telegram }`; без почтового провайдера вне Development
   регистрация и «Забыли код?» → 503 `email_not_configured` (вход по PIN работает), без SMS-провайдера `/auth/sms/send` → 503 `sms_not_configured`
-- **Токены:** access (JWT, 15 мин) + refresh (64 байта, SHA-256 в БД, 30 дней, ротация)
-- **Refresh-cookie:** `sitora_rt` (HttpOnly, SameSite=Strict, `Path=/api/v1/auth`), режим `Auth__RefreshCookie__Mode` = Dual|Cookie|Body
+- **Токены:** access (JWT, 15 мин, claim `sid` — вход) + refresh (64 байта, SHA-256 в БД, ротация). Сессия скользящая:
+  каждый refresh — ещё `Jwt__RefreshTokenDays` (30) дней; токен наследует вход (`SessionId`, дата входа, User-Agent).
+  Повтор токена, заменённого ротацией, — отзыв всех сессий; отозванный выходом — просто 401.
+  «Устройства»: `GET /auth/sessions`, `DELETE /auth/sessions/{id}`, `POST /auth/sessions/revoke-all`.
+- **«Запомнить меня» на сайте:** `/login` и `/cabinet` с живой сессией сразу открывают кабинет, истёкший access обновляется
+  тихо (`restore()` → 401 → `refresh()`, в режиме Cookie — без тела); форма входа помнит почту (`sitora.lastEmail`, не PIN),
+  «Выйти» отзывает refresh этого устройства и забывает почту
+- **Refresh-cookie:** `sitora_rt` (HttpOnly, SameSite=Strict, `Path=/api/v1/auth`), режим `Auth__RefreshCookie__Mode` = Dual|Cookie|Body:
+  Vercel → Render — `Dual` (cookie третьей стороны Safari/iOS не шлёт), сайт и API на одном домене — `Cookie` (`docs/DECISIONS.md`)
 - **Dev-режим:** код из письма (подтверждение, «Забыли код?») можно заменить на `123456` (только `IsDevelopment()`); почты задаются в user-secrets:
   `dotnet user-secrets set "Auth:DevFixedCodeEmails:0" "почта" --project src/Sitora.WebApi`
 
@@ -210,6 +220,11 @@ Jwt__Key=...                    # ≥32 байта, base64
 Encryption__Key=...             # 32 байта, base64 (для паспортных данных)
 Telegram__BotToken=...
 Telegram__ChatId=...
+Telegram__BotUsername=...        # имя бота без @ — ссылка t.me/<бот>?start=<токен> для покупателей
+Telegram__WebhookSecret=...      # секрет webhook /api/v1/telegram/webhook/{secret} и X-Telegram-Bot-Api-Secret-Token; пусто — 404
+Telegram__Gateway__Token=        # Telegram Gateway: коды входа по телефону в Telegram (платно); пусто — канал выключен
+Telegram__Gateway__DailyLimit=200   # отправок кодов в сутки на платформу; больше — 503 telegram_gateway_limit
+Email__ApiUrl=                   # адрес API для ссылки «Отписаться» в письмах, если сайт на другом домене
 Auth__DevFixedCodeForAnyEmail=true   # только Development
 Hangfire__ServerEnabled=true
 Email__Provider=Gmail             # Smtp | Resend | Gmail (Dev — коды только в лог разработки)
@@ -223,12 +238,24 @@ Auth__DemoPasswordLogin=false    # true — вход демо-покупател
 SEED_DEMO_ACCOUNTS=false         # true + SEED_DEMO_BUYER_PASSWORD / SEED_DEMO_MANAGER_PASSWORD — демо-доступ (--migrate)
 Payments__MockEnabled=false      # true — тестовый банк вне Development (только на время показа; деньги не списываются)
 Logging__File__Enabled=true      # файлы логов (только VPS; на Render — stdout)
-```
-
 Claude__ApiKey=                  # ключ Anthropic: AI-помощник в кабинете, CRM и на публичном сайте; пусто — помощника нет (сайт его не показывает)
 Claude__PublicDailyLimit=300     # вопросов гостей к помощнику на сайте в сутки на организацию; на IP — RateLimiting__AiPublicPerMinute/PerDay (6/40)
+```
+
+## Уведомления покупателю
+- `BuyerNotifier` → таблица `BuyerMessages` (очередь и журнал: событие × канал, `DedupeKey` от дублей) → задача Hangfire
+  `BuyerMessageJob` (повторы 1/5/15/60 мин, 5 попыток). В тестах очередь синхронная (`InlineBuyerMessageQueue`).
+- Платежи (кабинет + Telegram + почта): за 3 дня, в день срока, 1-й день просрочки и через 6 дней после него, 10:00 Душанбе;
+  «Напомнить сейчас» в CRM — не чаще раза в сутки на пункт (`/deals/{id}/reminders`, журнал там же).
+- Только Telegram: бронь (создана, за 6 часов — `BookingExpiryNoticeJob`, снята), этап сделки, платёж принят, документ,
+  сообщение менеджера вне сети. Без паспортных данных, файлов и текста чата; 403 «бот заблокирован» — отвязать.
+- Каналы и галочки событий — покупатель в кабинете («Настройки», `/profile/notifications`); привязка —
+  `/profile/telegram/link` → `t.me/<бот>?start=<токен 15 мин>` → webhook; `/stop` — отвязать; отписка от писем — ссылка в письме.
+- Письма — от имени организации (`EmailMessage.FromName`), тексты — `BuyerTexts` (ru, tg, en).
+
 ## Что сейчас заглушки (нужно заменить перед продакшеном)
-- **SMS** — `SmsSender`: в Development пишет код в лог, вне его ничего не отправляет. Нужен реальный провайдер.
+- **SMS** — `SmsSender`: в Development пишет код в лог, вне его ничего не отправляет. Вместо SMS — Telegram Gateway
+  (`Telegram__Gateway__Token`); для номеров без Telegram нужен реальный SMS-провайдер.
 - **Платёжный шлюз** — `MockPaymentGateway` (тестовый банк): Development или `Payments__MockEnabled=true`. Нужен банк (Alif, Корти Миллӣ).
 
 Работают по-настоящему:
