@@ -11,4 +11,7 @@ public static class AccessClaims
 
     // Id создателя платформы, если токен выдан в режиме «войти как владелец».
     public const string ImpersonatedBy = "imp";
+
+    // Вход (сессия refresh-токенов) этого access-токена — «это устройство» в списке устройств.
+    public const string Session = "sid";
 }

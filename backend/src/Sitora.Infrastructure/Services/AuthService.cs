@@ -564,7 +564,10 @@ public partial class AuthService(
         if (stored is null)
             throw new UnauthorizedException(InvalidRefreshToken);
 
-        // Повторное использование отозванного токена означает, что его украли: гасим все сессии пользователя.
+        // Повторное использование токена, уже заменённого при ротации, означает, что его украли: гасим все сессии пользователя.
+        // Токен, отозванный выходом или «закрыть вход» (без замены), — просто 401: закрытое устройство не выкидывает остальные.
+        if (stored.RevokedAt is not null && stored.ReplacedByTokenHash is null)
+            throw new UnauthorizedException(InvalidRefreshToken);
         if (stored.RevokedAt is not null)
         {
             await RevokeAllAsync(stored.UserId, now, ct);
@@ -587,6 +590,43 @@ public partial class AuthService(
 
         stored.RevokedAt = Now;
         await db.SaveChangesAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<SessionResponse>> GetSessionsAsync(Guid userId, CancellationToken ct = default)
+    {
+        var now = Now;
+        var current = currentUser.SessionId;
+        var active = await db.RefreshTokens.AsNoTracking()
+            .Where(t => t.UserId == userId && t.RevokedAt == null && t.ExpiresAt > now)
+            .Select(t => new { t.SessionId, t.SessionStartedAt, t.CreatedAt, t.ExpiresAt, t.UserAgent })
+            .ToListAsync(ct);
+        // Одна строка на вход: при гонке двух вкладок у сессии бывает два живых токена — берём последний.
+        return active.GroupBy(t => t.SessionId)
+            .Select(g => g.OrderByDescending(t => t.CreatedAt).First())
+            .Select(t => new SessionResponse(t.SessionId, DeviceNames.Describe(t.UserAgent), t.SessionStartedAt, t.CreatedAt,
+                t.ExpiresAt, t.SessionId == current))
+            .OrderByDescending(s => s.Current).ThenByDescending(s => s.LastActiveAt)
+            .ToList();
+    }
+
+    public async Task RevokeSessionAsync(Guid userId, Guid sessionId, CancellationToken ct = default)
+    {
+        var now = Now;
+        var revoked = await db.RefreshTokens
+            .Where(t => t.UserId == userId && t.SessionId == sessionId && t.RevokedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, now), ct);
+        if (revoked == 0)
+            throw new NotFoundException("Вход не найден или уже закрыт");
+        audit.Record("User", userId, "SessionRevoked", null, new { sessionId });
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task<int> RevokeAllSessionsAsync(Guid userId, CancellationToken ct = default)
+    {
+        var count = await RevokeAllAsync(userId, Now, ct);
+        audit.Record("User", userId, "SessionsRevokedAll", null, new { count });
+        await db.SaveChangesAsync(ct);
+        return count;
     }
 
     // В режиме «войти как владелец» отвечаем по claims токена: роль Owner в выбранной организации.
@@ -646,7 +686,9 @@ public partial class AuthService(
     {
         var roles = await userManager.GetRolesAsync(user);
         var scope = await ScopeOfAsync(user, ct);
-        var (accessToken, accessExpiresAt) = tokens.CreateAccessToken(user, roles, scope);
+        // Новый вход — новая сессия; при обновлении токен наследует сессию: срок скользит, устройство остаётся тем же.
+        var sessionId = replacing?.SessionId is { } inherited && inherited != Guid.Empty ? inherited : Guid.CreateVersion7();
+        var (accessToken, accessExpiresAt) = tokens.CreateAccessToken(user, roles, scope, sessionId);
         var (refreshToken, refreshHash, refreshExpiresAt) = tokens.CreateRefreshToken();
 
         if (replacing is not null)
@@ -659,7 +701,10 @@ public partial class AuthService(
         {
             UserId = user.Id,
             TokenHash = refreshHash,
-            ExpiresAt = refreshExpiresAt
+            ExpiresAt = refreshExpiresAt,
+            SessionId = sessionId,
+            SessionStartedAt = replacing is { SessionStartedAt: var started } && started != default ? started : Now,
+            UserAgent = DeviceNames.Trim(currentUser.UserAgent) ?? replacing?.UserAgent
         });
         await db.SaveChangesAsync(ct);
 
@@ -667,7 +712,7 @@ public partial class AuthService(
             await BuildUserResponseAsync(user, roles, scope, ct));
     }
 
-    private Task RevokeAllAsync(Guid userId, DateTime now, CancellationToken ct) =>
+    private Task<int> RevokeAllAsync(Guid userId, DateTime now, CancellationToken ct) =>
         db.RefreshTokens
             .Where(t => t.UserId == userId && t.RevokedAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, now), ct);

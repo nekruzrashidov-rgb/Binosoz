@@ -39,6 +39,10 @@ public class HttpCurrentUser(IHttpContextAccessor accessor, HubCaller hubCaller)
     // После UseForwardedHeaders здесь адрес клиента, а не прокси Caddy. Вызовы хаба SignalR — без адреса.
     public string? IpAddress => hubCaller.Principal is null ? accessor.HttpContext?.Connection.RemoteIpAddress?.ToString() : null;
 
+    public string? UserAgent => hubCaller.Principal is null && accessor.HttpContext?.Request.Headers.UserAgent.ToString() is { Length: > 0 } ua ? ua : null;
+
+    public Guid? SessionId => ReadGuid(AccessClaims.Session);
+
     private Guid? ReadGuid(string claim) =>
         Guid.TryParse(Principal?.FindFirst(claim)?.Value, out var id) ? id : null;
 }

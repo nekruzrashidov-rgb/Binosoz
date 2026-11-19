@@ -1716,6 +1716,12 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Property<DateTime?>("RevokedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("SessionStartedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("TokenHash")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -1723,6 +1729,10 @@ namespace Sitora.Infrastructure.Data.Migrations
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
@@ -1732,7 +1742,7 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.HasIndex("TokenHash")
                         .IsUnique();
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId", "SessionId");
 
                     b.ToTable("RefreshTokens", (string)null);
                 });

@@ -117,6 +117,9 @@
     // Buyers sign in far more often than staff: their tab is the default; the last choice is remembered.
     let who = resetToken || S.store.get('sitora.loginAs') === 'staff' ? 'staff' : 'buyer';
     let step = resetToken ? 'reset' : who, emailVal = '', timer = 0, tick = null, challenge = null, notice = '';
+    // The buyer who signed in on this device before: «Войти как user@… · сменить» — only the 6-digit code is left to enter.
+    let known = S.api.lastEmail;
+    if (known && step === 'buyer') emailVal = known;
     // The buyer's registration (kept for «Изменить почту»), the code from the e-mail for «Забыли код?», the last sign-in error.
     let reg = { first: '', last: '', phone: '+992', pin: '' }, resetCode = '', pinError = null;
     const isEmail = (v) => /^\S+@\S+\.\S+$/.test(v);
@@ -254,15 +257,18 @@
         focus = phone;
       } else if (step === 'buyer') {
         // E-mail and the buyer's own 6-digit code. A wrong code shows the attempts left and highlights «Забыли код?».
-        const email = S.input('email', { type: 'email', value: emailVal, placeholder: 'name@mail.tj', autocomplete: 'username', inputmode: 'email' });
-        const pin = S.pinCells('pin', t('pin.label'), { secret: true, autocomplete: 'current-password' });
+        const asKnown = !!known && emailVal === known;
+        const email = S.input('email', { type: asKnown ? 'hidden' : 'email', value: emailVal, placeholder: 'name@mail.tj', autocomplete: 'username', inputmode: 'email' });
+        const knownRow = asKnown ? h('div', { class: 'login-known', 'data-known': '' }, h('span', null, t('login.asKnown') + ' ', h('b', null, known)),
+          link(t('login.changeEmail'), () => { known = ''; emailVal = ''; S.api.forgetEmail(); draw(); })) : null;
+        const pin = S.pinCells('pin', t('pin.label'), { secret: true, autocomplete: 'current-password', onComplete: asKnown ? () => form.requestSubmit() : undefined });
         const forgot = link(t('pin.forgot'), () => { emailVal = email.value.trim(); go('pinForgot'); }, 'pin-forgot' + (pinError ? ' hot' : ''));
         const problem = pinError ? h('div', { class: 'pin-problem', role: 'alert' }, pinError.text, pinError.resend
           ? h('div', null, link(t('pin.resendConfirm'), async () => {
             try { await S.api.customerResend(emailVal); startTick(); go('confirm'); } catch (er) { S.err(humanError(er)); }
           })) : null) : null;
         form.append(h('h2', null, t('login.buyerTitle')), byToggle(), h('p', { class: 'muted' }, t('login.hintBuyer')), info, problem,
-          S.field(t('login.email'), email), pin.field, btn,
+          asKnown ? h('div', null, knownRow, email) : S.field(t('login.email'), email), pin.field, btn,
           h('div', { class: 'row between pin-links' }, forgot, link(t('pin.register'), () => { emailVal = email.value.trim(); go('register'); })));
         submit = async () => {
           emailVal = email.value.trim();
@@ -282,7 +288,7 @@
             draw();
           }
         };
-        focus = emailVal ? pin : email;
+        focus = emailVal || asKnown ? pin : email;
       } else if (step === 'register') {
         const first = S.input('firstName', { autocomplete: 'given-name', value: reg.first });
         const last = S.input('lastName', { autocomplete: 'family-name', value: reg.last });
@@ -432,7 +438,7 @@
   /* ---------- buyer cabinet ---------- */
   // GET /cabinet/overview: no deals → a welcome card with the developer's contacts; otherwise the deal picker and six tabs.
   // Each tab loads its own data from the shared deal addresses (schedule, documents, stages, messages, reviews).
-  const CAB_TABS = [['apt', '🏠', 'cab.t.apt'], ['pay', '💰', 'cab.t.pay'], ['docs', '📄', 'cab.t.docs'], ['build', '🏗️', 'cab.t.build'], ['chat', '💬', 'cab.t.chat'], ['review', '⭐', 'cab.t.review']];
+  const CAB_TABS = [['apt', '🏠', 'cab.t.apt'], ['pay', '💰', 'cab.t.pay'], ['docs', '📄', 'cab.t.docs'], ['build', '🏗️', 'cab.t.build'], ['chat', '💬', 'cab.t.chat'], ['review', '⭐', 'cab.t.review'], ['settings', '⚙️', 'cab.t.settings']];
   // Deal stages as the buyer sees them: booking → contract → ownership.
   const CAB_STEPS = [['booking', ['Lead', 'Showing', 'Booking']], ['deal', ['Contract', 'Payment']], ['own', ['Completed']]];
   const NEW_DAYS = 3;
@@ -546,7 +552,7 @@
       panel.classList.remove('cab-fade'); void panel.offsetWidth; panel.classList.add('cab-fade');
       panel.replaceChildren(S.skeleton(3, 70));
       try {
-        const body = k === 'apt' ? aptTab() : k === 'pay' ? await payTab() : k === 'docs' ? await docsTab() : k === 'build' ? await buildTab() : k === 'chat' ? chatTab() : reviewTab();
+        const body = k === 'apt' ? aptTab() : k === 'pay' ? await payTab() : k === 'docs' ? await docsTab() : k === 'build' ? await buildTab() : k === 'chat' ? chatTab() : k === 'settings' ? await settingsTab() : reviewTab();
         if (tab === k && !stopped) panel.replaceChildren(body);
       } catch (e) { if (tab === k) panel.replaceChildren(S.errorCard(e)); }
     }
@@ -757,6 +763,32 @@
       };
       draw(false);
       return box;
+    }
+
+    /* ---- ⚙️ settings: devices (sign-ins of this account) ---- */
+    async function settingsTab() {
+      const parts = await Promise.all([devicesCard()]);
+      return h('div', { class: 'stack cab-settings' }, parts);
+    }
+
+    // Every device where the buyer is signed in: the browser, since when, the last visit; «это устройство» is marked.
+    // A session lives Jwt:RefreshTokenDays after the last visit; «Выйти на всех устройствах» revokes them all.
+    async function devicesCard() {
+      const list = await S.api.sessions();
+      const row = (s) => h('li', { class: 'dev-row' + (s.current ? ' current' : '') },
+        h('span', { class: 'dev-ico', 'aria-hidden': 'true' }, /iPhone|Android|iPad/.test(s.device) ? '📱' : '💻'),
+        h('div', { class: 'dev-info' },
+          h('b', null, s.device || t('dev.unknown')), s.current ? h('span', { class: 'dev-this' }, t('dev.this')) : null,
+          h('div', { class: 'muted cab-small' }, t('dev.since', { d: longDate(s.startedAt) }) + ' · ' + t('dev.last', { d: longDate(s.lastActiveAt) }))),
+        s.current ? null : h('button', { class: 'btn ghost sm', type: 'button', onclick: (e) => S.busy(e.currentTarget, async () => {
+          try { await S.api.revokeSession(s.id); S.toast(t('dev.closed'), 'ok'); show(); } catch (er) { S.err(er); }
+        }) }, t('dev.close')));
+      const all = h('button', { class: 'btn ghost', type: 'button', 'data-logout-all': '', onclick: async () => {
+        if (!(await S.confirm(t('dev.allConfirm'), t('dev.allOut'), true))) return;
+        await S.busy(all, async () => { try { await S.api.revokeAllSessions(); } catch (er) { /* signed out anyway */ } location.href = '/login'; });
+      } }, t('dev.allOut'));
+      return h('section', { class: 'card cab-devices' }, h('h2', null, t('dev.title')), h('p', { class: 'muted' }, t('dev.sub')),
+        h('ul', { class: 'dev-list' }, list.map(row)), all);
     }
 
     /* ---- helpers ---- */

@@ -34,6 +34,7 @@
   // ---------- auth state ----------
   let auth = null;
   try { auth = JSON.parse(store.get('sitora.auth') || 'null'); } catch (e) { auth = null; }
+  const LAST_EMAIL = 'sitora.lastEmail';
   const saveAuth = () => { if (auth) store.set('sitora.auth', JSON.stringify(auth)); else store.del('sitora.auth'); };
 
   const pick = (o, keys, d) => { if (!o) return d; for (const k of keys) { if (o[k] !== undefined && o[k] !== null) return o[k]; } return d; };
@@ -237,12 +238,16 @@
     }
   }
 
+  // A quiet refresh when the access token (15 min) has expired: the session slides — every refresh gives the device another
+  // Jwt:RefreshTokenDays. With Auth:RefreshCookie:Mode=Cookie the token is not in localStorage at all: the HttpOnly cookie
+  // sitora_rt goes by itself to the API on the same domain (no body); on another domain (Vercel → Render) Dual keeps the body.
   async function refresh() {
-    if (!auth || !auth.refreshToken) return false;
+    if (!auth || (!auth.refreshToken && (S.isDemo() || auth.platform))) return false;
     if (refreshing) return refreshing;
+    const body = auth.refreshToken ? { refreshToken: auth.refreshToken } : undefined;
     refreshing = (async () => {
       try {
-        const data = S.isDemo() ? await demoCall('POST', '/auth/refresh', { body: { refreshToken: auth.refreshToken } }) : await (async () => { const r = await doFetch('POST', '/auth/refresh', { auth: false, body: { refreshToken: auth.refreshToken } }); if (!r.ok) throw await readError(r); return r.json(); })();
+        const data = S.isDemo() ? await demoCall('POST', '/auth/refresh', { body }) : await (async () => { const r = await doFetch('POST', '/auth/refresh', { auth: false, body }); if (!r.ok) throw await readError(r); return r.json(); })();
         setAuth(data, auth.user); return true;
       } catch (e) { clearAuth(); return false; } finally { refreshing = null; }
     })();
@@ -307,6 +312,8 @@
     if (d && d.requiresTwoFactor) return { challenge: { token: d.tempToken, expiresAt: d.expiresAt || null } };
     setAuth(d);
     if (!auth.user || !auth.user.roles.length) await api.loadMe();
+    // «Войти как …»: the buyer's e-mail (never the code) is remembered on this device for the next sign-in.
+    if (auth.user && auth.user.role === 'Customer' && auth.user.email) store.set(LAST_EMAIL, auth.user.email);
     return { user: auth.user };
   }
 
@@ -367,11 +374,21 @@
     invitationInfo(token) { return request('GET', '/auth/invitations/' + encodeURIComponent(token), { auth: false }); },
     async acceptInvitation(token, password) { return signedIn(await request('POST', '/auth/invitations/accept', { auth: false, body: { token, password: password || null } })); },
     async loadMe() { const u = M.user(await request('GET', '/auth/me')); auth.user = u; saveAuth(); S.bus.emit('auth', u); return u; },
+    // «Выйти»: the refresh token of this device is revoked (from the body or the cookie) and the remembered e-mail forgotten.
     async logout() {
       if (auth && auth.platform) auth = Object.assign({}, auth.platform);
-      try { if (auth && auth.refreshToken) await request('POST', '/auth/logout', { body: { refreshToken: auth.refreshToken } }); } catch (e) { /* ignore */ }
+      try { if (auth) await request('POST', '/auth/logout', { auth: false, body: auth.refreshToken ? { refreshToken: auth.refreshToken } : undefined }); } catch (e) { /* ignore */ }
+      store.del(LAST_EMAIL);
       clearAuth();
     },
+    // The e-mail of the buyer who signed in on this device last («Войти как …»); '' — none.
+    get lastEmail() { return store.get(LAST_EMAIL) || ''; },
+    forgetEmail() { store.del(LAST_EMAIL); },
+    // «Устройства»: active sign-ins of this account; one of them is this device (current).
+    async sessions() { return arr(await request('GET', '/auth/sessions')).map((s) => ({ id: s.id, device: s.device || '', startedAt: s.startedAt, lastActiveAt: s.lastActiveAt, expiresAt: s.expiresAt, current: !!s.current })); },
+    revokeSession(id) { return request('DELETE', '/auth/sessions/' + id); },
+    // «Выйти на всех устройствах»: every refresh token is revoked, this device signs out too.
+    async revokeAllSessions() { try { await request('POST', '/auth/sessions/revoke-all'); } finally { store.del(LAST_EMAIL); clearAuth(); } },
 
     // developer applications: the public form (/register) and their review by the platform owner
     submitApplication(b) { return request('POST', '/public/applications', { auth: false, body: { companyName: b.companyName, contactEmail: b.contactEmail, contactPhone: b.contactPhone, ownerFullName: b.ownerFullName, comment: b.comment || null } }); },
@@ -425,7 +442,8 @@
     totpEnable(code) { return request('POST', '/auth/2fa/enable', { body: { code } }); },
     totpDisable(code) { return request('POST', '/auth/2fa/disable', { body: { code } }); },
     clearAuth,
-    async restore() { if (!auth || !auth.accessToken) return null; try { return await api.loadMe(); } catch (e) { if (auth && e.status !== 0) clearAuth(); return null; } },
+    // A live session opens the cabinet at once: an expired access token is refreshed quietly by request() (401 → refresh).
+    async restore() { if (!auth || !(auth.accessToken || auth.refreshToken !== undefined)) return null; try { return await api.loadMe(); } catch (e) { if (auth && e.status !== 0) clearAuth(); return null; } },
 
     // catalog
     // The public site shows one developer's buildings (ORG_SLUG in config.js); a staff token is filtered by the server itself.

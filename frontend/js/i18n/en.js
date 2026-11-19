@@ -1885,5 +1885,17 @@
     "locf.lon": "Longitude",
     "locf.floorH": "Floor height, m",
     "locf.floorHint": "Floor to floor; empty — the site counts 3.0 m and says “estimate”",
+    "login.asKnown": "Sign in as",
+    "cab.t.settings": "Settings",
+    "dev.title": "Devices",
+    "dev.sub": "Where you are signed in now. A sign-in lasts 30 days after the last visit — then the sign-in code is needed.",
+    "dev.unknown": "Unknown device",
+    "dev.this": "This device",
+    "dev.since": "signed in {d}",
+    "dev.last": "last visit {d}",
+    "dev.close": "Sign out there",
+    "dev.closed": "That device is signed out",
+    "dev.allOut": "Sign out everywhere",
+    "dev.allConfirm": "Sign out on every device, this one too? You can sign in again with your e-mail and sign-in code.",
   };
 })();

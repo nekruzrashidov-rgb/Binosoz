@@ -18,6 +18,13 @@ public interface IAuthService
     Task DisableTwoFactorAsync(Guid userId, TwoFactorCodeRequest request, CancellationToken ct = default);
     Task<AuthResponse> RefreshAsync(RefreshRequest request, CancellationToken ct = default);
     Task LogoutAsync(LogoutRequest request, CancellationToken ct = default);
+
+    // «Устройства»: активные входы пользователя (одна строка на сессию refresh-токенов), текущий — Current.
+    Task<IReadOnlyList<SessionResponse>> GetSessionsAsync(Guid userId, CancellationToken ct = default);
+    // Закрыть один вход (чужой или свой); не найден — 404.
+    Task RevokeSessionAsync(Guid userId, Guid sessionId, CancellationToken ct = default);
+    // «Выйти на всех устройствах»: отзывает все refresh-токены пользователя, включая этот.
+    Task<int> RevokeAllSessionsAsync(Guid userId, CancellationToken ct = default);
     Task<CurrentUserResponse> GetCurrentUserAsync(Guid userId, CancellationToken ct = default);
 
     // Покупатель: свой 6-значный код входа (PIN, хранится как пароль Identity). Регистрация и сброс подтверждаются

@@ -17,7 +17,7 @@ public class JwtTokenService(IOptions<JwtOptions> options, TimeProvider timeProv
 
     // Организация, дома и режим «войти как владелец» попадают в claims: по ним AppDbContext
     // ограничивает данные. Изменение домов сотрудника вступает в силу со следующим токеном (до 15 минут).
-    public (string Token, DateTime ExpiresAt) CreateAccessToken(AppUser user, IEnumerable<string> roles, TokenScope scope)
+    public (string Token, DateTime ExpiresAt) CreateAccessToken(AppUser user, IEnumerable<string> roles, TokenScope scope, Guid? sessionId = null)
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var expiresAt = now.AddMinutes(_options.AccessTokenMinutes);
@@ -36,6 +36,8 @@ public class JwtTokenService(IOptions<JwtOptions> options, TimeProvider timeProv
         claims.AddRange(scope.BuildingIds.Select(id => new Claim(AccessClaims.Building, id.ToString())));
         if (scope.ImpersonatedBy is { } impersonator)
             claims.Add(new Claim(AccessClaims.ImpersonatedBy, impersonator.ToString()));
+        if (sessionId is { } session)
+            claims.Add(new Claim(AccessClaims.Session, session.ToString()));
 
         var descriptor = new SecurityTokenDescriptor
         {

@@ -228,6 +228,38 @@ public class AuthController(IAuthService auth, IOptions<AuthOptions> options, IH
         return NoContent();
     }
 
+    /// <summary>
+    /// «Устройства»: активные входы (браузер и система по User-Agent, когда вошли, последнее обновление, до какого числа вход
+    /// живёт без визитов). current — это устройство. Срок скользит: каждое обновление токена продлевает его на Jwt:RefreshTokenDays.
+    /// </summary>
+    [HttpGet("sessions")]
+    [Authorize]
+    [ProducesResponseType<IReadOnlyList<SessionResponse>>(StatusCodes.Status200OK)]
+    public Task<IReadOnlyList<SessionResponse>> Sessions(CancellationToken ct) =>
+        auth.GetSessionsAsync(User.GetUserId(), ct);
+
+    /// <summary>Закрыть один вход: его refresh-токен отзывается, через ≤ 15 минут (срок access-токена) устройство выйдет. Не найден — 404.</summary>
+    [HttpDelete("sessions/{id:guid}")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RevokeSession(Guid id, CancellationToken ct)
+    {
+        await auth.RevokeSessionAsync(User.GetUserId(), id, ct);
+        return NoContent();
+    }
+
+    /// <summary>«Выйти на всех устройствах»: отзывает все refresh-токены пользователя, включая этот; cookie стирается.</summary>
+    [HttpPost("sessions/revoke-all")]
+    [Authorize]
+    [ProducesResponseType<SessionsRevokedResponse>(StatusCodes.Status200OK)]
+    public async Task<SessionsRevokedResponse> RevokeAllSessions(CancellationToken ct)
+    {
+        var revoked = await auth.RevokeAllSessionsAsync(User.GetUserId(), ct);
+        Response.Cookies.Delete(RefreshCookieOptions.Name, RefreshCookieFilter.Cookie(HttpContext, environment, null));
+        return new SessionsRevokedResponse(revoked);
+    }
+
     /// <summary>Старый вход покупателя по SMS. Выключен (404), пока Auth:SmsLoginEnabled = false.</summary>
     [HttpPost("sms/send")]
     [AllowAnonymous]

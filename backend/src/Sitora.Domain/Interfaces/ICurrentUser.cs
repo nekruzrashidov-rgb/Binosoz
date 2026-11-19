@@ -29,4 +29,10 @@ public interface ICurrentUser
 
     // IP-адрес запроса для журнала; вне HTTP-запроса (фоновые задачи, тесты сервисов) — null.
     string? IpAddress => null;
+
+    // Браузер запроса (заголовок User-Agent) — для списка устройств; вне HTTP-запроса — null.
+    string? UserAgent => null;
+
+    // Вход (сессия refresh-токенов), к которому выдан access-токен: claim sid.
+    Guid? SessionId => null;
 }

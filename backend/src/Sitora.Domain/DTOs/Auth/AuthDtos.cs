@@ -4,6 +4,12 @@ public record LoginRequest(string Email, string Password);
 
 public record RefreshRequest(string RefreshToken);
 
+// Активный вход: устройство по User-Agent («Chrome · Windows»), когда вошли, когда последний раз обновляли токен,
+// до какого числа вход живёт без визитов; Current — это устройство (вход текущего access-токена).
+public record SessionResponse(Guid Id, string? Device, DateTime StartedAt, DateTime LastActiveAt, DateTime ExpiresAt, bool Current);
+
+public record SessionsRevokedResponse(int Revoked);
+
 public record LogoutRequest(string RefreshToken);
 
 public record AuthResponse(
