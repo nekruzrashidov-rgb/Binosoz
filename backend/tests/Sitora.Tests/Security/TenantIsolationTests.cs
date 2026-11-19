@@ -237,9 +237,10 @@ public class TenantIsolationTests(SitoraApiFactory factory) : IClassFixture<Sito
         Assert.Equal((normalized, "Приглашённый Админ"), (invitation.Email, invitation.FullName));
         Assert.NotNull(invitation.AcceptedAt);
 
-        // Письмо «Вы приглашены в Binosoz» с логином и паролем из 8 букв и цифр.
+        // Письмо «Вы приглашены в «Организация»» от имени организации, с логином и паролем из 8 букв и цифр.
         var letter = factory.Email.LastMessage(normalized)!;
-        Assert.Equal("Вы приглашены в Binosoz", letter.Subject);
+        Assert.StartsWith("Вы приглашены в «", letter.Subject);
+        Assert.Equal(letter.Subject[("Вы приглашены в «".Length)..^1], letter.FromName);
         Assert.Contains($"Логин: {normalized}", letter.Text);
         var password = factory.Email.LastPassword(normalized)!;
         Assert.Matches("^[A-Za-z0-9]{8}$", password);

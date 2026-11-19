@@ -23,6 +23,13 @@ public class EmailOptions
 
     public string FromName { get; set; } = "Binosoz";
 
+    // Имя отправителя письма: организация-застройщик (EmailMessage.FromName), иначе Email:FromName. Без переводов строк.
+    public static string SenderName(EmailOptions o, EmailMessage message)
+    {
+        var name = string.IsNullOrWhiteSpace(message.FromName) ? o.FromName : message.FromName.Trim();
+        return name.Replace("\r", " ").Replace("\n", " ");
+    }
+
     // Короткие переменные Smtp__Host, Smtp__Port, Smtp__Username, Smtp__Password, Smtp__FromEmail, Smtp__FromName
     // (user-secrets или .env) перекрывают Email__Smtp__* и включают отправку через SMTP.
     public const string SmtpSectionName = "Smtp";
@@ -116,7 +123,7 @@ public class SmtpEmailSender(IOptions<EmailOptions> options) : IEmailSender
         if (string.IsNullOrWhiteSpace(o.Smtp.Host))
             throw new InvalidOperationException("Не задан SMTP-сервер (Email__Smtp__Host)");
 
-        using var mail = new MailMessage(new MailAddress(o.From, o.FromName), new MailAddress(message.To))
+        using var mail = new MailMessage(new MailAddress(o.From, EmailOptions.SenderName(o, message)), new MailAddress(message.To))
         {
             Subject = message.Subject,
             Body = message.Text,
@@ -148,7 +155,7 @@ public class ResendEmailSender(HttpClient http, IOptions<EmailOptions> options) 
         {
             Content = JsonContent.Create(new
             {
-                from = $"{o.FromName} <{o.From}>",
+                from = $"{EmailOptions.SenderName(o, message).Replace("\"", "'")} <{o.From}>",
                 to = new[] { message.To },
                 subject = message.Subject,
                 text = message.Text,

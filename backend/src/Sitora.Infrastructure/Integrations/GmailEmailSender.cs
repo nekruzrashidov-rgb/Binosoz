@@ -131,7 +131,7 @@ public class GmailEmailSender(
         var boundary = "=_binosoz_" + Guid.NewGuid().ToString("N");
         var sb = new StringBuilder();
         // Длинные заголовки переносятся (folding: перевод строки и пробел) — строка не длиннее 78 символов.
-        sb.Append("From: ").Append(DisplayName(o.FromName)).Append("\r\n <").Append(from).Append(">\r\n");
+        sb.Append("From: ").Append(DisplayName(EmailOptions.SenderName(o, message))).Append("\r\n <").Append(from).Append(">\r\n");
         sb.Append("To: <").Append(to).Append(">\r\n");
         sb.Append("Subject: ").Append(EncodedWords(message.Subject)).Append("\r\n");
         sb.Append("MIME-Version: 1.0\r\n");

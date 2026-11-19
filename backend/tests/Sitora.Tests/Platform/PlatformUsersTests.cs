@@ -68,7 +68,8 @@ public class PlatformUsersTests(SitoraApiFactory factory) : IClassFixture<Sitora
         var (id, email, oldPassword) = await NewStaffAsync(platform);
 
         Assert.Equal(HttpStatusCode.NoContent, (await platform.PostAsync($"/api/v1/platform/users/{id}/reset-password", null)).StatusCode);
-        Assert.Equal("Binosoz: новый пароль", factory.Email.LastMessage(email)!.Subject);
+        Assert.EndsWith(": новый пароль", factory.Email.LastMessage(email)!.Subject);
+        Assert.DoesNotContain("Binosoz", factory.Email.LastMessage(email)!.Subject);
         var newPassword = factory.Email.LastPassword(email)!;
         Assert.NotEqual(oldPassword, newPassword);
         Assert.Equal(HttpStatusCode.Unauthorized, (await factory.CreateClient().PostAsJsonAsync("/api/v1/auth/login", new LoginRequest(email, oldPassword))).StatusCode);

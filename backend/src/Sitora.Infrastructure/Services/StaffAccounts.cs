@@ -15,6 +15,7 @@ public class StaffAccounts(
     UserManager<AppUser> userManager,
     IEmailSender email,
     IOptions<EmailOptions> emailOptions,
+    IBrandService brands,
     ILogger<StaffAccounts> logger)
 {
     public const int GeneratedPasswordLength = 8;
@@ -67,10 +68,12 @@ public class StaffAccounts(
     {
         try
         {
-            await email.SendAsync(new EmailMessage(user.Email!, "Binosoz: новый пароль",
+            // Отправитель и тема — организация сотрудника (бренд застройщика), у сотрудников платформы — сама платформа.
+            var brand = await brands.NameForEmailAsync(user.Email!, ct);
+            await email.SendAsync(new EmailMessage(user.Email!, $"{brand}: новый пароль",
                 $"Здравствуйте, {user.FullName}!\n\nАдминистратор платформы задал вам новый пароль.\n\n" +
                 $"Страница входа: {emailOptions.Value.LoginUrl}\nЛогин: {user.Email}\nПароль: {password}\n\n" +
-                "Прежний пароль больше не действует, все сессии завершены. Сменить пароль можно через «Забыли пароль?»."), ct);
+                "Прежний пароль больше не действует, все сессии завершены. Сменить пароль можно через «Забыли пароль?».", FromName: brand), ct);
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
@@ -85,10 +88,11 @@ public class StaffAccounts(
         var where = string.IsNullOrEmpty(organizationName) ? "Binosoz" : $"«{organizationName}» на платформе Binosoz";
         try
         {
-            await email.SendAsync(new EmailMessage(user.Email!, "Вы приглашены в Binosoz",
+            await email.SendAsync(new EmailMessage(user.Email!, string.IsNullOrEmpty(organizationName) ? "Вы приглашены в Binosoz" : $"Вы приглашены в «{organizationName}»",
                 $"Здравствуйте, {user.FullName}!\n\nВас пригласили в {where}.\n\n" +
                 $"Страница входа: {emailOptions.Value.LoginUrl}\nЛогин: {user.Email}\nПароль: {password}\n\n" +
-                "Входите на вкладке «Сотрудник». Пароль никому не сообщайте; сменить его можно через «Забыли пароль?»."), ct);
+                "Входите на вкладке «Сотрудник». Пароль никому не сообщайте; сменить его можно через «Забыли пароль?».",
+                FromName: string.IsNullOrEmpty(organizationName) ? null : organizationName), ct);
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {

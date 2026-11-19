@@ -212,10 +212,11 @@ public partial class AuthService(
         // Сбой почты не меняет ответ: иначе по ошибке было бы видно, что почта принадлежит сотруднику.
         try
         {
-            await email.SendAsync(new EmailMessage(address, "Binosoz: смена пароля",
+            var brand = await brands.NameForEmailAsync(address, ct);
+            await email.SendAsync(new EmailMessage(address, $"{brand}: смена пароля",
                 $"Здравствуйте, {user.FullName}!\n\nЧтобы задать новый пароль, откройте ссылку:\n{emailOptions.Value.LoginUrl}#reset={token}\n\n" +
                 $"Ссылка действует {PasswordResetToken.Lifetime.TotalHours:0} часа и срабатывает один раз. " +
-                "Если вы не просили сменить пароль, просто удалите это письмо: старый пароль продолжает работать."), ct);
+                "Если вы не просили сменить пароль, просто удалите это письмо: старый пароль продолжает работать.", FromName: brand), ct);
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
