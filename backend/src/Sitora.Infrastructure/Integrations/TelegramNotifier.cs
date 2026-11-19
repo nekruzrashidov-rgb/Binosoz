@@ -14,6 +14,13 @@ public class TelegramOptions
 
     public string? BotToken { get; set; }
 
+    // Имя бота без @ (для ссылки t.me/<бот>?start=…) и секрет webhook (часть адреса и заголовок
+    // X-Telegram-Bot-Api-Secret-Token). Без секрета webhook выключен (404).
+    public string? BotUsername { get; set; }
+    public string? WebhookSecret { get; set; }
+
+    public bool BotConfigured => !string.IsNullOrWhiteSpace(BotToken) && !string.IsNullOrWhiteSpace(BotUsername);
+
     // Повторы при сбое сети: сколько раз повторить и с какой паузой.
     public int Retries { get; set; } = 2;
     public TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(2);
@@ -70,6 +77,34 @@ public sealed class TelegramNotifier(IOptions<TelegramOptions> options, ITelegra
             }
         }
     }
+
+    public async Task<TelegramSendResult> TrySendAsync(long chatId, string message, CancellationToken ct = default)
+    {
+        var o = options.Value;
+        if (string.IsNullOrWhiteSpace(o.BotToken))
+            return TelegramSendResult.NotConfigured;
+        if (chatId == 0)
+            return TelegramSendResult.Blocked;
+        try
+        {
+            await transport.SendAsync(o.BotToken, chatId, message, ct);
+            return TelegramSendResult.Sent;
+        }
+        catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            if (IsBlocked(e))
+            {
+                logger.LogInformation("Telegram: бот заблокирован или чат недоступен (чат {ChatId})", chatId);
+                return TelegramSendResult.Blocked;
+            }
+            logger.LogWarning(e, "Не удалось отправить сообщение в Telegram (чат {ChatId}), будет повтор", chatId);
+            return TelegramSendResult.Failed;
+        }
+    }
+
+    // 403 — пользователь заблокировал бота или удалил аккаунт; 400 «chat not found» — чата нет.
+    public static bool IsBlocked(Exception e) => e is ApiRequestException api
+        && (api.ErrorCode == 403 || (api.ErrorCode == 400 && api.Message.Contains("chat not found", StringComparison.OrdinalIgnoreCase)));
 
     // Повторяем сбои сети и временные ошибки Telegram; неверный чат или заблокированный бот повтор не исправит.
     private static bool IsTransient(Exception e) => e switch

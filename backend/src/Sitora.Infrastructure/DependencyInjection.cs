@@ -159,6 +159,12 @@ public static class DependencyInjection
         services.AddScoped<PaymentAlertService>();
         services.AddScoped<OverduePaymentJob>();
         services.AddScoped<PaymentReminderJob>();
+        services.AddScoped<BookingExpiryNoticeJob>();
+        services.AddScoped<BuyerNotifier>();
+        services.AddScoped<BuyerMessageJob>();
+        services.AddScoped<IBuyerMessageQueue, HangfireBuyerMessageQueue>();
+        services.AddSingleton<UnsubscribeTokens>();
+        services.AddScoped<TelegramLinkService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddSingleton<HealthAlertState>();
 
@@ -173,6 +179,7 @@ public static class DependencyInjection
         jobs.AddOrUpdate<HealthAlertJob>(HealthAlertJob.Id, job => job.RunAsync(CancellationToken.None), HealthAlertJob.Schedule);
         jobs.AddOrUpdate<OverduePaymentJob>(OverduePaymentJob.Id, job => job.RunAsync(CancellationToken.None), OverduePaymentJob.Schedule);
         jobs.AddOrUpdate<PaymentReminderJob>(PaymentReminderJob.Id, job => job.RunAsync(CancellationToken.None), PaymentReminderJob.Schedule);
+        jobs.AddOrUpdate<BookingExpiryNoticeJob>(BookingExpiryNoticeJob.Id, job => job.RunAsync(CancellationToken.None), BookingExpiryNoticeJob.Schedule);
         jobs.AddOrUpdate<WeeklyOwnerReportJob>(WeeklyOwnerReportJob.Id, job => job.RunAsync(CancellationToken.None), WeeklyOwnerReportJob.Schedule);
     }
 

@@ -52,7 +52,7 @@ public class TelegramAlertTests(SitoraApiFactory factory) : IClassFixture<Sitora
         await RunOverdueAsync();
         await RunOverdueAsync();
 
-        var overdue = factory.Telegram.To(chat).Where(m => m.StartsWith("🔴 *Просрочка*\nПокупатель Кабинета, кв. ")).ToList();
+        var overdue = factory.Telegram.To(chat).Where(m => m.StartsWith("🔴 *Просроченный платёж*\nПлатёж ")).ToList();
         Assert.NotEmpty(overdue);
         // Повторный запуск — те же пункты графика, второго сообщения нет.
         Assert.Equal(overdue.Distinct().Count(), overdue.Count);

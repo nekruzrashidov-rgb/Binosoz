@@ -35,6 +35,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider t
     public DbSet<Apartment> Apartments => Set<Apartment>();
     public DbSet<Lead> Leads => Set<Lead>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<BuyerMessage> BuyerMessages => Set<BuyerMessage>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Booking> Bookings => Set<Booking>();
@@ -109,6 +110,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider t
         builder.Entity<Organization>().HasQueryFilter(x => ScopeAll || x.Id == ScopeOrganizationId);
         builder.Entity<OrganizationTariff>().HasQueryFilter(x => ScopeAll || x.OrganizationId == ScopeOrganizationId);
         builder.Entity<MessageTemplate>().HasQueryFilter(x => ScopeAll || x.OrganizationId == ScopeOrganizationId);
+        builder.Entity<BuyerMessage>().HasQueryFilter(x => ScopeAll || x.OrganizationId == ScopeOrganizationId);
     }
 
     private void ByBuilding<T>(ModelBuilder builder, Expression<Func<T, Guid>> organizationId, Expression<Func<T, Guid>> buildingId)

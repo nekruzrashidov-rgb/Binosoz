@@ -17,6 +17,7 @@ public class BookingService(
     CatalogCache cache,
     INotificationSender notifications,
     TelegramAlertService telegram,
+    BuyerNotifier buyers,
     TimeProvider timeProvider,
     ILogger<BookingService> logger) : IBookingService
 {
@@ -85,6 +86,7 @@ public class BookingService(
         await NotifyAsync($"Новая бронь{(isStaff ? "" : " с сайта")}: {clientName}, {clientPhone}, кв. №{apartment.Number}, " +
                           $"до {booking.ExpiresAt.Add(DushanbeOffset):dd.MM.yyyy HH:mm} (Душанбе)", ct);
         await telegram.BookingCreatedAsync(booking.Id, ct);
+        await buyers.BookingCreatedAsync(booking.Id, ct);
 
         return ToResponse(booking, apartment.Number);
     }
@@ -120,6 +122,7 @@ public class BookingService(
             await transaction.CommitAsync(ct);
 
             await cache.InvalidateAsync(ct);
+            await buyers.BookingReleasedAsync(booking.Id, ct);
             return ToResponse(booking, apartment.Number);
         }
     }
@@ -136,7 +139,10 @@ public class BookingService(
         foreach (var id in overdue)
         {
             if (await TryExpireAsync(id, now, ct))
+            {
                 expired++;
+                await buyers.BookingReleasedAsync(id, ct);
+            }
             db.ChangeTracker.Clear();
         }
 

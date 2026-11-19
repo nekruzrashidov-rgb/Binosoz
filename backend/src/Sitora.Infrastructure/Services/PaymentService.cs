@@ -19,6 +19,7 @@ public class PaymentService(
     IAuditService audit,
     INotificationSender notifications,
     TelegramAlertService telegram,
+    BuyerNotifier buyers,
     TimeProvider timeProvider,
     StatsCache stats,
     PdfIssueRecorder pdfIssues,
@@ -176,6 +177,7 @@ public class PaymentService(
         await NotifyCustomerAsync(customerUserId,
             $"Получен платёж {payment.Amount:0.00} {payment.Currency} от {payment.PaidAt:dd.MM.yyyy}", ct);
         await telegram.PaymentReceivedAsync(payment.Id, ct);
+        await buyers.PaymentReceivedAsync(payment.Id, ct);
         return ToResponse(payment, false);
     }
 

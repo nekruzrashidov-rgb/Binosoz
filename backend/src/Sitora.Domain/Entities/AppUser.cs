@@ -19,6 +19,13 @@ public class AppUser : IdentityUser<Guid>, IHasTimestamps
 
     // Личный чат в Telegram для уведомлений; null — не привязан.
     public long? TelegramChatId { get; set; }
+
+    // Уведомления покупателю: каналы (Telegram и почта — оба, что подключено, по умолчанию), какие события присылать
+    // и язык сообщений (ru, tg, en — как выбран на сайте при сохранении настроек или привязке Telegram).
+    public bool NotifyByTelegram { get; set; } = true;
+    public bool NotifyByEmail { get; set; } = true;
+    public NotifyEventGroups NotifyEvents { get; set; } = NotifyEventGroups.All;
+    public string? NotifyLanguage { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

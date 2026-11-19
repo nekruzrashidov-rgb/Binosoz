@@ -11,4 +11,8 @@ public interface INotificationService
 
     // Личный чат Telegram для уведомлений текущего пользователя; null — отвязать.
     Task SetTelegramChatAsync(long? chatId, CancellationToken ct = default);
+
+    Task<NotificationSettingsResponse> GetSettingsAsync(CancellationToken ct = default);
+    // language — язык сайта, на котором покупатель сохранил настройки (ru, tg, en): на нём придут сообщения.
+    Task<NotificationSettingsResponse> SaveSettingsAsync(UpdateNotificationSettingsRequest request, string language, CancellationToken ct = default);
 }

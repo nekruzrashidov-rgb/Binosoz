@@ -30,7 +30,7 @@ async function mockApi(page) {
       { id: 's2', device: 'Safari · iPhone', startedAt: '2026-10-20T08:00:00Z', lastActiveAt: '2026-11-10T08:00:00Z', expiresAt: '2026-12-10T08:00:00Z', current: false }]);
     if (p === '/cabinet/overview') return json(200, { hasDeals: true, customerName: USER.fullName, deals: [DEAL], contacts: {} });
     if (p.startsWith('/deals/d1/messages/unread')) return json(200, { unread: 0 });
-    if (p === '/notifications/preferences') return json(200, { email: true, telegram: true, emailAvailable: true, telegramLinked: false, telegramAvailable: false, events: {} });
+    if (p === '/profile/notifications') return json(200, { email: true, telegram: true, emailAvailable: true, telegramLinked: false, telegramAvailable: false, events: { payments: true, bookings: true, deal: true, documents: true, chat: true }, language: 'ru' });
     return json(404, { title: 'Не найдено' });
   });
   return s;

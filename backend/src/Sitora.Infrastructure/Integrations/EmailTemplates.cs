@@ -40,4 +40,36 @@ public static class EmailTemplates
             """;
         return new EmailMessage(to, "Заявка принята — Binosoz", text, html);
     }
+
+    // Напоминание о платеже покупателю: на его языке, от имени застройщика (brand), кнопка «Открыть кабинет»
+    // и ссылка «Отписаться» (без входа). Только сумма, номер квартиры и срок — без паспортных данных.
+    public static EmailMessage PaymentReminder(string to, string lang, string brand, string name, string title, string body,
+        string? cabinetUrl, string unsubscribeUrl)
+    {
+        var intro = Services.BuyerTexts.EmailIntro(lang, name);
+        var paid = Services.BuyerTexts.AlreadyPaid(lang);
+        var footer = Services.BuyerTexts.EmailFooter(lang, brand);
+        var open = Services.BuyerTexts.OpenCabinet(lang);
+        var unsubscribe = Services.BuyerTexts.Unsubscribe(lang);
+        var text = $"{intro}\n\n{body}.\n\n" + (cabinetUrl is null ? "" : $"{open}: {cabinetUrl}\n\n") +
+                   $"{paid}\n\n— {brand}\n{footer}\n{unsubscribe}: {unsubscribeUrl}";
+
+        string E(string s) => WebUtility.HtmlEncode(s);
+        var button = cabinetUrl is null ? "" : $"""
+              <p style="margin:28px 0;"><a href="{E(cabinetUrl)}" style="display:inline-block; background:#8a5a2b; color:#ffffff; text-decoration:none; padding:14px 24px; border-radius:2px; font-weight:bold;">{E(open)}</a></p>
+            """;
+        var html = $"""
+            <div style="background:#ffffff; font-family: Arial, sans-serif; max-width:560px; margin:0 auto; padding:32px 24px; color:#222222;">
+              <p style="font-size:13px; color:#666666; margin:0 0 24px;">{E(brand)}</p>
+              <h1 style="font-size:22px; margin:0 0 16px; color:#1a1a1a;">{E(title)}</h1>
+              <p style="line-height:1.6;">{E(intro)}</p>
+              <p style="line-height:1.6; font-size:17px;"><strong>{E(body)}</strong></p>
+              {button}
+              <p style="line-height:1.6; color:#555555;">{E(paid)}</p>
+              <p style="color:#555555; margin-top:32px;">— {E(brand)}</p>
+              <p style="font-size:12px; color:#777777; line-height:1.5;">{E(footer)}<br><a href="{E(unsubscribeUrl)}" style="color:#777777;">{E(unsubscribe)}</a></p>
+            </div>
+            """;
+        return new EmailMessage(to, $"{brand}: {title}", text, html, brand);
+    }
 }

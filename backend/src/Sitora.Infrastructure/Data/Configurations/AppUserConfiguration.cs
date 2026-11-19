@@ -15,6 +15,9 @@ public class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
         builder.HasIndex(u => u.NormalizedEmail).HasDatabaseName("EmailIndex")
             .IsUnique().HasFilter("\"NormalizedEmail\" IS NOT NULL");
 
+        builder.Property(u => u.NotifyLanguage).HasMaxLength(2);
+        builder.HasIndex(u => u.TelegramChatId).HasFilter("\"TelegramChatId\" IS NOT NULL");
+
         builder.HasOne(u => u.Organization).WithMany()
             .HasForeignKey(u => u.OrganizationId).OnDelete(DeleteBehavior.Restrict);
     }

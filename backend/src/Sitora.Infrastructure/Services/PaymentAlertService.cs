@@ -3,20 +3,32 @@ using Microsoft.Extensions.Logging;
 using Sitora.Domain.Common;
 using Sitora.Domain.Entities;
 using Sitora.Domain.Enums;
+using Sitora.Domain.Exceptions;
 using Sitora.Infrastructure.Data;
 
 namespace Sitora.Infrastructure.Services;
 
-// Уведомления в приложении о платежах по графику: просрочка (покупателю и бухгалтерам дома)
-// и напоминание за 3 дня до срока (покупателю). Каждое уведомление — один раз на пункт графика и получателя;
-// новое уведомление дублируется в Telegram тем, у кого привязан чат.
+// Напоминания о платежах по графику, в 10:00 по Душанбе:
+// - покупателю (кабинет + Telegram + почта, BuyerNotifier): за 3 дня, в день срока, на 1-й день просрочки и ещё раз
+//   через 6 дней после первого (7-й день); защита от дублей — по событию, пункту графика и каналу;
+// - бухгалтерам дома — в колокольчик и Telegram о просрочке, один раз на пункт графика.
 // Работает из фоновых задач без пользователя: фильтры организаций не действуют, видны все дома.
-public class PaymentAlertService(AppDbContext db, TelegramAlertService telegram, TimeProvider timeProvider, ILogger<PaymentAlertService> logger)
+public class PaymentAlertService(AppDbContext db, TelegramAlertService telegram, BuyerNotifier buyers, TimeProvider timeProvider, ILogger<PaymentAlertService> logger)
 {
     public const int ReminderDaysBefore = 3;
+    // Второе напоминание о просрочке — через столько дней после первого (первое на 1-й день → второе на 7-й).
+    public const int SecondOverdueAfterDays = 6;
+    // «Напомнить сейчас» из CRM — не чаще раза в сутки на пункт графика.
+    public static readonly TimeSpan ManualReminderInterval = TimeSpan.FromDays(1);
+    public const string ManualTooSoon = "Напоминание по этому платежу уже отправляли сегодня. Следующее — через сутки после прошлого";
+    public const string ItemNotOpen = "Этот платёж уже оплачен или его нет в графике";
+    public const string NoCabinet = "У покупателя нет входа в кабинет: напоминание некуда отправить";
 
     private record OpenItem(Guid DealId, DateOnly DueDate, decimal Left, Currency Currency, int Apartment,
         string Customer, Guid? CustomerUserId, Guid BuildingId, Guid OrganizationId);
+
+    private static PaymentNotice Notice(OpenItem i, int overdueDays) =>
+        new(i.DealId, i.DueDate, i.Left, i.Currency, i.Apartment, i.CustomerUserId, i.OrganizationId, overdueDays);
 
     // Пункты со сроком раньше сегодняшнего дня, оплаченные не полностью, по действующим сделкам.
     public async Task<int> NotifyOverdueAsync(CancellationToken ct = default)
@@ -25,21 +37,49 @@ public class PaymentAlertService(AppDbContext db, TelegramAlertService telegram,
         var items = await OpenItems(i => i.DueDate < today).ToListAsync(ct);
         var accountants = await AccountantsAsync(items.Select(i => i.OrganizationId).Distinct().ToList(), ct);
 
-        var notifications = new List<(Notification, string)>();
+        var staff = new List<(Notification, string)>();
         foreach (var i in items)
         {
             var days = today.DayNumber - i.DueDate.DayNumber;
             var money = $"{Money(i.Left)} {i.Currency}";
-            var telegramText = TelegramMessages.Overdue(i.Customer, i.Apartment, i.Left, i.Currency, days);
-            if (i.CustomerUserId is { } customer)
-                notifications.Add((New(customer, Notification.KindOverdue, i, "Просроченный платёж",
-                    $"Платёж {money} по кв. №{i.Apartment} просрочен на {days} дн."), telegramText));
             foreach (var accountant in accountants.Where(a => a.OrganizationId == i.OrganizationId
                                                                && (a.Buildings.Count == 0 || a.Buildings.Contains(i.BuildingId))))
-                notifications.Add((New(accountant.Id, Notification.KindOverdue, i, "Просрочка по сделке",
-                    $"{i.Customer}, кв. №{i.Apartment}: {money} просрочено {days} дн."), telegramText));
+                staff.Add((New(accountant.Id, Notification.KindOverdue, i, "Просрочка по сделке",
+                    $"{i.Customer}, кв. №{i.Apartment}: {money} просрочено {days} дн."), TelegramMessages.Overdue(i.Customer, i.Apartment, i.Left, i.Currency, days)));
         }
-        return await SaveNewAsync(notifications, "о просрочке", ct);
+        var count = await SaveNewAsync(staff, "о просрочке", ct);
+
+        // Покупателю: первое напоминание — сразу (1-й день или первый запуск после появления просрочки),
+        // второе — через 6 дней после первого.
+        var sentFirst = await FirstOverdueSentAsync(items.Select(i => i.DealId).Distinct().ToList(), ct);
+        foreach (var i in items.Where(i => i.CustomerUserId is not null))
+        {
+            var days = today.DayNumber - i.DueDate.DayNumber;
+            if (!sentFirst.TryGetValue((i.DealId, i.DueDate, i.CustomerUserId!.Value), out var first))
+                count += await buyers.PaymentReminderAsync(Notice(i, days), BuyerEvents.PaymentOverdue, null, ct);
+            else if (days >= 7 && DushanbeTime.Today(first).DayNumber <= today.DayNumber - SecondOverdueAfterDays)
+                count += await buyers.PaymentReminderAsync(Notice(i, days), BuyerEvents.PaymentOverdueWeek, null, ct);
+        }
+        return count;
+    }
+
+    // Когда покупателю ушло первое напоминание о просрочке: журнал (кабинет) или колокольчик до появления журнала.
+    private async Task<Dictionary<(Guid, DateOnly, Guid), DateTime>> FirstOverdueSentAsync(List<Guid> deals, CancellationToken ct)
+    {
+        var journal = await db.BuyerMessages.IgnoreQueryFilters().AsNoTracking()
+            .Where(m => m.Event == BuyerEvents.PaymentOverdue && m.Channel == BuyerChannels.InApp && m.DealId != null
+                        && deals.Contains(m.DealId.Value) && m.DueDate != null)
+            .Select(m => new { DealId = m.DealId!.Value, DueDate = m.DueDate!.Value, m.UserId, m.CreatedAt })
+            .ToListAsync(ct);
+        var bells = await db.Notifications.AsNoTracking()
+            .Where(n => n.Kind == Notification.KindOverdue && n.DealId != null && deals.Contains(n.DealId.Value) && n.DueDate != null && n.UserId != null)
+            .Select(n => new { DealId = n.DealId!.Value, DueDate = n.DueDate!.Value, UserId = n.UserId!.Value, n.CreatedAt })
+            .ToListAsync(ct);
+        var result = new Dictionary<(Guid, DateOnly, Guid), DateTime>();
+        foreach (var x in journal.Concat(bells))
+            if (!result.TryGetValue((x.DealId, x.DueDate, x.UserId), out var at) || x.CreatedAt < at)
+                result[(x.DealId, x.DueDate, x.UserId)] = x.CreatedAt;
+        return result;
     }
 
     // Пункты со сроком ровно через 3 дня, оплаченные не полностью.
@@ -47,12 +87,40 @@ public class PaymentAlertService(AppDbContext db, TelegramAlertService telegram,
     {
         var due = Today.AddDays(ReminderDaysBefore);
         var items = await OpenItems(i => i.DueDate == due).ToListAsync(ct);
-        var notifications = items.Where(i => i.CustomerUserId is not null)
-            .Select(i => (New(i.CustomerUserId!.Value, Notification.KindReminder, i, "Напоминание о платеже",
-                $"Через {ReminderDaysBefore} дня ({i.DueDate:dd.MM.yyyy}) платёж {Money(i.Left)} {i.Currency} по кв. №{i.Apartment}"),
-                TelegramMessages.Reminder(i.Left, i.Currency, i.DueDate)))
-            .ToList();
-        return await SaveNewAsync(notifications, "о платеже через 3 дня", ct);
+        var count = 0;
+        foreach (var i in items.Where(i => i.CustomerUserId is not null))
+            count += await buyers.PaymentReminderAsync(Notice(i, 0), BuyerEvents.PaymentReminder, null, ct);
+        if (count > 0)
+            logger.LogInformation("Напоминаний о платеже через 3 дня: {Count}", count);
+        return count;
+    }
+
+    // Пункты со сроком сегодня: «Сегодня срок платежа: 12 500 TJS по кв. №…».
+    public async Task<int> RemindDueTodayAsync(CancellationToken ct = default)
+    {
+        var today = Today;
+        var items = await OpenItems(i => i.DueDate == today).ToListAsync(ct);
+        var count = 0;
+        foreach (var i in items.Where(i => i.CustomerUserId is not null))
+            count += await buyers.PaymentReminderAsync(Notice(i, 0), BuyerEvents.PaymentDueToday, null, ct);
+        if (count > 0)
+            logger.LogInformation("Напоминаний «сегодня срок платежа»: {Count}", count);
+        return count;
+    }
+
+    // «Напомнить сейчас» из CRM: пункт графика должен быть неоплаченным; не чаще раза в сутки на пункт.
+    public async Task<int> RemindNowAsync(Guid dealId, DateOnly dueDate, Guid staffUserId, CancellationToken ct = default)
+    {
+        var item = await OpenItems(i => i.Plan.DealId == dealId && i.DueDate == dueDate).FirstOrDefaultAsync(ct)
+                   ?? throw new BusinessRuleException(ItemNotOpen);
+        if (item.CustomerUserId is null)
+            throw new BusinessRuleException(NoCabinet);
+        var since = timeProvider.GetUtcNow().UtcDateTime - ManualReminderInterval;
+        if (await db.BuyerMessages.IgnoreQueryFilters().AnyAsync(m => m.DealId == dealId && m.DueDate == dueDate
+                && m.Event == BuyerEvents.PaymentManual && m.CreatedAt > since, ct))
+            throw new TooManyRequestsException(ManualTooSoon);
+        var days = Math.Max(0, Today.DayNumber - dueDate.DayNumber);
+        return await buyers.PaymentReminderAsync(Notice(item, days), BuyerEvents.PaymentManual, staffUserId, ct);
     }
 
     private IQueryable<OpenItem> OpenItems(System.Linq.Expressions.Expression<Func<PaymentScheduleItem, bool>> when) =>

@@ -387,6 +387,15 @@
     // «Устройства»: active sign-ins of this account; one of them is this device (current).
     async sessions() { return arr(await request('GET', '/auth/sessions')).map((s) => ({ id: s.id, device: s.device || '', startedAt: s.startedAt, lastActiveAt: s.lastActiveAt, expiresAt: s.expiresAt, current: !!s.current })); },
     revokeSession(id) { return request('DELETE', '/auth/sessions/' + id); },
+    // Notifications of the buyer: channels (Telegram, e-mail), events, what is connected; the site language is saved with them.
+    notificationSettings() { return request('GET', '/profile/notifications'); },
+    saveNotificationSettings(b) { return request('PUT', '/profile/notifications', { body: { telegram: !!b.telegram, email: !!b.email, events: b.events } }); },
+    // «Получать уведомления в Telegram»: { url: https://t.me/<bot>?start=<token>, expiresAt } — one-time, 15 minutes.
+    telegramLink() { return request('POST', '/profile/telegram/link'); },
+    telegramUnlink() { return request('DELETE', '/profile/telegram'); },
+    // CRM: the log of messages to the buyer about a deal and «Напомнить сейчас» for one schedule item (once a day).
+    async reminders(dealId) { return arr(await request('GET', '/deals/' + dealId + '/reminders')); },
+    remindNow(dealId, dueDate) { return request('POST', '/deals/' + dealId + '/reminders', { body: { dueDate } }); },
     // «Выйти на всех устройствах»: every refresh token is revoked, this device signs out too.
     async revokeAllSessions() { try { await request('POST', '/auth/sessions/revoke-all'); } finally { store.del(LAST_EMAIL); clearAuth(); } },
 

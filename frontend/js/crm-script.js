@@ -729,6 +729,37 @@
         } catch (e) { /* the panel still shows the apartment */ }
       }
       const kv = (k, v) => [h('dt', null, k), h('dd', null, v === undefined || v === null || v === '' ? '—' : v)];
+
+      // Reminders to the buyer: «Напомнить сейчас» for an unpaid schedule item (with a confirmation, once a day) and the log —
+      // when, through which channel (cabinet, Telegram, e-mail) and how it ended.
+      function remindersCard(s) {
+        const box = h('section', { class: 'card flat stack rem-card' }, h('h3', null, t('rem.title')), S.skeleton(2, 28));
+        const open = (s.items || []).filter((i) => i.status !== 'Paid' && i.amountDue > i.amountPaid);
+        const draw = (log) => {
+          const parts = [h('h3', null, t('rem.title')), h('p', { class: 'hint' }, t('rem.hint'))];
+          if (open.length && (S.api.has('Accountant') || S.api.has('Manager'))) {
+            const sel = S.select('dueDate', open.slice(0, 24).map((i) => [i.dueDate, S.fmt.date(i.dueDate) + ' · ' + S.fmt.money(i.amountDue - i.amountPaid, s.currency)]), open[0].dueDate, { 'aria-label': t('rem.item') });
+            const btn = h('button', { class: 'btn soft', type: 'button', 'data-remind-now': '', onclick: async () => {
+              if (!(await S.confirm(t('rem.confirm', { d: S.fmt.date(sel.value) }), t('rem.now')))) return;
+              await S.busy(btn, async () => {
+                try { const r = await S.api.remindNow(id, sel.value); S.toast(t('rem.sent', { n: r.queued || 0 }), 'ok'); draw(await S.api.reminders(id)); }
+                catch (er) { S.err(er.code === 'reminder_too_soon' ? Object.assign(er, { message: t('rem.tooSoon') }) : er); }
+              });
+            } }, '🔔 ' + t('rem.now'));
+            parts.push(h('div', { class: 'row' }, sel, btn));
+          }
+          parts.push(log.length ? S.tbl([
+            { label: t('rem.when'), render: (m) => S.fmt.date(m.createdAt) + ' ' + new Date(m.createdAt).toLocaleTimeString(S.lang === 'en' ? 'en-GB' : 'ru-RU', { hour: '2-digit', minute: '2-digit' }) },
+            { label: t('rem.event'), render: (m) => t('rem.ev.' + m.event, null, m.event) + (m.dueDate ? ' · ' + S.fmt.date(m.dueDate) : '') },
+            { label: t('rem.channel'), render: (m) => t('rem.ch.' + m.channel, null, m.channel) },
+            { label: t('rem.status'), render: (m) => h('span', { class: 'chip ' + ({ Sent: 'good', Failed: 'bad', Skipped: 'warn' }[m.status] || ''), title: m.error || '' }, t('rem.st.' + m.status, null, m.status)) },
+            { label: t('rem.by'), render: (m) => m.createdBy || t('rem.auto') },
+          ], log, { rowClass: () => 'rem-log' }) : h('p', { class: 'muted' }, t('rem.none')));
+          box.replaceChildren(...parts);
+        };
+        S.api.reminders(id).then(draw, (er) => box.replaceChildren(h('h3', null, t('rem.title')), h('div', { class: 'form-err' }, er.message)));
+        return box;
+      }
       const close = (fn) => () => { md.close(); fn(); };
       const run = (label, fn, cls) => h('button', { class: 'btn ' + (cls || ''), type: 'button', onclick: (e) => S.busy(e.currentTarget, async () => { try { await fn(); } catch (er) { S.err(er); } }) }, label);
       const actions = [];
@@ -1111,7 +1142,7 @@
         },
         async schedule(c) {
           c.replaceChildren(S.skeleton(3, 50)); const s = await getSched();
-          if (!s.none) { c.replaceChildren(S.panels.schedule(s), h('div', { class: 'row' }, h('button', { class: 'btn ghost', onclick: (e) => S.busy(e.currentTarget, () => S.api.openDoc('/deals/' + id + '/schedule.pdf', null, 'PDF').catch(S.err)) }, t('cab.pdfSchedule')), h('button', { class: 'btn ghost', onclick: (e) => S.busy(e.currentTarget, () => S.api.openDoc('/deals/' + id + '/statement.pdf', { date: S.today() }, 'PDF').catch(S.err)) }, t('cab.pdfAct')), s.paid === 0 && sales() ? h('button', { class: 'btn soft', onclick: () => planForm(true) }, t('plan.rebuild')) : null)); return; }
+          if (!s.none) { c.replaceChildren(S.panels.schedule(s), remindersCard(s), h('div', { class: 'row' }, h('button', { class: 'btn ghost', onclick: (e) => S.busy(e.currentTarget, () => S.api.openDoc('/deals/' + id + '/schedule.pdf', null, 'PDF').catch(S.err)) }, t('cab.pdfSchedule')), h('button', { class: 'btn ghost', onclick: (e) => S.busy(e.currentTarget, () => S.api.openDoc('/deals/' + id + '/statement.pdf', { date: S.today() }, 'PDF').catch(S.err)) }, t('cab.pdfAct')), s.paid === 0 && sales() ? h('button', { class: 'btn soft', onclick: () => planForm(true) }, t('plan.rebuild')) : null)); return; }
           c.replaceChildren(sales() ? planFormEl() : S.empty(t('plan.none'), 'wallet'));
         },
         async payments(c) {

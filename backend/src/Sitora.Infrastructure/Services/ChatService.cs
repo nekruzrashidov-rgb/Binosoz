@@ -17,6 +17,7 @@ public class ChatService(
     IChatNotifier chatNotifier,
     IPresenceTracker presence,
     INotificationSender notifications,
+    BuyerNotifier buyers,
     TimeProvider timeProvider,
     ILogger<ChatService> logger) : IChatService
 {
@@ -126,6 +127,8 @@ public class ChatService(
             await SafeAsync(() => notifications.SendAsync(recipient,
                 $"Новое сообщение по кв. №{info.ApartmentNumber} от {senderName}: {Shorten(text)}", ct), "отправить уведомление о сообщении");
         }
+        if (!message.FromCustomer)
+            await buyers.ChatMessageAsync(dealId, ct);
 
         return response;
     }

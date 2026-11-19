@@ -47,6 +47,10 @@ public class EmailOptions
             options.FromName = smtp["FromName"]!;
     }
 
+    // Публичный адрес API для ссылок в письмах (отписка): пусто — тот же домен, что и сайт (сайт отдаёт сам API).
+    // Сайт на другом домене (Vercel) — задайте Email__ApiUrl=https://<api>.onrender.com.
+    public string? ApiUrl { get; set; }
+
     // Адрес страницы принятия приглашения; токен дописывается в конец.
     public string InviteUrl { get; set; } = "http://localhost:5500/accept-invite#token=";
 

@@ -19,6 +19,7 @@ public class DocumentService(
     ICurrentUser currentUser,
     IAuditService audit,
     INotificationSender notifications,
+    BuyerNotifier buyers,
     ILogger<DocumentService> logger) : IDocumentService
 {
     public const long MaxFileSize = 20 * 1024 * 1024;
@@ -73,6 +74,7 @@ public class DocumentService(
         }
 
         await NotifyCustomerAsync(dealId, $"Добавлен документ: {document.FileName}", ct);
+        await buyers.DocumentAddedAsync(dealId, ct);
         return new DocumentResponse(document.Id, dealId, document.Type, document.FileName, document.ContentType,
             document.SizeBytes, document.SignedAt, document.CreatedAt);
     }

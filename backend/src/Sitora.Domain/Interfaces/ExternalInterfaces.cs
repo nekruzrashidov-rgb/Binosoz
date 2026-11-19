@@ -8,6 +8,22 @@ namespace Sitora.Domain.Interfaces;
 public interface ITelegramNotifier
 {
     Task SendAsync(long chatId, string message, CancellationToken ct = default);
+
+    // Одна попытка с ответом, чем кончилось: для очереди сообщений покупателю (повторы — задача Hangfire,
+    // Blocked — бот заблокирован или чат удалён: чат отвязывается и больше туда не шлём).
+    async Task<TelegramSendResult> TrySendAsync(long chatId, string message, CancellationToken ct = default)
+    {
+        await SendAsync(chatId, message, ct);
+        return TelegramSendResult.Sent;
+    }
+}
+
+public enum TelegramSendResult
+{
+    Sent,
+    Blocked,
+    Failed,
+    NotConfigured
 }
 
 public interface ISmsSender
@@ -16,7 +32,8 @@ public interface ISmsSender
 }
 
 // Html — необязательная оформленная версия; Text уходит всегда, для почтовых программ без HTML.
-public record EmailMessage(string To, string Subject, string Text, string? Html = null);
+// FromName — имя отправителя («Некруз Резиденс <no-reply@…>»): имя организации-застройщика; null — Email:FromName.
+public record EmailMessage(string To, string Subject, string Text, string? Html = null, string? FromName = null);
 
 public interface IEmailSender
 {

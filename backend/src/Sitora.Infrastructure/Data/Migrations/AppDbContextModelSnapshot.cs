@@ -265,6 +265,19 @@ namespace Sitora.Infrastructure.Data.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<bool>("NotifyByEmail")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("NotifyByTelegram")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("NotifyEvents")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("NotifyLanguage")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)");
+
                     b.Property<Guid?>("OrganizationId")
                         .HasColumnType("uuid");
 
@@ -309,6 +322,9 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.HasIndex("PhoneNumber")
                         .IsUnique()
                         .HasFilter("\"PhoneNumber\" IS NOT NULL");
+
+                    b.HasIndex("TelegramChatId")
+                        .HasFilter("\"TelegramChatId\" IS NOT NULL");
 
                     b.ToTable("Users", (string)null);
                 });
@@ -497,6 +513,89 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.HasIndex("OrganizationId");
 
                     b.ToTable("Buildings", (string)null);
+                });
+
+            modelBuilder.Entity("Sitora.Domain.Entities.BuyerMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("DealId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DedupeKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateOnly?>("DueDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Event")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Html")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Subject")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DedupeKey")
+                        .IsUnique()
+                        .HasFilter("\"DedupeKey\" IS NOT NULL");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("DealId", "CreatedAt");
+
+                    b.HasIndex("OrganizationId", "CreatedAt");
+
+                    b.ToTable("BuyerMessages", (string)null);
                 });
 
             modelBuilder.Entity("Sitora.Domain.Entities.CashTransaction", b =>
@@ -2135,6 +2234,22 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Navigation("Eco");
 
                     b.Navigation("Organization");
+                });
+
+            modelBuilder.Entity("Sitora.Domain.Entities.BuyerMessage", b =>
+                {
+                    b.HasOne("Sitora.Domain.Entities.Deal", null)
+                        .WithMany()
+                        .HasForeignKey("DealId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Sitora.Domain.Entities.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Sitora.Domain.Entities.CashTransaction", b =>

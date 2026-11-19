@@ -140,6 +140,10 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Seed:RichTower", "false");
         // Код 123456 для любой почты (Development) выключен: тесты проверяют настоящие коды; режим проверяет DevFixedCodeTests.
         builder.UseSetting("Auth:DevFixedCodeForAnyEmail", "false");
+        // Бот Telegram «настроен»: сам Telegram подменён FakeTelegramNotifier, в сеть ничего не уходит.
+        builder.UseSetting("Telegram:BotToken", "test-bot-token");
+        builder.UseSetting("Telegram:BotUsername", TelegramBotUsername);
+        builder.UseSetting("Telegram:WebhookSecret", TelegramWebhookSecret);
         builder.UseSetting("ADMIN_EMAIL", SuperAdminEmail);
         builder.UseSetting("ADMIN_PASSWORD", SuperAdminPassword);
         builder.ConfigureTestServices(services =>
@@ -148,6 +152,8 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.AddSingleton<IEmailSender>(Email);
             services.AddSingleton<IRateProvider>(Rates);
             services.AddSingleton<ITelegramNotifier>(Telegram);
+            // Сообщения покупателю уходят сразу, в том же запросе: без сервера Hangfire очередь стояла бы.
+            services.AddSingleton<Sitora.Infrastructure.Services.IBuyerMessageQueue>(sp => new InlineBuyerMessageQueue(sp.GetRequiredService<IServiceScopeFactory>(), BuyerQueue));
         });
     }
 
@@ -160,6 +166,9 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public FakeRateProvider Rates { get; } = new();
     public FakeTelegramNotifier Telegram { get; } = new();
     public FakeEmailSender Email { get; } = new();
+    public InlineBuyerMessageQueue.Log BuyerQueue { get; } = new();
+    public const string TelegramBotUsername = "sitora_test_bot";
+    public const string TelegramWebhookSecret = "test-webhook-secret-0123456789";
 
     public string ConnectionString => _connectionString;
 

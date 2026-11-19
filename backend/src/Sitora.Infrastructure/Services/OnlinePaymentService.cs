@@ -20,7 +20,6 @@ public class OnlinePaymentService(
     DealAccess access,
     ICurrentUser currentUser,
     IAuditService audit,
-    TelegramAlertService telegram,
     TimeProvider timeProvider,
     ILogger<OnlinePaymentService> logger) : IOnlinePaymentService
 {
@@ -126,7 +125,6 @@ public class OnlinePaymentService(
             audit.Record(nameof(OnlinePayment), online.Id, "Paid", new { Status = nameof(PaymentGatewayStatus.Pending) },
                 new { Status = nameof(PaymentGatewayStatus.Paid), PaymentId = payment.Id, online.Amount, online.Currency }, await db.OrganizationOfDealAsync(online.DealId, ct));
             await db.SaveChangesAsync(ct);
-            await NotifyCustomerAsync(online, ct);
         }
         catch (Exception e) when (e is DomainException)
         {
@@ -148,13 +146,6 @@ public class OnlinePaymentService(
         await db.SaveChangesAsync(ct);
     }
 
-    private async Task NotifyCustomerAsync(OnlinePayment online, CancellationToken ct)
-    {
-        var customer = await db.Deals.IgnoreQueryFilters().AsNoTracking().Where(d => d.Id == online.DealId)
-            .Select(d => new { d.Customer.UserId, d.Apartment.Number }).SingleAsync(ct);
-        if (customer.UserId is { } userId)
-            await telegram.SendToUsersAsync([(userId, TelegramMessages.OnlinePayment(customer.Number, online.Amount, online.Currency))], ct);
-    }
 
     // Только путь на этом сайте: иначе ссылку оплаты можно было бы использовать для перехода на чужой сайт.
     private static string SafeReturnUrl(string? url) =>

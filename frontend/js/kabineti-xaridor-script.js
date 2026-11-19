@@ -767,8 +767,62 @@
 
     /* ---- ⚙️ settings: devices (sign-ins of this account) ---- */
     async function settingsTab() {
-      const parts = await Promise.all([devicesCard()]);
+      const parts = await Promise.all([notificationsCard(), devicesCard()]);
       return h('div', { class: 'stack cab-settings' }, parts);
+    }
+
+    // Notifications: Telegram (linked through the bot: a one-time link t.me/<bot>?start=…, 15 minutes) and e-mail — both by
+    // default, what is connected; which events to send. Payment reminders always stay in the cabinet's bell.
+    async function notificationsCard() {
+      let st = await S.api.notificationSettings();
+      const card = h('section', { class: 'card cab-notify' });
+      const check = (name, label, on, off) => {
+        const i = h('input', { type: 'checkbox', name, id: 'ntf-' + name });
+        i.checked = !!on; i.disabled = !!off;
+        return { i, el: h('label', { class: 'ntf-check', for: i.id }, i, h('span', null, label)) };
+      };
+      let link = null;
+      const draw = () => {
+        const tg = check('telegram', t('ntf.chTelegram'), st.telegram && st.telegramLinked, !st.telegramLinked);
+        const em = check('email', t('ntf.chEmail'), st.email && st.emailAvailable, !st.emailAvailable);
+        const events = ['payments', 'bookings', 'deal', 'documents', 'chat'].map((k) => [k, check('ev-' + k, t('ntf.ev.' + k), st.events && st.events[k])]);
+        const save = async () => {
+          try {
+            st = await S.api.saveNotificationSettings({ telegram: tg.i.disabled ? st.telegram : tg.i.checked, email: em.i.disabled ? st.email : em.i.checked,
+              events: Object.fromEntries(events.map(([k, c]) => [k, c.i.checked])) });
+            S.toast(t('common.saved'), 'ok');
+          } catch (er) { S.err(er); draw(); }
+        };
+        [tg, em].concat(events.map(([, c]) => c)).forEach((c) => c.i.addEventListener('change', save));
+
+        let tgState;
+        if (!st.telegramAvailable) tgState = h('p', { class: 'muted cab-small' }, t('ntf.tgOff'));
+        else if (st.telegramLinked) {
+          tgState = h('div', { class: 'tg-state', 'data-tg-linked': '' }, h('span', { class: 'dev-this' }, '✓ ' + t('ntf.tgLinked')),
+            h('button', { class: 'btn ghost sm', type: 'button', onclick: (e) => S.busy(e.currentTarget, async () => {
+              try { await S.api.telegramUnlink(); st.telegramLinked = false; S.toast(t('ntf.tgUnlinked'), 'ok'); draw(); } catch (er) { S.err(er); }
+            }) }, t('ntf.tgUnlink')));
+        } else if (link) {
+          // The link is opened by the person's own click: a window opened after a request would be blocked as a pop-up.
+          tgState = h('div', { class: 'stack' }, h('div', { class: 'tg-state' },
+            h('a', { class: 'btn', href: link.url, target: '_blank', rel: 'noopener', 'data-tg-open': '' }, t('ntf.tgOpen')),
+            h('button', { class: 'btn ghost sm', type: 'button', onclick: (e) => S.busy(e.currentTarget, async () => {
+              st = await S.api.notificationSettings(); if (st.telegramLinked) { link = null; S.toast(t('ntf.tgDone'), 'ok'); } else S.toast(t('ntf.tgNotYet'), 'warn'); draw();
+            }) }, t('ntf.tgCheck'))), h('p', { class: 'hint' }, t('ntf.tgSteps')));
+        } else {
+          tgState = h('div', { class: 'tg-state' }, h('button', { class: 'btn', type: 'button', 'data-tg-link': '', onclick: (e) => S.busy(e.currentTarget, async () => {
+            try { link = await S.api.telegramLink(); draw(); } catch (er) { S.err(er.code === 'telegram_not_configured' ? Object.assign(er, { message: t('ntf.tgOff') }) : er); }
+          }) }, '✈️ ' + t('ntf.tgGet')));
+        }
+        card.replaceChildren(h('h2', null, t('ntf.title')), h('p', { class: 'muted' }, t('ntf.sub')),
+          h('h3', { class: 'cab-small' }, 'Telegram'), tgState,
+          h('div', { class: 'ntf-group', role: 'group', 'aria-label': t('ntf.channels') }, tg.el, em.el,
+            st.emailAvailable ? null : h('p', { class: 'hint' }, t('ntf.emailOff'))),
+          h('div', { class: 'ntf-group', role: 'group', 'aria-label': t('ntf.events') }, h('b', null, t('ntf.events')), events.map(([, c]) => c.el)),
+          h('p', { class: 'hint' }, t('ntf.note')));
+      };
+      draw();
+      return card;
     }
 
     // Every device where the buyer is signed in: the browser, since when, the last visit; «это устройство» is marked.
