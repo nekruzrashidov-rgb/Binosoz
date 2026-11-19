@@ -20,6 +20,11 @@ public class RateLimitSettings
     // AI-помощник: каждое сообщение — платный запрос к Claude, поэтому лимит на пользователя.
     public int AiPerHour { get; set; } = 60;
 
+    // AI-помощник гостя на публичном сайте: на IP — не чаще 6 вопросов в минуту и 40 в сутки
+    // (плюс общий суточный лимит организации Claude:PublicDailyLimit).
+    public int AiPublicPerMinute { get; set; } = 6;
+    public int AiPublicPerDay { get; set; } = 40;
+
     // Общий лимит на все запросы: гости — на IP (до входа и до кэша), вошедшие — на пользователя
     // (сотрудники за одним офисным IP не мешают друг другу). 300 в минуту на IP, а не 120: каталог дома на сайте
     // загружает этажи и квартиры десятками запросов, и семья или офис за одним NAT упирались бы в лимит.
@@ -35,6 +40,8 @@ public static class RateLimitPolicies
     public const string PublicForms = "public-forms";
     public const string Applications = "applications";
     public const string Ai = "ai";
+    // Помощник на публичном сайте: по IP, минутный и суточный счётчики сразу.
+    public const string AiPublic = "ai-public";
 }
 
 public static class SecuritySetup
@@ -69,6 +76,20 @@ public static class SecuritySetup
             });
 
             // Общий лимит после входа — на пользователя (сотрудники за одним офисным IP не мешают друг другу).
+            // Гость без входа: всегда по IP (вошедший покупатель на сайте — тоже), два окна — минута и сутки.
+            options.AddPolicy(RateLimitPolicies.AiPublic, context =>
+            {
+                var settings = context.RequestServices.GetRequiredService<IOptions<RateLimitSettings>>().Value;
+                return RateLimitPartition.Get("ai-public:" + ClientIp(context), _ => RateLimiter.CreateChained(
+                    new FixedWindowRateLimiter(new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = settings.AiPublicPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0
+                    }),
+                    new FixedWindowRateLimiter(new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = settings.AiPublicPerDay, Window = TimeSpan.FromDays(1), QueueLimit = 0
+                    })));
+            });
             // Запрос с непрошедшим токеном считается по IP. Гостей без токена уже ограничил ранний лимит по IP.
             options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
             {
@@ -122,7 +143,7 @@ public static class SecuritySetup
             response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
 
         response.StatusCode = StatusCodes.Status429TooManyRequests;
-        await context.HttpContext.RequestServices.GetRequiredService<IProblemDetailsService>().WriteAsync(new ProblemDetailsContext
+        var problem = new ProblemDetailsContext
         {
             HttpContext = context.HttpContext,
             ProblemDetails =
@@ -131,7 +152,21 @@ public static class SecuritySetup
                 Title = "Слишком много запросов",
                 Detail = "Слишком много запросов. Попробуйте позже"
             }
-        });
+        };
+
+        // Помощник на публичном сайте: тот же ответ, что и при суточном лимите организации — текст и контакты менеджера.
+        var policy = context.HttpContext.GetEndpoint()?.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName;
+        if (policy == RateLimitPolicies.AiPublic)
+        {
+            problem.ProblemDetails.Detail = Sitora.Infrastructure.Services.PublicAiAssistant.Busy;
+            problem.ProblemDetails.Extensions["code"] = "ai_public_busy";
+            var slug = context.HttpContext.GetRouteValue("orgSlug") as string;
+            if (slug is not null && await context.HttpContext.RequestServices.GetRequiredService<Sitora.Domain.Interfaces.IPublicAiAssistant>()
+                    .ContactsAsync(slug, context.HttpContext.RequestAborted) is { } contacts)
+                problem.ProblemDetails.Extensions["contacts"] = contacts;
+        }
+
+        await context.HttpContext.RequestServices.GetRequiredService<IProblemDetailsService>().WriteAsync(problem);
     }
 
     // Список доменов фронтенда задаётся в Cors:AllowedOrigins; пустой список — CORS выключен.

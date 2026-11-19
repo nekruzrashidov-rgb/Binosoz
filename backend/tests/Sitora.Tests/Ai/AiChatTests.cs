@@ -114,6 +114,8 @@ public class AiChatTests(AiFactory factory) : IClassFixture<AiFactory>
         Assert.Contains("\nDeal stage: ", buyer);
         Assert.Contains("\nBuilding: ", buyer);
         Assert.Single(buyer.Split('\n'), l => l == "=== BUYER CONTEXT ===");
+        // Удобства и контакты — из общего контекста ЖК, а не из промпта.
+        Assert.Contains(EstateContext.Header, buyer);
         Assert.EndsWith(AiAssistant.CustomerPrompt, buyer);
 
         // Сотрудник со сделкой: те же данные; без доступа к сделке — 404.
@@ -159,9 +161,12 @@ public class FakeChatModel : IChatModel
 
     public string? LastSystem => _calls.LastOrDefault().System;
     public IReadOnlyList<AiChatMessage> LastMessages => _calls.LastOrDefault().Messages ?? [];
+    public int? LastMaxTokens { get; private set; }
+    public int Calls => _calls.Count;
 
-    public Task<string> CompleteAsync(string system, IReadOnlyList<AiChatMessage> messages, CancellationToken ct = default)
+    public Task<string> CompleteAsync(string system, IReadOnlyList<AiChatMessage> messages, CancellationToken ct = default, int? maxTokens = null)
     {
+        LastMaxTokens = maxTokens;
         _calls.Enqueue((system, messages));
         return Task.FromResult("ответ модели");
     }

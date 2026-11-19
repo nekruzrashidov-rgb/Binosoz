@@ -21,6 +21,11 @@ public class ClaudeOptions
 
     public int MaxTokens { get; set; } = 1000;
 
+    // Публичный чат на сайте застройщика (гости без входа): ответы короче, а запросов на организацию в сутки — не больше
+    // PublicDailyLimit (ключ платный; на сервере — переменная Claude__PublicDailyLimit).
+    public int PublicMaxTokens { get; set; } = 400;
+    public int PublicDailyLimit { get; set; } = 300;
+
     // Чтение паспортов и чеков по изображению. Лимит с запасом: в него входит и рассуждение модели,
     // а обрезанный JSON — это непрочитанный документ.
     public string VisionModel { get; set; } = "claude-haiku-5-5";
@@ -34,7 +39,7 @@ public sealed class ClaudeChatModel(IOptions<ClaudeOptions> options, ILogger<Cla
     private const string Unavailable = "AI помощник временно недоступен, попробуйте позже";
     private AnthropicClient? _client;
 
-    public async Task<string> CompleteAsync(string system, IReadOnlyList<AiChatMessage> messages, CancellationToken ct = default)
+    public async Task<string> CompleteAsync(string system, IReadOnlyList<AiChatMessage> messages, CancellationToken ct = default, int? maxTokens = null)
     {
         var o = options.Value;
         _client ??= new AnthropicClient { ApiKey = o.ApiKey };
@@ -45,7 +50,7 @@ public sealed class ClaudeChatModel(IOptions<ClaudeOptions> options, ILogger<Cla
             response = await _client.Messages.Create(new MessageCreateParams
             {
                 Model = o.Model,
-                MaxTokens = o.MaxTokens,
+                MaxTokens = maxTokens ?? o.MaxTokens,
                 System = system,
                 // Чат: короткие ответы важнее глубины рассуждений.
                 OutputConfig = new OutputConfig { Effort = Effort.Low },

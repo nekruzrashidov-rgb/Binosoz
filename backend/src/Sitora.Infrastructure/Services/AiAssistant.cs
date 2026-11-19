@@ -12,7 +12,7 @@ namespace Sitora.Infrastructure.Services;
 
 // Помощник: покупателю — его квартира, платежи и дом; сотрудникам — CRM, правила и API; создателю платформы — организации и тарифы.
 // История диалога приходит из браузера и в базе не хранится.
-public class AiAssistant(IChatModel model, ICurrentUser currentUser, IOptions<ClaudeOptions> options, AppDbContext db, DealAccess access, TimeProvider time) : IAiAssistant
+public class AiAssistant(IChatModel model, ICurrentUser currentUser, IOptions<ClaudeOptions> options, AppDbContext db, DealAccess access, TimeProvider time, EstateContext estate) : IAiAssistant
 {
     public const string NotConfigured = "AI помощник не настроен";
     private const int MaxMessageLength = 2000;
@@ -25,18 +25,18 @@ public class AiAssistant(IChatModel model, ICurrentUser currentUser, IOptions<Cl
         "When laws come up, refer to the legislation of the Republic of Tajikistan, not Russia.";
 
     // Покупатель: его квартира, платежи и дом; отвечает на языке вопроса (таджикский, русский, английский).
+    // Удобства, контакты и условия — только из контекста ЖК (EstateContext, тот же, что у гостя на сайте), не из промпта.
     public const string CustomerPrompt =
-        "You are the personal assistant of \"Некруз Резиденс\" residential complex in Dushanbe, Tajikistan.\n" +
+        "You are the personal assistant of the residential complex described in the RESIDENTIAL COMPLEX CONTEXT above.\n" +
         "You are speaking with a BUYER. Answer in the same language the user writes in (Tajik, Russian, or English).\n" +
         "Be concise and warm. Answer questions about:\n" +
-        "- Their apartment (number, floor, area, layout, ceiling height)\n" +
+        "- Their apartment (number, floor, area, layout)\n" +
         "- Payment schedule (next payment date, amount, remaining balance)\n" +
         "- Deal status and next steps toward ownership\n" +
-        "- The building, its amenities, construction progress and delivery timeline — only as given in the context\n" +
-        "- How to reach the manager: the chat in this cabinet, phone +992 98 363 70 70, Telegram @nekru01, " +
-        "office hours — on the site's Contacts page\n" +
+        "- Building amenities, construction progress and delivery timeline — only as given in the context\n" +
+        "- How to reach the manager: the chat in this cabinet, or the sales office contacts — only as given in the context\n" +
         "- General questions about buying real estate in Tajikistan\n" +
-        "Never state amenities, brands, phone numbers, addresses or office hours beyond this prompt and the context.\n" +
+        "Never state amenities, brands, phone numbers, addresses or office hours that are not in the context.\n" +
         "Never discuss other clients' data. Keep answers under 150 words unless breakdown is needed.\n" +
         "If context data is provided above, use it to give personalized answers. " +
         "What is not in the context, do not make up: suggest asking the manager.\n" + Region;
@@ -94,7 +94,15 @@ public class AiAssistant(IChatModel model, ICurrentUser currentUser, IOptions<Cl
         // промпт сотрудника); все остальные роли — промпт сотрудника с названием роли.
         string system;
         if (currentUser.IsInRole(RoleNames.Customer))
-            system = await CustomerContextAsync(ct) is { } mine ? mine + "\n\n" + CustomerPrompt : CustomerPrompt;
+        {
+            var parts = new List<string>();
+            if (await CustomerContextAsync(ct) is { } mine)
+                parts.Add(mine);
+            if (await CustomerOrganizationAsync(ct) is { } organizationId)
+                parts.Add(await estate.BuildAsync(organizationId, ct));
+            parts.Add(CustomerPrompt);
+            system = string.Join("\n\n", parts);
+        }
         else
         {
             var prompt = currentUser.IsInRole(RoleNames.SuperAdmin) && currentUser.ImpersonatorId is null
@@ -110,9 +118,20 @@ public class AiAssistant(IChatModel model, ICurrentUser currentUser, IOptions<Cl
                 system = prompt;
         }
 
-        var messages = Conversation(request.History, message);
+        var messages = Conversation(request.History, message, MaxHistory, MaxMessageLength * 2);
         var reply = await model.CompleteAsync(system, messages, ct);
         return new AiChatResponse(reply);
+    }
+
+    // Организация покупателя: по его карточке клиента, иначе по учётной записи.
+    private async Task<Guid?> CustomerOrganizationAsync(CancellationToken ct)
+    {
+        if (currentUser.UserId is not { } userId)
+            return currentUser.OrganizationId;
+        return await db.Customers.IgnoreQueryFilters().AsNoTracking()
+                   .Where(c => c.UserId == userId).OrderByDescending(c => c.CreatedAt)
+                   .Select(c => (Guid?)c.OrganizationId).FirstOrDefaultAsync(ct)
+               ?? currentUser.OrganizationId;
     }
 
     // Блок BUYER CONTEXT на каждую действующую сделку покупателя (до трёх, новые первыми).
@@ -261,18 +280,19 @@ public class AiAssistant(IChatModel model, ICurrentUser currentUser, IOptions<Cl
         _ => "отменена"
     };
 
-    // Модель ждёт чередование реплик, начиная с пользователя: лишнее отбрасывается, длинная история обрезается с начала.
-    private static List<AiChatMessage> Conversation(IReadOnlyList<AiChatMessage>? history, string message)
+    // Модель ждёт чередование реплик, начиная с пользователя: лишнее отбрасывается (в том числе роль system),
+    // длинная история обрезается с начала, длинная реплика — до maxContent символов.
+    internal static List<AiChatMessage> Conversation(IReadOnlyList<AiChatMessage>? history, string message, int maxHistory, int maxContent)
     {
         var result = new List<AiChatMessage>();
-        foreach (var item in (history ?? []).TakeLast(MaxHistory))
+        foreach (var item in (history ?? []).TakeLast(maxHistory))
         {
             var role = item.Role?.Trim().ToLowerInvariant();
             var content = item.Content?.Trim();
             if (role is not ("user" or "assistant") || string.IsNullOrEmpty(content))
                 continue;
-            if (content.Length > MaxMessageLength * 2)
-                content = content[..(MaxMessageLength * 2)];
+            if (content.Length > maxContent)
+                content = content[..maxContent];
             if (result.Count == 0 ? role != "user" : result[^1].Role == role)
                 continue;
             result.Add(new AiChatMessage(role, content));

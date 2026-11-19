@@ -96,6 +96,11 @@ public static class DependencyInjection
         services.AddScoped<IAiAssistant, AiAssistant>();
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<ApartmentImporter>();
+        // Публичный помощник на сайте застройщика: общий с кабинетом контекст ЖК (кэш 60 с) и суточный лимит организации.
+        services.AddMemoryCache();
+        services.AddScoped<EstateContext>();
+        services.AddSingleton<PublicAiQuota>();
+        services.AddScoped<IPublicAiAssistant, PublicAiAssistant>();
         services.AddScoped<ICatalogService, CatalogService>();
         services.AddScoped<IGreenService, GreenService>();
         services.AddScoped<IInstallmentService, InstallmentService>();
