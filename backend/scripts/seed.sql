@@ -189,8 +189,12 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM "Organizations" WHERE "Id" = org AND "GreenIsDemo") THEN
     RAISE NOTICE 'Организация не помечена демо — демо-сделки не добавляются'; RETURN;
   END IF;
-  IF EXISTS (SELECT 1 FROM "IssuedPdfs" WHERE "OrganizationId" = org) THEN
-    RAISE NOTICE 'Выданные PDF уже есть — демо-сделки не добавляются'; RETURN;
+  -- Повторный запуск: демо-сделки уже добавлены (по ним — StageReason «Демо-данные»). Настоящие PDF (например, акт
+  -- сверки демо-покупателя) не мешают: квартиры со сделкой цикл ниже и так пропускает.
+  IF EXISTS (SELECT 1 FROM "Deals" d JOIN "Apartments" a ON a."Id" = d."ApartmentId" JOIN "Floors" f ON f."Id" = a."FloorId"
+             JOIN "Buildings" b ON b."Id" = f."BuildingId"
+             WHERE b."OrganizationId" = org AND d."StageReason" = 'Демо-данные') THEN
+    RAISE NOTICE 'Демо-сделки уже есть — не добавляются'; RETURN;
   END IF;
   SELECT u."Id" INTO manager FROM "Users" u
   WHERE u."OrganizationId" = org AND u."IsActive"

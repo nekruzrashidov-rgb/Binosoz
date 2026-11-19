@@ -20,8 +20,13 @@ public class SeedSqlTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
         await using var tx = await connection.BeginTransactionAsync();
         await ExecAsync(connection, tx, "UPDATE \"Buildings\" SET \"NameRu\" = 'Некруз Резиденс (сидер)' WHERE \"NameRu\" = 'Некруз Резиденс'");
 
-        // Демо-сделки «Зелёного эффекта» добавляются, только если у демо-организации ещё нет выданных PDF.
-        var demoDealsExpected = await ScalarAsync<long>(connection, tx, $"SELECT count(*) FROM \"IssuedPdfs\" WHERE \"OrganizationId\" = '{Organization.DefaultId}'") == 0;
+        // Демо-сделки «Зелёного эффекта» добавляются, если их ещё нет; уже выданные настоящие PDF (акт сверки
+        // демо-покупателя) этому не мешают — новые PDF считаются сверх них.
+        var demoDealsExpected = await ScalarAsync<long>(connection, tx,
+            "SELECT count(*) FROM \"Deals\" d JOIN \"Apartments\" a ON a.\"Id\" = d.\"ApartmentId\" JOIN \"Floors\" f ON f.\"Id\" = a.\"FloorId\" " +
+            $"JOIN \"Buildings\" b ON b.\"Id\" = f.\"BuildingId\" WHERE b.\"OrganizationId\" = '{Organization.DefaultId}' AND d.\"StageReason\" = 'Демо-данные'") == 0;
+        var pdfsBefore = await ScalarAsync<long>(connection, tx, $"SELECT count(*) FROM \"IssuedPdfs\" WHERE \"OrganizationId\" = '{Organization.DefaultId}'");
+        var pagesBefore = await ScalarAsync<long>(connection, tx, $"SELECT coalesce(sum(\"PageCount\"), 0) FROM \"IssuedPdfs\" WHERE \"OrganizationId\" = '{Organization.DefaultId}'");
 
         await ExecAsync(connection, tx, sql);
 
@@ -74,8 +79,8 @@ public class SeedSqlTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
             // 6 проданных квартир — 6 завершённых демо-сделок, по 5 выданных PDF (8 страниц) на каждую.
             Assert.Equal(6L, await ScalarAsync<long>(connection, tx, "SELECT count(*) FROM \"Deals\" d JOIN \"Apartments\" a ON a.\"Id\" = d.\"ApartmentId\" JOIN \"Floors\" f ON f.\"Id\" = a.\"FloorId\" " +
                 $"WHERE f.\"BuildingId\" = '{buildingId}' AND a.\"Status\" = 'Sold' AND d.\"Stage\" = 'Completed'"));
-            Assert.Equal(30L, await ScalarAsync<long>(connection, tx, $"SELECT count(*) FROM \"IssuedPdfs\" WHERE \"OrganizationId\" = '{Organization.DefaultId}'"));
-            Assert.Equal(48L, await ScalarAsync<long>(connection, tx, $"SELECT sum(\"PageCount\") FROM \"IssuedPdfs\" WHERE \"OrganizationId\" = '{Organization.DefaultId}'"));
+            Assert.Equal(pdfsBefore + 30L, await ScalarAsync<long>(connection, tx, $"SELECT count(*) FROM \"IssuedPdfs\" WHERE \"OrganizationId\" = '{Organization.DefaultId}'"));
+            Assert.Equal(pagesBefore + 48L, await ScalarAsync<long>(connection, tx, $"SELECT coalesce(sum(\"PageCount\"), 0) FROM \"IssuedPdfs\" WHERE \"OrganizationId\" = '{Organization.DefaultId}'"));
         }
 
         // Повторный запуск ничего не добавляет.
