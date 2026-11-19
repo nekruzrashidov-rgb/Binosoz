@@ -85,6 +85,14 @@ services:
       Email__Gmail__ClientSecret: ${GMAIL_CLIENT_SECRET:-}
       Email__Gmail__RefreshToken: ${GMAIL_REFRESH_TOKEN:-}
       Claude__ApiKey: ${CLAUDE_API_KEY:-}
+      # Telegram: чат менеджеров, бот для покупателей (webhook) и коды входа через Telegram Gateway (docs/DEPLOY.md).
+      Telegram__BotToken: ${TELEGRAM_BOT_TOKEN:-}
+      Telegram__ChatId: ${TELEGRAM_CHAT_ID:-}
+      Telegram__BotUsername: ${TELEGRAM_BOT_USERNAME:-}
+      Telegram__WebhookSecret: ${TELEGRAM_WEBHOOK_SECRET:-}
+      Telegram__Gateway__Token: ${TELEGRAM_GATEWAY_TOKEN:-}
+      Telegram__Gateway__DailyLimit: ${TELEGRAM_GATEWAY_DAILY_LIMIT:-200}
+      Email__ApiUrl: ${EMAIL_API_URL:-}
       # JSON-логи в файлы на томе logs (по дню, 14 дней); stdout пишется всегда.
       Logging__File__Enabled: "true"
       Sentry__Dsn: ${SENTRY_DSN:-}
