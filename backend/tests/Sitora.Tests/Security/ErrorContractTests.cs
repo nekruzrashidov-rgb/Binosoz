@@ -40,6 +40,8 @@ public partial class ErrorContractTests(SitoraApiFactory factory) : IClassFixtur
         var root = json.RootElement;
         Assert.True(code == root.GetProperty("code").GetString(), root.GetRawText());
         Assert.False(string.IsNullOrWhiteSpace(root.GetProperty("traceId").GetString()));
+        // У каждой ошибки, и у 400 валидации тоже, есть type (RFC 9457).
+        Assert.True(root.TryGetProperty("type", out var type) && type.GetString()!.StartsWith("https://", StringComparison.Ordinal), root.GetRawText());
         foreach (var text in Texts(root))
             Assert.False(LatinRegex().IsMatch(text.Replace("JSON", "", StringComparison.Ordinal)), $"Латиница в ответе: «{text}»");
         Assert.DoesNotContain("BytePositionInLine", root.GetRawText());

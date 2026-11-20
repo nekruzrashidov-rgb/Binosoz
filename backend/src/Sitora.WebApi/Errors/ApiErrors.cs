@@ -152,6 +152,8 @@ public static partial class ApiErrors
 
         var problem = new ValidationProblemDetails(errors)
         {
+            // Как у остальных ошибок (RFC 9457): тип — ссылка на раздел RFC 9110 о коде ответа (A-26).
+            Type = "https://tools.ietf.org/html/rfc9110#section-15.5.1",
             Status = StatusCodes.Status400BadRequest,
             Title = ValidationTitle,
             Detail = malformed ? MalformedRequest : errors.Values.SelectMany(v => v).FirstOrDefault() ?? ValidationTitle

@@ -209,15 +209,17 @@ public class BookingService(
     }
 
     // Бронь с сайта: не больше Booking:GuestActivePerIp активных броней с одного IP (у всех застройщиков сразу —
-    // фильтры организаций здесь не нужны). Возвращает IP, который запоминается в брони.
+    // фильтры организаций здесь не нужны). Возвращает IP, который запоминается в брони. Считаются только действующие:
+    // просроченная бронь, которую ExpireBookingsJob ещё не снял (Render спит), лимит не занимает (A-19).
     private async Task<string?> CheckGuestLimitAsync(CancellationToken ct)
     {
         var ip = currentUser.IpAddress;
         if (string.IsNullOrEmpty(ip))
             return null;
         var limit = options.Value.GuestActivePerIp;
+        var now = Now;
         if (limit > 0 && await db.Bookings.IgnoreQueryFilters()
-                .CountAsync(b => b.Status == BookingStatus.Active && b.ClientIp == ip, ct) >= limit)
+                .CountAsync(b => b.Status == BookingStatus.Active && b.ExpiresAt > now && b.ClientIp == ip, ct) >= limit)
         {
             logger.LogWarning("Бронь с сайта отклонена: с адреса уже {Limit} активных броней", limit);
             throw new TooManyRequestsException(TooManyFromAddress);
@@ -231,8 +233,9 @@ public class BookingService(
         var phone = PhoneNumber.Normalize(request.Phone)
             ?? throw new BusinessRuleException("Неверный номер телефона");
 
-        // Защита от того, чтобы один посетитель сайта занял бронями много квартир.
-        if (!isStaff && await db.Bookings.AnyAsync(b => b.Status == BookingStatus.Active && b.Lead!.Phone == phone, ct))
+        // Защита от того, чтобы один посетитель сайта занял бронями много квартир (только действующие брони, A-19).
+        var now = Now;
+        if (!isStaff && await db.Bookings.AnyAsync(b => b.Status == BookingStatus.Active && b.ExpiresAt > now && b.Lead!.Phone == phone, ct))
             throw new ConflictException("На этот номер уже есть активная бронь. Чтобы забронировать другую квартиру, свяжитесь с менеджером");
 
         // Заявки у каждого застройщика свои: ищем открытую заявку только в организации квартиры.

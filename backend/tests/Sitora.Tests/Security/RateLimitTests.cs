@@ -186,5 +186,26 @@ public class RateLimitTests(LowRateLimitFactory factory) : IClassFixture<LowRate
         Assert.Equal("10.0.6.1", ip);
     }
 
+    // A-19: просроченная бронь, которую фоновая задача ещё не сняла (статус Active, срок прошёл), не занимает ни лимит
+    // по IP, ни лимит «одна бронь на телефон».
+    [Fact]
+    public async Task ExpiredButNotYetReleasedBooking_DoesNotCountTowardsGuestLimits()
+    {
+        var guest = factory.CreateClientWithIp("10.0.6.9");
+        var phone = SitoraApiFactory.RandomPhone();
+        var first = await guest.PostAsJsonAsync($"/api/v1/apartments/{await factory.FindFreeApartmentAsync()}/bookings",
+            new CreateBookingRequest("Гость", phone, null, null));
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        var booking = (await first.Content.ReadFromJsonAsync<BookingResponse>(TestJson.Options))!;
+
+        await factory.WithDbAsync(db => db.Bookings.IgnoreQueryFilters().Where(b => b.Id == booking.Id)
+            .ExecuteUpdateAsync(s => s.SetProperty(b => b.ExpiresAt, DateTime.UtcNow.AddMinutes(-1))));
+
+        // Тот же IP и тот же телефон, другая квартира: лимиты считают только действующие брони.
+        var again = await guest.PostAsJsonAsync($"/api/v1/apartments/{await factory.FindFreeApartmentAsync()}/bookings",
+            new CreateBookingRequest("Гость", phone, null, null));
+        Assert.Equal(HttpStatusCode.Created, again.StatusCode);
+    }
+
     private const string ClientIpHeaderName = LowRateLimitFactory.ClientIpHeader;
 }
