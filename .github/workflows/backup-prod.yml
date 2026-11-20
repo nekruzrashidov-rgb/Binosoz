@@ -1,0 +1,46 @@
+# Ежедневный бэкап продакшен-базы на Render: pg_dump, зашифрованный открытым ключом age, — артефакт на 30 дней.
+# Нужны секрет PROD_DATABASE_URL (External Database URL из Render) и переменная репозитория BACKUP_AGE_RECIPIENT
+# (открытый ключ age1…; закрытый ключ хранится только у владельца, вне GitHub). Без них workflow падает —
+# письмо от GitHub напоминает, что бэкапов нет. Восстановление — docs/DEPLOY.md, «Бэкапы базы на Render».
+# Тот же бэкап делает CI перед каждой миграцией прода (.github/workflows/ci.yml).
+name: Backup prod
+
+on:
+  schedule:
+    # 22:30 UTC — 03:30 по Душанбе, ночью нагрузки нет.
+    - cron: "30 22 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-prod
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Бэкап базы
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Бэкап (зашифрованный)
+        id: backup
+        env:
+          PROD_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          BACKUP_AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+        run: |
+          if [ -z "$PROD_DATABASE_URL" ] || [ -z "$BACKUP_AGE_RECIPIENT" ]; then
+            echo "::error::Бэкап не сделан: задайте секрет PROD_DATABASE_URL и переменную BACKUP_AGE_RECIPIENT (docs/DEPLOY.md, «Бэкапы базы на Render»)."
+            exit 1
+          fi
+          bash backend/scripts/backup-remote.sh daily
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: db-backup-daily-${{ github.run_id }}
+          path: ${{ steps.backup.outputs.file }}
+          retention-days: 30
+          if-no-files-found: error

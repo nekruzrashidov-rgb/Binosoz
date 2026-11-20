@@ -167,6 +167,36 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           docker buildx imagetools create --tag "$IMAGE:latest" "$IMAGE:${{ github.sha }}"
 
+      # Перед миграцией — зашифрованный бэкап базы (backend/scripts/backup-remote.sh): неудачную миграцию можно откатить
+      # восстановлением (docs/DEPLOY.md, «Бэкапы базы на Render»). Без BACKUP_AGE_RECIPIENT — крупное предупреждение,
+      # деплой не блокируется; ежедневный workflow «Backup prod» в этом случае падает и напоминает письмом.
+      - uses: actions/checkout@v5
+
+      - name: Бэкап базы перед миграцией
+        id: backup
+        env:
+          PROD_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          BACKUP_AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+        run: |
+          if [ -z "$PROD_DATABASE_URL" ]; then
+            echo "Секрет PROD_DATABASE_URL не задан — миграций не будет, бэкап не нужен."
+            exit 0
+          fi
+          if [ -z "$BACKUP_AGE_RECIPIENT" ]; then
+            echo "# ⚠️ Миграции прода идут БЕЗ бэкапа: задайте переменную BACKUP_AGE_RECIPIENT (docs/DEPLOY.md, «Бэкапы базы на Render»)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          bash backend/scripts/backup-remote.sh pre-deploy-${GITHUB_SHA:0:7}
+
+      - name: Сохранение бэкапа
+        if: steps.backup.outputs.file != ''
+        uses: actions/upload-artifact@v5
+        with:
+          name: db-backup-pre-deploy-${{ github.sha }}
+          path: ${{ steps.backup.outputs.file }}
+          retention-days: 90
+          if-no-files-found: error
+
       # Production API не применяет миграции сам и не стартует, если они есть: сначала миграции образом этого коммита
       # (секрет PROD_DATABASE_URL — External Database URL из Render, как в seed-prod.yml), потом деплой. Ошибка миграции —
       # шаг падает, деплой не запускается. Строка подключения маскируется в логе.

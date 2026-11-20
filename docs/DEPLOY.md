@@ -197,6 +197,44 @@ WEBAPI_IMAGE=ghcr.io/nekruzrashidov-rgb/binosoz-api:<полный sha преды
 
 После смены — `/health/ready` (с `X-Health-Key`) показывает `Healthy` у проверки `storage`: она пишет, читает и удаляет пробный файл.
 
+## Бэкапы базы на Render
+
+На Render нет `docker compose exec`, поэтому `backup.sh` там не работает. Бэкап делает GitHub Actions
+(`backend/scripts/backup-remote.sh`): `pg_dump` образом `postgres:18` и сразу шифрование [age](https://age-encryption.org)
+открытым ключом — открытый дамп на диск не пишется. Репозиторий публичный, и артефакты Actions могут скачать посторонние,
+поэтому бэкап без шифрования не создаётся.
+
+Когда делается:
+- каждую ночь в 03:30 по Душанбе — workflow «Backup prod», артефакт хранится 30 дней;
+- перед каждой миграцией прода в CI (`ci.yml`, job «Деплой») и перед `seed-prod.yml` — артефакт на 90 дней.
+
+Настройка (один раз):
+
+1. На своём компьютере: `age-keygen -o sitora-backup.key`. Команда выведет открытый ключ `age1…`.
+2. Закрытый ключ `sitora-backup.key` храните **вне GitHub и вне сервера** (менеджер паролей, флешка в сейфе). Без него
+   бэкапы не расшифровать; потерян ключ — бэкапы бесполезны.
+3. GitHub → Settings → Secrets and variables → Actions → **Variables** → `BACKUP_AGE_RECIPIENT` = открытый ключ `age1…`
+   (это не секрет). Секрет `PROD_DATABASE_URL` уже нужен для миграций.
+4. Actions → «Backup prod» → Run workflow — проверить, что появился артефакт.
+
+Без `BACKUP_AGE_RECIPIENT` деплой не блокируется (в summary — предупреждение), а ежедневный workflow падает, и GitHub
+присылает письмо.
+
+Восстановление (сначала — на тестовой базе):
+
+```bash
+# артефакт: Actions → запуск → Artifacts → db-backup-… (zip с файлом .dump.age)
+age --decrypt --identity sitora-backup.key -o sitora.dump sitora-db-ДАТА-daily.dump.age
+pg_restore --clean --if-exists --no-owner --no-privileges -d "postgresql://…" sitora.dump   # pg_restore 18
+rm sitora.dump
+```
+
+Файлы (документы, фото) в этот бэкап не входят: на Render их нужно держать в S3/R2 с версионированием бакета
+(«Файлы на Render»). Ключ `ENCRYPTION_KEY` храните отдельно: без него паспортные данные из бэкапа не расшифруются.
+
+Хотя бы раз в месяц проверяйте восстановление. Бесплатная база Render живёт ограниченное время — проверьте срок в панели
+Render и переходите на платный тариф (там ещё и восстановление на момент времени) до реальных продаж.
+
 ## Демо-данные в пустой базе (Render)
 
 Сидер каталога работает только в Development, поэтому продакшен-база на Render после миграций пустая.

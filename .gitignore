@@ -504,3 +504,9 @@ frontend/tools/e2e/playwright-report/
 # Playwright (frontend/tools/e2e)
 playwright-report*/
 test-results/
+
+# Архив фронтенда для ручной выгрузки (не коммитить)
+frontend.zip
+
+# Внутренний аудит (репозиторий публичный — не коммитить)
+AUDIT.md
