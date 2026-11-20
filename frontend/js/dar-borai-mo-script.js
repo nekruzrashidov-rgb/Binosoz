@@ -65,11 +65,15 @@
         if (!alive) return;
         title.textContent = S.brandName(b.name);
         const apts = b.plannedApartments || b.total || 0;
+        // The year of completion is a plan until the construction has stages with progress (A-04).
+        const p = await S.api.publicProgress(id).catch(() => null);
+        if (!alive) return;
+        const planned = !p || !p.stages || !p.stages.length || !p.overallPercent;
         chips.replaceChildren(...[
           b.floorsCount ? t('aboutpg.chip.floors', { n: b.floorsCount }) : null,
           apts ? t('aboutpg.chip.apts', { n: apts }) : null,
-          b.completionYear ? t('aboutpg.chip.delivery', { y: b.completionYear }) : null,
-        ].filter(Boolean).map((x) => h('li', null, x)));
+          b.completionYear ? t(planned ? 'aboutpg.chip.planned' : 'aboutpg.chip.delivery', { y: b.completionYear }) : null,
+        ].filter(Boolean).map((x) => h('li', null, x)), ...(b.isDemo ? [h('li', { class: 'nr-chip-demo' }, h('span', { class: 'demo-badge' }, t('demo.badge')))] : []));
         const desc = S.lang === 'tg' ? b.descriptionTg || b.description : b.descriptionRu || b.description;
         const address = S.brandAddress(b.address) || site.contacts().address;
         text.replaceChildren(...[desc ? h('p', { class: 'nr-lead' }, desc) : null,
@@ -77,8 +81,7 @@
         complex.hidden = !text.children.length;
         amenGrid.replaceChildren(...(b.amenities || []).map((k) => h('div', { class: 'nr-amen-card' }, site.icon(site.amenIcon(k)), h('h3', null, t('amen.' + k)))));
         amenities.hidden = !amenGrid.children.length;
-        const p = await S.api.publicProgress(id).catch(() => null);
-        if (!alive || !p || !p.stages || !p.stages.length) return;
+        if (!p || !p.stages || !p.stages.length) return;
         overall.textContent = t('nr.about.overall', { n: p.overallPercent });
         stages.replaceChildren(...p.stages.map((s) => h('li', { class: 'nr-stage-item' + (s.percent >= 100 ? ' done' : '') },
           h('span', { class: 'nr-stage-dot', 'aria-hidden': 'true' }),

@@ -328,7 +328,7 @@
     // A filter of the catalog (rooms, price, only free) — the same in the list below and in the 3D mode.
     function passes(a) {
       if (st.onlyFree && a.status !== 'free') return false;
-      if (st.rooms !== 'all' && !(st.rooms === '3' ? a.rooms >= 3 : a.rooms === +st.rooms)) return false;
+      if (!S.roomsKind.match(a, st.rooms)) return false;
       return !st.priceCap || a.price <= st.priceCap;
     }
     function openFull(push) {
@@ -432,13 +432,13 @@
       }
       const onFloor = st.apts.filter((a) => a.floor === f).sort((a, b) => a.number - b.number);
       const free = onFloor.filter((a) => a.status === 'free').length;
-      const match = (a) => st.floorRooms === 'all' || (st.floorRooms === '3' ? a.rooms >= 3 : a.rooms === +st.floorRooms);
+      const match = (a) => S.roomsKind.match(a, st.floorRooms);
       const units = onFloor.filter(match);
       const pills = h('div', { class: 'nr-pills', role: 'group', 'aria-label': t('filter.rooms') }, roomOptions(onFloor).map(([v, l]) =>
         h('button', { type: 'button', class: 'nr-pill', 'aria-pressed': String(st.floorRooms === v), onclick: () => { st.floorRooms = v; renderPanel(); } }, l)));
       const list = h('div', { class: 'nr-units' }, units.map((a) => h('button', { type: 'button', class: 'nr-unit st-' + a.status, 'aria-pressed': String(!!st.sel && st.sel.id === a.id), onclick: () => pickApt(a) },
         h('span', { class: 'nr-unit-top' }, h('b', null, t('nr.cat.aptN', { n: a.number })), h('span', { class: 'nr-unit-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status))),
-        h('span', { class: 'nr-unit-type' }, t('layouts.type' + Math.min(3, a.rooms))),
+        h('span', { class: 'nr-unit-type' }, S.roomsKind.label(a.rooms)),
         h('span', { class: 'nr-unit-meta' }, S.fmt.area(a.area)),
         h('span', { class: 'nr-unit-price' }, S.fmt.money(a.price, 'TJS')))));
       panel.replaceChildren(
@@ -450,16 +450,16 @@
     }
     // The chosen apartment: its plan, the facts, the price, «от … в месяц» by the developer's terms, booking.
     function detail(a) {
-      const plan = h('canvas', { class: 'nr-detail-plan', width: 300, height: 200, role: 'img', 'aria-label': t('layouts.type' + Math.min(3, a.rooms)) });
-      drawFloorPlan(plan, Math.min(3, a.rooms));
+      const plan = h('canvas', { class: 'nr-detail-plan', width: 300, height: 200, role: 'img', 'aria-label': S.roomsKind.label(a.rooms) });
+      drawFloorPlan(plan, S.roomsKind.group(a.rooms));
       const eq = st.rate ? Math.round(a.price / st.rate.rate) : null;
       const m = cheapestMonthly(a.price);
       const badge = S.eco && S.eco.badge(st.building.eco);
       return h('div', { class: 'nr-detail' }, h('div', { class: 'nr-detail-pic' }, plan),
         h('div', { class: 'nr-detail-body' },
           h('div', { class: 'nr-detail-kicker' }, t('nr.cat.aptN', { n: a.number }) + ' · ' + t('floor.n', { n: a.floor })),
-          h('h3', { class: 'nr-detail-type' }, t('layouts.type' + Math.min(3, a.rooms))),
-          h('dl', { class: 'nr-detail-facts' }, h('div', null, h('dt', null, t('nr.cat.area')), h('dd', null, S.fmt.area(a.area))), h('div', null, h('dt', null, t('nr.cat.sqm')), h('dd', null, S.fmt.money(a.pricePerSqm, 'TJS')))),
+          h('h3', { class: 'nr-detail-type' }, S.roomsKind.label(a.rooms)),
+          h('dl', { class: 'nr-detail-facts' }, h('div', null, h('dt', null, t('nr.cat.area')), h('dd', null, S.fmt.area(a.area))), h('div', null, h('dt', null, t('nr.cat.sqm')), h('dd', null, S.fmt.money(sqmPrice(a), 'TJS')))),
           h('div', { class: 'nr-detail-label' }, t('nr.cat.price')),
           h('div', { class: 'nr-detail-price' }, S.fmt.money(a.price, 'TJS')),
           eq ? h('div', { class: 'nr-detail-note' }, '≈ $' + S.fmt.n(eq) + ' · ' + t('price.estimate')) : null,
@@ -550,16 +550,17 @@
     // ---------- layouts: one card per type, the button filters the list ----------
     function renderPlans() {
       const cards = PLAN_TYPES.map((type) => {
-        const list = st.apts.filter((a) => (type === 3 ? a.rooms >= 3 : a.rooms === type));
+        const list = st.apts.filter((a) => S.roomsKind.group(a.rooms) === type);
         if (!list.length) return null;
         const prices = (list.some((a) => a.status === 'free') ? list.filter((a) => a.status === 'free') : list).map((a) => a.price).filter((p) => p > 0);
         const lo = Math.floor(Math.min(...list.map((a) => a.area))), hi = Math.ceil(Math.max(...list.map((a) => a.area)));
-        const canvas = h('canvas', { class: 'nr-layout-plan', width: 320, height: 210, role: 'img', 'aria-label': t('layouts.type' + type) });
+        const typeLabel = S.roomsKind.groupLabel(type, list);
+        const canvas = h('canvas', { class: 'nr-layout-plan', width: 320, height: 210, role: 'img', 'aria-label': typeLabel });
         drawFloorPlan(canvas, type);
         return h('button', { class: 'nr-layout', type: 'button', onclick: () => { st.rooms = String(type); st.shown = 12; renderApartments(); scrollTo('apartments'); } },
           h('div', { class: 'nr-layout-pic' }, canvas),
           h('div', { class: 'nr-layout-body' },
-            h('div', { class: 'nr-layout-top' }, h('span', { class: 'nr-layout-type' }, t('layouts.type' + type)), h('span', { class: 'nr-layout-area' }, (lo === hi ? S.fmt.n(lo) : S.fmt.n(lo) + '–' + S.fmt.n(hi)) + ' ' + t('u.m2'))),
+            h('div', { class: 'nr-layout-top' }, h('span', { class: 'nr-layout-type' }, typeLabel), h('span', { class: 'nr-layout-area' }, (lo === hi ? S.fmt.n(lo) : S.fmt.n(lo) + '–' + S.fmt.n(hi)) + ' ' + t('u.m2'))),
             h('div', { class: 'nr-layout-bottom' }, prices.length ? h('span', { class: 'nr-layout-price' }, t('home.chip.from', { p: S.fmt.money(Math.min(...prices), 'TJS') })) : h('span'),
               h('span', { class: 'nr-layout-more' }, t('nr.look'), arrow()))));
       }).filter(Boolean);
@@ -572,13 +573,13 @@
     // ---------- the whole list with filters ----------
     // Room buttons: «Все» and only the types that exist (no «Студия» in a building without studios).
     function roomOptions(list) {
-      const has = (v) => list.some((a) => (v === '3' ? a.rooms >= 3 : a.rooms === +v));
-      return [['all', t('filter.all')]].concat([['0', t('apt.studio')], ['1', '1'], ['2', '2'], ['3', '3+']].filter(([v]) => has(v)));
+      // One pill per type that has apartments: studio, 1, 2, 3, 4+ (S.roomsKind).
+      return [['all', t('filter.all')]].concat(S.roomsKind.types.filter((g) => list.some((a) => S.roomsKind.group(a.rooms) === g)).map((g) => [String(g), S.roomsKind.pill(g)]));
     }
     function filtered() {
       let l = st.apts.slice();
       if (st.onlyFree) l = l.filter((a) => a.status === 'free');
-      if (st.rooms !== 'all') l = l.filter((a) => (st.rooms === '3' ? a.rooms >= 3 : a.rooms === +st.rooms));
+      if (st.rooms !== 'all') l = l.filter((a) => S.roomsKind.match(a, st.rooms));
       if (st.priceCap) l = l.filter((a) => a.price <= st.priceCap);
       const cls = st.building && st.building.eco && st.building.eco.energyClass;
       if (cls && st.minClass && st.minClass !== 'any' && S.eco.rank(cls) > S.eco.rank(st.minClass)) l = [];
@@ -620,13 +621,13 @@
     // A card of the list: the plan of its type, status and floor, number, type, area, price; it opens the apartment on the model.
     function renderCard(a) {
       const plan = h('canvas', { class: 'nr-unit-plan', width: 320, height: 180, 'aria-hidden': 'true' });
-      drawFloorPlan(plan, Math.min(3, a.rooms));
+      drawFloorPlan(plan, S.roomsKind.group(a.rooms));
       return h('button', { class: 'nr-unit-card', type: 'button', onclick: () => { pickApt(a); scrollTo('home'); } },
         h('span', { class: 'nr-unit-card-pic' }, plan),
         h('span', { class: 'nr-unit-card-body' },
           h('span', { class: 'nr-unit-top' }, h('b', null, t('nr.cat.aptN', { n: a.number })), h('span', { class: 'nr-unit-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status))),
-          h('span', { class: 'nr-unit-type' }, t('layouts.type' + Math.min(3, a.rooms))),
-          h('span', { class: 'nr-unit-meta' }, t('floor.n', { n: a.floor }) + ' · ' + S.fmt.area(a.area) + ' · ' + S.fmt.n(a.pricePerSqm) + ' TJS / ' + t('u.m2')),
+          h('span', { class: 'nr-unit-type' }, S.roomsKind.label(a.rooms)),
+          h('span', { class: 'nr-unit-meta' }, t('floor.n', { n: a.floor }) + ' · ' + S.fmt.area(a.area) + ' · ' + S.fmt.n(sqmPrice(a)) + ' TJS / ' + t('u.m2')),
           h('span', { class: 'nr-unit-price' }, S.fmt.money(a.price, 'TJS'))));
     }
 
@@ -689,6 +690,8 @@
     const heroSub = fromShell('heroSub') || h('p', { class: 'nr-hero-sub' });
     heroSub.textContent = t('nr.hero.sub');
     const heroStats = h('dl', { class: 'nr-hero-stats', hidden: true });
+    // A demo building (isDemo): its numbers are marked as demo data right under the buttons (A-04).
+    const heroDemo = h('p', { class: 'nr-hero-demo', hidden: true }, h('span', { class: 'demo-badge' }, t('demo.badge')), ' ', t('nr.hero.demoNote'));
     const hero = h('section', { class: 'nr-hero nr-dark', id: 'top' },
       h('figure', { class: 'nr-hero-media' }, fromShell('heroImg') || heroPicture(),
         h('figcaption', { class: 'nr-render-note' }, t('nr.render'))),
@@ -697,7 +700,7 @@
         h('div', { class: 'nr-hero-text' }, heroKicker, heroTitle, heroSub,
           h('div', { class: 'nr-actions' },
             h('a', { class: 'btn nr-btn nr-btn--primary', href: '/apartments' }, t('wow.hero.pick'), arrow()),
-            h('a', { class: 'btn nr-btn nr-btn--light', href: '/apartments#3d' }, t('wow.hero.3d')))),
+            h('a', { class: 'btn nr-btn nr-btn--light', href: '/apartments#3d' }, t('wow.hero.3d'))), heroDemo),
         heroStats));
 
     // 2. About the house: the description, amenities and the eco passport from the API; the render on the right.
@@ -770,12 +773,14 @@
         b.floorsCount ? stat(S.fmt.n(b.floorsCount), plural(b.floorsCount, 'nr.floors')) : null,
         stat(S.fmt.n(d.apts.length), plural(d.apts.length, 'nr.apts')),
         stat(S.fmt.n(free), t('nr.freeNow')),
-        year ? stat(String(year), t('nr.yearDone')) : null,
+        // Without construction stages with progress the year is only the plan (A-04).
+        year ? stat(String(year), t(d.planned ? 'nr.yearPlanned' : 'nr.yearDone')) : null,
       ].filter(Boolean) : [];
       // While loading: four empty cells keep the band's height, so nothing below jumps when the numbers arrive.
       const wait = d.state === 'loading';
       heroStats.replaceChildren(...(wait ? [0, 1, 2, 3].map(() => h('div', { class: 'nr-stat is-wait', 'aria-hidden': 'true' }, h('dt', null, ' '), h('dd', null, ' '))) : stats));
       heroStats.hidden = !wait && !stats.length;
+      heroDemo.hidden = !(ready && b.isDemo);
 
       // No building or no apartments: one card instead of the house blocks.
       const none = d.state === 'empty' || d.state === 'error';
@@ -812,10 +817,10 @@
     function layoutCard(x) {
       const area = x.areaFrom === x.areaTo ? S.fmt.n(x.areaFrom) : S.fmt.n(x.areaFrom) + '–' + S.fmt.n(x.areaTo);
       const planCanvas = h('canvas', { class: 'nr-layout-plan', width: 320, height: 210, 'aria-hidden': 'true' });
-      drawFloorPlan(planCanvas, Math.min(3, x.rooms || 0));
-      return h('a', { class: 'nr-layout', href: '/apartments?rooms=' + Math.min(3, x.rooms || 0) }, h('div', { class: 'nr-layout-pic' }, planCanvas),
+      drawFloorPlan(planCanvas, x.rooms);
+      return h('a', { class: 'nr-layout', href: '/apartments?rooms=' + x.rooms }, h('div', { class: 'nr-layout-pic' }, planCanvas),
         h('div', { class: 'nr-layout-body' },
-          h('div', { class: 'nr-layout-top' }, h('span', { class: 'nr-layout-type' }, t('layouts.type' + Math.min(3, x.rooms))), h('span', { class: 'nr-layout-area' }, area + ' ' + t('u.m2'))),
+          h('div', { class: 'nr-layout-top' }, h('span', { class: 'nr-layout-type' }, x.label), h('span', { class: 'nr-layout-area' }, area + ' ' + t('u.m2'))),
           h('div', { class: 'nr-layout-bottom' }, h('span', { class: 'nr-layout-price' }, t('home.chip.from', { p: S.fmt.money(x.priceFrom, 'TJS') })),
             h('span', { class: 'nr-layout-more' }, t('nr.look'), arrow()))));
     }
@@ -888,15 +893,17 @@
         const b = await S.api.building(id);
         const floors = await S.api.floors(id);
         const apts = await S.api.allApartments(floors);
+        const prog = await S.api.publicProgress(id).catch(() => null);
         if (!alive) return;
         d.b = b; d.apts = apts;
+        d.planned = !prog || !prog.stages || !prog.stages.length || !prog.overallPercent;
         d.state = apts.length ? 'ready' : 'empty';
-        // Types from the real apartments: area range of all, price from the free ones (else from all). 3 — three rooms and more.
-        d.types = [0, 1, 2, 3].map((rooms) => {
-          const all = apts.filter((a) => (rooms === 3 ? a.rooms >= 3 : a.rooms === rooms));
+        // Types from the real apartments (S.roomsKind: 4 — four rooms and more): area range of all, price from the free ones (else from all).
+        d.types = S.roomsKind.types.map((rooms) => {
+          const all = apts.filter((a) => S.roomsKind.group(a.rooms) === rooms);
           if (!all.length) return null;
           const priced = all.filter((a) => a.status === 'free').length ? all.filter((a) => a.status === 'free') : all;
-          return { rooms, areaFrom: Math.floor(Math.min(...all.map((a) => a.area))), areaTo: Math.ceil(Math.max(...all.map((a) => a.area))), priceFrom: Math.min(...priced.map((a) => a.price)) };
+          return { rooms, label: S.roomsKind.groupLabel(rooms, all), areaFrom: Math.floor(Math.min(...all.map((a) => a.area))), areaTo: Math.ceil(Math.max(...all.map((a) => a.area))), priceFrom: Math.min(...priced.map((a) => a.price)) };
         }).filter(Boolean);
         renderData();
       } catch (e) { if (alive) { d.state = 'error'; renderData(); } }
@@ -1157,7 +1164,10 @@
     return () => {};
   };
   /* ---------- floor plans drawn on a canvas (catalog) ---------- */
-  const PLAN_TYPES = [0, 1, 2, 3];
+  const PLAN_TYPES = [0, 1, 2, 3, 4];
+  // The price of a square metre the buyer actually pays: price / area, rounded to a somoni (A-27). The stored price per m²
+  // can differ from it when the total price was rounded; without an area or a price — the stored one.
+  const sqmPrice = (a) => (a.area > 0 && a.price > 0 ? Math.round(a.price / a.area) : a.pricePerSqm);
   // An architect's plan as in the design: walls in the ink colour on the paper of the card, windows and the balcony in copper,
   // doors as gaps with a thin swing, room names in the middle. The rooms, doors and windows come from S.plans
   // (planirovki-data.js) — the same layout the 3D model builds inside; with the area the plan is scaled to it.

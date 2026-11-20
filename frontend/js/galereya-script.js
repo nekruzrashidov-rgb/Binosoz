@@ -99,7 +99,7 @@
         if (!id) return;
         const apts = await S.api.allApartments(await S.api.floors(id));
         if (!alive) return;
-        planTypes = [0, 1, 2, 3].filter((n) => apts.some((a) => (n === 3 ? a.rooms >= 3 : a.rooms === n)));
+        planTypes = S.roomsKind.types.filter((n) => apts.some((a) => S.roomsKind.group(a.rooms) === n));
         if (planTypes.length) { drawBar(); drawGrid(); }
       } catch (e) { /* no API: renders and city views only */ }
     })();

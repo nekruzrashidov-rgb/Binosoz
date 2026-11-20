@@ -104,6 +104,17 @@
     initials(n) { return String(n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]).join('').toUpperCase(); },
     left(iso) { const ms = new Date(iso).getTime() - Date.now(); if (ms <= 0) return t('book.expired'); const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000); return h + t('u.h') + ' ' + m + t('u.min'); },
   };
+  // Apartment types by rooms — one rule for the catalog, the layouts, the gallery and the 3D card, so the labels agree:
+  // groups 0 (studio), 1, 2, 3, 4 (four rooms and more); the label names the real number of rooms.
+  S.roomsKind = {
+    types: [0, 1, 2, 3, 4],
+    group: (n) => Math.max(0, Math.min(4, Math.floor(+n || 0))),
+    label: (n) => { const r = Math.floor(+n || 0); return r > 4 ? t('layouts.typeN', { n: r }) : t('layouts.type' + S.roomsKind.group(r)); },
+    // The label of a group card: «4 комнаты и больше», when the group holds apartments with more than four rooms.
+    groupLabel: (g, list) => (g === 4 && (list || []).some((a) => a.rooms > 4) ? t('layouts.type4plus') : t('layouts.type' + g)),
+    pill: (g) => (g === 0 ? t('apt.studio') : g === 4 ? '4+' : String(g)),
+    match: (a, v) => v === 'all' || v === undefined || S.roomsKind.group(a.rooms) === +v,
+  };
   // Local calendar date (toISOString would give the UTC date: in Dushanbe, UTC+5, "today" before 5 a.m. would be yesterday).
   const localDay = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   S.today = () => localDay(new Date());
