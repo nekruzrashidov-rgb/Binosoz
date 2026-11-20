@@ -14,6 +14,10 @@ public class Booking : BaseEntity
     public Guid? LeadId { get; set; }
     public Lead? Lead { get; set; }
 
+    // IP-адрес гостя или покупателя, забронировавшего с сайта (у брони менеджера — null): по нему ограничивается
+    // число активных броней с одного адреса, чтобы один человек не снял с продажи весь дом.
+    public string? ClientIp { get; set; }
+
     public DateTime ExpiresAt { get; set; }
     public BookingStatus Status { get; private set; } = BookingStatus.Active;
     public string? CancelReason { get; private set; }

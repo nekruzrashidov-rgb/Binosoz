@@ -60,8 +60,10 @@ public static class SecuritySetup
                 PerIp(context, s => s.LoginPerMinute, TimeSpan.FromMinutes(1)));
             options.AddPolicy(RateLimitPolicies.Sms, context =>
                 PerIp(context, s => s.SmsPerHour, TimeSpan.FromHours(1)));
+            // Без лимита — только сотрудники; вошедший покупатель ограничен по IP, как гость
+            // (иначе любой зарегистрировавшийся мог бы бронировать без ограничений).
             options.AddPolicy(RateLimitPolicies.PublicForms, context =>
-                context.User.Identity?.IsAuthenticated == true
+                IsStaff(context.User)
                     ? RateLimitPartition.GetNoLimiter("staff")
                     : PerIp(context, s => s.PublicFormsPerHour, TimeSpan.FromHours(1)));
             // Свой счётчик, отдельный от заявок на квартиры и броней.
@@ -74,8 +76,6 @@ public static class SecuritySetup
                 var userId = context.User.FindFirst(Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames.Sub)?.Value;
                 return FixedWindow("ai:" + (userId ?? ClientIp(context)), settings.AiPerHour, TimeSpan.FromHours(1));
             });
-
-            // Общий лимит после входа — на пользователя (сотрудники за одним офисным IP не мешают друг другу).
             // Гость без входа: всегда по IP (вошедший покупатель на сайте — тоже), два окна — минута и сутки.
             options.AddPolicy(RateLimitPolicies.AiPublic, context =>
             {
@@ -90,6 +90,8 @@ public static class SecuritySetup
                         PermitLimit = settings.AiPublicPerDay, Window = TimeSpan.FromDays(1), QueueLimit = 0
                     })));
             });
+
+            // Общий лимит после входа — на пользователя (сотрудники за одним офисным IP не мешают друг другу).
             // Запрос с непрошедшим токеном считается по IP. Гостей без токена уже ограничил ранний лимит по IP.
             options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
             {
@@ -226,6 +228,11 @@ public static class SecuritySetup
             Window = window,
             QueueLimit = 0
         });
+
+    private static readonly string[] StaffRoles = Sitora.WebApi.Controllers.Roles.AllStaff.Split(',');
+
+    private static bool IsStaff(System.Security.Claims.ClaimsPrincipal user) =>
+        user.Identity?.IsAuthenticated == true && StaffRoles.Any(user.IsInRole);
 
     private static string ClientIp(HttpContext context) => context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 }

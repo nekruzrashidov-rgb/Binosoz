@@ -59,6 +59,8 @@ public static class DependencyInjection
             .BindConfiguration(ClaudeOptions.SectionName);
         services.AddOptions<BrandOptions>()
             .BindConfiguration(BrandOptions.SectionName);
+        services.AddOptions<BookingOptions>()
+            .BindConfiguration(BookingOptions.SectionName);
         services.AddOptions<EmailOptions>()
             .BindConfiguration(EmailOptions.SectionName)
             .PostConfigure<IConfiguration>(EmailOptions.ApplySmtpSection)
@@ -94,13 +96,13 @@ public static class DependencyInjection
         services.AddScoped<IBrandService, BrandService>();
         services.AddSingleton<IChatModel, ClaudeChatModel>();
         services.AddScoped<IAiAssistant, AiAssistant>();
-        services.AddScoped<IAuditService, AuditService>();
-        services.AddScoped<ApartmentImporter>();
         // Публичный помощник на сайте застройщика: общий с кабинетом контекст ЖК (кэш 60 с) и суточный лимит организации.
         services.AddMemoryCache();
         services.AddScoped<EstateContext>();
         services.AddSingleton<PublicAiQuota>();
         services.AddScoped<IPublicAiAssistant, PublicAiAssistant>();
+        services.AddScoped<IAuditService, AuditService>();
+        services.AddScoped<ApartmentImporter>();
         services.AddScoped<ICatalogService, CatalogService>();
         services.AddScoped<IGreenService, GreenService>();
         services.AddScoped<IInstallmentService, InstallmentService>();

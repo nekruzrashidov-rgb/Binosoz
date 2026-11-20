@@ -228,6 +228,7 @@ TwoFactorRequired = { requiresTwoFactor: true, tempToken, expiresAt }
 | `bad_request` | Неверный запрос |
 | `booking_conflict` | На этот номер уже есть активная бронь. Чтобы забронировать другую квартиру, свяжитесь с менеджером |
 | `booking_inactive` | Бронь уже не активна |
+| `booking_ip_limit` | С этого адреса уже есть несколько активных броней. Чтобы забронировать ещё, свяжитесь с менеджером (429) |
 | `booking_not_found` | Бронь не найдена |
 | `building_not_found` | Дом не найден |
 | `building_required` | Укажите дом, в котором заводите клиента; Укажите дом или квартиру, к которой относится заявка … |
@@ -418,7 +419,7 @@ TwoFactorRequired = { requiresTwoFactor: true, tempToken, expiresAt }
 | GET | `/apartments/{id}` | `ApartmentResponse` | `apartment()` |
 | GET | `/rates/current?currency=USD&organization=slug` (или `&organizationId=`) | `{ date, currency, rateToTjs, source }`. Ручной курс у каждой организации свой, поэтому сайт передаёт slug или id организации; неизвестный slug — 404. Без него — только общий курс НБТ. Сотруднику организация берётся из токена. 404, если курса нет | `rate()` → `{ rate, date }` |
 | POST | `/leads` | `{ name, phone, apartmentId?, buildingId?, source, comment? }`. Организация берётся из квартиры или дома. Если на платформе несколько застройщиков, без них — 422 | `createLead()` |
-| POST | `/apartments/{id}/bookings` | `{ name, phone }` (гость) или `{ customerId }` (менеджер) → `BookingResponse`; 409, если квартира занята | `book()` |
+| POST | `/apartments/{id}/bookings` | `{ name, phone }` (гость) или `{ customerId }` (менеджер) → `BookingResponse`; 409, если квартира занята. Бронь с сайта (гость или покупатель): лимит формы — 30 в час на IP, не больше одной активной брони на телефон и `Booking__GuestActivePerIp` (3) активных на IP — иначе 429 `booking_ip_limit` | `book()` |
 
 Состав ответов:
 - `ApartmentResponse`: `id, floorId, buildingId, floorNumber, number, rooms, area, pricePerM2, price, currency, status, planSlot (0–7), model3dId`.

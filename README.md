@@ -107,7 +107,8 @@ Caddy сам получает сертификат HTTPS. Бэкап — `./back
 | `AllowedHosts` | домен API в продакшене (`api.sitora.tj`) |
 | `Cors__AllowedOrigins__0`, `__1`, … | адреса фронтендов, которым разрешён CORS |
 | `ForwardedHeaders__Enabled` | `true`, только если API стоит за своим обратным прокси (в prod-compose это Caddy) |
-| `RateLimiting__LoginPerMinute`, `__SmsPerHour`, `__PublicFormsPerHour` | лимиты на один IP (по умолчанию 10, 20, 30) |
+| `RateLimiting__LoginPerMinute`, `__SmsPerHour`, `__PublicFormsPerHour` | лимиты на один IP (по умолчанию 10, 20, 30); лимит форм снят только для сотрудников, вошедший покупатель считается как гость |
+| `Booking__GuestActivePerIp` | сколько активных броней с сайта может быть с одного IP (по умолчанию 3; 0 — без ограничения) |
 | `RateLimiting__AnonymousPerMinute`, `__UserPerMinute` | общий лимит: гостю на IP и вошедшему на пользователя (по умолчанию 300 и 600) |
 | `Storage__RootPath` | папка для документов и фото (по умолчанию `./storage`, в Docker — том `files`) |
 | `Hangfire__ServerEnabled` | `false` выключает фоновые задачи в этом экземпляре |

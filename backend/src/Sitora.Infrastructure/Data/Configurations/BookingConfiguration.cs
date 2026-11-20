@@ -20,6 +20,9 @@ public class BookingConfiguration : IEntityTypeConfiguration<Booking>
             .IsUnique()
             .HasFilter("\"Status\" = 'Active'");
         builder.HasIndex(b => new { b.Status, b.ExpiresAt });
+        // Подсчёт активных броней с сайта по IP (лимит Booking:GuestActivePerIp).
+        builder.Property(b => b.ClientIp).HasMaxLength(45);
+        builder.HasIndex(b => b.ClientIp).HasFilter("\"Status\" = 'Active' AND \"ClientIp\" IS NOT NULL");
 
         builder.HasOne(b => b.Apartment).WithMany().HasForeignKey(b => b.ApartmentId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(b => b.Customer).WithMany().HasForeignKey(b => b.CustomerId).OnDelete(DeleteBehavior.Restrict);

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Sitora.Domain.Common;
 using Sitora.Domain.DTOs.Sales;
 using Sitora.Domain.Entities;
@@ -10,6 +11,17 @@ using Sitora.Infrastructure.Data;
 
 namespace Sitora.Infrastructure.Services;
 
+// Настройки брони (раздел Booking; на сервере — переменная Booking__GuestActivePerIp).
+public class BookingOptions
+{
+    public const string SectionName = "Booking";
+
+    // Сколько активных броней с сайта (гость или покупатель, не сотрудник) может быть с одного IP одновременно.
+    // Защита от того, чтобы один человек с разными номерами телефона снял с продажи весь дом.
+    // Несколько семей за одним NAT мобильного оператора — поэтому не 1. 0 и меньше — без ограничения.
+    public int GuestActivePerIp { get; set; } = 3;
+}
+
 public class BookingService(
     AppDbContext db,
     ICurrentUser currentUser,
@@ -19,9 +31,12 @@ public class BookingService(
     TelegramAlertService telegram,
     BuyerNotifier buyers,
     TimeProvider timeProvider,
+    IOptions<BookingOptions> options,
     ILogger<BookingService> logger) : IBookingService
 {
     private const string AlreadyBooked = "Квартира уже забронирована или недоступна";
+    public const string TooManyFromAddress =
+        "С этого адреса уже есть несколько активных броней. Чтобы забронировать ещё, свяжитесь с менеджером";
 
     // Время в уведомлениях показываем по Душанбе (UTC+5, без перехода на летнее время).
     private static readonly TimeSpan DushanbeOffset = TimeSpan.FromHours(5);
@@ -55,6 +70,8 @@ public class BookingService(
                 throw new ConflictException(AlreadyBooked);
 
             booking = new Booking { ApartmentId = apartment.Id, ExpiresAt = now.Add(Booking.Duration) };
+            if (!isStaff)
+                booking.ClientIp = await CheckGuestLimitAsync(ct);
 
             if (request.CustomerId is { } customerId)
             {
@@ -189,6 +206,23 @@ public class BookingService(
         audit.Record(nameof(Apartment), apartment.Id, "StatusChanged",
             new { Status = ApartmentStatus.Booked }, new { apartment.Status }, organizationId);
         return true;
+    }
+
+    // Бронь с сайта: не больше Booking:GuestActivePerIp активных броней с одного IP (у всех застройщиков сразу —
+    // фильтры организаций здесь не нужны). Возвращает IP, который запоминается в брони.
+    private async Task<string?> CheckGuestLimitAsync(CancellationToken ct)
+    {
+        var ip = currentUser.IpAddress;
+        if (string.IsNullOrEmpty(ip))
+            return null;
+        var limit = options.Value.GuestActivePerIp;
+        if (limit > 0 && await db.Bookings.IgnoreQueryFilters()
+                .CountAsync(b => b.Status == BookingStatus.Active && b.ClientIp == ip, ct) >= limit)
+        {
+            logger.LogWarning("Бронь с сайта отклонена: с адреса уже {Limit} активных броней", limit);
+            throw new TooManyRequestsException(TooManyFromAddress);
+        }
+        return ip;
     }
 
     private async Task<Lead> FindOrCreateLeadAsync(CreateBookingRequest request, Guid apartmentId, Guid buildingId,

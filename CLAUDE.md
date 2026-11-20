@@ -62,7 +62,7 @@ Binosoz/
 │   │   │   ├── Data/
 │   │   │   │   ├── AppDbContext.cs
 │   │   │   │   ├── Configurations/ ← EF конфигурации сущностей
-│   │   │   │   ├── Migrations/     ← миграции EF Core (25)
+│   │   │   │   ├── Migrations/     ← миграции EF Core (33)
 │   │   │   │   └── Seed/           ← сидер (Development-данные)
 │   │   │   ├── Services/           ← вся бизнес-логика:
 │   │   │   │   AuthService.cs      (675 строк: email OTP, SMS, JWT, refresh, lockout)
@@ -167,6 +167,8 @@ Binosoz/
 - **Деньги** — только `decimal(18,2)` + код валюты (TJS или USD). Никогда `float/double`.
 - **Платежи** — не удалять, только сторно (`ReversalOfId`). Сторно одно, сторно сторно нельзя.
 - **Бронь** — одна активная на квартиру: partial unique index `IX_Bookings_ApartmentId_Active` + `SELECT FOR UPDATE` в транзакции. Двойная бронь → 409.
+  Бронь с сайта (гость или покупатель, не сотрудник): одна активная на телефон (409) и не больше `Booking__GuestActivePerIp` (3)
+  активных на IP (`Booking.ClientIp`, 429 `booking_ip_limit`); лимит формы `PublicForms` снят только для сотрудников.
 - **Статус квартиры** — меняют только `Book()`, `ReleaseBooking()`, `Sell()`, `SetOnRequest()` на сущности. Через PUT статус не меняется.
 - **AuditLog** — любое изменение статуса, цены, платежа, документа пишется в той же транзакции.
 - **Права** — проверяются на сервере в каждом запросе. Чужая сделка → 404 (не 403).
@@ -181,10 +183,10 @@ Binosoz/
 - Язык ответов и ошибок: по заголовку `Accept-Language` (ru, tg)
 - Пагинация: `page` (от 1), `pageSize` (по умолчанию 20, макс 100); вне границ — тихо исправляется
 - Публичный каталог кэшируется (Output Cache, 15–30 с); изменения каталога сбрасывают тег `catalog`
-- Все эндпоинты: `docs/API_CONTRACT.md`
-
 - AI-помощник гостя: `/public/{orgSlug}/ai/chat` и `/ai/status` — контекст ЖК только из базы (`EstateContext`, кэш 60 с,
   без клиентов и сделок; он же у покупателя в кабинете), вопрос ≤ 500, история 10, 429 `ai_public_busy` с контактами
+- Все эндпоинты: `docs/API_CONTRACT.md`
+
 ## Auth-флоу
 - **Сотрудники:** `POST /auth/login` (почта + пароль) → (если включена 2FA) `POST /auth/2fa/verify`
 - **Покупатели:** почта + свой 6-значный код (PIN) — `POST /auth/customer/login`. PIN хранится как пароль Identity (хеш);

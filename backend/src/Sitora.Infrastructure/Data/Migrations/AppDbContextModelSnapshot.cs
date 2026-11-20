@@ -400,6 +400,10 @@ namespace Sitora.Infrastructure.Data.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("ClientIp")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -426,6 +430,9 @@ namespace Sitora.Infrastructure.Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("IX_Bookings_ApartmentId_Active")
                         .HasFilter("\"Status\" = 'Active'");
+
+                    b.HasIndex("ClientIp")
+                        .HasFilter("\"Status\" = 'Active' AND \"ClientIp\" IS NOT NULL");
 
                     b.HasIndex("CustomerId");
 

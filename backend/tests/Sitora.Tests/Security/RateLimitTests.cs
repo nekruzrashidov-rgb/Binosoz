@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Sitora.Domain.DTOs.Auth;
 using Sitora.Domain.DTOs.Sales;
@@ -25,6 +26,7 @@ public class LowRateLimitFactory : SitoraApiFactory
         builder.UseSetting("RateLimiting:ApplicationsPerHour", "3");
         builder.UseSetting("RateLimiting:AnonymousPerMinute", "20");
         builder.UseSetting("RateLimiting:UserPerMinute", "1000");
+        builder.UseSetting("Booking:GuestActivePerIp", "1");
         builder.ConfigureTestServices(services => services.AddSingleton<IStartupFilter, TestClientIpFilter>());
     }
 
@@ -142,4 +144,47 @@ public class RateLimitTests(LowRateLimitFactory factory) : IClassFixture<LowRate
         for (var i = 0; i < 3; i++)
             Assert.Equal(HttpStatusCode.Created, (await manager.PostAsJsonAsync("/api/v1/leads", lead)).StatusCode);
     }
+
+    // Вход покупателя не снимает лимит публичных форм: иначе любой зарегистрировавшийся бронировал бы без ограничений.
+    [Fact]
+    public async Task PublicForms_LimitSignedInCustomers_LikeGuests()
+    {
+        var manager = await factory.CreateManagerClientAsync();
+        var customer = await Sales.BookingTests.CreateCustomerAsync(manager);
+        var client = await factory.CreateCustomerClientAsync(customer.Phone);
+        client.DefaultRequestHeaders.Add(ClientIpHeaderName, "10.0.5.1");
+        var lead = new CreateLeadRequest("Покупатель", "+992901112244", null, null, null);
+
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/v1/leads", lead)).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/v1/leads", lead)).StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await client.PostAsJsonAsync("/api/v1/leads", lead)).StatusCode);
+    }
+
+    // Booking:GuestActivePerIp = 1 в этой фабрике: вторая бронь с сайта с того же IP (другой телефон) — 429,
+    // с другого IP — можно. Бронь запоминает IP.
+    [Fact]
+    public async Task GuestBookings_AreLimitedByActiveBookingsPerIp()
+    {
+        var guest = factory.CreateClientWithIp("10.0.6.1");
+        var first = await guest.PostAsJsonAsync($"/api/v1/apartments/{await factory.FindFreeApartmentAsync()}/bookings",
+            new CreateBookingRequest("Гость", SitoraApiFactory.RandomPhone(), null, null));
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+
+        var second = await guest.PostAsJsonAsync($"/api/v1/apartments/{await factory.FindFreeApartmentAsync()}/bookings",
+            new CreateBookingRequest("Гость", SitoraApiFactory.RandomPhone(), null, null));
+        Assert.Equal(HttpStatusCode.TooManyRequests, second.StatusCode);
+        Assert.Contains("С этого адреса уже есть несколько активных броней", await second.Content.ReadAsStringAsync());
+
+        var other = await factory.CreateClientWithIp("10.0.6.2").PostAsJsonAsync(
+            $"/api/v1/apartments/{await factory.FindFreeApartmentAsync()}/bookings",
+            new CreateBookingRequest("Гость", SitoraApiFactory.RandomPhone(), null, null));
+        Assert.Equal(HttpStatusCode.Created, other.StatusCode);
+
+        var booking = (await first.Content.ReadFromJsonAsync<BookingResponse>(TestJson.Options))!;
+        var ip = await factory.WithDbAsync(db => db.Bookings.IgnoreQueryFilters()
+            .Where(b => b.Id == booking.Id).Select(b => b.ClientIp).SingleAsync());
+        Assert.Equal("10.0.6.1", ip);
+    }
+
+    private const string ClientIpHeaderName = LowRateLimitFactory.ClientIpHeader;
 }

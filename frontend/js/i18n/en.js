@@ -1175,7 +1175,7 @@
     "privacy.s2.li5": "A review of the building: rating and text.",
     "privacy.s2.li6": "A developer’s application to join the platform: company name, owner’s name, email, phone and comment.",
     "privacy.s2.li7": "Staff accounts: name, email and role; the password is stored only as a hash.",
-    "privacy.s2.li8": "Technical data: IP address and time of requests in the server log, IP address when a sign-in code is requested, and the change log (who changed what and when, from which IP).",
+    "privacy.s2.li8": "Technical data: IP address and time of requests in the server log, IP address when a sign-in code is requested and when an apartment is booked on the website (so that one person cannot hold many apartments with bookings), and the change log (who changed what and when, from which IP).",
     "privacy.s3.h": "Why",
     "privacy.s3.li1": "Signing in: email and an own 6-digit code for buyers (sign-up and code changes are confirmed with a code by email; by phone — with a code in Telegram if the developer has connected Telegram Gateway), a password for staff. On your device the sign-in is kept for 30 days after the last visit, and the sign-in form remembers your email (never the code).",
     "privacy.s3.li2": "Handling requests and getting back to you.",
