@@ -201,6 +201,17 @@ public static class SecuritySetup
 
     // Включать только когда API доступен лишь через свой обратный прокси (Caddy в docker-compose.prod.yml):
     // иначе любой клиент сможет подставить себе IP и обойти лимиты.
+    // Заголовок с адресом клиента от доверенного прокси (например, CF-Connecting-IP — его ставит Cloudflare и перезаписывает
+    // присланный клиентом). Включается вместе с UseForwardedHeaders; неверный адрес в заголовке игнорируется.
+    public static IApplicationBuilder UseSitoraClientIpHeader(this IApplicationBuilder app, string header) =>
+        app.Use((http, next) =>
+        {
+            var value = http.Request.Headers[header].ToString().Split(',')[0].Trim();
+            if (System.Net.IPAddress.TryParse(value, out var ip))
+                http.Connection.RemoteIpAddress = ip;
+            return next(http);
+        });
+
     public static IServiceCollection AddSitoraForwardedHeaders(this IServiceCollection services) =>
         services.Configure<ForwardedHeadersOptions>(options =>
         {

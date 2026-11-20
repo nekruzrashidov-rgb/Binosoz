@@ -214,6 +214,13 @@ app.Use(async (http, next) =>
 });
 if (forwardedHeadersEnabled)
     app.UseForwardedHeaders();
+// Адрес клиента из заголовка доверенного прокси (CF-Connecting-IP у Cloudflare перед Render): только вместе с доверием
+// прокси и только когда задан ForwardedHeaders__ClientIpHeader — по умолчанию выключено, решение — по логам прода (A-15).
+var clientIpHeader = forwardedHeadersEnabled ? app.Configuration["ForwardedHeaders:ClientIpHeader"]?.Trim() : null;
+if (!string.IsNullOrEmpty(clientIpHeader))
+    app.UseSitoraClientIpHeader(clientIpHeader);
+app.Logger.LogInformation("IP клиента: {Source}", !string.IsNullOrEmpty(clientIpHeader) ? "заголовок " + clientIpHeader
+    : forwardedHeadersEnabled ? "последний адрес X-Forwarded-For" : "адрес соединения");
 // Журнал запросов — снаружи обработчика исключений: так он видит итоговый код ответа.
 // Внутри он принимал каждую ошибку домена (404, 409, 422) за 500 и писал её со стеком.
 // Настоящие 500 отдельно пишет DomainExceptionHandler.
