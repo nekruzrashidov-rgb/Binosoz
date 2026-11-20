@@ -207,7 +207,7 @@
         place(r, W, 'tv', Math.min(1.6, fitLen(1.6)), 0.45, s && s.side === 'back' ? ['left', 'right', 'front'] : ['right', 'left', 'back']);
         if (r.w > 2.8 && r.h > 2.8) centre(r, 'coffee', 0, 0, s && s.side === 'back' ? 0.25 : 0);
         // A studio: the kitchen corner is a room of its own in the layout.
-      } else if (r.key === 'bedroom' || r.key === 'bedroom2') {
+      } else if (r.key === 'bedroom' || r.key === 'bedroom2' || r.key === 'bedroom3') {
         place(r, W, 'bed', Math.min(2.6, fitLen(2.6)), 2.1, ['back', 'left', 'right']);
         place(r, W, 'wardrobe', Math.min(1.6, fitLen(1.6)), 0.6, ['left', 'right', 'back', 'front']);
       } else if (r.key === 'kitchen') {

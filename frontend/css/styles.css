@@ -2602,6 +2602,8 @@ a:hover > .nr-arrow, button:hover > .nr-arrow { transform: translateX(4px); }
 .nr-hero-title { margin: 28px 0 0; font-family: var(--display); font-weight: 500; font-size: clamp(56px, 9.5vw, 140px); line-height: 0.92; letter-spacing: -0.02em; color: var(--ink); }
 .nr-hero-sub { margin-top: 30px; max-width: 540px; font-size: 19px; line-height: 1.6; color: var(--ink-2); }
 .nr-actions { margin-top: 40px; display: flex; flex-wrap: wrap; gap: 14px; }
+/* A-04: the numbers of a demo building are marked right under the hero buttons. */
+.nr-hero-demo { margin: 18px 0 0; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 13px; color: var(--ink-2); }
 .nr-hero-stats { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); background: rgba(20, 17, 15, 0.88); }
 .nr-stat { display: flex; flex-direction: column-reverse; padding: 24px 28px; border-left: 1px solid var(--line); }
 .nr-stat dt { margin-top: 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
@@ -2928,6 +2930,7 @@ button.nr-layout { width: 100%; padding: 0; text-align: left; font: inherit; cur
 .nr-about-title { font-size: clamp(52px, 8vw, 112px); line-height: 0.95; }
 .nr-chips { list-style: none; margin: 30px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
 .nr-chips li { padding: 10px 16px; border: 1px solid rgba(244, 239, 231, 0.4); font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink); }
+.nr-chips li.nr-chip-demo { padding: 0; border: 0; display: flex; align-items: center; letter-spacing: 0; text-transform: none; }
 .nr-about-text .nr-lead:first-child { margin-top: 0; }
 .nr-about-address { display: flex; align-items: center; gap: 12px; margin-top: 24px; font-size: 16px; font-weight: 600; color: var(--ink); }
 .nr-about-address svg { width: 22px; height: 22px; flex: none; color: var(--accent-text); }

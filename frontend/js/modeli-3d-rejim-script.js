@@ -146,7 +146,7 @@
       card.replaceChildren(
         h('button', { class: 'h3d-icon h3d-card-x', type: 'button', 'aria-label': t('common.close'), onclick: () => { sel = null; house.clearSelection(); drawCard(); drawList(); } }, '×'),
         h('div', { class: 'h3d-card-kicker' }, t('nr.cat.aptN', { n: a.number }) + ' · ' + t('floor.n', { n: a.floor })),
-        h('div', { class: 'h3d-card-type' }, t('layouts.type' + Math.min(3, a.rooms)) + ' · ' + S.fmt.area(a.area)),
+        h('div', { class: 'h3d-card-type' }, S.roomsKind.label(a.rooms) + ' · ' + S.fmt.area(a.area)),
         h('div', { class: 'h3d-card-price' }, S.fmt.money(a.price, 'TJS')),
         d ? h('div', { class: 'h3d-card-usd' }, '≈ $' + S.fmt.n(d) + ' · ' + t('price.estimate')) : null,
         h('div', { class: 'h3d-card-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status)),
@@ -172,7 +172,7 @@
       if (!sel) return;
       const a = sel;
       ctx.loadInterior().then(() => {
-        if (!S.plans || !house.enterInside(a.id, S.plans.layout(Math.min(3, a.rooms), a.area), { furniture: furnBtn.getAttribute('aria-pressed') === 'true' })) S.toast(t('h3d.insideFail'), 'err');
+        if (!S.plans || !house.enterInside(a.id, S.plans.layout(S.roomsKind.group(a.rooms), a.area), { furniture: furnBtn.getAttribute('aria-pressed') === 'true' })) S.toast(t('h3d.insideFail'), 'err');
       }).catch(() => S.toast(t('h3d.insideFail'), 'err'));
     }
     house.on('mode', (m) => {

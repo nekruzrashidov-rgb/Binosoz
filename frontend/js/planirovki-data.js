@@ -26,6 +26,10 @@
     3: { w: 12.0, d: 7.0,
       rooms: [['living', 0, 0, 4.6, 4.4], ['bedroom', 4.6, 0, 3.6, 4.4], ['bedroom2', 8.2, 0, 3.8, 4.4], ['kitchen', 0, 4.4, 3.6, 2.6], ['hall', 3.6, 4.4, 5.2, 2.6], ['hall', 8.8, 4.4, 1.2, 2.6, true], ['bath', 10.0, 4.4, 2.0, 2.6]],
       doors: [[4, 0, 0.9], [4, 1, 0.9], [5, 2, 0.9], [4, 3, 0.9], [4, 5, 'open'], [5, 6, 0.8]], entrance: 4, balcony: { room: 0, x: 0.6, w: 3.4, depth: 1.2 } },
+    // Four rooms, 115 m² (also «four and more»): three bedrooms on the facade, the hall is two rectangles of one space.
+    4: { w: 14.6, d: 7.6,
+      rooms: [['living', 0, 0, 5.0, 4.6], ['bedroom', 5.0, 0, 3.4, 4.6], ['bedroom2', 8.4, 0, 3.2, 4.6], ['bedroom3', 11.6, 0, 3.0, 4.6], ['kitchen', 0, 4.6, 3.8, 3.0], ['hall', 3.8, 4.6, 6.4, 3.0], ['hall', 10.2, 4.6, 2.6, 3.0, true], ['bath', 12.8, 4.6, 1.8, 3.0]],
+      doors: [[5, 0, 0.9], [5, 1, 0.9], [5, 2, 0.9], [6, 3, 0.9], [5, 4, 0.9], [5, 6, 'open'], [6, 7, 0.8]], entrance: 5, balcony: { room: 0, x: 0.6, w: 3.4, depth: 1.2 } },
   };
   // Rooms without windows to the street.
   const INNER = { hall: 1, bath: 1, wc: 1 };
@@ -48,9 +52,9 @@
     return null;
   }
 
-  // The layout of a type (0 studio … 3 three rooms and more) scaled to the area (m²); without the area — the nominal one.
+  // The layout of a type (0 studio … 4 four rooms and more) scaled to the area (m²); without the area — the nominal one.
   function layout(type, area) {
-    const p = L[Math.max(0, Math.min(3, type | 0))] || L[1];
+    const p = L[Math.max(0, Math.min(4, type | 0))] || L[1];
     const nom = nominal(p);
     const k = area > 0 ? Math.sqrt(area / nom) : 1;
     const rooms = p.rooms.map(([key, x, y, w, h, part], i) => ({ i, key, x: x * k, y: y * k, w: w * k, h: h * k, area: w * h * k * k, part: !!part, wet: !!WET[key] }));
@@ -82,7 +86,7 @@
         windows.push({ room: r.i, from: r.x + (r.w - ww) / 2, to: r.x + (r.w + ww) / 2 });
       }
     });
-    return { type: Math.max(0, Math.min(3, type | 0)), w: p.w * k, d: p.d * k, rooms, doors, windows, balcony, area: area > 0 ? area : nom, scale: k };
+    return { type: Math.max(0, Math.min(4, type | 0)), w: p.w * k, d: p.d * k, rooms, doors, windows, balcony, area: area > 0 ? area : nom, scale: k };
   }
 
   // Walls as segments [x1, y1, x2, y2, outer] with the door openings cut out (windows stay in the wall: the 3D model
