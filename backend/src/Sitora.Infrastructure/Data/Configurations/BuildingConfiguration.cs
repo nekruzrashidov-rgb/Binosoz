@@ -14,6 +14,8 @@ public class BuildingConfiguration : IEntityTypeConfiguration<Building>
         builder.Property(b => b.Address).HasMaxLength(300).IsRequired();
         builder.Property(b => b.DescriptionRu).HasMaxLength(4000);
         builder.Property(b => b.DescriptionTg).HasMaxLength(4000);
+        builder.Property(b => b.NameEn).HasMaxLength(200);
+        builder.Property(b => b.DescriptionEn).HasMaxLength(4000);
         builder.Property(b => b.ModelUrl).HasMaxLength(500);
         // Удобства — массив ключей (text[]), по умолчанию пустой.
         // Координаты — 6 знаков после запятой (≈ 0,1 м), высота этажа — до сантиметра.
@@ -30,6 +32,8 @@ public class BuildingConfiguration : IEntityTypeConfiguration<Building>
             eco.Property(e => e.WallInsulationTg).HasColumnName("EcoWallInsulationTg").HasMaxLength(200);
             eco.Property(e => e.WindowsRu).HasColumnName("EcoWindowsRu").HasMaxLength(200);
             eco.Property(e => e.WindowsTg).HasColumnName("EcoWindowsTg").HasMaxLength(200);
+            eco.Property(e => e.WallInsulationEn).HasColumnName("EcoWallInsulationEn").HasMaxLength(200);
+            eco.Property(e => e.WindowsEn).HasColumnName("EcoWindowsEn").HasMaxLength(200);
             eco.Property(e => e.SolarPanelsKw).HasColumnName("EcoSolarPanelsKw").HasPrecision(18, 2);
             eco.Property(e => e.HasHeatMeters).HasColumnName("EcoHasHeatMeters");
             eco.Property(e => e.HasWaterMeters).HasColumnName("EcoHasWaterMeters");

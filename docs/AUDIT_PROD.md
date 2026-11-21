@@ -92,3 +92,67 @@
 ## 5. Скриншоты
 
 `docs/audit/`: `A-01.png`, `A-01b.png` (подписи комнат), `A-04.png`, `A-04b.png` («Сдача 2026»), `A-07.png` (модалка брони), `A-17.png` (пустая бронь → ошибки сервера). Для остальных минусов доказательство — ответ API, лог или строка кода в таблице.
+
+## 6. На вычитку: ключи tg, совпадающие с ru
+
+A-24: в `frontend/js/i18n/tg.js` 57 ключей, у которых текст такой же, как в `ru.js`. Часть из них — нормальна (имена собственные: «Душанбе», «Некруз Резиденс»; слова, общие для двух языков: «Галерея», «Балкон», «Сторно»), часть может быть непереведённой. Проверить носителю языка и, где нужно, перевести; исправленные в этой серии строки (`nav.about`, `book.extend`, `deal.reasonPh`, `home.chip.year`, `aboutpg.chip.delivery`) в список не входят.
+
+| Ключ | Текст (ru = tg) |
+|---|---|
+| `wow.hero.badge` | ДУШАНБЕ · {y} |
+| `nav.gallery` | Галерея |
+| `galpg.f.city` | Душанбе |
+| `plans.room.balcony` | Балкон |
+| `pact.entity` | Объект |
+| `pact.platform` | платформа |
+| `audit.act.Reversed` | Сторно |
+| `audit.ent.TariffPlan` | Тариф |
+| `nav.cabinet` | Кабинет |
+| `nav.menu` | Меню |
+| `hero.city` | Душанбе |
+| `hero.photo` | Фасад |
+| `apt.studio` | Студия |
+| `u.m2` | м² |
+| `f.phone` | Телефон |
+| `deal.tab.chat` | Чат |
+| `pay.reverse` | Сторно |
+| `crm.g.system` | Система |
+| `crm.pipeline` | Воронка |
+| `crm.audit` | Журнал |
+| `set.logo` | Логотип |
+| `set.plan` | Тариф |
+| `set.tariff` | Тариф |
+| `set.standard` | Стандарт |
+| `wiz.city.dushanbe` | Душанбе |
+| `wiz.city.bokhtar` | Бохтар |
+| `plat.logo` | Логотип |
+| `stats.months` | янв,фев,мар,апр,май,июн,июл,авг,сен,окт,ноя,дек |
+| `cash.title` | Касса |
+| `cash.reverse` | Сторно |
+| `cash.cat.Marketing` | Маркетинг |
+| `login.twoFaLabel` | Код |
+| `plat.dashboard` | Дашборд |
+| `plat.tariff` | Тариф |
+| `cab.t.chat` | Чат |
+| `green.gV` | {n} г |
+| `green.kgV` | {n} кг |
+| `eco.kw` | {n} кВт |
+| `login.demoAdmin` | Суперадмин |
+| `cat.studioHint` | 0 — студия |
+| `audit.entity` | Объект |
+| `audit.system` | система |
+| `unit.kb` | КБ |
+| `unit.mb` | МБ |
+| `settings.demo` | ДЕМО |
+| `role.SuperAdmin` | Суперадмин |
+| `nav.platform` | Платформа |
+| `ct.phone` | Телефон |
+| `layouts.type0` | Студия |
+| `reg2.phone` | Телефон |
+| `nr.hero.kicker` | Душанбе · {y} |
+| `nr.hero.city` | Душанбе |
+| `h3d.m` | м |
+| `h3d.km` | км |
+| `rem.channel` | Канал |
+| `rem.ch.InApp` | Кабинет |
+| `rem.ch.Email` | Почта |

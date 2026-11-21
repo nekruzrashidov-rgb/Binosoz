@@ -104,6 +104,15 @@
     initials(n) { return String(n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]).join('').toUpperCase(); },
     left(iso) { const ms = new Date(iso).getTime() - Date.now(); if (ms <= 0) return t('book.expired'); const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000); return h + t('u.h') + ' ' + m + t('u.min'); },
   };
+  // A text of the developer's data in the page language: field + 'Ru' | 'Tg' | 'En' (A-10). Without a translation — the
+  // Russian text, and in English it says so: «… (in Russian)». The plain field (`key`) is the API's pick, the last resort.
+  S.localText = (o, key) => {
+    if (!o) return '';
+    const ru = o[key + 'Ru'] || o[key] || '';
+    if (S.lang === 'tg') return o[key + 'Tg'] || ru;
+    if (S.lang === 'en') return o[key + 'En'] || (ru ? ru + ' (' + t('i18n.ruOnly') + ')' : '');
+    return ru;
+  };
   // Apartment types by rooms — one rule for the catalog, the layouts, the gallery and the 3D card, so the labels agree:
   // groups 0 (studio), 1, 2, 3, 4 (four rooms and more); the label names the real number of rooms.
   S.roomsKind = {

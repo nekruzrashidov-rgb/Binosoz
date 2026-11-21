@@ -319,6 +319,10 @@
   async function boot() {
     if (page === 'home' && oldLink()) { location.replace(oldLink()); return; }
     await S.initLang();
+    // The skip link is built before the language has loaded: its text is set again now and on every switch (A-09).
+    const skipText = () => { if (skip) skip.textContent = t('a11y.skip'); };
+    skipText();
+    S.bus.on('lang', skipText);
     applyTheme();
     startProgress();
     // Login and invitation pages draw no top bar (drawHeader skips them): an empty <header> left a blank 68px strip.

@@ -30,7 +30,10 @@ public record BuildingResponse(
     // Точка дома на карте и высота этажа (м); не заданы — полей нет (на сайте нет окружения, высота — оценка 3,0 м).
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? Latitude = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? Longitude = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? FloorHeight = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? FloorHeight = null,
+    // Английские название и описание (A-10): не заданы — полей нет, сайт на EN показывает русский текст с пометкой.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? NameEn = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? DescriptionEn = null);
 
 // PUT /buildings/{id}/location: координаты задаются парой (обе или ни одной), пустое значение — «не задано».
 public record SaveBuildingLocationRequest(decimal? Latitude = null, decimal? Longitude = null, decimal? FloorHeight = null);
@@ -57,7 +60,9 @@ public record BuildingEcoResponse(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? HasWasteSorting,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? GreenAreaM2,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] HeatingType? HeatingType,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? EstimatedKwhPerM2Year)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? EstimatedKwhPerM2Year,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? WallInsulationEn = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? WindowsEn = null)
 {
     public bool IsEmpty => this == new BuildingEcoResponse(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 }
@@ -78,7 +83,9 @@ public record SaveBuildingEcoRequest(
     bool? HasWasteSorting = null,
     decimal? GreenAreaM2 = null,
     HeatingType? HeatingType = null,
-    decimal? EstimatedKwhPerM2Year = null);
+    decimal? EstimatedKwhPerM2Year = null,
+    string? WallInsulationEn = null,
+    string? WindowsEn = null);
 
 public record FloorResponse(
     Guid Id,
@@ -113,7 +120,9 @@ public record SaveBuildingRequest(
     string? ModelUrl,
     string? DescriptionTg = null,
     int? CompletionYear = null,
-    int? PlannedApartments = null);
+    int? PlannedApartments = null,
+    string? NameEn = null,
+    string? DescriptionEn = null);
 
 public record CreateFloorRequest(Guid BuildingId, int Number, string? PlanImageUrl);
 

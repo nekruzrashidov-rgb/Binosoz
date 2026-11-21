@@ -20,6 +20,8 @@ public static class GreenDemoSeeder
         WallInsulationTg = "Пахтаи маъданӣ 100 мм",
         WindowsRu = "Двухкамерный стеклопакет",
         WindowsTg = "Шишапакети дукамера",
+        WallInsulationEn = "Mineral wool, 100 mm",
+        WindowsEn = "Double-chamber glazing units",
         HasHeatMeters = true,
         HasWaterMeters = true,
         HasLedCommonAreas = true,

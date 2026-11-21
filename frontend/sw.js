@@ -4,9 +4,9 @@
    the page /offline.html.
    Never touched: the API (/api, /hubs, /health), files by signed links (/files), Swagger, other hosts (the API on
    Render, fonts, cdnjs) and non-GET requests. Tokens and API answers never reach the cache. */
-const CACHE = 'sitora-v2';
+const CACHE = 'sitora-v3';
 const OFFLINE = '/offline.html';
-const PRECACHE = [OFFLINE, '/css/styles.css', '/favicon.svg', '/manifest.json'];
+const PRECACHE = [OFFLINE, '/js/offline-lang.js', '/css/styles.css', '/favicon.svg', '/manifest.json'];
 const SKIP = ['/api/', '/hubs/', '/health', '/files/', '/swagger'];
 const ASSETS = ['script', 'style', 'image', 'font', 'manifest'];
 

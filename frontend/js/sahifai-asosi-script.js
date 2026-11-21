@@ -790,7 +790,7 @@
       soonHost.replaceChildren(none ? soonCard(d.state, () => { d.state = 'loading'; renderData(); load(); }) : '');
       // Shown while loading too (the render keeps its height): hidden only when there is no building at all.
       about.hidden = d.state === 'empty' || d.state === 'error';
-      aboutText.textContent = (b && (S.lang === 'tg' ? b.descriptionTg || b.description : b.descriptionRu || b.description)) || '';
+      aboutText.textContent = S.localText(b, 'description');
       aboutText.hidden = !aboutText.textContent;
       amenList.replaceChildren(...((b && b.amenities) || []).map((k) => h('li', null, landIcon(AMEN_ICON[k] || 'check'), h('span', null, t('amen.' + k)))));
       amenList.hidden = !amenList.children.length;
