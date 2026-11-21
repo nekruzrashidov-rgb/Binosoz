@@ -223,6 +223,8 @@ public class CatalogService(
             WallInsulationTg = Clean(request.WallInsulationTg),
             WindowsRu = Clean(request.WindowsRu),
             WindowsTg = Clean(request.WindowsTg),
+            WallInsulationEn = Clean(request.WallInsulationEn),
+            WindowsEn = Clean(request.WindowsEn),
             SolarPanelsKw = request.SolarPanelsKw,
             HasHeatMeters = request.HasHeatMeters,
             HasWaterMeters = request.HasWaterMeters,
@@ -270,7 +272,7 @@ public class CatalogService(
 
     private static object EcoSnapshot(BuildingEcoInfo e) => new
     {
-        e.EnergyClass, e.WallInsulationRu, e.WallInsulationTg, e.WindowsRu, e.WindowsTg, e.SolarPanelsKw,
+        e.EnergyClass, e.WallInsulationRu, e.WallInsulationTg, e.WindowsRu, e.WindowsTg, e.WallInsulationEn, e.WindowsEn, e.SolarPanelsKw,
         e.HasHeatMeters, e.HasWaterMeters, e.HasLedCommonAreas, e.HasEvCharging, e.HasRainwaterReuse, e.HasWasteSorting,
         e.GreenAreaM2, e.HeatingType, e.EstimatedKwhPerM2Year
     };
@@ -406,6 +408,8 @@ public class CatalogService(
         building.FloorsCount = request.FloorsCount;
         building.DescriptionRu = EmptyToNull(request.DescriptionRu);
         building.DescriptionTg = EmptyToNull(request.DescriptionTg);
+        building.NameEn = EmptyToNull(request.NameEn);
+        building.DescriptionEn = EmptyToNull(request.DescriptionEn);
         building.ModelUrl = request.ModelUrl?.Trim();
         building.CompletionYear = request.CompletionYear;
         building.PlannedApartments = request.PlannedApartments;
@@ -414,7 +418,7 @@ public class CatalogService(
     private static string? EmptyToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static object Snapshot(Building b) =>
-        new { b.NameRu, b.NameTg, b.Address, b.FloorsCount, b.DescriptionRu, b.DescriptionTg, b.ModelUrl, b.CompletionYear, b.PlannedApartments };
+        new { b.NameRu, b.NameTg, b.NameEn, b.Address, b.FloorsCount, b.DescriptionRu, b.DescriptionTg, b.DescriptionEn, b.ModelUrl, b.CompletionYear, b.PlannedApartments };
 
     private static object Snapshot(Apartment a) =>
         new { a.Number, a.Rooms, a.Area, a.PricePerM2, a.Price, a.Currency, a.Status, a.PlanSlot, a.Model3dId };
@@ -451,7 +455,9 @@ public class CatalogService(
             b.Eco.HasWasteSorting,
             b.Eco.GreenAreaM2,
             b.Eco.HeatingType,
-            b.Eco.EstimatedKwhPerM2Year),
+            b.Eco.EstimatedKwhPerM2Year,
+            b.Eco.WallInsulationEn,
+            b.Eco.WindowsEn),
         b.Organization.Green.IsDemo,
         b.Amenities,
         b.Organization.Installment.DownPaymentMinPct == null && b.Organization.Installment.MaxMonths == null && !b.Organization.Installment.NoOverpayment
@@ -459,7 +465,9 @@ public class CatalogService(
             : new InstallmentTermsResponse(b.Organization.Installment.DownPaymentMinPct, b.Organization.Installment.MaxMonths, b.Organization.Installment.NoOverpayment),
         b.Latitude,
         b.Longitude,
-        b.FloorHeight);
+        b.FloorHeight,
+        b.NameEn,
+        b.DescriptionEn);
 
     private static readonly Expression<Func<Floor, FloorResponse>> ToFloorResponse = f => new FloorResponse(
         f.Id,

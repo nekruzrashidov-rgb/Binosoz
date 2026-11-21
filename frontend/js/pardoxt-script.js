@@ -35,7 +35,9 @@
   const brand = (n) => (/^4/.test(n) ? 'VISA' : /^(5[1-5]|2[2-7])/.test(n) ? 'Mastercard' : /^9762/.test(n) ? 'Корти Миллӣ' : '');
 
   // A strip that cannot be missed while the test bank is on (GET /payment/mock/status): no money is charged.
-  const testBanner = h('div', { class: 'pay-testbar', role: 'note', hidden: true }, S.icon('shield'), h('b', null, t('pay.mockBanner')));
+  // Its text is set after the language has loaded (boot): built earlier, it stayed Russian on TJ and EN (A-11).
+  const testBannerText = h('b');
+  const testBanner = h('div', { class: 'pay-testbar', role: 'note', hidden: true }, S.icon('shield'), testBannerText);
   if (S.api.mockBankStatus) S.api.mockBankStatus().then((r) => { testBanner.hidden = !(r && r.enabled); }).catch(() => {});
 
   function shell(...children) {
@@ -138,6 +140,7 @@
 
   async function boot() {
     await S.initLang();
+    testBannerText.textContent = t('pay.mockBanner');
     // The tab title in the page language (the HTML holds the Russian one).
     if (S.lang !== 'ru') document.title = t('pay.title') + ' — ' + t('brand.name');
     document.documentElement.dataset.theme = S.store.get('sitora.theme') === 'dark' ? 'dark' : 'light';

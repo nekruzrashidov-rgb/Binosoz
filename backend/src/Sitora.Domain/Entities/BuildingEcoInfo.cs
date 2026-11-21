@@ -11,6 +11,8 @@ public class BuildingEcoInfo
     public string? WallInsulationTg { get; set; }
     public string? WindowsRu { get; set; }
     public string? WindowsTg { get; set; }
+    public string? WallInsulationEn { get; set; }
+    public string? WindowsEn { get; set; }
     public decimal? SolarPanelsKw { get; set; }
     public bool? HasHeatMeters { get; set; }
     public bool? HasWaterMeters { get; set; }
@@ -26,7 +28,8 @@ public class BuildingEcoInfo
 
     public bool IsEmpty =>
         EnergyClass is null && string.IsNullOrWhiteSpace(WallInsulationRu) && string.IsNullOrWhiteSpace(WallInsulationTg)
-        && string.IsNullOrWhiteSpace(WindowsRu) && string.IsNullOrWhiteSpace(WindowsTg) && SolarPanelsKw is null
+        && string.IsNullOrWhiteSpace(WindowsRu) && string.IsNullOrWhiteSpace(WindowsTg)
+        && string.IsNullOrWhiteSpace(WallInsulationEn) && string.IsNullOrWhiteSpace(WindowsEn) && SolarPanelsKw is null
         && HasHeatMeters is null && HasWaterMeters is null && HasLedCommonAreas is null && HasEvCharging is null
         && HasRainwaterReuse is null && HasWasteSorting is null && GreenAreaM2 is null && HeatingType is null
         && EstimatedKwhPerM2Year is null;

@@ -62,7 +62,7 @@ Binosoz/
 │   │   │   ├── Data/
 │   │   │   │   ├── AppDbContext.cs
 │   │   │   │   ├── Configurations/ ← EF конфигурации сущностей
-│   │   │   │   ├── Migrations/     ← миграции EF Core (33)
+│   │   │   │   ├── Migrations/     ← миграции EF Core (34)
 │   │   │   │   └── Seed/           ← сидер (Development-данные)
 │   │   │   ├── Services/           ← вся бизнес-логика:
 │   │   │   │   AuthService.cs      (675 строк: email OTP, SMS, JWT, refresh, lockout)
@@ -80,14 +80,14 @@ Binosoz/
 │   │   │   ├── Jobs/               ← ExpireBookingsJob, UpdateRatesJob, PaymentReminderJob, OverduePaymentJob, BookingExpiryNoticeJob (Hangfire)
 │   │   │   └── Security/           ← JwtTokenService, EncryptionService (AES-256-GCM)
 │   │   └── Sitora.WebApi/          ← HTTP-слой
-│   │       ├── Controllers/        ← 37 тонких контроллеров (принял DTO → сервис → ответ)
+│   │       ├── Controllers/        ← 43 файла тонких контроллеров (принял DTO → сервис → ответ)
 │   │       ├── Hubs/ChatHub.cs     ← SignalR: JoinDeal, SendMessage, messageReceived
 │   │       ├── Middleware/         ← DomainExceptionHandler, SecurityHeadersMiddleware,
 │   │       │                          ImpersonationAuditMiddleware
 │   │       ├── Validators/         ← FluentValidation
 │   │       └── Program.cs          ← точка входа, DI, пайплайн
 │   ├── tests/
-│   │   └── Sitora.Tests/           ← 509 тестов, Testcontainers, покрывают:
+│   │   └── Sitora.Tests/           ← 519 тестов (PostgreSQL: SITORA_TEST_DB или Testcontainers), покрывают:
 │   │                                  auth, catalog, chat, payments, sales, security
 │   └── scripts/                    ← backup.sh/restore.sh, seed.sql (демо для прода), smoke.sh, load/ (k6),
 │                                      gmail-token.mjs (refresh token Gmail), set-resend-key.ps1
@@ -102,7 +102,7 @@ Binosoz/
     ├── css/styles.css             ← токены (:root и [data-theme='dark']), все компоненты; новый дизайн — классы nr-*
     └── js/
         ├── tanzimot-api-url.js        ← config: API_BASE ('/api/v1'; Vercel → Render), ORG_SLUG, CONTACT, INSTALLMENT
-        ├── i18n/ru.js, tg.js, en.js   ← тексты (по 1946 ключей); ru — на каждой странице и запасной
+        ├── i18n/ru.js, tg.js, en.js   ← тексты (по 1959 ключей); ru — на каждой странице и запасной
         ├── tarjumaho-ru-tg-en.js      ← S.t(), S.initLang()/S.setLang() (грузит tg/en по требованию), S.bus
         ├── komponentho-modal-toast-tabs.js ← h() DOM-builder, иконки, модалки, тосты
         ├── zaprosho-ba-backend.js     ← все вызовы API, токены (localStorage sitora.auth)
@@ -118,12 +118,13 @@ Binosoz/
         ├── siyosati-mahfiyat-script.js ← /privacy: политика конфиденциальности (тексты privacy.*; сверять с кодом при изменениях)
         ├── kabineti-xaridor-script.js ← вход и кабинет покупателя
         ├── crm-script.js, panelho-crm-script.js ← CRM и её боковые панели
-        ├── superadmin-platform-script.js ← раздел PlatformOwner
+        ├── superadmin-platform-script.js ← раздел платформы (SuperAdmin)
         ├── pardoxt-script.js          ← payment.html (тестовый банк)
         ├── ai-assistent.js, pwa-sabt.js ← AI-ассистент (кабинет/CRM/платформа и публичный режим на страницах ЖК), регистрация Service Worker
-        └── namunavi-malumot-mock.js   ← demo-бэкенд; сейчас ни одна страница его не подключает
+        └── offline-lang.js            ← язык offline.html без API (в прекэше Service Worker)
     └── tools/                  ← только разработка, НЕ публикуется (.vercelignore, .dockerignore):
         ├── serve-web.mjs          статик-сервер: node frontend/tools/serve-web.mjs 5500
+        ├── namunavi-malumot-mock.js  старый demo-бэкенд; ни одна страница его не подключает (не публикуется)
         ├── check-contrast.js      проверка контраста WCAG AA
         ├── qr/                    QR-код сайта в SVG: cd frontend/tools/qr && npm ci && npm run build
         ├── renders/               кадры 3D-модели для сайта: serve-web на 5500, затем node frontend/tools/renders/render.mjs
@@ -155,12 +156,12 @@ Binosoz/
 ## Роли
 | Роль | Доступ |
 |------|--------|
-| Admin | Всё, включая пользователей, аудит, настройки |
+| Owner (владелец), ObjectAdmin (руководитель дома) | Всё в своей организации / своём доме, включая пользователей, аудит, настройки |
 | Manager | Лиды, брони, сделки, клиенты, документы, чат |
 | Accountant | Платежи, сторно, акты сверки, курсы, отчёты |
 | Content | Каталог (дома/этажи/квартиры), ход стройки, фото |
 | Customer | Только свои сделки, платежи, документы, чат |
-| PlatformOwner | Управление организациями (мультиарендность) |
+| SuperAdmin | Платформа: организации, тарифы, пользователи всех организаций (мультиарендность) |
 | Гость | Каталог (read-only) + отправка заявки |
 
 ## Бизнес-правила (нельзя нарушать)
@@ -242,6 +243,8 @@ Payments__MockEnabled=false      # true — тестовый банк вне Dev
 Logging__File__Enabled=true      # файлы логов (только VPS; на Render — stdout)
 Claude__ApiKey=                  # ключ Anthropic: AI-помощник в кабинете, CRM и на публичном сайте; пусто — помощника нет (сайт его не показывает)
 Claude__PublicDailyLimit=300     # вопросов гостей к помощнику на сайте в сутки на организацию; на IP — RateLimiting__AiPublicPerMinute/PerDay (6/40)
+Booking__GuestActivePerIp=3      # активных броней с сайта на один IP; 0 — без лимита
+ForwardedHeaders__ClientIpHeader=  # заголовок с IP клиента от доверенного прокси (CF-Connecting-IP); пусто — X-Forwarded-For (docs/DECISIONS.md, A-15)
 ```
 
 ## Уведомления покупателю

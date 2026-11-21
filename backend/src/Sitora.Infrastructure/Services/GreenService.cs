@@ -16,19 +16,23 @@ public partial class GreenService(
     CatalogCache catalogCache,
     TimeProvider timeProvider) : IGreenService
 {
+    // Вычисляется до запроса (var orgId = OrganizationId): исключение внутри LINQ-выражения EF Core оборачивает
+    // в InvalidOperationException, и вместо ответа 400 был 500. Без организации (суперадмин платформы) — 400 organization_required.
     private Guid OrganizationId => currentUser.OrganizationId
-        ?? throw new BusinessRuleException("Выберите организацию: войдите как её владелец");
+        ?? throw new BadRequestException("Укажите организацию");
 
     public async Task<GreenSettingsResponse> GetSettingsAsync(CancellationToken ct = default)
     {
-        var org = await db.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == OrganizationId, ct)
+        var orgId = OrganizationId;
+        var org = await db.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == orgId, ct)
                   ?? throw new NotFoundException("Организация не найдена");
         return ToResponse(org.Green);
     }
 
     public async Task<GreenSettingsResponse> SaveSettingsAsync(SaveGreenSettingsRequest request, CancellationToken ct = default)
     {
-        var org = await db.Organizations.FirstOrDefaultAsync(o => o.Id == OrganizationId, ct)
+        var orgId = OrganizationId;
+        var org = await db.Organizations.FirstOrDefaultAsync(o => o.Id == orgId, ct)
                   ?? throw new NotFoundException("Организация не найдена");
         var before = ToResponse(org.Green);
         org.Green.TariffKwhTjs = request.TariffKwhTjs;
@@ -80,7 +84,8 @@ public partial class GreenService(
 
     public async Task<GreenStatsResponse> GetStatsAsync(CancellationToken ct = default)
     {
-        var org = await db.Organizations.AsNoTracking().Where(o => o.Id == OrganizationId)
+        var orgId = OrganizationId;
+        var org = await db.Organizations.AsNoTracking().Where(o => o.Id == orgId)
                       .Select(o => new { o.Id, o.Green }).FirstOrDefaultAsync(ct)
                   ?? throw new NotFoundException("Организация не найдена");
         var (totals, bookings, payments, chat) = await CountAsync(org.Id, org.Green, ct);

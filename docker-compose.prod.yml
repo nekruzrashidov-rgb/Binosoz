@@ -72,6 +72,7 @@ services:
       Cors__AllowedOrigins__1: ${CRM_ORIGIN:-}
       # API доступен только через Caddy, поэтому заголовкам X-Forwarded-* можно доверять.
       ForwardedHeaders__Enabled: "true"
+      ForwardedHeaders__ClientIpHeader: ${FORWARDED_CLIENT_IP_HEADER:-}
       # Коды входа и приглашения уходят письмами: Smtp, Resend или Gmail.
       Email__Provider: ${EMAIL_PROVIDER:?Задайте EMAIL_PROVIDER (Smtp, Resend или Gmail) в файле .env}
       Email__From: ${EMAIL_FROM:?Задайте EMAIL_FROM в файле .env}
@@ -85,6 +86,7 @@ services:
       Email__Gmail__ClientSecret: ${GMAIL_CLIENT_SECRET:-}
       Email__Gmail__RefreshToken: ${GMAIL_REFRESH_TOKEN:-}
       Claude__ApiKey: ${CLAUDE_API_KEY:-}
+      Claude__PublicDailyLimit: ${CLAUDE_PUBLIC_DAILY_LIMIT:-300}
       # Telegram: чат менеджеров, бот для покупателей (webhook) и коды входа через Telegram Gateway (docs/DEPLOY.md).
       Telegram__BotToken: ${TELEGRAM_BOT_TOKEN:-}
       Telegram__ChatId: ${TELEGRAM_CHAT_ID:-}
@@ -98,6 +100,8 @@ services:
       Sentry__Dsn: ${SENTRY_DSN:-}
       Health__Key: ${HEALTH_KEY:-}
       Payments__MockEnabled: ${PAYMENTS_MOCK_ENABLED:-false}
+      Auth__DemoPasswordLogin: ${DEMO_PASSWORD_LOGIN:-false}
+      Booking__GuestActivePerIp: ${BOOKING_GUEST_ACTIVE_PER_IP:-3}
       Auth__RefreshCookie__Mode: ${AUTH_REFRESH_COOKIE_MODE:-Dual}
       # Хранилище файлов: Local — том files ниже; S3 — RustFS / MinIO / Cloudflare R2 / Backblaze B2 / AWS (docs/DEPLOY.md, «Файлы»).
       Storage__Provider: ${STORAGE_PROVIDER:-Local}

@@ -104,6 +104,26 @@
     initials(n) { return String(n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]).join('').toUpperCase(); },
     left(iso) { const ms = new Date(iso).getTime() - Date.now(); if (ms <= 0) return t('book.expired'); const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000); return h + t('u.h') + ' ' + m + t('u.min'); },
   };
+  // A text of the developer's data in the page language: field + 'Ru' | 'Tg' | 'En' (A-10). Without a translation — the
+  // Russian text, and in English it says so: «… (in Russian)». The plain field (`key`) is the API's pick, the last resort.
+  S.localText = (o, key) => {
+    if (!o) return '';
+    const ru = o[key + 'Ru'] || o[key] || '';
+    if (S.lang === 'tg') return o[key + 'Tg'] || ru;
+    if (S.lang === 'en') return o[key + 'En'] || (ru ? ru + ' (' + t('i18n.ruOnly') + ')' : '');
+    return ru;
+  };
+  // Apartment types by rooms — one rule for the catalog, the layouts, the gallery and the 3D card, so the labels agree:
+  // groups 0 (studio), 1, 2, 3, 4 (four rooms and more); the label names the real number of rooms.
+  S.roomsKind = {
+    types: [0, 1, 2, 3, 4],
+    group: (n) => Math.max(0, Math.min(4, Math.floor(+n || 0))),
+    label: (n) => { const r = Math.floor(+n || 0); return r > 4 ? t('layouts.typeN', { n: r }) : t('layouts.type' + S.roomsKind.group(r)); },
+    // The label of a group card: «4 комнаты и больше», when the group holds apartments with more than four rooms.
+    groupLabel: (g, list) => (g === 4 && (list || []).some((a) => a.rooms > 4) ? t('layouts.type4plus') : t('layouts.type' + g)),
+    pill: (g) => (g === 0 ? t('apt.studio') : g === 4 ? '4+' : String(g)),
+    match: (a, v) => v === 'all' || v === undefined || S.roomsKind.group(a.rooms) === +v,
+  };
   // Local calendar date (toISOString would give the UTC date: in Dushanbe, UTC+5, "today" before 5 a.m. would be yesterday).
   const localDay = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   S.today = () => localDay(new Date());
@@ -165,15 +185,46 @@
   S.err = (e) => S.toast((e && e.message) || t('err.unknown'), 'bad');
 
   // ---------- modal ----------
+  // Focus stays inside an open dialog (WCAG 2.4.3, A-07): the rest of the page becomes inert, Tab and Shift+Tab go round
+  // the dialog, and when it closes the focus returns to the element that opened it. `root` — the dialog's element that is
+  // a direct child of <body> (an overlay); dialogs may open over dialogs: each one restores only what it changed.
+  const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"]),summary';
+  S.trapFocus = (root, box) => {
+    box = box || root;
+    const opener = document.activeElement;
+    // Toasts stay outside: their messages must still be announced while the dialog is open.
+    const made = [...document.body.children].filter((el) => el !== root && !el.inert && el.tagName !== 'SCRIPT' && !el.classList.contains('toasts'));
+    made.forEach((el) => { el.inert = true; });
+    const onKey = (e) => {
+      if (e.key !== 'Tab') return;
+      const items = [...box.querySelectorAll(FOCUSABLE)].filter((el) => el.offsetParent !== null || el === document.activeElement);
+      if (!items.length) { e.preventDefault(); return; }
+      const first = items[0], last = items[items.length - 1];
+      if (!box.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+      else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('keydown', onKey, true);
+      made.forEach((el) => { el.inert = false; });
+      if (opener && opener.isConnected && typeof opener.focus === 'function') opener.focus({ preventScroll: true });
+    };
+  };
+
+  let modalN = 0;
   S.modal = (opts) => {
-    const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); if (opts.onClose) opts.onClose(); };
+    let release = null;
+    const close = () => { if (!ov.isConnected) return; ov.remove(); document.removeEventListener('keydown', onKey); if (release) release(); if (opts.onClose) opts.onClose(); };
     const onKey = (e) => { if (e.key === 'Escape') close(); };
     const x = h('button', { class: 'icon-btn x', 'aria-label': t('common.close'), onclick: close }, S.icon('x'));
     const body = h('div', { class: 'modal-body' }, opts.body);
-    const m = h('div', { class: 'modal' + (opts.wide ? ' wide' : ''), role: 'dialog', 'aria-modal': 'true' }, x, opts.title ? h('h2', null, opts.title) : null, body, opts.actions ? h('div', { class: 'actions' }, opts.actions) : null);
+    const titleId = opts.title ? 'modal-title-' + (++modalN) : null;
+    const m = h('div', { class: 'modal' + (opts.wide ? ' wide' : ''), role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId }, x, opts.title ? h('h2', { id: titleId }, opts.title) : null, body, opts.actions ? h('div', { class: 'actions' }, opts.actions) : null);
     const ov = h('div', { class: 'overlay' + (opts.side ? ' right' : ''), onmousedown: (e) => { if (e.target === ov) close(); } }, m);
     document.body.appendChild(ov); document.addEventListener('keydown', onKey);
-    setTimeout(() => { const f = m.querySelector('input:not([type=hidden]),select,textarea'); if (f && !opts.noFocus) f.focus(); }, 60);
+    release = S.trapFocus(ov, m);
+    setTimeout(() => { if (!ov.isConnected) return; const f = m.querySelector('input:not([type=hidden]),select,textarea'); (f && !opts.noFocus ? f : x).focus(); }, 60);
     return { close, el: m, body, overlay: ov };
   };
 

@@ -412,7 +412,7 @@ TwoFactorRequired = { requiresTwoFactor: true, tempToken, expiresAt }
 
 | Метод | Путь | Ответ | `api.js` |
 | --- | --- | --- | --- |
-| GET | `/buildings?organization=slug` | страница `BuildingResponse`. Сайт застройщика передаёт свой `slug` (у организации по умолчанию — `sitora`). Без параметра — дома всех активных организаций. С токеном сотрудника — только его дома | `buildings()` |
+| GET | `/buildings?organization=slug` | страница `BuildingResponse`. Сайт застройщика передаёт свой `slug` (у организации по умолчанию — `nekruz`). Без параметра — 400 `organization_required`, неизвестный `slug` — 404 `organization_not_found`. С токеном сотрудника — только его дома | `buildings()` |
 | GET | `/buildings/{id}` | `BuildingResponse` | `building()` |
 | GET | `/buildings/{id}/floors` | страница `FloorResponse` | `floors()` |
 | GET | `/floors/{id}/apartments` | страница `ApartmentResponse` | `floorApartments()` |

@@ -19,7 +19,7 @@
 
   S.views.gallery = function (root) {
     const site = S.site;
-    let filter = 'all', lightbox = null, opener = null, planTypes = [];
+    let filter = 'all', lightbox = null, opener = null, planTypes = [], releaseFocus = null;
     const page = h('div', { class: 'page-in nr gallery-page' });
     root.appendChild(page);
 
@@ -44,7 +44,7 @@
       const list = shown();
       grid.replaceChildren(...list.map((it, i) => {
         let pic;
-        if (it.photo || it.render) pic = picture(it, '(max-width: 600px) 100vw, (max-width: 1000px) 50vw, 420px');
+        if (it.photo || it.render) pic = picture(it, '(max-width: 600px) calc(100vw - 32px), (max-width: 1000px) calc(50vw - 30px), 380px');
         else { pic = h('canvas', { role: 'img', 'aria-label': t(it.cap) }); paintPlan(pic, it.plan, 300, 200); }
         return h('figure', { class: 'galpg-card' },
           h('button', { type: 'button', class: 'galpg-shot' + (it.plan != null ? ' is-plan' : ''), 'aria-label': t('galpg.zoom') + ': ' + title(it), onclick: () => open(i) }, pic,
@@ -79,6 +79,7 @@
         h('div', { class: 'lb-box' }, x, h('div', { class: 'lb-stage' }, prev, stage, next), h('div', { class: 'lb-foot' }, cap, count)));
       lightbox.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); else if (e.key === 'ArrowLeft') step(-1); else if (e.key === 'ArrowRight') step(1); });
       document.body.appendChild(lightbox);
+      releaseFocus = S.trapFocus(lightbox);
       document.body.classList.add('menu-open');
       draw();
       x.focus();
@@ -86,6 +87,7 @@
     function close() {
       if (!lightbox) return;
       lightbox.remove(); lightbox = null;
+      if (releaseFocus) { releaseFocus(); releaseFocus = null; }
       document.body.classList.remove('menu-open');
       if (opener && opener.isConnected) opener.focus();
       opener = null;
@@ -99,7 +101,7 @@
         if (!id) return;
         const apts = await S.api.allApartments(await S.api.floors(id));
         if (!alive) return;
-        planTypes = [0, 1, 2, 3].filter((n) => apts.some((a) => (n === 3 ? a.rooms >= 3 : a.rooms === n)));
+        planTypes = S.roomsKind.types.filter((n) => apts.some((a) => S.roomsKind.group(a.rooms) === n));
         if (planTypes.length) { drawBar(); drawGrid(); }
       } catch (e) { /* no API: renders and city views only */ }
     })();

@@ -50,7 +50,9 @@ public static class CatalogSeeder
             PlannedApartments = ResidentialFloors * Layout.Length,
             // Нейтральное описание без оценок («бизнес-класс» и т. п. — только если их подтвердит застройщик) и его перевод.
             DescriptionRu = "Жилой дом с коммерческим первым этажом",
-            DescriptionTg = "Бинои истиқоматӣ бо ошёнаи якуми тиҷоратӣ"
+            DescriptionTg = "Бинои истиқоматӣ бо ошёнаи якуми тиҷоратӣ",
+            NameEn = "Nekruz Residence",
+            DescriptionEn = "A residential building with a commercial ground floor"
         };
 
         building.Floors.Add(new Floor { Number = Floor.CommercialFloorNumber });

@@ -14,3 +14,8 @@ backend/scripts/
 frontend/tools/
 **/.env
 *.md
+# Файлы сборки Vercel и описание папки сайта в образ API не идут (A-22).
+frontend/README.md
+frontend/build-version.sh
+frontend/vercel.json
+frontend/.vercelignore

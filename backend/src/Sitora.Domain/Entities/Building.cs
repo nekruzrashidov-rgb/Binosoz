@@ -12,6 +12,9 @@ public class Building : BaseEntity
     public int FloorsCount { get; set; }
     public string? DescriptionRu { get; set; }
     public string? DescriptionTg { get; set; }
+    // Английские тексты для сайта на EN (A-10); не заданы — сайт показывает русский с пометкой.
+    public string? NameEn { get; set; }
+    public string? DescriptionEn { get; set; }
     public string? ModelUrl { get; set; }
 
     // Год сдачи и сколько квартир задумано в доме — задаёт владелец при создании; заведённых квартир может быть меньше.
