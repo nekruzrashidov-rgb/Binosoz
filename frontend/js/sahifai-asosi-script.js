@@ -483,6 +483,7 @@
       const md = S.modal({ title: t('book.title', { n: a.number }), body: [h('div', { class: 'card flat', style: { marginBottom: '14px' } }, h('div', { class: 'row between' }, h('b', null, t('apt.title', { n: a.number })), S.fmt.money(a.price, 'TJS')), h('div', { class: 'muted' }, t('floor.n', { n: a.floor }) + ' · ' + S.fmt.rooms(a.rooms) + ' · ' + S.fmt.area(a.area))), form], actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
       form.addEventListener('submit', async (e) => {
         e.preventDefault(); S.showErrors(form, null);
+        if (!namePhoneOk(form, name, phone)) return;
         await S.busy(btn, async () => {
           try {
             const r = await S.api.book(a.id, { name: name.value.trim(), phone: phone.value.replace(/[\s()-]/g, '') });
@@ -503,6 +504,7 @@
       const md = S.modal({ title: t('lead.title'), body: form, actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
       form.addEventListener('submit', async (e) => {
         e.preventDefault(); S.showErrors(form, null);
+        if (!namePhoneOk(form, name, phone)) return;
         await S.busy(btn, async () => { try { await S.api.createLead({ name: name.value.trim(), phone: phone.value.replace(/[\s()-]/g, ''), comment: cm.value.trim(), apartmentId: aptId }); md.close(); S.toast(t('lead.ok'), 'ok'); } catch (er) { S.showErrors(form, er); } });
       });
     }
@@ -944,8 +946,9 @@
             h('dl', null, schedule.map(([day, time]) => [h('dt', null, t('day.' + day)), h('dd', { class: time ? '' : 'off' }, time || t('day.off'))]))))
           : null),
       // A map card: the office address on a stylised city plan.
-      h('div', { class: 'ct-map', role: 'img', 'aria-label': c.address || '' },
-        h('div', { class: 'ct-map-pin' }, landIcon('pin')), h('b', null, t('ct.city') + ', ' + (c.address || '').replace(/^(г\.\s*|ш\.\s*)?Душанбе,\s*/, '').replace(/,\s*Dushanbe$/, '')),
+      // Not role="img": the card holds a link (axe nested-interactive, A-18); the address is read as text, the pin is decoration.
+      h('div', { class: 'ct-map' },
+        h('div', { class: 'ct-map-pin', 'aria-hidden': 'true' }, landIcon('pin')), h('b', null, t('ct.city') + ', ' + (c.address || '').replace(/^(г\.\s*|ш\.\s*)?Душанбе,\s*/, '').replace(/,\s*Dushanbe$/, '')),
         h('a', { class: 'btn nr-btn nr-btn--primary', href: 'https://www.openstreetmap.org/search?query=' + encodeURIComponent(c.address || ''), target: '_blank', rel: 'noopener' }, t('ct.route'), arrow())));
 
     // Above the form — straight to the messengers; under it — why it is safe to write.
@@ -1034,6 +1037,17 @@
     return '+992' + (parts.length ? ' ' + parts.join(' ') : '');
   };
   const validPhone = (v) => { const d = phoneDigits(v); return /^992\d{9}$/.test(d) || /^\d{9}$/.test(d); };
+  // The booking and question forms check the name and the phone before sending, like the contact form (A-17):
+  // the errors appear under the fields, the server is not asked with an empty form.
+  const namePhoneOk = (form, name, phone) => {
+    const errors = {};
+    if (name.value.trim().length < 2) errors.name = [t('ct.errName')];
+    if (!validPhone(phone.value)) errors.phone = [t('ct.errPhone')];
+    if (!Object.keys(errors).length) return true;
+    S.showErrors(form, { errors, message: t('ct.errPhone') });
+    (errors.name ? name : phone).focus();
+    return false;
+  };
 
   S.views.register = function (root) {
     // Design docs/design/Register.dc.html: on the left a dark column with what the platform gives, on the right the form.

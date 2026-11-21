@@ -90,7 +90,11 @@
   // Phone and tablet menu: a dark full-screen layer with large links, the languages and the phone. Closes on ×, Escape or a link.
   let overlay = null;
   // extra: an optional row under the languages (the public site puts the theme switch there: on phones it leaves the header).
+  // While the menu is open the page behind is inert and Tab stays in the menu (S.trapFocus, A-07). The header is redrawn
+  // with the menu open (the theme switch inside it): the old menu's trap is released first, or the page would stay inert.
+  let releaseFocus = null;
   function buildMobileOverlay(navItems, extra) {
+    if (releaseFocus) { releaseFocus(); releaseFocus = null; }
     if (overlay) overlay.remove();
     // Escape closes the menu wherever the focus is (focus moves into the menu only after a moment).
     const onKey = (e) => { if (e.key === 'Escape') close(); };
@@ -100,6 +104,7 @@
       document.body.classList.remove('menu-open');
       btn.setAttribute('aria-expanded', 'false');
       document.removeEventListener('keydown', onKey);
+      if (releaseFocus) { releaseFocus(); releaseFocus = null; }
       btn.focus();
     };
     const navEls = navItems.map(([href, label, active]) => h('a', { href, class: active ? 'on' : '', 'aria-current': active ? 'page' : null, onclick: close }, label));
@@ -115,7 +120,7 @@
     document.body.appendChild(el);
     document.body.classList.remove('menu-open');
     const btn = h('button', { class: 'icon-btn menu-btn', type: 'button', 'aria-label': t('nav.menu'), 'aria-expanded': 'false',
-      onclick: () => { el.classList.add('open'); document.body.classList.add('menu-open'); btn.setAttribute('aria-expanded', 'true'); document.addEventListener('keydown', onKey); setTimeout(() => el.querySelector('.mob-close').focus(), 30); } }, S.icon('menu'));
+      onclick: () => { el.classList.add('open'); document.body.classList.add('menu-open'); btn.setAttribute('aria-expanded', 'true'); document.addEventListener('keydown', onKey); releaseFocus = S.trapFocus(el); setTimeout(() => el.querySelector('.mob-close').focus(), 30); } }, S.icon('menu'));
     return { btn, overlay: el };
   }
 

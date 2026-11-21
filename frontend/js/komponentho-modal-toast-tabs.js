@@ -176,15 +176,46 @@
   S.err = (e) => S.toast((e && e.message) || t('err.unknown'), 'bad');
 
   // ---------- modal ----------
+  // Focus stays inside an open dialog (WCAG 2.4.3, A-07): the rest of the page becomes inert, Tab and Shift+Tab go round
+  // the dialog, and when it closes the focus returns to the element that opened it. `root` — the dialog's element that is
+  // a direct child of <body> (an overlay); dialogs may open over dialogs: each one restores only what it changed.
+  const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"]),summary';
+  S.trapFocus = (root, box) => {
+    box = box || root;
+    const opener = document.activeElement;
+    // Toasts stay outside: their messages must still be announced while the dialog is open.
+    const made = [...document.body.children].filter((el) => el !== root && !el.inert && el.tagName !== 'SCRIPT' && !el.classList.contains('toasts'));
+    made.forEach((el) => { el.inert = true; });
+    const onKey = (e) => {
+      if (e.key !== 'Tab') return;
+      const items = [...box.querySelectorAll(FOCUSABLE)].filter((el) => el.offsetParent !== null || el === document.activeElement);
+      if (!items.length) { e.preventDefault(); return; }
+      const first = items[0], last = items[items.length - 1];
+      if (!box.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+      else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('keydown', onKey, true);
+      made.forEach((el) => { el.inert = false; });
+      if (opener && opener.isConnected && typeof opener.focus === 'function') opener.focus({ preventScroll: true });
+    };
+  };
+
+  let modalN = 0;
   S.modal = (opts) => {
-    const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); if (opts.onClose) opts.onClose(); };
+    let release = null;
+    const close = () => { if (!ov.isConnected) return; ov.remove(); document.removeEventListener('keydown', onKey); if (release) release(); if (opts.onClose) opts.onClose(); };
     const onKey = (e) => { if (e.key === 'Escape') close(); };
     const x = h('button', { class: 'icon-btn x', 'aria-label': t('common.close'), onclick: close }, S.icon('x'));
     const body = h('div', { class: 'modal-body' }, opts.body);
-    const m = h('div', { class: 'modal' + (opts.wide ? ' wide' : ''), role: 'dialog', 'aria-modal': 'true' }, x, opts.title ? h('h2', null, opts.title) : null, body, opts.actions ? h('div', { class: 'actions' }, opts.actions) : null);
+    const titleId = opts.title ? 'modal-title-' + (++modalN) : null;
+    const m = h('div', { class: 'modal' + (opts.wide ? ' wide' : ''), role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId }, x, opts.title ? h('h2', { id: titleId }, opts.title) : null, body, opts.actions ? h('div', { class: 'actions' }, opts.actions) : null);
     const ov = h('div', { class: 'overlay' + (opts.side ? ' right' : ''), onmousedown: (e) => { if (e.target === ov) close(); } }, m);
     document.body.appendChild(ov); document.addEventListener('keydown', onKey);
-    setTimeout(() => { const f = m.querySelector('input:not([type=hidden]),select,textarea'); if (f && !opts.noFocus) f.focus(); }, 60);
+    release = S.trapFocus(ov, m);
+    setTimeout(() => { if (!ov.isConnected) return; const f = m.querySelector('input:not([type=hidden]),select,textarea'); (f && !opts.noFocus ? f : x).focus(); }, 60);
     return { close, el: m, body, overlay: ov };
   };
 
