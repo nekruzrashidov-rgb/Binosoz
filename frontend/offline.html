@@ -8,17 +8,19 @@
 <meta name="theme-color" content="#f5f0e8">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/css/styles.css">
+<script src="/js/offline-lang.js" defer></script>
 </head>
 <body data-page="offline">
-<!-- Shown by the Service Worker (sw.js) when there is no network and the page was never opened before. No scripts: works fully offline. -->
+<!-- Shown by the Service Worker (sw.js) when there is no network and the page was never opened before. Works fully offline:
+     the only script (js/offline-lang.js, precached) puts the texts in the chosen language; without it the page stays Russian. -->
 <main class="nr nr-sec nr-err">
   <div class="nr-wrap">
-    <div class="nr-kicker"><span class="nr-kicker-line" aria-hidden="true"></span>Нет подключения</div>
-    <h1 class="nr-page-title">Нет подключения</h1>
-    <p class="nr-err-text">Проверьте интернет и обновите страницу. Страницы, которые вы уже открывали, доступны и без сети.</p>
-    <p class="nr-err-text" lang="tg">Пайвастшавӣ нест. Интернетро санҷед ва саҳифаро аз нав кушоед.</p>
-    <p class="nr-err-text" lang="en">No connection. Check the internet and reload the page.</p>
-    <div class="nr-err-actions"><a class="btn nr-btn nr-btn--primary" href="/">Обновить</a></div>
+    <div class="nr-kicker"><span class="nr-kicker-line" aria-hidden="true"></span><span data-l="title">Нет подключения</span></div>
+    <h1 class="nr-page-title" data-l="title">Нет подключения</h1>
+    <p class="nr-err-text" data-l="text">Проверьте интернет и обновите страницу. Страницы, которые вы уже открывали, доступны и без сети.</p>
+    <p class="nr-err-text" lang="tg" data-fallback>Пайвастшавӣ нест. Интернетро санҷед ва саҳифаро аз нав кушоед.</p>
+    <p class="nr-err-text" lang="en" data-fallback>No connection. Check the internet and reload the page.</p>
+    <div class="nr-err-actions"><a class="btn nr-btn nr-btn--primary" href="/" data-l="reload">Обновить</a></div>
   </div>
 </main>
 </body>

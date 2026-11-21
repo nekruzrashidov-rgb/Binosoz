@@ -37,13 +37,18 @@
       h('p', { class: 'eco-class-text' }, t('eco.classIs', { c: label(cls) })));
   }
 
+  // A source of the comparison figures as the developer typed it. The demo phrase of the seed (GreenDemoSeeder,
+  // scripts/seed.sql) is shown from the dictionary in the page language (A-11); any other text — as it is.
+  const DEMO_SOURCE = 'Демо-значение для показа на конкурсе, не официальные данные';
+  const sourceText = (s) => (String(s || '').trim() === DEMO_SOURCE ? t('eco.demoSource') : s);
+
   // The public block: scale, facts with numbers, features the building has.
   function block(eco, opts) {
     if (!filled(eco)) return null;
     const o = opts || {};
     const facts = [];
-    // Texts in two languages: Tajik for TJ, Russian for RU and EN (there is no English text).
-    const text = (k) => (S.lang === 'tg' ? eco[k + 'Tg'] || eco[k] : eco[k + 'Ru'] || eco[k]);
+    // Texts in the page language; English falls back to Russian with a note (S.localText).
+    const text = (k) => S.localText(eco, k);
     if (has(text('wallInsulation'))) facts.push([t('eco.wall'), text('wallInsulation')]);
     if (has(text('windows'))) facts.push([t('eco.windows'), text('windows')]);
     if (has(eco.heatingType)) facts.push([t('eco.heating'), t('eco.heat.' + eco.heatingType)]);
@@ -74,6 +79,7 @@
       heatingType: sel('heatingType', HEATING.map((k) => [k, t('eco.heat.' + k)]), e.heatingType),
       wallInsulationRu: txt('wallInsulationRu'), wallInsulationTg: txt('wallInsulationTg'),
       windowsRu: txt('windowsRu'), windowsTg: txt('windowsTg'),
+      wallInsulationEn: txt('wallInsulationEn'), windowsEn: txt('windowsEn'),
       estimatedKwhPerM2Year: num('estimatedKwhPerM2Year'), solarPanelsKw: num('solarPanelsKw'), greenAreaM2: num('greenAreaM2'),
     };
     FEATURES.forEach((k) => { f[k] = yn(k); });
@@ -83,6 +89,7 @@
       h('div', { class: 'grid g2' }, S.field(t('eco.class'), f.energyClass), S.field(t('eco.heating'), f.heatingType)),
       h('div', { class: 'grid g2' }, S.field(t('eco.wall') + ' (RU)', f.wallInsulationRu), S.field(t('eco.wall') + ' (TJ)', f.wallInsulationTg)),
       h('div', { class: 'grid g2' }, S.field(t('eco.windows') + ' (RU)', f.windowsRu), S.field(t('eco.windows') + ' (TJ)', f.windowsTg)),
+      h('div', { class: 'grid g2' }, S.field(t('eco.wall') + ' (EN)', f.wallInsulationEn), S.field(t('eco.windows') + ' (EN)', f.windowsEn)),
       h('div', { class: 'grid g3' }, S.field(t('eco.kwhField'), f.estimatedKwhPerM2Year), S.field(t('eco.solarField'), f.solarPanelsKw), S.field(t('eco.greenField'), f.greenAreaM2)),
       h('div', { class: 'grid g3' }, FEATURES.map((k) => S.field(t('eco.f.' + k), f[k]))),
       h('div', null, btn));
@@ -93,6 +100,7 @@
         energyClass: v('energyClass') || null, heatingType: v('heatingType') || null,
         wallInsulationRu: v('wallInsulationRu') || null, wallInsulationTg: v('wallInsulationTg') || null,
         windowsRu: v('windowsRu') || null, windowsTg: v('windowsTg') || null,
+        wallInsulationEn: v('wallInsulationEn') || null, windowsEn: v('windowsEn') || null,
         estimatedKwhPerM2Year: v('estimatedKwhPerM2Year') === '' ? null : +v('estimatedKwhPerM2Year'),
         solarPanelsKw: v('solarPanelsKw') === '' ? null : +v('solarPanelsKw'),
         greenAreaM2: v('greenAreaM2') === '' ? null : +v('greenAreaM2'),
@@ -120,7 +128,7 @@
         base ? row(t('util.baseline'), kwh(r.baselineKwhPerYear) + ' · ' + money(r.baselineCostPerYearTjs)) : null,
         save ? row(save > 0 ? t('util.saving') : t('util.more'), kwh(Math.abs(r.savingKwhPerYear)) + ' · ' + money(Math.abs(r.savingCostPerYearTjs))) : null),
       h('p', { class: 'eco-note' }, t('util.note')),
-      base && r.baselineSource ? h('p', { class: 'eco-note' }, t('util.source', { s: r.baselineSource })) : null);
+      base && r.baselineSource ? h('p', { class: 'eco-note' }, t('util.source', { s: sourceText(r.baselineSource) })) : null);
   }
 
   // CRM → settings: the developer's tariff and coefficients, each with its source; nothing is invented by the site.
@@ -212,7 +220,7 @@
           tile(S.fmt.n(g.pagesSaved), S.plural(g.pagesSaved, 'green.pages')),
           tile(paper(g), t('green.paper')),
           g.co2KgSaved !== undefined && g.co2KgSaved !== null ? tile(weight(g.co2KgSaved), t('green.co2')) : tile(S.fmt.n(g.onlineActions), S.plural(g.onlineActions, 'green.actions'))),
-        h('p', { class: 'nr-note green-note' }, t('green.note'), g.co2Source ? ' ' + t('green.co2Source', { s: g.co2Source }) : '')));
+        h('p', { class: 'nr-note green-note' }, t('green.note'), g.co2Source ? ' ' + t('green.co2Source', { s: sourceText(g.co2Source) }) : '')));
       sec.hidden = false;
     }).catch(() => {});
     return sec;
@@ -243,7 +251,7 @@
           g.co2KgSaved !== undefined && g.co2KgSaved !== null ? kpi(weight(g.co2KgSaved), t('green.co2')) : null,
           kpi(S.fmt.n(g.onlineActions), S.plural(g.onlineActions, 'green.actions'))),
         svg,
-        h('p', { class: 'hint' }, t('green.cardNote', { b: s.onlineBookings, p: s.onlinePayments, c: s.chatMessages }), g.co2Source ? ' ' + t('green.co2Source', { s: g.co2Source }) : ''));
+        h('p', { class: 'hint' }, t('green.cardNote', { b: s.onlineBookings, p: s.onlinePayments, c: s.chatMessages }), g.co2Source ? ' ' + t('green.co2Source', { s: sourceText(g.co2Source) }) : ''));
       card.hidden = false;
     }).catch(() => {});
     return card;

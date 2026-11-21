@@ -469,6 +469,10 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("DescriptionEn")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
                     b.Property<string>("DescriptionRu")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
@@ -495,6 +499,10 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Property<string>("ModelUrl")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<string>("NameEn")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("NameRu")
                         .IsRequired()
@@ -2232,6 +2240,11 @@ namespace Sitora.Infrastructure.Data.Migrations
                                 .HasColumnType("numeric(18,2)")
                                 .HasColumnName("EcoSolarPanelsKw");
 
+                            b1.Property<string>("WallInsulationEn")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("EcoWallInsulationEn");
+
                             b1.Property<string>("WallInsulationRu")
                                 .HasMaxLength(200)
                                 .HasColumnType("character varying(200)")
@@ -2241,6 +2254,11 @@ namespace Sitora.Infrastructure.Data.Migrations
                                 .HasMaxLength(200)
                                 .HasColumnType("character varying(200)")
                                 .HasColumnName("EcoWallInsulationTg");
+
+                            b1.Property<string>("WindowsEn")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("EcoWindowsEn");
 
                             b1.Property<string>("WindowsRu")
                                 .HasMaxLength(200)

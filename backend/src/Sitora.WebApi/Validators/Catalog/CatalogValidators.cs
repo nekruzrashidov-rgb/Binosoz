@@ -15,6 +15,8 @@ public class SaveBuildingRequestValidator : AbstractValidator<SaveBuildingReques
         RuleFor(x => x.FloorsCount).InclusiveBetween(1, 100).WithMessage("Этажность должна быть от 1 до 100");
         RuleFor(x => x.DescriptionRu).MaximumLength(4000).WithMessage("Описание на русском не длиннее 4000 символов");
         RuleFor(x => x.DescriptionTg).MaximumLength(4000).WithMessage("Описание на таджикском не длиннее 4000 символов");
+        RuleFor(x => x.NameEn).MaximumLength(200).WithMessage("Название на английском не длиннее 200 символов");
+        RuleFor(x => x.DescriptionEn).MaximumLength(4000).WithMessage("Описание на английском не длиннее 4000 символов");
         RuleFor(x => x.ModelUrl).MaximumLength(500)
             .Must(BeAbsoluteUrl).When(x => !string.IsNullOrWhiteSpace(x.ModelUrl))
             .WithMessage("Ссылка на 3D-модель должна быть полным адресом http(s)");
@@ -64,6 +66,8 @@ public class SaveBuildingEcoRequestValidator : AbstractValidator<SaveBuildingEco
         RuleFor(x => x.WallInsulationTg).MaximumLength(200).WithMessage("Утепление стен — не длиннее 200 символов");
         RuleFor(x => x.WindowsRu).MaximumLength(200).WithMessage("Окна — не длиннее 200 символов");
         RuleFor(x => x.WindowsTg).MaximumLength(200).WithMessage("Окна — не длиннее 200 символов");
+        RuleFor(x => x.WallInsulationEn).MaximumLength(200).WithMessage("Утепление стен — не длиннее 200 символов");
+        RuleFor(x => x.WindowsEn).MaximumLength(200).WithMessage("Окна — не длиннее 200 символов");
         RuleFor(x => x.SolarPanelsKw).InclusiveBetween(0m, 100_000m).When(x => x.SolarPanelsKw is not null)
             .WithMessage("Мощность солнечных панелей — от 0 до 100 000 кВт");
         RuleFor(x => x.GreenAreaM2).InclusiveBetween(0m, 10_000_000m).When(x => x.GreenAreaM2 is not null)

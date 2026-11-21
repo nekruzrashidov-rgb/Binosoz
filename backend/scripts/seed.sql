@@ -144,6 +144,19 @@ BEGIN
   GET DIAGNOSTICS n = ROW_COUNT;
   IF n > 0 THEN RAISE NOTICE 'Эко-паспорт дома заполнен демо-значениями'; END IF;
 
+  -- Английские тексты дома и эко-паспорта (сайт на EN, A-10) — перевод тех же текстов; только пустые поля.
+  UPDATE "Buildings" SET
+    "NameEn" = COALESCE("NameEn", 'Nekruz Residence'),
+    "DescriptionEn" = COALESCE("DescriptionEn", CASE WHEN "DescriptionRu" = 'Жилой дом на 20 этажей с коммерческим первым этажом'
+      THEN 'A 20-storey residential building with a commercial ground floor' END),
+    "EcoWallInsulationEn" = COALESCE("EcoWallInsulationEn", CASE WHEN "EcoWallInsulationRu" = 'Минеральная вата 100 мм' THEN 'Mineral wool, 100 mm' END),
+    "EcoWindowsEn" = COALESCE("EcoWindowsEn", CASE WHEN "EcoWindowsRu" = 'Двухкамерный стеклопакет' THEN 'Double-chamber glazing units' END),
+    "UpdatedAt" = now()
+  WHERE "OrganizationId" = org AND "NameRu" = 'Некруз Резиденс'
+    AND ("NameEn" IS NULL OR "DescriptionEn" IS NULL OR "EcoWallInsulationEn" IS NULL OR "EcoWindowsEn" IS NULL);
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n > 0 THEN RAISE NOTICE 'Английские тексты дома заполнены'; END IF;
+
   UPDATE "Organizations" SET
     "GreenTariffKwhTjs" = 0.29,
     "GreenBaselineKwhPerM2Year" = 180,
