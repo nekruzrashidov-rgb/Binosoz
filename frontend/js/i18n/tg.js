@@ -1,4 +1,4 @@
-/* Tajik interface texts (1857 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* Tajik interface texts (1959 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. Tajik strings should be proof-read by a native speaker before launch. */
 (function () {
   const S = (window.S = window.S || {});
