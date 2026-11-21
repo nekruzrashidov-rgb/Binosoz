@@ -30,7 +30,7 @@ public class FrontendTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFa
         Assert.DoesNotMatch(@"<script(?![^>]*\ssrc=)[^>]*>", html);
         var policy = response.Headers.GetValues("Content-Security-Policy").Single();
         Assert.Contains("script-src 'self' https://cdnjs.cloudflare.com;", policy);
-        Assert.Contains("connect-src 'self'", policy);
+        Assert.Contains("connect-src 'self' https://fonts.googleapis.com;", policy);
     }
 
     [Fact]

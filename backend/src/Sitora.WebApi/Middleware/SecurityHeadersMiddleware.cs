@@ -5,12 +5,13 @@ namespace Sitora.WebApi.Middleware;
 // Базовые защитные заголовки для ответов API и страниц сайта.
 public class SecurityHeadersMiddleware(RequestDelegate next)
 {
-    // Сайт: свои скрипты и стили, библиотеки с cdnjs (Three.js, SignalR), шрифты Google, запросы только к своему API.
+    // Сайт: свои скрипты и стили, библиотеки с cdnjs (Three.js, SignalR), шрифты Google, запросы только к своему API
+    // (и к fonts.googleapis.com: таблицу шрифтов браузер загружает заранее, rel=preload, — A-21).
     // Встроенных скриптов на страницах нет; встроенные стили нужны SVG-иконкам.
     private const string SitePolicy =
         "default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; " +
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; " +
-        "img-src 'self' data: blob: https:; connect-src 'self'; object-src 'none'; base-uri 'none'; " +
+        "img-src 'self' data: blob: https:; connect-src 'self' https://fonts.googleapis.com; object-src 'none'; base-uri 'none'; " +
         "form-action 'self'; frame-ancestors 'none'";
 
     public Task InvokeAsync(HttpContext context)

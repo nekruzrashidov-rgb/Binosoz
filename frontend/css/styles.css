@@ -751,7 +751,7 @@ body:has(.lux) { background: var(--bg); }
 .foot-brand a.row:hover { text-decoration: none; }
 .foot-brand p { margin: 14px 0 18px; max-width: 32ch; }
 .foot-col { display: flex; flex-direction: column; gap: 10px; }
-.foot-col h3, .foot-col h4 { color: #fff; font-family: var(--font); font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+.foot-col h2, .foot-col h3, .foot-col h4 { color: #fff; font-family: var(--font); font-size: 14px; font-weight: 700; margin-bottom: 4px; }
 .lux-footer a { color: rgba(240,220,190,0.6); }
 .lux-footer a:hover { color: var(--accent-text); text-decoration: none; }
 .lux-footer .btn.ghost { color: #fff; border-color: rgba(255,255,255,0.25); }
@@ -2719,7 +2719,7 @@ a:hover > .nr-arrow, button:hover > .nr-arrow { transform: translateX(4px); }
 .lux-footer { background: var(--espresso); color: var(--muted); }
 :root[data-theme='dark'] .lux-footer { background: #0d0b0a; }
 .lux-footer .foot-brand b { font-family: var(--display); font-size: 30px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink); }
-.lux-footer .foot-col :is(h3, h4) { font-size: 12px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent-text); }
+.lux-footer .foot-col :is(h2, h3, h4) { font-size: 12px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent-text); }
 .lux-footer a { color: var(--ink-2); }
 .lux-footer a:hover { color: var(--accent-text); }
 
@@ -2794,6 +2794,8 @@ body { font-variant-numeric: lining-nums; font-feature-settings: 'lnum' 1; } /* 
 .nr-house.is-ready .nr-3d-poster, .nr-house.is-ready .nr-3d-wait { opacity: 0; }
 /* «Загружаем 3D-модель…» over the placeholder render. */
 .nr-3d-wait { position: absolute; left: 12px; top: 12px; z-index: 2; display: inline-flex; align-items: center; gap: 10px; padding: 8px 14px; border-radius: 2px; background: rgba(20, 17, 15, 0.78); color: #f4efe7; font-size: 13px; font-weight: 600; transition: opacity 0.4s; pointer-events: none; }
+/* A-06: on a phone the 3D loads on a tap — the button sits over the render of the model. */
+.nr-3d-load { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 3; white-space: nowrap; }
 .nr-3d-wait::before { content: ''; width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(244, 239, 231, 0.3); border-top-color: #f4efe7; animation: spin 0.9s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .nr-3d-wait::before { animation: none; } }
 @media (prefers-reduced-motion: reduce) { .nr-3d-poster { transition: none; } }
@@ -2928,7 +2930,10 @@ button.nr-layout { width: 100%; padding: 0; text-align: left; font: inherit; cur
 .nr-about-hero .nr-crumbs, .nr-about-hero .nr-crumbs a { color: var(--ink-2); }
 .nr-about-hero .nr-crumbs [aria-current] { color: var(--ink); }
 .nr-about-title { font-size: clamp(52px, 8vw, 112px); line-height: 0.95; }
-.nr-chips { list-style: none; margin: 30px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
+.nr-chips { list-style: none; margin: 30px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; min-height: 42px; }
+/* A-08: «О проекте» keeps the place of the blocks from the API until they arrive. */
+#complex.is-wait { min-height: 320px; }
+#amenities.is-wait { min-height: 200px; }
 .nr-chips li { padding: 10px 16px; border: 1px solid rgba(244, 239, 231, 0.4); font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink); }
 .nr-chips li.nr-chip-demo { padding: 0; border: 0; display: flex; align-items: center; letter-spacing: 0; text-transform: none; }
 .nr-about-text .nr-lead:first-child { margin-top: 0; }
