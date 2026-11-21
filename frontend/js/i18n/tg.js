@@ -1840,6 +1840,7 @@
     "i18n.ruOnly": "бо забони русӣ",
     "foot.verSite": "сомона",
     "hero.loading3d": "Модели 3D бор мешавад…",
+    "nr.cat.load3d": "Боркунии модели 3D",
     "errp.k.notFound": "Хатои 404",
     "errp.k.network": "Пайвастшавӣ нест",
     "errp.k.server": "Хатои сервер",

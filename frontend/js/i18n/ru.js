@@ -1840,6 +1840,7 @@
     "i18n.ruOnly": "на русском",
     "foot.verSite": "сайт",
     "hero.loading3d": "Загружаем 3D-модель…",
+    "nr.cat.load3d": "Загрузить 3D-модель",
     "errp.k.notFound": "Ошибка 404",
     "errp.k.network": "Нет подключения",
     "errp.k.server": "Ошибка сервера",

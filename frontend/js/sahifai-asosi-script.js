@@ -151,7 +151,8 @@
 
   function siteFooter() {
     const c = contacts();
-    const col = (title, ...items) => h('div', { class: 'foot-col' }, h('h3', null, title), ...items);
+    // h2: on pages without section headings (the gallery) an h3 right after the h1 broke the heading order (A-29).
+    const col = (title, ...items) => h('div', { class: 'foot-col' }, h('h2', null, title), ...items);
     return h('footer', { class: 'footer lux-footer' }, h('div', { class: 'wrap' },
       h('div', { class: 'foot-grid' },
         h('div', { class: 'foot-brand' }, h('a', { class: 'row', href: '/', style: { gap: '12px' } }, S.towerLogo(), h('b', null, t('brand.name'))), h('p', null, t('foot.tagline')),
@@ -296,10 +297,20 @@
       // The 3D engine is loaded now (once): when the stage comes near the screen.
       if (!S.House3D || !S.House3DMode) {
         const go = () => loadHouse3D().then(() => { if (alive && S.House3D) initHouse(); }).catch(() => { houseWait.remove(); open3d.hidden = true; /* no 3D: the render stays, the floor list and the apartments still work */ });
-        if ('IntersectionObserver' in window && !wantFull) {
-          const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); go(); } }, { rootMargin: '200px' });
+        // A-06: Three.js and the model are the heaviest part of the page. On a phone the render stays with a button —
+        // the 3D loads only on a tap (or with «Открыть 3D» / #3d); on a desktop — when the stage is near the screen and
+        // the browser is idle, so the first screen and the catalog are ready first.
+        const phone = !!(window.matchMedia && window.matchMedia('(max-width: 900px), (pointer: coarse)').matches);
+        const idle = (fn) => ('requestIdleCallback' in window ? window.requestIdleCallback(fn, { timeout: 3000 }) : setTimeout(fn, 1200));
+        if (wantFull) go();
+        else if (phone) {
+          const tap = h('button', { class: 'btn nr-btn nr-btn--primary nr-3d-load', type: 'button', onclick: () => { tap.remove(); houseWait.hidden = false; go(); } }, landIcon('cube'), t('nr.cat.load3d'));
+          houseWait.hidden = true;
+          houseBox.append(tap);
+        } else if ('IntersectionObserver' in window) {
+          const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); idle(go); } }, { rootMargin: '200px' });
           io.observe(stage);
-        } else go();
+        } else idle(go);
         return;
       }
       try {
@@ -321,6 +332,7 @@
         return;
       }
       window.__house3d = house;
+      const tapLoad = houseBox.querySelector('.nr-3d-load'); if (tapLoad) tapLoad.remove();
       pushToHouse();
       if (wantFull) openFull(false);
     }

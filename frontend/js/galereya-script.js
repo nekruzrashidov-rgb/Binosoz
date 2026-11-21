@@ -44,7 +44,7 @@
       const list = shown();
       grid.replaceChildren(...list.map((it, i) => {
         let pic;
-        if (it.photo || it.render) pic = picture(it, '(max-width: 600px) 100vw, (max-width: 1000px) 50vw, 420px');
+        if (it.photo || it.render) pic = picture(it, '(max-width: 600px) calc(100vw - 32px), (max-width: 1000px) calc(50vw - 30px), 380px');
         else { pic = h('canvas', { role: 'img', 'aria-label': t(it.cap) }); paintPlan(pic, it.plan, 300, 200); }
         return h('figure', { class: 'galpg-card' },
           h('button', { type: 'button', class: 'galpg-shot' + (it.plan != null ? ' is-plan' : ''), 'aria-label': t('galpg.zoom') + ': ' + title(it), onclick: () => open(i) }, pic,

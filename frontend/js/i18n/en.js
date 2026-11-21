@@ -1840,6 +1840,7 @@
     "i18n.ruOnly": "in Russian",
     "foot.verSite": "site",
     "hero.loading3d": "Loading the 3D model…",
+    "nr.cat.load3d": "Load the 3D model",
     "errp.k.notFound": "Error 404",
     "errp.k.network": "No connection",
     "errp.k.server": "Server error",
