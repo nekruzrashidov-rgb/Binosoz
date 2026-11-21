@@ -1,7 +1,7 @@
 /* Sitora front-end settings.
    API_BASE: address of the Sitora API, e.g. 'http://localhost:5194/api/v1'.
-   Empty (the default) runs the built-in demo backend: no server needed; the address of a real API
-   is entered in the page itself (gear button, bottom right) and remembered in the browser.
+   '/api/v1' — the API on the same address as the site; on Vercel API_BASE_BY_HOST below points to Render.
+   (The old in-browser demo backend is no longer loaded: frontend/tools/namunavi-malumot-mock.js.)
    ORG_SLUG: short name of the developer whose buildings and USD rate the public site shows
    ('nekruz' is the default organization, «Некруз Резиденс»). Empty — buildings of all developers on the platform. */
 window.SITORA_CONFIG = {
