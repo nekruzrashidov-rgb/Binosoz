@@ -3158,3 +3158,13 @@ body:is([data-page='crm'], [data-page='cabinet'], [data-page='platform']) h1, bo
 .ntf-check input { width: 20px; height: 20px; accent-color: var(--accent); }
 .tg-state { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0 12px; }
 .rem-log td, .rem-log th { white-space: nowrap; }
+
+/* A-20: every stand-alone link and button is at least 24 px high on a desktop too (WCAG 2.5.8); phones get 44 px above.
+   Links inside sentences (the privacy text) are exempt by the rule and keep the line height. */
+@media (pointer: fine) and (min-width: 769px) {
+  .lux-footer .foot-col a, .lux-footer .foot-col span, .lux-footer .foot-brand > a, .lux-footer .foot-dev a, .lux-footer .foot-privacy, .lux-footer .foot-demo a { display: inline-flex; align-items: center; min-height: 24px; }
+  .photo-credit { display: inline-flex; align-items: center; min-height: 24px; }
+}
+/* Padding, not display: .desk-only and the header media rules hide the phone on narrow screens. */
+.top-phone { padding-block: 12px; }
+.crumbs a { display: inline-flex; align-items: center; min-height: 24px; }

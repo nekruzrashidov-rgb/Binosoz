@@ -19,7 +19,7 @@
 
   S.views.gallery = function (root) {
     const site = S.site;
-    let filter = 'all', lightbox = null, opener = null, planTypes = [];
+    let filter = 'all', lightbox = null, opener = null, planTypes = [], releaseFocus = null;
     const page = h('div', { class: 'page-in nr gallery-page' });
     root.appendChild(page);
 
@@ -79,6 +79,7 @@
         h('div', { class: 'lb-box' }, x, h('div', { class: 'lb-stage' }, prev, stage, next), h('div', { class: 'lb-foot' }, cap, count)));
       lightbox.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); else if (e.key === 'ArrowLeft') step(-1); else if (e.key === 'ArrowRight') step(1); });
       document.body.appendChild(lightbox);
+      releaseFocus = S.trapFocus(lightbox);
       document.body.classList.add('menu-open');
       draw();
       x.focus();
@@ -86,6 +87,7 @@
     function close() {
       if (!lightbox) return;
       lightbox.remove(); lightbox = null;
+      if (releaseFocus) { releaseFocus(); releaseFocus = null; }
       document.body.classList.remove('menu-open');
       if (opener && opener.isConnected) opener.focus();
       opener = null;
