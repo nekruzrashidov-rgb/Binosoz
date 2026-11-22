@@ -16,7 +16,16 @@
 
   const cfg = window.SITORA_CONFIG || {};
   function apiBase() {
-    const saved = store.get('sitora.api');
+    let saved = store.get('sitora.api');
+    // An address saved while developing (http://localhost:5194/…) must not follow the browser to the real site: there
+    // it points nowhere, every request hangs and the page shows «Сервер просыпается…» forever. Off localhost only
+    // https addresses of other hosts are kept; a local one is forgotten.
+    const here = location.hostname;
+    const localPage = here === 'localhost' || here === '127.0.0.1' || here === '[::1]' || here.endsWith('.localhost');
+    if (saved && !localPage && (/^http:\/\//i.test(saved) || /\/\/(localhost|127\.0\.0\.1|\[::1\])([:/]|$)/i.test(saved))) {
+      store.del('sitora.api');
+      saved = null;
+    }
     let b = saved !== null ? saved : cfg.API_BASE || '';
     b = String(b || '').trim().replace(/\/+$/, '');
     return b;
