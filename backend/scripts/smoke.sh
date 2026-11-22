@@ -34,7 +34,15 @@ echo "Версия на проде: ${version:-неизвестна}"
 summary() { [ -n "${GITHUB_STEP_SUMMARY:-}" ] && echo "$1" >> "$GITHUB_STEP_SUMMARY"; return 0; }
 if [ -n "$EXPECTED_SHA" ]; then
     expected=$(printf '%s' "$EXPECTED_SHA" | cut -c1-7)
-    if [ "$version" != "$expected" ]; then
+    # Прод может быть и новее ожидаемого: CI деплоит каждый коммит main, в том числе только с документами — тогда
+    # ожидаемый коммит (последний с кодом) — предок версии прода, и это не отставание.
+    newer=0
+    if [ -n "$version" ] && [ "$version" != "$expected" ] && command -v git >/dev/null \
+        && git merge-base --is-ancestor "$EXPECTED_SHA" "$version" 2>/dev/null; then
+        newer=1
+        echo "OK: на проде $version — новее ожидаемого $expected (после него только коммиты без кода)"
+    fi
+    if [ "$version" != "$expected" ] && [ "$newer" = "0" ]; then
         echo "##############################################################################" >&2
         echo "Прод отстаёт от main: на проде ${version:-неизвестно}, ожидается $expected" >&2
         echo "Проверьте деплой на Render (docs/DEPLOY.md, «Render: деплой»)." >&2
@@ -42,7 +50,7 @@ if [ -n "$EXPECTED_SHA" ]; then
         summary "### ❌ На Render старая версия ${version:-неизвестна}, в main — $expected: задеплойте (docs/DEPLOY.md, «Render: деплой»)"
         exit 3
     fi
-    echo "OK: версия совпадает с main ($expected)"
+    [ "$newer" = "0" ] && echo "OK: версия совпадает с main ($expected)"
 fi
 
 body=$(curl -s --max-time 30 "$API_URL/api/v1/buildings?organization=$ORG")
