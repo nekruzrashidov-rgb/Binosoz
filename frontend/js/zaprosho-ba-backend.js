@@ -135,7 +135,7 @@
 
   // ---------- the server is waking up ----------
   // The free Render plan puts the API to sleep after 15 idle minutes; the first request then takes up to a minute.
-  // Until the API has answered once, a request slower than 3 s shows a bar «Сервер просыпается…» instead of an empty
+  // Until the API has answered once (the quiet /health/live at load counts), a request slower than 6 s shows a bar «Сервер просыпается…» instead of an empty
   // page, and GET requests that hit the sleeping gateway (no connection, 502/504, a 503 that is not the API's own
   // problem+json) are repeated every 5 s for up to 90 s. After the first answer the bar is gone and nothing is retried.
   let awake = false, pending = 0, wakeTimer = 0, wakeBar = null;
@@ -178,7 +178,7 @@
     const retry = !awake && method === 'GET';
     const until = Date.now() + 90000;
     pending++;
-    if (!awake && !wakeTimer && !wakeBar) wakeTimer = setTimeout(wakeShow, 3000);
+    if (!awake && !wakeTimer && !wakeBar) wakeTimer = setTimeout(wakeShow, 6000);
     try {
       for (;;) {
         let res = null;
@@ -693,6 +693,10 @@
   // Wake the API as soon as any page opens: on the free Render plan it sleeps after 15 idle minutes, and waking takes
   // 30–50 s. One quiet request at load starts that while the visitor is still looking at the page.
   try {
-    if (!(S.isDemo && S.isDemo()) && origin()) fetch(origin() + '/health/live', { cache: 'no-store', credentials: 'omit' }).catch(() => {});
+    if (!(S.isDemo && S.isDemo()) && origin()) {
+      fetch(origin() + '/health/live', { cache: 'no-store', credentials: 'omit' })
+        .then((r) => { if (r && r.ok) { awake = true; wakeHide(); } })   // the API answered — it is not asleep
+        .catch(() => {});
+    }
   } catch (e) { /* no fetch — nothing to wake */ }
 })();
