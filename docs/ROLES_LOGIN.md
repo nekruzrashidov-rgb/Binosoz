@@ -11,7 +11,7 @@ SuperAdmin. **Паролей в этом файле нет и не будет.**
 
 | Роль | Почта (пример) | Секрет почты | Секрет пароля | Где входить | Что увидит |
 | --- | --- | --- | --- | --- | --- |
-| Owner (владелец) | `binosoz27+owner@gmail.com` | `BOOTSTRAP_ADMIN_EMAIL` | `BOOTSTRAP_ADMIN_PASSWORD` | `/login` → «Сотрудник» | CRM целиком: все дома, лиды, сделки, платежи, пользователи, журнал (аудит), настройки |
+| Owner (владелец) | `binosoz27+owner@gmail.com` | `OWNER_EMAIL` | `OWNER_PASSWORD` | `/login` → «Сотрудник» | CRM целиком: все дома, лиды, сделки, платежи, пользователи, журнал (аудит), настройки |
 | ObjectAdmin (руководитель дома) | `binosoz27+objectadmin@gmail.com` | `SEED_STAFF_OBJECTADMIN_EMAIL` | `SEED_STAFF_OBJECTADMIN_PASSWORD` | `/login` → «Сотрудник» | CRM только дома «Некруз Резиденс»: его сделки, клиенты, сотрудники; журнала организации нет |
 | Manager (менеджер) | `binosoz27+manager@gmail.com` | `SEED_STAFF_MANAGER_EMAIL` | `SEED_STAFF_MANAGER_PASSWORD` | `/login` → «Сотрудник» | Лиды, брони, сделки, клиенты, документы, чат; без пользователей и журнала |
 | Manager «только чтение» (для жюри) | `demo-manager@binosoz.tj` (постоянная) | — (`SEED_DEMO_ACCOUNTS` = `true`) | `SEED_DEMO_MANAGER_PASSWORD` | `/login` → «Сотрудник» | То же, что менеджер, но изменить ничего нельзя — только смотреть и писать в чат |
@@ -19,7 +19,7 @@ SuperAdmin. **Паролей в этом файле нет и не будет.**
 | Content (контент-менеджер) | `binosoz27+content@gmail.com` | `SEED_STAFF_CONTENT_EMAIL` | `SEED_STAFF_CONTENT_PASSWORD` | `/login` → «Сотрудник» | Каталог (дома, этажи, квартиры), ход стройки, фото; без платежей и лидов |
 | Customer (покупатель, демо) | `demo-buyer@binosoz.tj` (постоянная) | — (`SEED_DEMO_ACCOUNTS` = `true`) | `SEED_DEMO_BUYER_PASSWORD` | `/login` → «Войти как демо-покупатель» (нужно `Auth__DemoPasswordLogin` = `true` на Render) | Кабинет: одна сделка, график платежей, два платежа, документы (акт сверки в PDF), чат с менеджером |
 | Customer (покупатель, свой) | своя почта, например `binosoz27+buyer@gmail.com` | — | — (6-значный PIN задаёте сами) | `/register` → код из письма → дальше `/login` → «Покупатель» (почта + PIN) | Пустой кабинет: сделок нет, пока менеджер не заведёт сделку на эту почту |
-| SuperAdmin (создатель платформы) | `binosoz27+super@gmail.com` | `ADMIN_EMAIL` | `ADMIN_PASSWORD` | `/login` → «Сотрудник» (откроется `/platform`) | Платформа: все организации, тарифы, заявки, пользователи всех организаций, «войти как владелец» |
+| SuperAdmin (создатель платформы) | `binosoz27+super@gmail.com` | `SUPERADMIN_EMAIL` | `SUPERADMIN_PASSWORD` | `/login` → «Сотрудник» (откроется `/platform`) | Платформа: все организации, тарифы, заявки, пользователи всех организаций, «войти как владелец» |
 
 Как ведут себя секреты при повторном запуске «Seed prod»:
 
@@ -45,7 +45,7 @@ SuperAdmin. **Паролей в этом файле нет и не будет.**
    - `SEED_STAFF_ACCOUNTANT_EMAIL`, `SEED_STAFF_ACCOUNTANT_PASSWORD`
    - `SEED_STAFF_CONTENT_EMAIL`, `SEED_STAFF_CONTENT_PASSWORD`
    - для демо: `SEED_DEMO_ACCOUNTS` = `true`, `SEED_DEMO_BUYER_PASSWORD`, `SEED_DEMO_MANAGER_PASSWORD`
-   - если их ещё нет: `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`
+   - если их ещё нет: `OWNER_EMAIL`, `OWNER_PASSWORD`, `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD` (старые имена `BOOTSTRAP_ADMIN_*` и `ADMIN_*` тоже работают)
    - `PROD_DATABASE_URL` уже должен быть (External Database URL из Render, см. `docs/DEPLOY.md`).
 3. **Render → binosoz-1 → Environment** (только для демо-покупателя): `Auth__DemoPasswordLogin` = `true`.
 4. **GitHub → Actions → «Seed prod» → Run workflow**, в поле `confirm` — `nekruz`. Шаг «Сотрудники по ролям» напишет по

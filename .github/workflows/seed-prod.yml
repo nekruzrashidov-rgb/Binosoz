@@ -60,8 +60,8 @@ jobs:
         env:
           P1: ${{ secrets.SEED_DEMO_BUYER_PASSWORD }}
           P2: ${{ secrets.SEED_DEMO_MANAGER_PASSWORD }}
-          P3: ${{ secrets.BOOTSTRAP_ADMIN_PASSWORD }}
-          P4: ${{ secrets.ADMIN_PASSWORD }}
+          P3: ${{ secrets.OWNER_PASSWORD || secrets.BOOTSTRAP_ADMIN_PASSWORD }}
+          P4: ${{ secrets.SUPERADMIN_PASSWORD || secrets.ADMIN_PASSWORD }}
           P5: ${{ secrets.SEED_STAFF_OBJECTADMIN_PASSWORD }}
           P6: ${{ secrets.SEED_STAFF_ACCOUNTANT_PASSWORD }}
           P7: ${{ secrets.SEED_STAFF_CONTENT_PASSWORD }}
@@ -153,10 +153,10 @@ jobs:
       - name: Владелец и суперадмин
         env:
           CS: ${{ steps.cs.outputs.value }}
-          BOOTSTRAP_ADMIN_EMAIL: ${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}
-          BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.BOOTSTRAP_ADMIN_PASSWORD }}
-          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
-          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          BOOTSTRAP_ADMIN_EMAIL: ${{ secrets.OWNER_EMAIL || secrets.BOOTSTRAP_ADMIN_EMAIL }}
+          BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.OWNER_PASSWORD || secrets.BOOTSTRAP_ADMIN_PASSWORD }}
+          ADMIN_EMAIL: ${{ secrets.SUPERADMIN_EMAIL || secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.SUPERADMIN_PASSWORD || secrets.ADMIN_PASSWORD }}
         run: |
           if [ -z "$BOOTSTRAP_ADMIN_EMAIL$ADMIN_EMAIL" ]; then
             echo "Секреты BOOTSTRAP_ADMIN_EMAIL и ADMIN_EMAIL не заданы — владелец и суперадмин не создаются."
