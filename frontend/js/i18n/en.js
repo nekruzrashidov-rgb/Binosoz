@@ -1,4 +1,4 @@
-/* English interface texts (2020 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* English interface texts (2027 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -651,10 +651,9 @@
     "set.logoDone": "Logo uploaded",
     "set.plan": "Plan",
     "set.tariff": "Plan",
-    "set.standard": "Standard",
     "set.objects": "Properties",
     "set.objectsN": "{n} of {m}",
-    "set.planHint": "Plan payments are not connected yet: the limit is shown for reference and does not stop you adding buildings.",
+    "set.planHint": "Tariff limits: you cannot add more buildings or staff than this — a higher tariff is needed (the platform administrator assigns it).",
     "wiz.progress": "Setup steps",
     "wiz.step1": "Introduction",
     "wiz.step2": "First property",
@@ -2036,5 +2035,13 @@
     "audit.req.POST /platform/impersonate/stop": "Left owner mode",
     "audit.req.POST /users": "Staff member added",
     "audit.req.POST /customers": "Customer added",
+    "set.noTariff": "No tariff assigned",
+    "set.noTariffHint": "The platform administrator assigns the tariff. Until then there are no limits on buildings or staff.",
+    "set.objectsNoLimit": "{n}, no limit",
+    "set.staff": "Staff",
+    "set.tariffEnds": "Valid until",
+    "plat.trEmpty": "Empty — the Russian text is shown",
+    "pset.builtAt": "built {d}",
+    "pset.versionHint": "The commit of the build running now (as /health/live); it changes by itself with every release.",
   };
 })();

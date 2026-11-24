@@ -13,6 +13,9 @@ public interface ITariffService
     // Действующие тарифы организаций (для списков); у организации без тарифа записи нет.
     Task<IReadOnlyDictionary<Guid, OrganizationTariffResponse>> CurrentAsync(IReadOnlyCollection<Guid> organizationIds, CancellationToken ct = default);
 
+    // Действующий тариф организации и сколько домов и сотрудников уже есть (CRM → «Настройки»).
+    Task<OwnTariffResponse> OwnAsync(Guid organizationId, CancellationToken ct = default);
+
     // 402, если по тарифу больше нельзя: у организации без тарифа лимитов нет.
     Task EnsureCanAddBuildingAsync(Guid organizationId, CancellationToken ct = default);
     Task EnsureCanAddUserAsync(Guid organizationId, CancellationToken ct = default);

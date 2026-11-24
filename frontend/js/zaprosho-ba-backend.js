@@ -500,6 +500,7 @@
 
     // the owner's brand: name, short name, contacts, colour and logo of the developer's site
     ownerBrand() { return request('GET', '/owner/brand'); },
+    ownTariff() { return request('GET', '/owner/tariff'); },
     saveOwnerBrand(b) { return withFields(request('PUT', '/owner/brand', { body: b })); },
     uploadLogo(file) { const f = new FormData(); f.append('file', file); return request('POST', '/owner/brand/logo', { form: f, file }); },
     deleteLogo() { return request('DELETE', '/owner/brand/logo'); },

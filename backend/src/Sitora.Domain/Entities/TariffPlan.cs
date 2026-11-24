@@ -3,10 +3,15 @@ using Sitora.Domain.Enums;
 namespace Sitora.Domain.Entities;
 
 // Тариф платформы для застройщика. MaxBuildings / MaxUsers null — без ограничения.
-// Features — список возможностей тарифа, JSON-массив строк (для карточки тарифа).
+// Features — список возможностей тарифа, JSON-массив строк (для карточки тарифа). Name и Features — по-русски (Name —
+// уникальный ключ тарифа); *Tg / *En — переводы (R-03), пустые — показывается русский текст.
 public class TariffPlan : BaseEntity
 {
     public string Name { get; set; } = string.Empty;
+    public string? NameTg { get; set; }
+    public string? NameEn { get; set; }
+    public string FeaturesTg { get; set; } = "[]";
+    public string FeaturesEn { get; set; } = "[]";
     public decimal Price { get; set; }
     public Currency Currency { get; set; } = Currency.TJS;
     public int? MaxBuildings { get; set; }

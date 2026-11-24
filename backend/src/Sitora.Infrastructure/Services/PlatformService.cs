@@ -79,11 +79,12 @@ public class PlatformService(
             .ToListAsync(ct);
         var sold = await db.Apartments.CountAsync(a => a.Floor.Building.OrganizationId == organizationId && a.Status == ApartmentStatus.Sold, ct);
         var paid = await db.Payments.Where(p => p.Deal.Apartment.Floor.Building.OrganizationId == organizationId).SumAsync(p => (decimal?)p.AmountTjs, ct) ?? 0;
-        var history = await db.OrganizationTariffs.AsNoTracking().Where(t => t.OrganizationId == organizationId)
-            .OrderByDescending(t => t.StartsAt)
-            .Select(t => new OrganizationTariffResponse(t.Id, t.OrganizationId, t.TariffPlanId, t.TariffPlan.Name, t.TariffPlan.Price,
-                t.TariffPlan.Currency, t.StartsAt, t.EndsAt, t.IsPaid))
-            .ToListAsync(ct);
+        // Название тарифа — на языке запроса (R-03).
+        var history = (await db.OrganizationTariffs.AsNoTracking().Include(t => t.TariffPlan).Where(t => t.OrganizationId == organizationId)
+                .OrderByDescending(t => t.StartsAt)
+                .ToListAsync(ct))
+            .Select(t => TariffService.ToResponse(t, t.TariffPlan))
+            .ToList();
         return new OrganizationDetailsResponse(organization, paid, buildings.Sum(b => b.ApartmentsCount), buildings.Sum(b => b.FreeApartments),
             sold, buildings, history);
     }

@@ -1,8 +1,8 @@
 using System.Reflection;
 
-namespace Sitora.WebApi.Extensions;
+namespace Sitora.Infrastructure;
 
-// Какая сборка работает: короткий SHA коммита и время сборки — для /health/live, чтобы отставание прода от main
+// Какая сборка работает: короткий SHA коммита и время сборки — для /health/live и «Настроек платформы» (R-07), чтобы отставание прода от main
 // было видно без панели хостинга.
 // Источники SHA по порядку: GIT_SHA (Docker-образ из CI: --build-arg GIT_SHA), RENDER_GIT_COMMIT (Render при сборке
 // из репозитория), иначе «dev». Время: BUILT_AT (Docker-образ), иначе время записи сборки приложения.

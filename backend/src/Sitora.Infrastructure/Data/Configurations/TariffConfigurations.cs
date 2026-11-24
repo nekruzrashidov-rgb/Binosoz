@@ -12,6 +12,10 @@ public class TariffPlanConfiguration : IEntityTypeConfiguration<TariffPlan>
         builder.Property(t => t.Name).HasMaxLength(50).IsRequired();
         builder.HasIndex(t => t.Name).IsUnique();
         builder.Property(t => t.Features).HasColumnType("jsonb").IsRequired();
+        builder.Property(t => t.NameTg).HasMaxLength(50);
+        builder.Property(t => t.NameEn).HasMaxLength(50);
+        builder.Property(t => t.FeaturesTg).HasColumnType("jsonb").HasDefaultValueSql("'[]'::jsonb").IsRequired();
+        builder.Property(t => t.FeaturesEn).HasColumnType("jsonb").HasDefaultValueSql("'[]'::jsonb").IsRequired();
     }
 }
 

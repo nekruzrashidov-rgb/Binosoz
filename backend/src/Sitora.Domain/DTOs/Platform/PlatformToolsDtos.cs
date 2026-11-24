@@ -27,7 +27,9 @@ public record PlatformNotificationRequest(Guid? OrganizationId, string Type, str
 
 public record PlatformNotificationResponse(int Recipients);
 
-public record PlatformSettingsResponse(int? MaxOrganizations, bool DemoMode, string Version, string? ContactEmail, int Organizations);
+// Version — фактическая сборка, как в /health/live: короткий SHA коммита («dev» без него), BuiltAt — время сборки (R-07).
+public record PlatformSettingsResponse(int? MaxOrganizations, bool DemoMode, string Version, string? ContactEmail, int Organizations,
+    string? BuiltAt = null);
 
 // PATCH: меняются только переданные поля; ClearMaxOrganizations = true снимает ограничение.
 public record UpdatePlatformSettingsRequest(int? MaxOrganizations, bool? ClearMaxOrganizations, bool? DemoMode, string? ContactEmail);

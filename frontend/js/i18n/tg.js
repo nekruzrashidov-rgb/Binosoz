@@ -1,4 +1,4 @@
-/* Tajik interface texts (2020 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* Tajik interface texts (2027 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. Tajik strings should be proof-read by a native speaker before launch. */
 (function () {
   const S = (window.S = window.S || {});
@@ -651,10 +651,9 @@
     "set.logoDone": "Логотип бор шуд",
     "set.plan": "Тариф",
     "set.tariff": "Тариф",
-    "set.standard": "Стандарт",
     "set.objects": "Объектҳо",
     "set.objectsN": "{n} аз {m}",
-    "set.planHint": "Пардохти тарифҳо ҳоло пайваст нашудааст: маҳдудият барои дидан аст ва ба илова кардани бино халал намерасонад.",
+    "set.planHint": "Маҳдудиятҳои тариф: зиёдтар бино ё корманд илова кардан мумкин нест — барои ин тарифи болотар лозим аст (маъмури платформа таъин мекунад).",
     "wiz.progress": "Қадамҳои танзим",
     "wiz.step1": "Шиносоӣ",
     "wiz.step2": "Объекти аввал",
@@ -2036,5 +2035,13 @@
     "audit.req.POST /platform/impersonate/stop": "Баромад аз реҷаи соҳиб",
     "audit.req.POST /users": "Корманд илова шуд",
     "audit.req.POST /customers": "Мизоҷ илова шуд",
+    "set.noTariff": "Тариф таъин нашудааст",
+    "set.noTariffHint": "Тарифро маъмури платформа таъин мекунад. То он вақт маҳдудият барои биноҳо ва кормандон нест.",
+    "set.objectsNoLimit": "{n}, бе маҳдудият",
+    "set.staff": "Кормандон",
+    "set.tariffEnds": "Эътибор то",
+    "plat.trEmpty": "Холӣ — матни русӣ нишон дода мешавад",
+    "pset.builtAt": "сохта шуд {d}",
+    "pset.versionHint": "Коммити сохтае, ки ҳоло кор мекунад (мисли /health/live); бо ҳар нашр худаш иваз мешавад.",
   };
 })();

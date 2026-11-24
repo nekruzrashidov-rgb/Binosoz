@@ -267,7 +267,8 @@ if (hasFrontend)
 app.UseRequestLocalization(options => options
     .SetDefaultCulture("ru")
     .AddSupportedCultures("ru", "tg")
-    .AddSupportedUICultures("ru", "tg"));
+    // en — только язык текстов (ошибки, тарифы); числа и даты в документах остаются по-русски (культура ru или tg).
+    .AddSupportedUICultures("ru", "tg", "en"));
 
 if (!app.Environment.IsProduction())
 {

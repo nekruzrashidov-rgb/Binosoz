@@ -595,6 +595,8 @@
         let br;
         try { br = await S.api.ownerBrand(); } catch (e) { body.replaceChildren(h('div', { class: 'form-err' }, e.message)); return; }
         const bs = await S.api.buildings().catch(() => []);
+        // C-07: the tariff the platform gave (the same as on the platform → «Застройщики»), no invented «Стандарт».
+        const tariff = await S.api.ownTariff().catch(() => null);
         const inp = (n, v, o) => S.input(n, Object.assign({ value: v || '' }, o || {}));
         const name = inp('name', br.name), slug = inp('slug', br.slug), phone = inp('phone', br.phone, { type: 'tel', placeholder: '+992 …' }), tg = inp('telegram', br.telegram, { placeholder: '@company' }), addr = inp('address', br.address), email = inp('email', br.email, { type: 'email' });
         const color = h('input', { type: 'color', class: 'color-inp', name: 'primaryColor', id: 'set-color', value: br.primaryColor || '#c9a227' });
@@ -627,12 +629,18 @@
         const del = h('button', { class: 'btn ghost', type: 'button', onclick: (e) => S.busy(e.currentTarget, async () => { try { br = await S.api.deleteLogo(); drawLogo(); } catch (er) { S.err(er); } }) }, t('set.logoDelete'));
         drawLogo();
 
-        const LIMIT = 3;
+        const maxB = tariff && tariff.maxBuildings != null ? tariff.maxBuildings : null;
+        const count = tariff ? tariff.buildings : bs.length;
+        const planCard = h('div', { class: 'card stack' }, h('h3', null, t('set.plan')),
+          h('dl', { class: 'kv' }, h('dt', null, t('set.tariff')), h('dd', null, tariff && tariff.name ? tariff.name : h('span', { class: 'muted' }, t('set.noTariff'))),
+            h('dt', null, t('set.objects')), h('dd', null, maxB != null ? t('set.objectsN', { n: count, m: maxB }) : t('set.objectsNoLimit', { n: count })),
+            tariff && tariff.maxUsers != null ? [h('dt', null, t('set.staff')), h('dd', null, t('set.objectsN', { n: tariff.users, m: tariff.maxUsers }))] : null,
+            tariff && tariff.endsAt ? [h('dt', null, t('set.tariffEnds')), h('dd', null, S.fmt.date(tariff.endsAt))] : null),
+          maxB != null ? S.bar((count * 100) / maxB, count >= maxB ? 'warn' : '') : null,
+          h('p', { class: 'hint' }, t(tariff && tariff.name ? 'set.planHint' : 'set.noTariffHint')));
         body.replaceChildren(h('div', { class: 'set-grid' }, form, h('div', { class: 'stack' },
           h('div', { class: 'card stack' }, h('h3', null, t('set.logo')), logoBox, h('p', { class: 'hint' }, t('set.logoHint')), h('div', { class: 'row' }, file, upload, del)),
-          h('div', { class: 'card stack' }, h('h3', null, t('set.plan')),
-            h('dl', { class: 'kv' }, h('dt', null, t('set.tariff')), h('dd', null, t('set.standard')), h('dt', null, t('set.objects')), h('dd', null, t('set.objectsN', { n: bs.length, m: LIMIT }))),
-            S.bar((bs.length * 100) / LIMIT, bs.length >= LIMIT ? 'warn' : ''), h('p', { class: 'hint' }, t('set.planHint'))))));
+          planCard)));
         // Tariffs and coefficients of the green features (owner): the utility calculator and the CO₂ figure use only these.
         if (S.eco) body.append(S.eco.settingsForm());
         // Installment terms for the site (owner): the landing and the calculator show only what is set here.

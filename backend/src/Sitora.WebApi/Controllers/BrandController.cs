@@ -38,6 +38,21 @@ public class PublicController(IBrandService brands) : ControllerBase
     }
 }
 
+// Тариф своей организации (CRM → «Настройки», C-07): тот же действующий тариф, что на платформе → «Застройщики».
+[ApiController]
+[Route("api/v1/owner/tariff")]
+[Authorize(Roles = Roles.Leaders)]
+[Produces("application/json")]
+public class OwnerTariffController(ITariffService tariffs, ICurrentUser currentUser) : ControllerBase
+{
+    /// <summary>Действующий тариф (name null — не назначен, лимитов нет), лимиты и сколько домов и сотрудников уже есть.</summary>
+    [HttpGet]
+    [ProducesResponseType<Sitora.Domain.DTOs.Platform.OwnTariffResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public Task<Sitora.Domain.DTOs.Platform.OwnTariffResponse> Get(CancellationToken ct) =>
+        tariffs.OwnAsync(currentUser.OrganizationId ?? throw new Sitora.Domain.Exceptions.NotFoundException("Организация не найдена"), ct);
+}
+
 // Раздел владельца «Бренд и сайт».
 [ApiController]
 [Route("api/v1/owner/brand")]

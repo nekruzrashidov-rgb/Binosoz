@@ -1,4 +1,4 @@
-/* Russian interface texts (2020 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* Russian interface texts (2027 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -651,10 +651,9 @@
     "set.logoDone": "Логотип загружен",
     "set.plan": "Тариф",
     "set.tariff": "Тариф",
-    "set.standard": "Стандарт",
     "set.objects": "Объектов",
     "set.objectsN": "{n} из {m}",
-    "set.planHint": "Оплата тарифов пока не подключена: лимит показан для ориентира и не мешает добавлять дома.",
+    "set.planHint": "Лимиты тарифа: больше домов или сотрудников добавить нельзя — для этого нужен тариф выше (назначает администратор платформы).",
     "wiz.progress": "Шаги настройки",
     "wiz.step1": "Знакомство",
     "wiz.step2": "Первый объект",
@@ -2036,5 +2035,13 @@
     "audit.req.POST /platform/impersonate/stop": "Выход из режима владельца",
     "audit.req.POST /users": "Сотрудник добавлен",
     "audit.req.POST /customers": "Клиент добавлен",
+    "set.noTariff": "Тариф не назначен",
+    "set.noTariffHint": "Тариф назначает администратор платформы. Пока его нет, ограничений по домам и сотрудникам нет.",
+    "set.objectsNoLimit": "{n}, без ограничения",
+    "set.staff": "Сотрудников",
+    "set.tariffEnds": "Действует до",
+    "plat.trEmpty": "Пусто — показывается русский текст",
+    "pset.builtAt": "собрано {d}",
+    "pset.versionHint": "Коммит сборки, которая работает сейчас (как /health/live); меняется сам при каждом выпуске.",
   };
 })();

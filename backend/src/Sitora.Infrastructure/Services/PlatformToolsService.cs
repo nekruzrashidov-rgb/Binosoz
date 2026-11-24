@@ -105,9 +105,10 @@ public class PlatformToolsService(AppDbContext db, IAuditService audit, TimeProv
         return new PlatformSettingsResponse(
             values.TryGetValue(PlatformSettingKeys.MaxOrganizations, out var max) && int.TryParse(max, NumberStyles.None, CultureInfo.InvariantCulture, out var m) ? m : null,
             values.TryGetValue(PlatformSettingKeys.DemoMode, out var demo) && demo == "true",
-            Version,
+            BuildInfo.Version,
             values.GetValueOrDefault(PlatformSettingKeys.ContactEmail),
-            organizations);
+            organizations,
+            BuildInfo.BuiltAt);
     }
 
     public async Task<PlatformSettingsResponse> UpdateSettingsAsync(UpdatePlatformSettingsRequest request, CancellationToken ct = default)
@@ -171,15 +172,5 @@ public class PlatformToolsService(AppDbContext db, IAuditService audit, TimeProv
     {
         if (await db.PlatformSettings.FirstOrDefaultAsync(s => s.Key == key, ct) is { } setting)
             db.PlatformSettings.Remove(setting);
-    }
-
-    // «1.0.0 (4ac525d)»: версия сборки и коммит, из которого она собрана.
-    private static readonly string Version = ReadVersion();
-
-    private static string ReadVersion()
-    {
-        var info = typeof(PlatformToolsService).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "1.0.0";
-        var plus = info.IndexOf('+');
-        return plus < 0 ? info : $"{info[..plus]} ({info[(plus + 1)..Math.Min(info.Length, plus + 8)]})";
     }
 }
