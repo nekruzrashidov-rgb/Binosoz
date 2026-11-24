@@ -102,7 +102,7 @@
     rooms: (r) => (r === 0 ? t('apt.studio') : r + t('apt.roomsShort')),
     size(b) { if (!b) return ''; return b > 1048576 ? (b / 1048576).toFixed(1) + ' ' + t('unit.mb', null, 'МБ') : Math.max(1, Math.round(b / 1024)) + ' ' + t('unit.kb', null, 'КБ'); },
     initials(n) { return String(n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]).join('').toUpperCase(); },
-    left(iso) { const ms = new Date(iso).getTime() - Date.now(); if (ms <= 0) return t('book.expired'); const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000); return h + t('u.h') + ' ' + m + t('u.min'); },
+    left(iso) { const ms = new Date(iso).getTime() - Date.now(); if (ms <= 0) return t('book.expired'); const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000); if (h >= 48) return Math.floor(h / 24) + t('u.d') + ' ' + (h % 24) + t('u.h'); return h + t('u.h') + ' ' + m + t('u.min'); },
   };
   // A text of the developer's data in the page language: field + 'Ru' | 'Tg' | 'En' (A-10). Without a translation — the
   // Russian text, and in English it says so: «… (in Russian)». The plain field (`key`) is the API's pick, the last resort.

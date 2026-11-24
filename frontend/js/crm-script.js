@@ -222,9 +222,8 @@
                 h('div', null, h('dt', null, t('proj.plan')), h('dd', null, S.fmt.money(c.plan, c.currency), ' ', h('small', null, revPct + '%'))))),
             h('div', { class: 'proj-tiles' },
               h('div', { class: 'card proj-tile' }, h('span', { 'aria-hidden': 'true' }, '📅'), h('small', null, t('proj.next')), h('b', null, c.nextStage || (c.completionYear ? t('proj.delivery', { y: c.completionYear }) : '—'))),
-              // Crews and tasks are not tracked yet: example numbers, marked as such.
-              h('div', { class: 'card proj-tile' }, h('span', { 'aria-hidden': 'true' }, '👷'), h('small', null, t('proj.crews')), h('b', null, '8'), h('em', null, t('proj.example'))),
-              h('div', { class: 'card proj-tile' }, h('span', { 'aria-hidden': 'true' }, '📋'), h('small', null, t('proj.tasks')), h('b', null, '3'), h('em', null, t('proj.example')))));
+              // Crews and open tasks are not tracked: no tiles with made-up numbers (CLAUDE.md, «Честные данные»).
+              ));
         }));
       },
 

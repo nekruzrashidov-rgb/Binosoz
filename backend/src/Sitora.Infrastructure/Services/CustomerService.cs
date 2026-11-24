@@ -29,7 +29,7 @@ public class CustomerService(AppDbContext db, EncryptionService encryption, IAud
         var total = await query.CountAsync(ct);
         var items = await query.OrderByDescending(c => c.CreatedAt)
             .Skip(p.Skip).Take(p.PageSize)
-            .Select(c => new CustomerListItem(c.Id, c.FullName, c.Phone, c.Email, c.CreatedAt))
+            .Select(c => new CustomerListItem(c.Id, c.FullName, c.Phone, c.Email, c.CreatedAt, c.Deals.Count))
             .ToListAsync(ct);
         return new PagedResult<CustomerListItem>(items, p.Page, p.PageSize, total);
     }

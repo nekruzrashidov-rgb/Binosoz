@@ -1,4 +1,4 @@
-/* English interface texts (1959 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* English interface texts (1960 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -343,6 +343,7 @@
     "u.m2": "m²",
     "u.month": "mo.",
     "u.monthsShort": "mo.",
+    "u.d": " d",
     "u.h": " h",
     "u.min": " min",
     "calc.example": "Installment example",
