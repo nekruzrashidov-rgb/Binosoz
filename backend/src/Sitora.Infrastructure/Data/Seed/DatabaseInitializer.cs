@@ -55,9 +55,9 @@ public static class DatabaseInitializer
         await db.Database.MigrateAsync();
         await SeedRolesAsync(provider.GetRequiredService<RoleManager<IdentityRole<Guid>>>());
         await TariffSeeder.SeedAsync(db);
-        await BootstrapOwnerAsync(provider.GetRequiredService<UserManager<AppUser>>(),
+        await BootstrapOwnerAsync(provider, provider.GetRequiredService<UserManager<AppUser>>(),
             provider.GetRequiredService<IConfiguration>(), logger);
-        await EnsureSuperAdminAsync(provider.GetRequiredService<UserManager<AppUser>>(),
+        await EnsureSuperAdminAsync(provider, provider.GetRequiredService<UserManager<AppUser>>(),
             provider.GetRequiredService<IConfiguration>(), logger);
 
         // Демо-доступ для жюри — в любом окружении, только при SEED_DEMO_ACCOUNTS=true (после каталога разработки — ниже).
@@ -95,16 +95,26 @@ public static class DatabaseInitializer
         }
     }
 
-    // Первый владелец организации по умолчанию в любом окружении: создаётся, только пока владельцев нет.
+    // Первый владелец организации по умолчанию в любом окружении: создаётся, только пока владельцев нет; у уже
+    // созданного с той же почтой пароль приводится к секрету (вне Development).
     // После первого запуска переменные BOOTSTRAP_ADMIN_* можно убрать из .env.
-    private static async Task BootstrapOwnerAsync(UserManager<AppUser> userManager, IConfiguration configuration, ILogger logger)
+    private static async Task BootstrapOwnerAsync(IServiceProvider provider, UserManager<AppUser> userManager,
+        IConfiguration configuration, ILogger logger)
     {
         var email = configuration["BOOTSTRAP_ADMIN_EMAIL"];
         var password = configuration["BOOTSTRAP_ADMIN_PASSWORD"];
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
             return;
         if ((await userManager.GetUsersInRoleAsync(RoleNames.Owner)).Count > 0)
+        {
+            // Владелец уже есть: если это он и есть (та же почта) — пароль приводится к секрету, как у сотрудников
+            // SEED_STAFF_* (забыли пароль — поменяли секрет и снова «Seed prod»). Чужого владельца не трогаем.
+            var existing = await userManager.FindByEmailAsync(email.Trim());
+            if (existing is not null && await userManager.IsInRoleAsync(existing, RoleNames.Owner)
+                && await SyncSeedPasswordAsync(provider, userManager, existing, password, "BOOTSTRAP_ADMIN_PASSWORD"))
+                logger.LogInformation("Владелец {Email}: пароль обновлён из секрета", existing.Email);
             return;
+        }
 
         var user = new AppUser
         {
@@ -124,8 +134,9 @@ public static class DatabaseInitializer
 
     // Суперадмин в любом окружении — из .env (ADMIN_EMAIL и ADMIN_PASSWORD). Вход по паролю,
     // поэтому без ADMIN_PASSWORD учётная запись не создаётся: войти было бы нечем.
-    // 2FA (TOTP) включается потом в разделе платформы. Существующему пароль не меняется.
-    private static async Task EnsureSuperAdminAsync(UserManager<AppUser> userManager, IConfiguration configuration, ILogger logger)
+    // 2FA (TOTP) включается потом в разделе платформы. Существующему пароль приводится к секрету (вне Development).
+    private static async Task EnsureSuperAdminAsync(IServiceProvider provider, UserManager<AppUser> userManager,
+        IConfiguration configuration, ILogger logger)
     {
         var email = configuration["ADMIN_EMAIL"]?.Trim().ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(email))
@@ -138,6 +149,10 @@ public static class DatabaseInitializer
                 throw new InvalidOperationException($"ADMIN_EMAIL {email} уже занят сотрудником организации");
             if (!await userManager.IsInRoleAsync(user, RoleNames.SuperAdmin))
                 await userManager.AddToRoleAsync(user, RoleNames.SuperAdmin);
+            var existingPassword = configuration["ADMIN_PASSWORD"];
+            if (!string.IsNullOrWhiteSpace(existingPassword)
+                && await SyncSeedPasswordAsync(provider, userManager, user, existingPassword, "ADMIN_PASSWORD"))
+                logger.LogInformation("Создатель платформы {Email}: пароль обновлён из секрета", email);
             return;
         }
 
@@ -155,6 +170,18 @@ public static class DatabaseInitializer
                                                 string.Join("; ", result.Errors.Select(e => e.Description)));
         await userManager.AddToRoleAsync(user, RoleNames.SuperAdmin);
         logger.LogInformation("Создан создатель платформы {Email}", email);
+    }
+
+    // Пароль владельца и создателя платформы приводится к секрету только вне Development: в Development их пароли
+    // ведёт сидер разработки (user-secrets), и два источника не должны спорить.
+    private static async Task<bool> SyncSeedPasswordAsync(IServiceProvider provider, UserManager<AppUser> userManager,
+        AppUser user, string password, string secretName)
+    {
+        if (provider.GetRequiredService<Microsoft.Extensions.Hosting.IHostEnvironment>().IsDevelopment())
+            return false;
+        return await SeedPasswords.SyncAsync(provider.GetRequiredService<AppDbContext>(), userManager,
+            provider.GetRequiredService<Sitora.Domain.Interfaces.IAuditService>(),
+            provider.GetRequiredService<TimeProvider>(), user, password, secretName);
     }
 
     // Только Development: пароль существующего пользователя приводится к user-secrets (сменили секрет — новый пароль).
