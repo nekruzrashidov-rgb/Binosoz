@@ -48,15 +48,17 @@ public class AuditService(AppDbContext db, ICurrentUser currentUser, TimeProvide
             logs = logs.Where(a => a.At < query.To);
 
         var total = await logs.CountAsync(ct);
-        var items = await (
-                from a in logs
-                join u in db.Users on a.UserId equals u.Id into users
-                from u in users.DefaultIfEmpty()
-                orderby a.At descending, a.Id descending
-                select new AuditLogResponse(a.Id, a.UserId, u != null ? u.Email : null,
-                    a.Entity, a.EntityId, a.Action, a.Before, a.After, a.At, a.OrganizationId, a.ImpersonatedById))
+        var page = await logs.OrderByDescending(a => a.At).ThenByDescending(a => a.Id)
             .Skip(p.Skip).Take(p.PageSize)
             .ToListAsync(ct);
+        var subjects = await AuditPresenter.DescribeAsync(db,
+            page.Select(a => new AuditPresenter.Row(a.Id, a.UserId, a.Entity, a.EntityId, a.Action)).ToList(), ct);
+        var items = page.Select(a =>
+        {
+            var s = subjects[a.Id];
+            return new AuditLogResponse(a.Id, s.ActorId, s.ActorEmail, a.Entity, a.EntityId, a.Action, a.Before, a.After, a.At,
+                a.OrganizationId, a.ImpersonatedById, s.ActorName, s.BySystem, s.EntityName, s.ApartmentNumber);
+        }).ToList();
         return new PagedResult<AuditLogResponse>(items, p.Page, p.PageSize, total);
     }
 

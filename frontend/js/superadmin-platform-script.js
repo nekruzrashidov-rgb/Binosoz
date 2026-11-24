@@ -281,7 +281,7 @@
         const pager = h('div', { class: 'row between', style: { marginTop: '12px' } });
         const [orgs, actions] = await Promise.all([S.api.organizations().catch(() => []), S.api.platformActivityActions().catch(() => [])]);
         const org = S.select('org', [['', t('pact.allOrgs')], ...orgs.map((o) => [o.id, o.name])], '');
-        const act = S.select('action', [['', t('pact.allActions')], ...actions.map((a) => [a, t('audit.act.' + a, null, a)])], '');
+        const act = S.select('action', [['', t('pact.allActions')], ...actions.map((a) => [a, S.audit.action(a)])], '');
         const from = S.input('from', { type: 'date' }), to = S.input('to', { type: 'date' });
         // The date filter is by Dushanbe days: [from 00:00; to + 1 day 00:00) in UTC+5.
         const utc = (d, addDay) => { if (!d) return ''; const x = new Date(d + 'T00:00:00+05:00'); if (addDay) x.setUTCDate(x.getUTCDate() + 1); return x.toISOString(); };
@@ -294,10 +294,11 @@
             const r = await S.api.platformActivity(q);
             holder.replaceChildren(S.tbl([
               { label: t('pact.time'), render: (x) => S.fmt.dt(x.at) },
-              { label: t('pact.action'), render: (x) => h('span', { class: 'chip act-' + kind(x.action) }, t('audit.act.' + x.action, null, x.action)) },
-              { label: t('pact.entity'), render: (x) => t('audit.ent.' + x.entity, null, x.entity) },
+              // R-04: readable action with a short summary (raw JSON under «Подробнее»), object and author.
+              { label: t('pact.action'), render: (x) => h('div', null, h('span', { class: 'chip act-' + kind(x.action) }, S.audit.action(x.action)), h('div', { class: 'audit-sum' }, S.audit.change(x))) },
+              { label: t('pact.entity'), render: (x) => S.audit.entity(x) },
               { label: t('pact.org'), render: (x) => x.organizationName || h('span', { class: 'muted' }, t('pact.platform')) },
-              { label: t('pact.user'), render: (x) => [x.userEmail || h('span', { class: 'muted' }, t('audit.system', null, 'система')), x.impersonated ? h('small', { class: 'muted' }, ' · ' + t('pact.asOwner')) : null] },
+              { label: t('pact.user'), render: (x) => [S.audit.who(x), x.impersonated ? h('small', { class: 'muted' }, ' · ' + t('pact.asOwner')) : null] },
               { label: 'IP', render: (x) => h('code', null, x.ip || '—') }], r.items, { empty: t('pact.none') }));
             const pages = Math.max(1, Math.ceil(r.totalCount / r.pageSize));
             pager.replaceChildren(h('span', { class: 'muted' }, t('pact.total', { n: r.totalCount })),

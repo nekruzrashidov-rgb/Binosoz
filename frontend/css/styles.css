@@ -3205,3 +3205,8 @@ body:is([data-page='crm'], [data-page='cabinet'], [data-page='platform']) h1, bo
 /* Padding, not display: .desk-only and the header media rules hide the phone on narrow screens. */
 .top-phone { padding-block: 12px; }
 .crumbs a { display: inline-flex; align-items: center; min-height: 24px; }
+/* Journal (CRM «Журнал», platform «Активность»): short summary, raw JSON only under «Подробнее» (C-06 / R-04). */
+.audit-sum { margin-top: 4px; font-size: 13px; color: var(--ink-2); }
+.audit-raw { margin-top: 4px; font-size: 12px; }
+.audit-raw summary { cursor: pointer; color: var(--accent-text); min-height: 24px; display: inline-flex; align-items: center; }
+.audit-raw code { display: block; margin-top: 4px; color: var(--ink-2); white-space: pre-wrap; word-break: break-word; max-width: 46ch; }

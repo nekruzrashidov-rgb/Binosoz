@@ -13,7 +13,13 @@ public record PlatformActivityItem(
     string? OrganizationName,
     string? UserEmail,
     string? Ip,
-    bool Impersonated);
+    bool Impersonated,
+    string? UserName = null,
+    bool BySystem = false,
+    string? EntityName = null,
+    int? ApartmentNumber = null,
+    string? Before = null,
+    string? After = null);
 
 // Уведомление от платформы: всем пользователям организации или всем пользователям всех организаций (OrganizationId = null).
 // Type: info, warning, error.

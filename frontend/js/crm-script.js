@@ -447,8 +447,10 @@
       async audit(body) {
         // Entity names as the server writes them (class names); the demo calls users "User".
         const userEntity = S.isDemo() ? 'User' : 'AppUser';
-        const holder = h('div'); const sel = S.select('entity', [['', t('filter.all')], ['Deal', 'Deal'], ['Payment', 'Payment'], ['Apartment', 'Apartment'], ['Booking', 'Booking'], ['Lead', 'Lead'], [userEntity, 'User'], ['Impersonation', t('audit.viaPlatform')], ['Invitation', 'Invitation']], '');
-        const load = async () => { holder.replaceChildren(S.skeleton(6, 34)); const l = await S.api.audit(sel.value); holder.replaceChildren(S.tbl([{ label: t('audit.when'), render: (a) => S.fmt.dt(a.at) }, { label: t('audit.who'), render: (a) => (a.viaPlatform ? h('span', null, a.user, ' ', S.chip('warn', t('audit.viaPlatform'))) : a.user) }, { label: t('audit.action'), render: (a) => h('b', null, a.action) }, { label: t('audit.entity'), render: (a) => a.entity + ' #' + shortId(a.entityId) }, { label: t('audit.change'), render: (a) => h('code', { style: { fontSize: '12px', color: 'var(--ink-2)' } }, [a.before ? JSON.stringify(a.before) : '', a.before && a.after ? ' → ' : '', a.after ? JSON.stringify(a.after) : ''].join('')) }], l, { empty: t('audit.none') })); };
+        const ent = (e) => [e, t('audit.ent.' + e, null, e)];
+        const holder = h('div'); const sel = S.select('entity', [['', t('filter.all')], ent('Deal'), ent('Payment'), ent('Apartment'), ent('Booking'), ent('Lead'), [userEntity, t('audit.ent.AppUser')], ['Impersonation', t('audit.viaPlatform')], ent('Invitation')], '');
+        // C-06: readable action, object and author; the short summary, the raw JSON only under «Подробнее».
+        const load = async () => { holder.replaceChildren(S.skeleton(6, 34)); const l = await S.api.audit(sel.value); holder.replaceChildren(S.tbl([{ label: t('audit.when'), render: (a) => S.fmt.dt(a.at) }, { label: t('audit.who'), render: (a) => (a.viaPlatform ? h('span', null, S.audit.who(a), ' ', S.chip('warn', t('audit.viaPlatform'))) : S.audit.who(a)) }, { label: t('audit.action'), render: (a) => h('b', null, S.audit.action(a.action)) }, { label: t('audit.entity'), render: (a) => S.audit.entity(a) }, { label: t('audit.change'), render: (a) => S.audit.change(a) }], l, { empty: t('audit.none') })); };
         sel.addEventListener('change', load); body.replaceChildren(h('div', { class: 'toolbar' }, h('div', { style: { minWidth: '200px' } }, S.field(t('audit.entity'), sel))), holder); load();
       },
 

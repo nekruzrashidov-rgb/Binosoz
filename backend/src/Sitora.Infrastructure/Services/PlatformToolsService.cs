@@ -33,21 +33,24 @@ public class PlatformToolsService(AppDbContext db, IAuditService audit, TimeProv
             logs = logs.Where(a => a.At < to);
 
         var total = await logs.CountAsync(ct);
-        var items = await (
+        var page = await (
                 from a in logs
-                join u in db.Users on a.UserId equals u.Id into users
-                from u in users.DefaultIfEmpty()
                 join o in db.Organizations.IgnoreQueryFilters() on a.OrganizationId equals o.Id into orgs
                 from o in orgs.DefaultIfEmpty()
                 orderby a.At descending, a.Id descending
-                // Вход и другие действия до аутентификации пишутся без UserId: тогда пользователь — сам объект записи (AppUser).
-                select new PlatformActivityItem(a.Id, a.At, a.Action, a.Entity, a.EntityId, a.OrganizationId,
-                    o != null ? o.Name : null,
-                    u != null ? u.Email
-                        : a.Entity == nameof(AppUser) ? db.Users.Where(x => x.Id == a.EntityId).Select(x => x.Email).FirstOrDefault() : null,
-                    a.Ip, a.ImpersonatedById != null))
+                select new { Log = a, OrganizationName = o != null ? o.Name : null })
             .Skip(p.Skip).Take(p.PageSize)
             .ToListAsync(ct);
+        // Вход и другие действия до аутентификации пишутся без UserId: тогда пользователь — сам объект записи (AppUser).
+        var subjects = await AuditPresenter.DescribeAsync(db,
+            page.Select(x => new AuditPresenter.Row(x.Log.Id, x.Log.UserId, x.Log.Entity, x.Log.EntityId, x.Log.Action)).ToList(), ct);
+        var items = page.Select(x =>
+        {
+            var (a, s) = (x.Log, subjects[x.Log.Id]);
+            return new PlatformActivityItem(a.Id, a.At, a.Action, a.Entity, a.EntityId, a.OrganizationId, x.OrganizationName,
+                s.ActorEmail, a.Ip, a.ImpersonatedById != null, s.ActorName, s.BySystem, s.EntityName, s.ApartmentNumber,
+                a.Before, a.After);
+        }).ToList();
         return new PagedResult<PlatformActivityItem>(items, p.Page, p.PageSize, total);
     }
 
