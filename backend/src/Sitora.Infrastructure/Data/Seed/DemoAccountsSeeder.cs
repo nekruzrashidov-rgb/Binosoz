@@ -40,10 +40,10 @@ public static class DemoAccountsSeeder
             return;
         }
 
-        var manager = await EnsureUserAsync(users, ManagerEmail, "Демо-менеджер", RoleNames.Manager, Organization.DefaultId,
-            configuration["SEED_DEMO_MANAGER_PASSWORD"], logger);
-        var buyer = await EnsureUserAsync(users, BuyerEmail, "Демо-покупатель", RoleNames.Customer, null,
-            configuration["SEED_DEMO_BUYER_PASSWORD"], logger);
+        var manager = await EnsureUserAsync(provider, ManagerEmail, "Демо-менеджер", RoleNames.Manager, Organization.DefaultId,
+            "SEED_DEMO_MANAGER_PASSWORD", logger);
+        var buyer = await EnsureUserAsync(provider, BuyerEmail, "Демо-покупатель", RoleNames.Customer, null,
+            "SEED_DEMO_BUYER_PASSWORD", logger);
         if (manager is null || buyer is null)
             return;
 
@@ -117,9 +117,11 @@ public static class DemoAccountsSeeder
             BuyerEmail, apartment.Number, ManagerEmail);
     }
 
-    private static async Task<AppUser?> EnsureUserAsync(UserManager<AppUser> users, string email, string fullName, string role,
-        Guid? organizationId, string? password, ILogger logger)
+    private static async Task<AppUser?> EnsureUserAsync(IServiceProvider provider, string email, string fullName, string role,
+        Guid? organizationId, string passwordVariable, ILogger logger)
     {
+        var users = provider.GetRequiredService<UserManager<AppUser>>();
+        var password = provider.GetRequiredService<IConfiguration>()[passwordVariable];
         if (string.IsNullOrWhiteSpace(password))
         {
             logger.LogWarning("Демо-доступ {Email} не создан: не задан пароль в секретах", email);
@@ -137,14 +139,12 @@ public static class DemoAccountsSeeder
             return user;
         }
 
-        // Пароль приводится к значению из секрета: сменили секрет — после следующего запуска действует новый.
-        if (!await users.CheckPasswordAsync(user, password))
-        {
-            await users.RemovePasswordAsync(user);
-            var reset = await users.AddPasswordAsync(user, password);
-            if (!reset.Succeeded)
-                throw new InvalidOperationException($"Не удалось обновить пароль {email}: " + string.Join("; ", reset.Errors.Select(e => e.Description)));
-        }
+        // Пароль приводится к значению из секрета: сменили секрет — после следующего запуска действует новый
+        // (с записью в AuditLog и отзывом сессий).
+        if (await SeedPasswords.SyncAsync(provider.GetRequiredService<AppDbContext>(), users,
+                provider.GetRequiredService<Sitora.Domain.Interfaces.IAuditService>(), provider.GetRequiredService<TimeProvider>(),
+                user, password, passwordVariable))
+            logger.LogInformation("Демо-доступ {Email}: пароль обновлён", email);
         return user;
     }
 }

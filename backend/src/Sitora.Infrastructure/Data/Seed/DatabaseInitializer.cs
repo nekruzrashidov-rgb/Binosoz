@@ -64,10 +64,7 @@ public static class DatabaseInitializer
         var isDevelopment = provider.GetRequiredService<IHostEnvironment>().IsDevelopment();
         if (isDevelopment)
         {
-            await SeedDevelopmentUsersAsync(
-                provider.GetRequiredService<UserManager<AppUser>>(),
-                provider.GetRequiredService<IConfiguration>(),
-                logger);
+            await SeedDevelopmentUsersAsync(provider, logger);
             await CatalogSeeder.SeedAsync(db, logger);
             await SalesSeeder.SeedAsync(db,
                 provider.GetRequiredService<EncryptionService>(),
@@ -84,6 +81,8 @@ public static class DatabaseInitializer
                     provider.GetRequiredService<IConfiguration>(), logger);
         }
 
+        // Сотрудники из секретов SEED_STAFF_* (ObjectAdmin, Manager, Accountant, Content) — в любом окружении, после каталога.
+        await StaffAccountsSeeder.SeedAsync(provider, logger);
         await DemoAccountsSeeder.SeedAsync(provider, logger);
     }
 
@@ -158,14 +157,25 @@ public static class DatabaseInitializer
         logger.LogInformation("Создан создатель платформы {Email}", email);
     }
 
-    private static async Task SeedDevelopmentUsersAsync(UserManager<AppUser> userManager, IConfiguration configuration, ILogger logger)
+    // Только Development: пароль существующего пользователя приводится к user-secrets (сменили секрет — новый пароль).
+    private static async Task SeedDevelopmentUsersAsync(IServiceProvider provider, ILogger logger)
     {
+        var userManager = provider.GetRequiredService<UserManager<AppUser>>();
+        var configuration = provider.GetRequiredService<IConfiguration>();
         foreach (var (email, fullName, role, passwordVariable, inOrganization) in DevelopmentUsers)
         {
-            if (await userManager.FindByEmailAsync(email) is not null)
-                continue;
-
             var password = configuration[passwordVariable];
+            var existing = await userManager.FindByEmailAsync(email);
+            if (existing is not null)
+            {
+                if (!string.IsNullOrWhiteSpace(password)
+                    && await SeedPasswords.SyncAsync(provider.GetRequiredService<AppDbContext>(), userManager,
+                        provider.GetRequiredService<Sitora.Domain.Interfaces.IAuditService>(),
+                        provider.GetRequiredService<TimeProvider>(), existing, password, passwordVariable))
+                    logger.LogInformation("Пользователь {Email}: пароль обновлён", email);
+                continue;
+            }
+
             if (string.IsNullOrWhiteSpace(password))
             {
                 logger.LogWarning("Пользователь {Email} не создан: не задана переменная окружения {Variable}", email, passwordVariable);

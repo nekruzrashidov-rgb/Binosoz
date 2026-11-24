@@ -5,7 +5,11 @@
 #  3. демо-доступ для жюри — только если секрет SEED_DEMO_ACCOUNTS = true: тот же образ с --migrate создаёт
 #     demo-buyer@binosoz.tj и demo-manager@binosoz.tj с паролями из секретов SEED_DEMO_BUYER_PASSWORD и
 #     SEED_DEMO_MANAGER_PASSWORD, демо-сделку с графиком, чатом и актом сверки в PDF.
+#  4. сотрудники для входа под каждой ролью — только по парам секретов SEED_STAFF_<РОЛЬ>_EMAIL и _PASSWORD
+#     (OBJECTADMIN, MANAGER, ACCOUNTANT, CONTENT): нет пары — роль не создаётся; есть — создаётся или пароль приводится к секрету
+#     (сессии отзываются). Инструкция — docs/ROLES_LOGIN.md.
 # Вход демо-покупателя паролем включается на Render переменной Auth__DemoPasswordLogin=true.
+# Пароли в лог не попадают: все маскируются (::add-mask::), сидер их не пишет — только «создан / пароль обновлён / пропущен».
 # Строка подключения — секрет PROD_DATABASE_URL (External Database URL из Render); в лог она не попадает (маскируется).
 # Повторный запуск ничего не дублирует. После заполнения — smoke-проверка каталога.
 name: Seed prod
@@ -50,6 +54,22 @@ jobs:
             echo "::error::Секрет PROD_DATABASE_URL не задан: Settings → Secrets and variables → Actions → New repository secret (External Database URL из Render). Подробно — docs/DEPLOY.md, «Демо-данные в пустой базе»."
             exit 1
           fi
+
+      # Все пароли из секретов маскируются до первого шага, который их использует.
+      - name: Маскирование паролей
+        env:
+          P1: ${{ secrets.SEED_DEMO_BUYER_PASSWORD }}
+          P2: ${{ secrets.SEED_DEMO_MANAGER_PASSWORD }}
+          P3: ${{ secrets.BOOTSTRAP_ADMIN_PASSWORD }}
+          P4: ${{ secrets.ADMIN_PASSWORD }}
+          P5: ${{ secrets.SEED_STAFF_OBJECTADMIN_PASSWORD }}
+          P6: ${{ secrets.SEED_STAFF_ACCOUNTANT_PASSWORD }}
+          P7: ${{ secrets.SEED_STAFF_CONTENT_PASSWORD }}
+          P8: ${{ secrets.SEED_STAFF_MANAGER_PASSWORD }}
+        run: |
+          for v in "$P1" "$P2" "$P3" "$P4" "$P5" "$P6" "$P7" "$P8"; do
+            if [ -n "$v" ]; then echo "::add-mask::$v"; fi
+          done
 
       - uses: actions/checkout@v5
 
@@ -129,7 +149,7 @@ jobs:
 
       # Первый владелец организации (Admin) и суперадмин платформы — только если заданы секреты.
       # Владелец создаётся, пока в организации нет владельцев; существующим паролям ничего не делается.
-      # Бухгалтера и контент-менеджера владелец потом приглашает из CRM (письмо со ссылкой).
+      # Остальные роли — следующий шаг (секреты SEED_STAFF_*) или приглашение из CRM (письмо со ссылкой).
       - name: Владелец и суперадмин
         env:
           CS: ${{ steps.cs.outputs.value }}
@@ -145,6 +165,42 @@ jobs:
           image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/binosoz-api:latest"
           docker run --rm -e ASPNETCORE_ENVIRONMENT=Production -e "ConnectionStrings__Default=$CS" \
             -e BOOTSTRAP_ADMIN_EMAIL -e BOOTSTRAP_ADMIN_PASSWORD -e ADMIN_EMAIL -e ADMIN_PASSWORD "$image" --migrate
+
+      # Сотрудники демо-организации для входа под каждой ролью (docs/ROLES_LOGIN.md). В лог — только строки сидера
+      # «Сотрудник <роль> <почта>: создан / пароль обновлён / уже есть / пропущен»; пароли он не пишет.
+      - name: Сотрудники по ролям
+        env:
+          CS: ${{ steps.cs.outputs.value }}
+          SEED_STAFF_OBJECTADMIN_EMAIL: ${{ secrets.SEED_STAFF_OBJECTADMIN_EMAIL }}
+          SEED_STAFF_OBJECTADMIN_PASSWORD: ${{ secrets.SEED_STAFF_OBJECTADMIN_PASSWORD }}
+          SEED_STAFF_MANAGER_EMAIL: ${{ secrets.SEED_STAFF_MANAGER_EMAIL }}
+          SEED_STAFF_MANAGER_PASSWORD: ${{ secrets.SEED_STAFF_MANAGER_PASSWORD }}
+          SEED_STAFF_ACCOUNTANT_EMAIL: ${{ secrets.SEED_STAFF_ACCOUNTANT_EMAIL }}
+          SEED_STAFF_ACCOUNTANT_PASSWORD: ${{ secrets.SEED_STAFF_ACCOUNTANT_PASSWORD }}
+          SEED_STAFF_CONTENT_EMAIL: ${{ secrets.SEED_STAFF_CONTENT_EMAIL }}
+          SEED_STAFF_CONTENT_PASSWORD: ${{ secrets.SEED_STAFF_CONTENT_PASSWORD }}
+        run: |
+          if [ -z "$SEED_STAFF_OBJECTADMIN_EMAIL$SEED_STAFF_MANAGER_EMAIL$SEED_STAFF_ACCOUNTANT_EMAIL$SEED_STAFF_CONTENT_EMAIL" ]; then
+            echo "Секреты SEED_STAFF_* не заданы — сотрудники по ролям не создаются (пропущено)."
+            exit 0
+          fi
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/binosoz-api:latest"
+          set +e
+          docker run --rm -e ASPNETCORE_ENVIRONMENT=Production -e "ConnectionStrings__Default=$CS" \
+            -e SEED_STAFF_OBJECTADMIN_EMAIL -e SEED_STAFF_OBJECTADMIN_PASSWORD \
+            -e SEED_STAFF_MANAGER_EMAIL -e SEED_STAFF_MANAGER_PASSWORD \
+            -e SEED_STAFF_ACCOUNTANT_EMAIL -e SEED_STAFF_ACCOUNTANT_PASSWORD \
+            -e SEED_STAFF_CONTENT_EMAIL -e SEED_STAFF_CONTENT_PASSWORD "$image" --migrate > staff.log 2>&1
+          code=$?
+          set -e
+          lines=$(grep -o 'Сотрудник[^"]*' staff.log || true)
+          echo "$lines"
+          { echo "### Сотрудники по ролям"; echo '```'; echo "$lines"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::Сидер сотрудников завершился с ошибкой (код $code) — причина выше; пароли в лог не пишутся."
+            grep -E 'Сотрудники из секретов|Unhandled|Exception' staff.log | head -20 || true
+            exit "$code"
+          fi
 
       # Каталог кэшируется до 30 секунд: ждём, чтобы smoke увидел новые дома.
       - name: Проверка каталога

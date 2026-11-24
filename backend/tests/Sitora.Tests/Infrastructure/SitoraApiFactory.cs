@@ -119,6 +119,15 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("SEED_CONTENT_PASSWORD", ContentPassword);
         builder.UseSetting("SEED_ACCOUNTANT_PASSWORD", AccountantPassword);
         builder.UseSetting("SEED_SUPERADMIN_PASSWORD", SeedSuperAdminPassword);
+        // Локальные user-secrets разработчика (демо-доступ, сотрудники SEED_STAFF_*, вход демо-покупателя паролем) читаются
+        // и тестовым хостом в Development — здесь они выключены; включают их только фабрики своих тестов.
+        builder.UseSetting("SEED_DEMO_ACCOUNTS", "false");
+        builder.UseSetting("Auth:DemoPasswordLogin", "false");
+        foreach (var account in Sitora.Infrastructure.Data.Seed.StaffAccountsSeeder.Accounts)
+        {
+            builder.UseSetting(account.EmailVariable, "");
+            builder.UseSetting(account.PasswordVariable, "");
+        }
         builder.UseSetting("Encryption:Key", _encryptionKey);
         builder.UseSetting("Storage:RootPath", _storagePath);
         builder.UseSetting("Cors:AllowedOrigins:0", AllowedOrigin);

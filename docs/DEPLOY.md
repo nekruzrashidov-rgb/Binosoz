@@ -458,6 +458,9 @@ Gmail с личного ящика годится для начала (лими�
 | Render → Environment | `Auth__DemoPasswordLogin` = `true` | Вход демо-покупателя паролем и кнопка «Войти как демо-покупатель» |
 | Render → Environment | `Payments__MockEnabled` = `true` | Тестовый банк для показа онлайн-оплаты (деньги не списываются). **После показа — выключить** (`false`) |
 
+Вход под каждой ролью (Owner, ObjectAdmin, Manager, Accountant, Content, покупатель, SuperAdmin) — секреты
+`SEED_STAFF_*` и пошаговая инструкция в `docs/ROLES_LOGIN.md`.
+
 Заранее (один раз): Actions → **Seed prod** → Run (confirm `nekruz`) — миграции, каталог с демо-эко-паспортом и
 тарифами, затем демо-доступ. Сценарий показа — `docs/DEMO_SCRIPT.md`.
 
