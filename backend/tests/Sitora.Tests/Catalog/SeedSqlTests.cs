@@ -83,6 +83,25 @@ public class SeedSqlTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
             Assert.Equal(pagesBefore + 48L, await ScalarAsync<long>(connection, tx, $"SELECT coalesce(sum(\"PageCount\"), 0) FROM \"IssuedPdfs\" WHERE \"OrganizationId\" = '{Organization.DefaultId}'"));
         }
 
+        // C-05: демо-бронь держится 48 часов, как обещает сайт, и каждый запуск снова продлевает действующие демо-брони
+        // до 48 часов (в воронке «47 ч», а не «20 дн»).
+        const string demoBookings = "FROM \"Bookings\" b JOIN \"Leads\" l ON l.\"Id\" = b.\"LeadId\" " +
+            "WHERE l.\"Comment\" LIKE 'Демо-данные: бронь квартиры %' AND b.\"Status\" = 'Active'";
+        Assert.True(await ScalarAsync<bool>(connection, tx,
+            $"SELECT bool_and(b.\"ExpiresAt\" > now() + interval '47 hours' AND b.\"ExpiresAt\" <= now() + interval '48 hours') {demoBookings}"));
+        await ExecAsync(connection, tx, $"UPDATE \"Bookings\" SET \"ExpiresAt\" = now() + interval '30 days' WHERE \"Id\" IN (SELECT b.\"Id\" {demoBookings})");
+        await ExecAsync(connection, tx, sql);
+        Assert.True(await ScalarAsync<bool>(connection, tx, $"SELECT bool_and(b.\"ExpiresAt\" <= now() + interval '48 hours') {demoBookings}"));
+        Assert.True(await ScalarAsync<long>(connection, tx, "SELECT count(*) FROM \"AuditLog\" WHERE \"Action\" = 'DemoBookingsRenewed'") >= 1);
+
+        // R-01: старое имя организации «Sitora» меняется на «Некруз Резиденс»; имя, заданное владельцем, не трогается.
+        await ExecAsync(connection, tx, $"UPDATE \"Organizations\" SET \"Name\" = 'Sitora' WHERE \"Id\" = '{Organization.DefaultId}'");
+        await ExecAsync(connection, tx, sql);
+        Assert.Equal("Некруз Резиденс", await ScalarAsync<string>(connection, tx, $"SELECT \"Name\" FROM \"Organizations\" WHERE \"Id\" = '{Organization.DefaultId}'"));
+        await ExecAsync(connection, tx, $"UPDATE \"Organizations\" SET \"Name\" = 'ЖК Свой' WHERE \"Id\" = '{Organization.DefaultId}'");
+        await ExecAsync(connection, tx, sql);
+        Assert.Equal("ЖК Свой", await ScalarAsync<string>(connection, tx, $"SELECT \"Name\" FROM \"Organizations\" WHERE \"Id\" = '{Organization.DefaultId}'"));
+
         // Повторный запуск ничего не добавляет.
         var issuedBefore = await ScalarAsync<long>(connection, tx, "SELECT count(*) FROM \"IssuedPdfs\"");
         await ExecAsync(connection, tx, sql);

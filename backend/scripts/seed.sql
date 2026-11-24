@@ -10,14 +10,16 @@
 --   6–7 — 4 rooms 118.5 m² at 6 500. Price = ROUND(area × price per m² / 100) × 100, as Apartment.CalculatePrice
 --   (PostgreSQL rounds numeric halves away from zero, like MidpointRounding.AwayFromZero). Money is numeric(18,2), currency TJS.
 -- * Statuses: floors 1–3, slots 0–1 — Sold (6); floors 1–5, slot 2 — Booked (5); all others — Free (149).
---   A booked apartment gets a real active booking (with a demo lead: a booking needs a customer or a lead) expiring in 30 days,
---   so managers can cancel, extend or turn it into a deal in the CRM. Sold apartments have no deal: they are catalog data only.
+--   A booked apartment gets a real active booking (with a demo lead: a booking needs a customer or a lead) expiring in 48 hours
+--   (as the site promises), so managers can cancel, extend or turn it into a deal in the CRM. Sold apartments have no deal: they are catalog data only.
 -- * The seed itself is recorded in AuditLog (Building / Seeded).
 -- * A second DO block (any run, never overwrites): the demo eco passport and amenities of the building, the organization
 --   tariffs and installment terms, marked as demo data — the same values as GreenDemoSeeder.cs. It also replaces the old
 --   description «…бизнес-класса…» (an unverified claim) of an already seeded building and fills the Tajik description if empty.
 -- * A third DO block (organization marked demo, no issued PDFs yet): demo completed deals for the sold apartments with
 --   issued PDFs (3 schedules × 2 pages, 2 statements × 1 page each), so «Зелёный эффект» shows meaningful demo numbers.
+-- * A fourth DO block (any run): active demo bookings get ExpiresAt = now() + 48 h again (the CRM funnel shows «47 ч», not
+--   «20 дн»), and the default organization still named «Sitora» (the old project name) is renamed to «Некруз Резиденс».
 DO $$
 DECLARE
   org        constant uuid := '01a20000-0000-7000-8000-000000000001';
@@ -89,7 +91,7 @@ BEGIN
         VALUES (lead_id, org, building, apt_id, 'Демо-покупатель ' || apt_number, '+9929000000' || lpad(f::text, 2, '0'),
                 'Демо-данные: бронь квартиры ' || apt_number, 'Office', 'InProgress', NULL, ts, ts);
         INSERT INTO "Bookings" ("Id", "ApartmentId", "CustomerId", "LeadId", "ExpiresAt", "Status", "CancelReason", "CreatedAt", "UpdatedAt")
-        VALUES (gen_random_uuid(), apt_id, NULL, lead_id, ts + interval '30 days', 'Active', NULL, ts, ts);
+        VALUES (gen_random_uuid(), apt_id, NULL, lead_id, ts + interval '48 hours', 'Active', NULL, ts, ts);
       END IF;
     END LOOP;
   END LOOP;
@@ -246,4 +248,36 @@ BEGIN
     deals_n := deals_n + 1;
   END LOOP;
   IF deals_n > 0 THEN RAISE NOTICE 'Демо-сделок с выданными PDF: % (по 5 документов, 8 страниц)', deals_n; END IF;
+END $$;
+
+-- Каждый запуск: демо-брони снова держатся 48 часов, как обещает сайт (C-05, docs/DECISIONS.md), и старое имя
+-- организации «Sitora» меняется на «Некруз Резиденс» (R-01). Трогаются только действующие демо-брони (лид
+-- «Демо-данные: бронь квартиры …» организации по умолчанию) и только имя «Sitora» — имя, заданное владельцем, не меняется.
+DO $$
+DECLARE
+  org constant uuid := '01a20000-0000-7000-8000-000000000001';
+  n   int;
+BEGIN
+  UPDATE "Bookings" b SET "ExpiresAt" = now() + interval '48 hours', "UpdatedAt" = now()
+  FROM "Leads" l
+  WHERE l."Id" = b."LeadId" AND l."OrganizationId" = org AND l."Comment" LIKE 'Демо-данные: бронь квартиры %'
+    AND b."Status" = 'Active';
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n > 0 THEN
+    INSERT INTO "AuditLog" ("Id", "UserId", "OrganizationId", "ImpersonatedById", "Entity", "EntityId", "Action", "Before", "After",
+                            "At", "Ip", "CreatedAt", "UpdatedAt")
+    VALUES (gen_random_uuid(), NULL, org, NULL, 'Booking', org, 'DemoBookingsRenewed', NULL,
+            jsonb_build_object('source', 'scripts/seed.sql', 'bookings', n, 'hours', 48), now(), NULL, now(), now());
+    RAISE NOTICE 'Демо-брони продлены на 48 часов: %', n;
+  END IF;
+
+  UPDATE "Organizations" SET "Name" = 'Некруз Резиденс', "UpdatedAt" = now() WHERE "Id" = org AND "Name" = 'Sitora';
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n > 0 THEN
+    INSERT INTO "AuditLog" ("Id", "UserId", "OrganizationId", "ImpersonatedById", "Entity", "EntityId", "Action", "Before", "After",
+                            "At", "Ip", "CreatedAt", "UpdatedAt")
+    VALUES (gen_random_uuid(), NULL, org, NULL, 'Organization', org, 'Renamed', jsonb_build_object('Name', 'Sitora'),
+            jsonb_build_object('Name', 'Некруз Резиденс', 'source', 'scripts/seed.sql'), now(), NULL, now(), now());
+    RAISE NOTICE 'Организация «Sitora» переименована в «Некруз Резиденс»';
+  END IF;
 END $$;
