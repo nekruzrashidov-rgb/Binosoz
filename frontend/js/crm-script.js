@@ -176,6 +176,8 @@
             h('div', { class: 'row between' }, h('b', null, tp.name), S.chip(tp.type, t('tpl.type.' + tp.type))),
             h('p', { class: 'tpl-text' }, highlightVars(tp.text)),
             h('div', { class: 'row', style: { gap: '8px' } },
+              // C-12: the platform does not send SMS or WhatsApp — the text is copied and pasted by hand.
+              h('button', { class: 'btn soft sm', type: 'button', onclick: () => S.copy(tp.text) }, t('tpl.copy')),
               h('button', { class: 'btn soft sm', type: 'button', onclick: () => form(tp) }, t('common.edit')),
               h('button', { class: 'btn ghost sm', type: 'button', onclick: async (e) => { if (!(await S.confirm(t('tpl.delAsk', { n: tp.name }), t('common.delete'), true))) return; await S.busy(e.currentTarget, () => S.api.deleteTemplate(tp.id)); S.toast(t('tpl.deleted'), 'ok'); load(); } }, t('common.delete'))))))
             : h('div', { class: 'empty card' }, t('tpl.none')));
@@ -278,7 +280,7 @@
         async function draw() {
           floorsRow.querySelectorAll('button').forEach((b) => b.classList.toggle('on', +b.dataset.floor === floor));
           tip.hidden = true;
-          if (!withPlan.includes(floor)) { stage.replaceChildren(h('p', { class: 'muted' }, t('fplan.none'))); return; }
+          if (!withPlan.includes(floor)) { await drawScheme(); return; }
           stage.replaceChildren(S.skeleton(1, 120));
           try {
             // The server colours the drawing and strips scripts when the template is saved; parse it as SVG, not HTML.
@@ -289,10 +291,50 @@
             stage.replaceChildren(svg);
           } catch (e) { stage.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
         }
+        // C-10: no uploaded plan — a scheme of the floor from its apartments: each one is its typical layout
+        // (planirovki-data.js, as on the site) scaled to its area, in the order of the plan slots, along both sides of
+        // the corridor. Signed «схема, не чертёж»; the developer's own plan is uploaded as before.
+        async function drawScheme() {
+          stage.replaceChildren(S.skeleton(1, 120));
+          let apts = [];
+          try {
+            const f = (await S.api.floors(bsel.value)).find((x) => x.number === floor);
+            apts = f ? await S.api.floorApartments(f) : [];
+          } catch (e) { stage.replaceChildren(h('div', { class: 'form-err' }, e.message)); return; }
+          if (!apts.length || !S.plans) { stage.replaceChildren(h('p', { class: 'muted' }, t('fplan.none'))); return; }
+          apts.sort((a, b) => (a.planSlot ?? 1e6) - (b.planSlot ?? 1e6) || String(a.number).localeCompare(String(b.number), undefined, { numeric: true }));
+          const NS = 'http://www.w3.org/2000/svg', SCALE = 14, GAP = 0.3, CORRIDOR = 2;
+          const el = (tag, attrs, text) => { const n = document.createElementNS(NS, tag); Object.entries(attrs).forEach(([k, v]) => n.setAttribute(k, String(v))); if (text != null) n.textContent = text; return n; };
+          const sized = apts.map((a) => ({ a, p: S.plans.layout(S.roomsKind.group(a.rooms), a.area) }));
+          const half = Math.ceil(sized.length / 2), rows = [sized.slice(0, half), sized.slice(half)];
+          const rowW = (row) => row.reduce((s, x) => s + x.p.w + GAP, GAP);
+          const rowD = (row) => Math.max(0, ...row.map((x) => x.p.d));
+          const W = Math.max(rowW(rows[0]), rowW(rows[1])), D0 = rowD(rows[0]), D1 = rowD(rows[1]);
+          const H = D0 + CORRIDOR + D1 + GAP * 2;
+          const svg = el('svg', { viewBox: `0 0 ${W * SCALE} ${H * SCALE}`, class: 'fp-scheme', role: 'img', 'aria-label': t('fplan.scheme') });
+          svg.append(el('rect', { x: 0, y: (GAP + D0) * SCALE, width: W * SCALE, height: CORRIDOR * SCALE, class: 'fp-corridor' }));
+          svg.append(el('text', { x: (W / 2) * SCALE, y: (GAP + D0 + CORRIDOR / 2) * SCALE + 4, 'text-anchor': 'middle', class: 'fp-label muted' }, t('fplan.corridor')));
+          rows.forEach((row, ri) => {
+            let x = GAP;
+            row.forEach(({ a, p }) => {
+              const y = ri === 0 ? GAP + D0 - p.d : GAP + D0 + CORRIDOR;
+              const g = el('g', { class: 'fp-apt st-' + a.status, tabindex: 0, role: 'button', 'data-apartment-id': a.id, 'data-number': a.number, 'data-status': a.status, 'data-scheme': '1' });
+              const label = t('fplan.aptTitle', { n: a.number, r: S.fmt.rooms(a.rooms), s: a.area, st: t('fplan.st.' + a.status, null, a.status) });
+              g.setAttribute('aria-label', label);
+              g.append(el('title', {}, label), el('rect', { x: x * SCALE, y: y * SCALE, width: p.w * SCALE, height: p.d * SCALE, rx: 2 }),
+                el('text', { x: (x + p.w / 2) * SCALE, y: (y + p.d / 2) * SCALE, 'text-anchor': 'middle', class: 'fp-num' }, String(a.number)),
+                el('text', { x: (x + p.w / 2) * SCALE, y: (y + p.d / 2) * SCALE + 16, 'text-anchor': 'middle', class: 'fp-label' }, t('fplan.aptShort', { r: S.fmt.rooms(a.rooms), s: a.area })));
+              svg.append(g);
+              x += p.w + GAP;
+            });
+          });
+          stage.replaceChildren(h('p', { class: 'fp-scheme-note' }, t('fplan.schemeNote')), svg);
+        }
         function open(r) {
           const st = r.dataset.status, dealId = r.dataset.dealId;
           if (st === 'free') bookForm({ id: r.dataset.apartmentId, number: r.dataset.number }, draw);
           else if (dealId) dealDrawer(dealId, draw);
+          else if (r.dataset.scheme) S.toast(t('fplan.schemeBusy', { n: r.dataset.number, st: t('fplan.st.' + st, null, st) }), 'info');
           else S.toast(st === 'booked' ? t('fplan.noDeal') : t('fplan.unavailable'), 'info');
         }
         stage.addEventListener('click', (e) => { const r = e.target.closest('.fp-apt'); if (r) open(r); });

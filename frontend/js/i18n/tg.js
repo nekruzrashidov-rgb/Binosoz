@@ -1,4 +1,4 @@
-/* Tajik interface texts (2036 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* Tajik interface texts (2044 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. Tajik strings should be proof-read by a native speaker before launch. */
 (function () {
   const S = (window.S = window.S || {});
@@ -73,7 +73,7 @@
     "plans.room.bedroom2": "Хобгоҳи 2",
     "plans.room.bedroom3": "Хобгоҳи 3",
     "tpl.title": "Қолибҳо",
-    "crm.sub.templates": "Қолибҳои SMS ва WhatsApp барои мизоҷон: дар бораи пардохт, банд, хушомадгӯӣ.",
+    "crm.sub.templates": "Матнҳо барои нусхабардорӣ ба WhatsApp, SMS ё Telegram: дар бораи пардохт, брон, табрик. Худи платформа SMS ва WhatsApp намефиристад.",
     "tpl.sub": "Ивазкуниҳо: {name} — номи мизоҷ, {apt} — манзил, {amount} — маблағ.",
     "tpl.new": "Қолиби нав",
     "tpl.edit": "Қолиби паём",
@@ -2052,5 +2052,13 @@
     "rate.stErr": "хато: {e}",
     "rate.stNever": "ҳанӯз боркунӣ набуд",
     "rate.stHint": "Қурб аз nbt.tj соати 09:00 ва 11:00 бо вақти Душанбе ва пас аз оғози сервер, агар қурб аз як шабонарӯз кӯҳнатар бошад, бор карда мешавад. Дар рӯзҳои истироҳат БМТ қурб нашр намекунад — охирин амал мекунад. Агар бор нашуд — қурбро дар поён дастӣ ворид кунед.",
+    "tpl.copy": "Нусха гирифтан",
+    "nav.profile": "Профил ва танзимот",
+    "fplan.scheme": "Нақшаи ошёна",
+    "fplan.schemeNote": "Нақша, на нақшаи техникӣ: нақшаи ин ошёна бор нашудааст, бинобар ин манзилҳо аз рӯи нақшаҳои намунавӣ ва масоҳати худ нишон дода шудаанд. Нақшаи худро мисли пештара бор кардан мумкин аст.",
+    "fplan.corridor": "долон",
+    "fplan.aptTitle": "Ҳ. {n}: {r}, {s} м² — {st}",
+    "fplan.aptShort": "{r} · {s} м²",
+    "fplan.schemeBusy": "Ҳ. {n}: {st}. Аҳдро дар бахши «Аҳдҳо» ё «Объектҳо» кушоед.",
   };
 })();

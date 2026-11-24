@@ -20,14 +20,17 @@ public static partial class ApiErrors
     private const string InternalDetail = "Произошла ошибка. Мы уже разбираемся; если повторится, сообщите номер ошибки (traceId)";
 
     // Язык ответа: культура, выбранная UseRequestLocalization, а если до неё не дошло (ошибка раньше) — заголовок.
-    public static bool IsTajik(HttpContext context)
+    public static bool IsTajik(HttpContext context) => LanguageOf(context) == ErrorCatalog.Language.Tg;
+
+    public static ErrorCatalog.Language LanguageOf(HttpContext context)
     {
         var feature = context.Features.Get<IRequestCultureFeature>();
-        if (feature is not null)
-            return feature.RequestCulture.UICulture.TwoLetterISOLanguageName == "tg";
-        var header = context.Request.Headers.AcceptLanguage.ToString();
-        var first = header.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault() ?? string.Empty;
-        return first.StartsWith("tg", StringComparison.OrdinalIgnoreCase);
+        var code = feature is not null
+            ? feature.RequestCulture.UICulture.TwoLetterISOLanguageName
+            : (context.Request.Headers.AcceptLanguage.ToString()
+                   .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault() ?? string.Empty)
+               .Split('-', ';')[0].ToLowerInvariant();
+        return code switch { "tg" => ErrorCatalog.Language.Tg, "en" => ErrorCatalog.Language.En, _ => ErrorCatalog.Language.Ru };
     }
 
     public static (string Title, string Code) ForStatus(int status) => status switch
@@ -106,13 +109,14 @@ public static partial class ApiErrors
         // Тот же идентификатор, что TraceId в записи лога о запросе (Serilog, поле @tr): по нему ошибку находят в логах.
         problem.Extensions[TraceIdKey] = Activity.Current?.TraceId.ToString() ?? http.TraceIdentifier;
 
-        if (IsTajik(http))
+        var language = LanguageOf(http);
+        if (language != ErrorCatalog.Language.Ru)
         {
-            problem.Title = ErrorCatalog.Translate(problem.Title!, true);
-            problem.Detail = ErrorCatalog.Translate(problem.Detail!, true);
+            problem.Title = ErrorCatalog.Translate(problem.Title!, language);
+            problem.Detail = ErrorCatalog.Translate(problem.Detail!, language);
             if (problem is HttpValidationProblemDetails validation)
                 foreach (var key in validation.Errors.Keys.ToList())
-                    validation.Errors[key] = validation.Errors[key].Select(m => ErrorCatalog.Translate(m, true)).ToArray();
+                    validation.Errors[key] = validation.Errors[key].Select(m => ErrorCatalog.Translate(m, language)).ToArray();
         }
     }
 

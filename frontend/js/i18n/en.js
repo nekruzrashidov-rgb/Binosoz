@@ -1,4 +1,4 @@
-/* English interface texts (2036 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* English interface texts (2044 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -73,7 +73,7 @@
     "plans.room.bedroom2": "Bedroom 2",
     "plans.room.bedroom3": "Bedroom 3",
     "tpl.title": "Templates",
-    "crm.sub.templates": "SMS and WhatsApp templates for customers: payment, booking, welcome.",
+    "crm.sub.templates": "Texts to copy into WhatsApp, SMS or Telegram: about a payment, a booking, a greeting. The platform itself does not send SMS or WhatsApp.",
     "tpl.sub": "Placeholders: {name} — customer name, {apt} — apartment, {amount} — amount.",
     "tpl.new": "New template",
     "tpl.edit": "Message template",
@@ -2052,5 +2052,13 @@
     "rate.stErr": "error: {e}",
     "rate.stNever": "no loads yet",
     "rate.stHint": "The rate is loaded from nbt.tj at 09:00 and 11:00 Dushanbe time and after the server starts if the rate is older than a day. The NBT does not publish on weekends — the last rate applies. If it did not load, enter the rate by hand below.",
+    "tpl.copy": "Copy",
+    "nav.profile": "Profile and settings",
+    "fplan.scheme": "Floor scheme",
+    "fplan.schemeNote": "A scheme, not a drawing: no plan of this floor is uploaded, so the apartments are shown by typical layouts and their own area. Your own plan is uploaded as before.",
+    "fplan.corridor": "corridor",
+    "fplan.aptTitle": "Apt. {n}: {r}, {s} m² — {st}",
+    "fplan.aptShort": "{r} · {s} m²",
+    "fplan.schemeBusy": "Apt. {n}: {st}. Open the deal in «Deals» or «Objects».",
   };
 })();

@@ -1,4 +1,4 @@
-/* Russian interface texts (2036 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* Russian interface texts (2044 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -73,7 +73,7 @@
     "plans.room.bedroom2": "Спальня 2",
     "plans.room.bedroom3": "Спальня 3",
     "tpl.title": "Шаблоны",
-    "crm.sub.templates": "Шаблоны SMS и WhatsApp для клиентов: о платеже, о брони, приветствие.",
+    "crm.sub.templates": "Тексты для копирования в WhatsApp, SMS или Telegram: о платеже, о брони, приветствие. Сама платформа SMS и WhatsApp не отправляет.",
     "tpl.sub": "Подстановки: {name} — имя клиента, {apt} — квартира, {amount} — сумма.",
     "tpl.new": "Новый шаблон",
     "tpl.edit": "Шаблон сообщения",
@@ -2052,5 +2052,13 @@
     "rate.stErr": "ошибка: {e}",
     "rate.stNever": "загрузок ещё не было",
     "rate.stHint": "Курс загружается с nbt.tj в 09:00 и 11:00 по Душанбе и после запуска сервера, если курс старше суток. В выходные НБТ курс не публикует — действует последний. Не загрузился — введите курс вручную ниже.",
+    "tpl.copy": "Скопировать",
+    "nav.profile": "Профиль и настройки",
+    "fplan.scheme": "Схема этажа",
+    "fplan.schemeNote": "Схема, не чертёж: план этого этажа не загружен, поэтому квартиры показаны по типовым планировкам и своей площади. Свой план загружается, как раньше.",
+    "fplan.corridor": "коридор",
+    "fplan.aptTitle": "Кв. {n}: {r}, {s} м² — {st}",
+    "fplan.aptShort": "{r} · {s} м²",
+    "fplan.schemeBusy": "Кв. {n}: {st}. Сделку откройте в разделе «Сделки» или «Объекты».",
   };
 })();

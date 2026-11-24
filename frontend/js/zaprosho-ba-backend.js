@@ -264,9 +264,22 @@
     return refreshing;
   }
 
+  // R-06: the access token's own expiry (JWT exp, 15 min). An expired token is refreshed before the request, so a page
+  // load does not first get 401 from /auth/me in the console. A token that cannot be read counts as valid (the server decides).
+  function accessExpired(token) {
+    try {
+      const p = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      return typeof p.exp === 'number' && p.exp * 1000 < Date.now() + 15000;
+    } catch (e) { return false; }
+  }
+
   async function request(method, path, o) {
     o = o || {};
     let tried = false;
+    if (!S.isDemo() && o.auth !== false && auth && auth.accessToken && !auth.platform && accessExpired(auth.accessToken)) {
+      tried = true;
+      if (!(await refresh())) throw new ApiError(401, S.t ? S.t('err.401') : 'Требуется вход');
+    }
     for (;;) {
       if (S.isDemo()) {
         try { return await demoCall(method, path, o); } catch (e) { if (e.status === 401 && o.auth !== false && !tried && auth && (await refresh())) { tried = true; continue; } throw e; }

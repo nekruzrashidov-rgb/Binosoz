@@ -18,6 +18,20 @@
   let publicEnabled = false;
 
   const bubble = h('button', { class: 'ai-fab', type: 'button', title: t('ai.open'), 'aria-label': t('ai.open'), 'aria-haspopup': 'dialog', onclick: () => toggle(true) }, '✦');
+  // R-05: on a phone the bubble hides while scrolling down (it covered the last rows and fields) and returns on the way
+  // up, near the top or when it gets the keyboard focus.
+  (() => {
+    const phone = window.matchMedia('(max-width: 768px)');
+    let lastY = window.scrollY;
+    window.addEventListener('scroll', () => {
+      const y = window.scrollY;
+      if (!phone.matches || y < 80) bubble.classList.remove('away');
+      else if (y > lastY + 6) bubble.classList.add('away');
+      else if (y < lastY - 6) bubble.classList.remove('away');
+      lastY = y;
+    }, { passive: true });
+    bubble.addEventListener('focus', () => bubble.classList.remove('away'));
+  })();
 
   // Paths of this site in a reply ("/apartments", "/contact#map") become links; nothing else is turned into a link.
   const SITE_LINK = /((?:^|[\s(«"'])\/(?:apartments|contact|about|gallery|privacy|cabinet|login|register)(?:#[\w-]+)?)(?=$|[\s.,;:!?)»"'])/;
