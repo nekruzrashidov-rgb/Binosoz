@@ -37,6 +37,11 @@ public static class SeedPasswords
         if (!added.Succeeded)
             throw new InvalidOperationException($"Не удалось задать пароль из секрета {secretName} для {user.Email}: " + Describe(added.Errors));
 
+        // Новый пароль из секрета снимает и блокировку входа (5 неверных попыток → 15 мин): иначе владелец, забывший
+        // пароль, после смены секрета ещё четверть часа видел бы «неверная почта или пароль».
+        await users.ResetAccessFailedCountAsync(user);
+        await users.SetLockoutEndDateAsync(user, null);
+
         var now = timeProvider.GetUtcNow().UtcDateTime;
         await db.RefreshTokens.Where(t => t.UserId == user.Id && t.RevokedAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, now));
