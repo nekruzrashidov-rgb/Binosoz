@@ -478,7 +478,14 @@
       page.appendChild(S.skeleton(4, 60));
       try { ov = await S.api.cabinetOverview(); } catch (e) { page.replaceChildren(S.errorCard(e)); return; }
       if (stopped) return;
-      if (!ov.hasDeals) { page.replaceChildren(onboarding()); return; }
+      // No deal yet: the welcome card, and below it the same settings (notifications, Telegram, devices) — a buyer
+      // without a deal still signs in, links Telegram and closes sessions on other devices.
+      if (!ov.hasDeals) {
+        page.replaceChildren(onboarding());
+        try { const st = await settingsTab(); if (!stopped) page.appendChild(h('div', { class: 'cab-onboard-settings' }, h('h2', null, '⚙️ ' + t('cab.t.settings')), st)); }
+        catch (e) { /* settings are optional here: the welcome card is enough */ }
+        return;
+      }
       // The remembered apartment, else the newest deal that is not cancelled.
       const saved = S.store.get('sitora.cab.deal');
       deal = ov.deals.find((d) => d.dealId === saved) || ov.deals.find((d) => d.stage !== 'Cancelled') || ov.deals[0];

@@ -1380,6 +1380,8 @@ a.float-card.tg:hover { border-color: rgba(34, 158, 217, 0.75); background: rgba
 .cab-onboard { max-width: 560px; margin: 40px auto; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 36px 24px; }
 .cab-onboard h1 { font-family: var(--display); font-size: clamp(22px, 5vw, 28px); margin: 0; }
 .cab-onboard p { margin: 0; }
+.cab-onboard-settings { max-width: 720px; margin: 0 auto 40px; }
+.cab-onboard-settings > h2 { font-family: var(--display); font-weight: 500; margin: 0 0 12px; }
 .cab-wave { font-size: 48px; animation: cab-wave 1.6s ease-in-out 0.3s 2; transform-origin: 70% 70%; }
 @keyframes cab-wave { 0%, 100% { transform: rotate(0); } 20%, 60% { transform: rotate(16deg); } 40%, 80% { transform: rotate(-8deg); } }
 .cab-contacts { display: flex; flex-direction: column; gap: 6px; padding: 16px 20px; border-radius: 14px; background: var(--surface-2); width: 100%; }
