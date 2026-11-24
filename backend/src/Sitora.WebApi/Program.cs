@@ -318,6 +318,9 @@ else
     }
 }
 app.Services.ScheduleRecurringJobs();
+// C-09: Render спал в 09:00 и 11:00 по Душанбе — курс НБТ старше суток догружается разовой задачей сразу после старта.
+if (hangfireServerEnabled)
+    await app.Services.EnqueueRateCatchUpAsync(app.Logger);
 
 app.Run();
 return 0;

@@ -32,6 +32,15 @@ public class RatesController(IExchangeRateService rates, ICatalogService catalog
         return await rates.GetCurrentAsync(currency, currentUser.OrganizationId ?? organizationId, ct);
     }
 
+    /// <summary>
+    /// Последняя загрузка курса с сайта НБТ (C-09): когда пробовали, ok или причина ошибки, когда загрузили удачно
+    /// и на какую дату последний курс НБТ. Для CRM → «Курс».
+    /// </summary>
+    [HttpGet("status")]
+    [Authorize(Roles = Roles.Accounting)]
+    [ProducesResponseType<RateUpdateStatus>(StatusCodes.Status200OK)]
+    public Task<RateUpdateStatus> Status(CancellationToken ct) => rates.GetUpdateStatusAsync(ct);
+
     /// <summary>Ручной ввод курса бухгалтером: действует в его организации; курс на ту же дату перезаписывается.</summary>
     [HttpPut]
     [Authorize(Roles = Roles.Accounting)]

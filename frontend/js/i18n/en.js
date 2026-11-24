@@ -1,4 +1,4 @@
-/* English interface texts (2027 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* English interface texts (2036 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -2043,5 +2043,14 @@
     "plat.trEmpty": "Empty — the Russian text is shown",
     "pset.builtAt": "built {d}",
     "pset.versionHint": "The commit of the build running now (as /health/live); it changes by itself with every release.",
+    "rate.stTitle": "NBT rate loading",
+    "rate.stAttempt": "Last attempt",
+    "rate.stResult": "Result",
+    "rate.stSuccess": "Last success",
+    "rate.stNbtDate": "NBT rate for",
+    "rate.stOk": "loaded",
+    "rate.stErr": "error: {e}",
+    "rate.stNever": "no loads yet",
+    "rate.stHint": "The rate is loaded from nbt.tj at 09:00 and 11:00 Dushanbe time and after the server starts if the rate is older than a day. The NBT does not publish on weekends — the last rate applies. If it did not load, enter the rate by hand below.",
   };
 })();

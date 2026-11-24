@@ -1,4 +1,4 @@
-/* Russian interface texts (2027 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* Russian interface texts (2036 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. */
 (function () {
   const S = (window.S = window.S || {});
@@ -2043,5 +2043,14 @@
     "plat.trEmpty": "Пусто — показывается русский текст",
     "pset.builtAt": "собрано {d}",
     "pset.versionHint": "Коммит сборки, которая работает сейчас (как /health/live); меняется сам при каждом выпуске.",
+    "rate.stTitle": "Загрузка курса НБТ",
+    "rate.stAttempt": "Последняя попытка",
+    "rate.stResult": "Итог",
+    "rate.stSuccess": "Последняя удачная",
+    "rate.stNbtDate": "Курс НБТ на дату",
+    "rate.stOk": "загружен",
+    "rate.stErr": "ошибка: {e}",
+    "rate.stNever": "загрузок ещё не было",
+    "rate.stHint": "Курс загружается с nbt.tj в 09:00 и 11:00 по Душанбе и после запуска сервера, если курс старше суток. В выходные НБТ курс не публикует — действует последний. Не загрузился — введите курс вручную ниже.",
   };
 })();

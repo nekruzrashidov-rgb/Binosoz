@@ -1,4 +1,4 @@
-/* Tajik interface texts (2027 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
+/* Tajik interface texts (2036 keys). Loaded by tarjumaho-ru-tg-en.js: Russian always (it is the fallback
    for a missing key), another language only when it is chosen. Tajik strings should be proof-read by a native speaker before launch. */
 (function () {
   const S = (window.S = window.S || {});
@@ -2043,5 +2043,14 @@
     "plat.trEmpty": "Холӣ — матни русӣ нишон дода мешавад",
     "pset.builtAt": "сохта шуд {d}",
     "pset.versionHint": "Коммити сохтае, ки ҳоло кор мекунад (мисли /health/live); бо ҳар нашр худаш иваз мешавад.",
+    "rate.stTitle": "Боркунии қурби БМТ",
+    "rate.stAttempt": "Кӯшиши охирин",
+    "rate.stResult": "Натиҷа",
+    "rate.stSuccess": "Охирин бомуваффақият",
+    "rate.stNbtDate": "Қурби БМТ ба сана",
+    "rate.stOk": "бор шуд",
+    "rate.stErr": "хато: {e}",
+    "rate.stNever": "ҳанӯз боркунӣ набуд",
+    "rate.stHint": "Қурб аз nbt.tj соати 09:00 ва 11:00 бо вақти Душанбе ва пас аз оғози сервер, агар қурб аз як шабонарӯз кӯҳнатар бошад, бор карда мешавад. Дар рӯзҳои истироҳат БМТ қурб нашр намекунад — охирин амал мекунад. Агар бор нашуд — қурбро дар поён дастӣ ворид кунед.",
   };
 })();

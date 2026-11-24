@@ -386,9 +386,23 @@
         const btn = h('button', { class: 'btn', type: 'submit' }, t('rate.save'));
         const form = h('form', { class: 'card stack', novalidate: true, style: { maxWidth: '420px' } }, h('h3', null, t('rate.set')), S.field(t('rate.value'), rate, t('rate.hint')), S.field(t('rep.asOf'), date, t('rate.dateHint')), btn);
         form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await S.api.setRate(+rate.value, date.value); S.toast(t('rate.saved'), 'ok'); draw(); } catch (er) { S.showErrors(form, er); } }); });
-        body.replaceChildren(holder, form);
+        // C-09: when the NBT rate was loaded last and how it went (ok / the error), so a stale rate has a visible reason.
+        const status = h('div', { class: 'card stack rate-status', style: { maxWidth: '420px' } });
+        body.replaceChildren(holder, status, form);
+        async function drawStatus() {
+          let st;
+          try { st = await S.api.rateStatus(); } catch (e) { status.remove(); return; }
+          const res = st.ok == null ? h('span', { class: 'muted' }, t('rate.stNever')) : st.ok ? S.chip('good', t('rate.stOk')) : S.chip('bad', t('rate.stErr', { e: st.error || '—' }));
+          status.replaceChildren(h('h3', null, t('rate.stTitle')),
+            h('dl', { class: 'kv' },
+              h('dt', null, t('rate.stAttempt')), h('dd', null, st.lastAttemptAt ? S.fmt.dt(st.lastAttemptAt) : '—'),
+              h('dt', null, t('rate.stResult')), h('dd', null, res),
+              h('dt', null, t('rate.stSuccess')), h('dd', null, st.lastSuccessAt ? S.fmt.dt(st.lastSuccessAt) : '—'),
+              h('dt', null, t('rate.stNbtDate')), h('dd', null, st.lastNbtDate ? S.fmt.date(st.lastNbtDate) : '—')),
+            h('p', { class: 'hint' }, t('rate.stHint')));
+        }
         async function draw() { try { const r = await S.api.rate(); holder.replaceChildren(h('div', { class: 'card kpi', style: { maxWidth: '420px', '--k': 'var(--gold)' } }, h('span', null, t('rate.current')), h('b', null, r.rate + ' TJS'), h('div', { class: 'muted' }, t('rate.on', { d: S.fmt.date(r.date) })), h('i'))); } catch (e) { holder.replaceChildren(h('div', { class: 'card kpi' }, h('span', null, t('rate.current')), h('b', null, '—'), h('div', { class: 'muted' }, t('rate.none')))); } }
-        draw();
+        draw(); drawStatus();
       },
 
       async catalog(body) {

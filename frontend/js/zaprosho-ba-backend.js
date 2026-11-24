@@ -615,6 +615,7 @@
     reverseCash(buildingId, id, reason) { return request('POST', '/buildings/' + buildingId + '/cash/' + id + '/reverse', { body: { reason } }); },
     // Each developer has its own manual rate: staff get theirs from the token, the public site names its organization.
     async rate() { const r = await request('GET', '/rates/current', { auth: api.isStaff(), query: real() ? { currency: 'USD', organization: api.isStaff() ? undefined : cfgSlug() || undefined } : undefined }); return { rate: num(pick(r, ['rateToTjs', 'rate', 'value', 'usdRate'], 0)), date: day(pick(r, ['date', 'rateDate'], '')), source: pick(r, ['source'], '') }; },
+    rateStatus() { return request('GET', '/rates/status'); },
     setRate(rate, date) { return withFields(request('PUT', '/rates', { body: { date, currency: 'USD', rateToTjs: rate, rate } })); },
     async reportPayments(from, to) {
       const r = await request('GET', '/reports/payments', { query: { from, to } });

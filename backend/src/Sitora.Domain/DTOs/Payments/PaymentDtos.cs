@@ -65,6 +65,10 @@ public record PaymentResponse(
 
 public record RateResponse(DateOnly Date, Currency Currency, decimal RateToTjs, RateSource Source);
 
+// Последняя загрузка курса с сайта НБТ (C-09): когда пробовали, получилось ли (Ok), причина ошибки, когда загрузили
+// удачно в последний раз и на какую дату последний курс НБТ в базе. Всё null — загрузок ещё не было.
+public record RateUpdateStatus(DateTime? LastAttemptAt, bool? Ok, string? Error, DateTime? LastSuccessAt, DateOnly? LastNbtDate);
+
 public record SetRateRequest(DateOnly Date, Currency Currency, decimal RateToTjs);
 
 public record StatementPayment(DateOnly PaidAt, decimal Amount, Currency Currency, decimal? RateUsed, decimal AmountInDealCurrency, bool IsReversal);
