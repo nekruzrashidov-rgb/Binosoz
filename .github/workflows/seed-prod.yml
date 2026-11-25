@@ -168,7 +168,8 @@ jobs:
           fi
           image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/binosoz-api:latest"
           docker run --rm -e ASPNETCORE_ENVIRONMENT=Production -e "ConnectionStrings__Default=$CS" \
-            -e BOOTSTRAP_ADMIN_EMAIL -e BOOTSTRAP_ADMIN_PASSWORD -e ADMIN_EMAIL -e ADMIN_PASSWORD \n            -e OWNER_NAME -e SUPERADMIN_NAME "$image" --migrate
+            -e BOOTSTRAP_ADMIN_EMAIL -e BOOTSTRAP_ADMIN_PASSWORD -e ADMIN_EMAIL -e ADMIN_PASSWORD \
+            -e OWNER_NAME -e SUPERADMIN_NAME "$image" --migrate
 
       # Сотрудники демо-организации для входа под каждой ролью (docs/ROLES_LOGIN.md). В лог — только строки сидера
       # «Сотрудник <роль> <почта>: создан / пароль обновлён / уже есть / пропущен»; пароли он не пишет.
