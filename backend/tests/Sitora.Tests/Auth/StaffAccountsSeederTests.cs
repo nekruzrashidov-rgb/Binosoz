@@ -88,9 +88,26 @@ public class StaffAccountsSeederTests(StaffAccountsFactory factory) : IClassFixt
         Assert.Equal(HttpStatusCode.Forbidden, (await content.PostAsJsonAsync($"/api/v1/payments/{Guid.NewGuid()}/reverse", new { reason = "тест" })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await content.GetAsync("/api/v1/leads")).StatusCode);
 
+        // Имя — часть почты, а не «Бухгалтер» по-русски на всех языках (как R-02).
+        Assert.Equal("seed-buh", await factory.WithDbAsync(db => db.Users.Where(u => u.Email == StaffAccountsFactory.AccountantEmail2).Select(u => u.FullName).SingleAsync()));
+
         // Создание записано в журнал.
         var created = await factory.WithDbAsync(db => db.AuditLogs.IgnoreQueryFilters().CountAsync(a => a.Action == SeedPasswords.CreatedAction));
         Assert.True(created >= 4);
+    }
+
+    [Fact]
+    public async Task OldRussianSeederName_IsReplaced_OwnNameIsKept()
+    {
+        await factory.WithDbAsync(db => db.Users.Where(u => u.Email == StaffAccountsFactory.ContentEmail2)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.FullName, "Контент-менеджер")));
+        await RunSeederAsync(null);
+        Assert.Equal("seed-content", await factory.WithDbAsync(db => db.Users.Where(u => u.Email == StaffAccountsFactory.ContentEmail2).Select(u => u.FullName).SingleAsync()));
+
+        await factory.WithDbAsync(db => db.Users.Where(u => u.Email == StaffAccountsFactory.ContentEmail2)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.FullName, "Зарина Каримова")));
+        await RunSeederAsync(null);
+        Assert.Equal("Зарина Каримова", await factory.WithDbAsync(db => db.Users.Where(u => u.Email == StaffAccountsFactory.ContentEmail2).Select(u => u.FullName).SingleAsync()));
     }
 
     [Fact]

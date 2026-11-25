@@ -17,19 +17,25 @@ public class RatesController(IExchangeRateService rates, ICatalogService catalog
     /// <summary>
     /// Текущий курс: общий курс НБТ или ручной курс организации. Сотрудник получает курс своей организации;
     /// публичный сайт застройщика передаёт organizationId или slug организации (organization).
+    /// Курса ещё нет — 404; с allowEmpty=true — 204 без тела (сайт и CRM: «курс не задан» без ошибки в консоли).
     /// </summary>
     [HttpGet("current")]
     [OutputCache(PolicyName = CachingSetup.PublicShort)]
     [AllowAnonymous]
     [ProducesResponseType<RateResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    public async Task<RateResponse> Current(Currency currency = Currency.USD, Guid? organizationId = null, string? organization = null,
-        CancellationToken ct = default)
+    public async Task<ActionResult<RateResponse>> Current(Currency currency = Currency.USD, Guid? organizationId = null, string? organization = null,
+        bool allowEmpty = false, CancellationToken ct = default)
     {
         if (currentUser.OrganizationId is null && organizationId is null && !string.IsNullOrWhiteSpace(organization))
             organizationId = await catalog.FindOrganizationIdAsync(organization, ct)
                              ?? throw new NotFoundException("Организация не найдена");
-        return await rates.GetCurrentAsync(currency, currentUser.OrganizationId ?? organizationId, ct);
+        var orgId = currentUser.OrganizationId ?? organizationId;
+        // Для сомони — та же ошибка «сомони — базовая валюта», что и без allowEmpty.
+        if (!allowEmpty || currency == Currency.TJS)
+            return await rates.GetCurrentAsync(currency, orgId, ct);
+        return await rates.FindCurrentAsync(currency, orgId, ct) is { } rate ? rate : NoContent();
     }
 
     /// <summary>

@@ -627,7 +627,8 @@
     addCash(buildingId, b) { return withFields(request('POST', '/buildings/' + buildingId + '/cash', { body: b })); },
     reverseCash(buildingId, id, reason) { return request('POST', '/buildings/' + buildingId + '/cash/' + id + '/reverse', { body: { reason } }); },
     // Each developer has its own manual rate: staff get theirs from the token, the public site names its organization.
-    async rate() { const r = await request('GET', '/rates/current', { auth: api.isStaff(), query: real() ? { currency: 'USD', organization: api.isStaff() ? undefined : cfgSlug() || undefined } : undefined }); return { rate: num(pick(r, ['rateToTjs', 'rate', 'value', 'usdRate'], 0)), date: day(pick(r, ['date', 'rateDate'], '')), source: pick(r, ['source'], '') }; },
+    // No rate yet: the server answers 204 (allowEmpty) instead of 404, so the console stays clean; callers still get an error.
+    async rate() { const r = await request('GET', '/rates/current', { auth: api.isStaff(), query: real() ? { currency: 'USD', organization: api.isStaff() ? undefined : cfgSlug() || undefined, allowEmpty: true } : undefined }); if (!r || r.rateToTjs === undefined && r.rate === undefined) throw new ApiError(404, S.t ? S.t('rate.none') : 'Курс ещё не задан'); return { rate: num(pick(r, ['rateToTjs', 'rate', 'value', 'usdRate'], 0)), date: day(pick(r, ['date', 'rateDate'], '')), source: pick(r, ['source'], '') }; },
     rateStatus() { return request('GET', '/rates/status'); },
     setRate(rate, date) { return withFields(request('PUT', '/rates', { body: { date, currency: 'USD', rateToTjs: rate, rate } })); },
     async reportPayments(from, to) {
