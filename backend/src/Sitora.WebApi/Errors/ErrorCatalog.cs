@@ -220,6 +220,7 @@ public static class ErrorCatalog
         E("Блоки на участке пересекаются", "blocks_overlap", "Блокҳо дар қитъа ҳамдигарро мебуранд", "The blocks overlap on the site");
         P("Расстояние между блоками меньше допустимого: ", "blocks_too_close", "Масофаи байни блокҳо аз иҷозатдодашуда камтар аст: ",
             "The distance between the blocks is less than allowed: ");
+        E("Дом изменён другим пользователем", "building_conflict", "Биноро корбари дигар тағйир дод", "The building was changed by another user");
         E("Блок с такой буквой уже есть", "block_code_taken", "Блок бо чунин ҳарф аллакай ҳаст", "A block with this code already exists");
         E("План участка изменён другим пользователем", "site_plan_conflict", "Нақшаи қитъаро корбари дигар тағйир дод", "The site plan was changed by another user");
         E("Зон участка — не больше 40", "too_many_site_zones", "Минтақаҳои қитъа — на зиёда аз 40", "No more than 40 site zones");

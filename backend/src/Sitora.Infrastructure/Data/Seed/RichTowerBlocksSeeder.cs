@@ -13,10 +13,9 @@ namespace Sitora.Infrastructure.Data.Seed;
 // участке»), сайт везде подписывает «Визуализация, концепт — не проектная документация».
 // Блоки стоят буквой «П» вокруг общего двора, разрывы 26 и 28 м: A — Г-образный со скруглённым внешним углом (22 этажа),
 // B — вытянутый с эркерами и срезанными торцами (20), C — П-образный со скруглёнными углами, открытый во двор (20).
-// Работает в Development и при SEED_RICH_TOWER_BLOCKS=true (Actions → Seed prod); блоки уже есть — ничего не меняет.
+// Работает в Development; на проде те же блоки создаёт backend/scripts/seed.sql (RichTowerBlocksSql). Блоки уже есть — ничего не меняет.
 public static class RichTowerBlocksSeeder
 {
-    public const string EnabledVariable = "SEED_RICH_TOWER_BLOCKS";
     public const string ConceptNoteRu = "Концепт: форма, расположение и планировки блока — визуализация до проекта застройщика, не проектная документация.";
     public const string ConceptNoteTg = "Консепсия: шакл, ҷойгиршавӣ ва нақшаҳои блок — визуализатсия то лоиҳаи сохтмончӣ, ҳуҷҷати лоиҳавӣ нест.";
     public const string ConceptNoteEn = "Concept: the block's shape, placement and layouts are a visualisation before the developer's project, not design documentation.";
@@ -81,9 +80,27 @@ public static class RichTowerBlocksSeeder
         var random = new Random(RandomSeed);
         foreach (var spec in Blocks)
         {
+            var building = NewBlock(spec, organization.Id, random);
+            db.Buildings.Add(building);
+            audit.Record(nameof(Building), building.Id, "Seeded", null, new { building.NameRu, building.BlockCode, building.FloorsCount, Concept = true }, organization.Id);
+        }
+
+        organization.SitePlan ??= SitePlan();
+        await db.SaveChangesAsync();
+        logger.LogInformation("ЖК {Name}: созданы блоки {Blocks} (концепт)", organization.Name, string.Join(", ", Blocks.Select(b => b.Code)));
+    }
+
+    // Блок со всеми этажами и помещениями. random — демо-статусы разработки (часть продана, «под запрос»); null — всё
+    // свободно (seed.sql на проде: продаж скрипт не выдумывает).
+    [SuppressMessage("Security", "CA5394", Justification = "Генератор с фиксированным зерном нужен для одинаковых статусов квартир при каждом запуске; к безопасности отношения не имеет.")]
+    public static Building NewBlock(BlockSpec spec, Guid organizationId, Random? random)
+    {
+        double Roll() => random?.NextDouble() ?? 0.5;
+        bool Sold(double p) => random is not null && Roll() < p;
+        {
             var building = new Building
             {
-                OrganizationId = organization.Id,
+                OrganizationId = organizationId,
                 NameRu = "Блок " + spec.Code,
                 NameTg = "Блоки " + spec.Code,
                 NameEn = "Block " + spec.Code,
@@ -114,7 +131,7 @@ public static class RichTowerBlocksSeeder
                 {
                     var spot = new Apartment { Number = -level * 100 + slot + 1, Rooms = 0, PlanSlot = slot, Kind = ApartmentKind.Parking };
                     spot.SetFixedPrice(ParkingSpotArea, PriceDefaults.ParkingSpotPrice, building.PriceCurrency);
-                    if (random.NextDouble() < 0.25)
+                    if (Sold(0.25))
                         spot.Sell();
                     floor.Apartments.Add(spot);
                 }
@@ -129,7 +146,7 @@ public static class RichTowerBlocksSeeder
                 {
                     var shop = new Apartment { Number = level * 100 + slot + 1, Rooms = 0, PlanSlot = slot, Kind = ApartmentKind.Commercial };
                     shop.SetPricing(shops[slot], PriceDefaults.CommercialPricePerM2, building.PriceCurrency);
-                    if (random.NextDouble() < 0.2)
+                    if (Sold(0.2))
                         shop.Sell();
                     floor.Apartments.Add(shop);
                 }
@@ -152,7 +169,7 @@ public static class RichTowerBlocksSeeder
                         TerraceArea = Math.Round((decimal)terrace * penthouses[slot] / sum, 1, MidpointRounding.AwayFromZero)
                     };
                     penthouse.SetPricing(penthouses[slot], PriceDefaults.PenthousePricePerM2, building.PriceCurrency);
-                    if (random.NextDouble() < 0.15)
+                    if (Sold(0.15))
                         penthouse.Sell();
                     floor.Apartments.Add(penthouse);
                 }
@@ -167,22 +184,20 @@ public static class RichTowerBlocksSeeder
                     var (rooms, area) = (spec.UnitRooms[slot], areas[slot]);
                     var apartment = new Apartment { Number = floorNumber * 100 + slot + 1, Rooms = rooms, PlanSlot = slot };
                     apartment.SetPricing(area, PriceRules.PricePerM2(building, floorNumber, floorNumber == spec.Floors)!.Value, building.PriceCurrency);
-                    var roll = random.NextDouble();
-                    if (roll < soldProbability)
-                        apartment.Sell();
-                    else if (roll > 0.97)
-                        apartment.SetOnRequest(true);
+                    if (random is not null)
+                    {
+                        var roll = random.NextDouble();
+                        if (roll < soldProbability)
+                            apartment.Sell();
+                        else if (roll > 0.97)
+                            apartment.SetOnRequest(true);
+                    }
                     floor.Apartments.Add(apartment);
                 }
                 building.Floors.Add(floor);
             }
             building.PlannedApartments = building.Floors.Sum(f => f.Apartments.Count(a => a.Kind is ApartmentKind.Residential or ApartmentKind.Penthouse));
-            db.Buildings.Add(building);
-            audit.Record(nameof(Building), building.Id, "Seeded", null, new { building.NameRu, building.BlockCode, building.FloorsCount, Concept = true }, organization.Id);
+            return building;
         }
-
-        organization.SitePlan ??= SitePlan();
-        await db.SaveChangesAsync();
-        logger.LogInformation("ЖК {Name}: созданы блоки {Blocks} (концепт)", organization.Name, string.Join(", ", Blocks.Select(b => b.Code)));
     }
 }

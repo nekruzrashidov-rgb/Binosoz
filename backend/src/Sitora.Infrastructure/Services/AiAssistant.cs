@@ -99,7 +99,7 @@ public class AiAssistant(IChatModel model, ICurrentUser currentUser, IOptions<Cl
             if (await CustomerContextAsync(ct) is { } mine)
                 parts.Add(mine);
             if (await CustomerOrganizationAsync(ct) is { } organizationId)
-                parts.Add(await estate.BuildAsync(organizationId, ct));
+                parts.Add(await estate.BuildAsync(organizationId, await CustomerBuildingsAsync(ct), ct));
             parts.Add(CustomerPrompt);
             system = string.Join("\n\n", parts);
         }
@@ -133,6 +133,12 @@ public class AiAssistant(IChatModel model, ICurrentUser currentUser, IOptions<Cl
                    .Select(c => (Guid?)c.OrganizationId).FirstOrDefaultAsync(ct)
                ?? currentUser.OrganizationId;
     }
+
+    // Дома сделок покупателя (кроме отменённых): они нужны в контексте ЖК, даже если дом скрыт с сайта.
+    private async Task<List<Guid>> CustomerBuildingsAsync(CancellationToken ct) =>
+        currentUser.UserId is not { } userId ? [] : await db.Deals.IgnoreQueryFilters().AsNoTracking()
+            .Where(d => d.Customer.UserId == userId && d.Stage != DealStage.Cancelled)
+            .Select(d => d.Apartment.Floor.BuildingId).Distinct().ToListAsync(ct);
 
     // Блок BUYER CONTEXT на каждую действующую сделку покупателя (до трёх, новые первыми).
     // Оплачено и остаток — как в обзоре кабинета: сумма платежей (сторно с минусом) от цены со скидкой.

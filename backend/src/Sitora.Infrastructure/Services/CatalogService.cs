@@ -54,6 +54,9 @@ public class CatalogService(
         {
             // Дома отключённой организации на сайте не показываются.
             var query = db.Buildings.AsNoTracking().Where(b => b.Organization.IsActive);
+            // Гость и покупатель видят только дома на сайте; сотрудники — все дома своей организации (скрытые с пометкой).
+            if (PublicOnly)
+                query = query.Where(b => b.IsPublished);
             if (slug is not null)
                 query = query.Where(b => b.Organization.Slug == slug);
             var total = await query.CountAsync(ct);
@@ -384,6 +387,23 @@ public class CatalogService(
         return new ApplyPriceRuleResponse(updated, unchanged, skipped);
     }
 
+    // Гость, покупатель и создатель платформы вне организации — публичный каталог.
+    private bool PublicOnly => currentUser.OrganizationId is null || currentUser.IsInRole(RoleNames.Customer);
+
+    // Показать дом на сайте или скрыть (руководители): квартиры, брони, сделки, графики и платежи не меняются.
+    public async Task<BuildingResponse> SetPublishedAsync(Guid id, bool isPublished, CancellationToken ct = default)
+    {
+        var building = await db.Buildings.FirstOrDefaultAsync(b => b.Id == id, ct)
+            ?? throw new NotFoundException(BuildingNotFound);
+        if (building.IsPublished != isPublished)
+        {
+            audit.Record(nameof(Building), building.Id, isPublished ? "Published" : "Unpublished", new { building.IsPublished }, new { IsPublished = isPublished });
+            building.IsPublished = isPublished;
+            await SaveAsync("Дом изменён другим пользователем", ct);
+        }
+        return await GetBuildingAsync(id, ct);
+    }
+
     private static object ShapeSnapshot(Building b) => new { b.BlockCode, b.SortOrder, b.Footprint, b.SitePosition, b.Setbacks };
 
     public async Task<SitePlan?> GetSitePlanAsync(CancellationToken ct = default)
@@ -620,7 +640,8 @@ public class CatalogService(
         b.ParkingSpotPrice,
         b.ElevatorsCount,
         b.Floors.SelectMany(f => f.Apartments).Count(a => a.Kind == ApartmentKind.Commercial),
-        b.Floors.SelectMany(f => f.Apartments).Count(a => a.Kind == ApartmentKind.Parking));
+        b.Floors.SelectMany(f => f.Apartments).Count(a => a.Kind == ApartmentKind.Parking),
+        b.IsPublished);
 
     private static readonly Expression<Func<Floor, FloorResponse>> ToFloorResponse = f => new FloorResponse(
         f.Id,

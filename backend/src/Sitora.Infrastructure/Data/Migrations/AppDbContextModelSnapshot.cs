@@ -513,6 +513,11 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Property<string>("Footprint")
                         .HasColumnType("jsonb");
 
+                    b.Property<bool>("IsPublished")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<decimal?>("Latitude")
                         .HasPrecision(9, 6)
                         .HasColumnType("numeric(9,6)");

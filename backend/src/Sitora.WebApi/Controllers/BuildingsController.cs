@@ -107,6 +107,14 @@ public class BuildingsController(ICatalogService catalog) : ControllerBase
 
     /// <summary>Правило цены блока (владелец и руководитель объекта): валюта, ступени «этажи с–по → цена м²» (с ценой «до» —
     /// ровно по этажам), цена м² пентхаусов последнего этажа. Квартиры не меняются. Журнал PriceRuleUpdated.</summary>
+    /// <summary>Показать дом на публичном сайте или скрыть (руководители). Скрытый дом не виден в каталоге, бренде, AI-помощнике
+    /// гостя и «Зелёном эффекте»; сотрудники видят его в CRM, покупатель — свою сделку. Журнал Published/Unpublished.</summary>
+    [HttpPut("{id:guid}/published")]
+    [Authorize(Roles = Roles.Leaders)]
+    [ProducesResponseType<BuildingResponse>(StatusCodes.Status200OK)]
+    public Task<BuildingResponse> SetPublished(Guid id, SetPublishedRequest request, CancellationToken ct) =>
+        catalog.SetPublishedAsync(id, request.IsPublished, ct);
+
     [HttpPut("{id:guid}/price-rule")]
     [Authorize(Roles = Roles.Leaders)]
     [ProducesResponseType<BuildingResponse>(StatusCodes.Status200OK)]

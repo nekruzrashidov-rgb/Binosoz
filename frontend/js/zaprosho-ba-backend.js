@@ -80,6 +80,8 @@
         // The price rule of a block: steps «floors from–to → price per m²», the penthouses' price, the catalogue currency.
         priceSteps: Array.isArray(b.priceSteps) ? b.priceSteps : [], penthousePricePerM2: b.penthousePricePerM2 == null ? null : num(b.penthousePricePerM2),
         priceCurrency: String(b.priceCurrency || 'TJS').toUpperCase(),
+        // false — the building is hidden from the public site (the CRM still shows it, marked).
+        isPublished: b.isPublished !== false,
         elevators: b.elevatorsCount == null ? null : num(b.elevatorsCount), commercialUnits: num(b.commercialUnits || 0), parkingSpots: num(b.parkingSpots || 0) };
     },
     floor(f) { return { id: f.id, number: num(pick(f, ['number', 'floorNumber', 'level'], 0)), commercial: !!pick(f, ['isCommercial', 'commercial'], false), parking: !!pick(f, ['isParking', 'parking'], false) || num(pick(f, ['number'], 0)) < 0, total: num(pick(f, ['totalApartments', 'apartmentsCount', 'total'], 0)), free: num(pick(f, ['freeApartments', 'freeCount', 'free'], 0)) }; },
@@ -516,6 +518,7 @@
     saveInstallmentSettings(b) { return request('PUT', '/owner/installment-settings', { body: b }); },
     saveBuildingLocation(id, body) { return request('PUT', '/buildings/' + id + '/location', { body }).then(M.building); },
     // A block of the complex: the letter, the order, the outline, the place on the site and the setbacks — as a whole.
+    setPublished(id, isPublished) { return request('PUT', '/buildings/' + id + '/published', { body: { isPublished: !!isPublished } }).then(M.building); },
     savePriceRule(id, body) { return request('PUT', '/buildings/' + id + '/price-rule', { body }).then(M.building); },
     // «Пересчитать цены»: { updated, unchanged, skipped } — only free apartments get the new price.
     applyPriceRule(id) { return request('POST', '/buildings/' + id + '/price-rule/apply'); },

@@ -58,5 +58,9 @@ public class Building : BaseEntity
     // Лифтов в блоке (на сайте — «Лифтов: 3», в 3D — шахты в ядре); не задано — не показывается.
     public int? ElevatorsCount { get; set; }
 
+    // На публичном сайте: false — дом скрыт из каталога, бренда, AI-помощника гостя и «Зелёного эффекта»; сотрудники видят его
+    // в CRM, покупатель — свою сделку, график, платежи и документы. Меняется через PUT /buildings/{id}/published (AuditLog).
+    public bool IsPublished { get; set; } = true;
+
     public List<Floor> Floors { get; set; } = [];
 }

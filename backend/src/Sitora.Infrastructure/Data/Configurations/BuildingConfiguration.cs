@@ -29,6 +29,7 @@ public class BuildingConfiguration : IEntityTypeConfiguration<Building>
         builder.Property(b => b.Setbacks).HasJson();
         builder.Property(b => b.BlockCode).HasMaxLength(4);
         builder.Property(b => b.SortOrder).HasDefaultValue(0);
+        builder.Property(b => b.IsPublished).HasDefaultValue(true);
         // Правило цены: ступени — jsonb, цена м² пентхаусов — decimal(18,2), валюта каталога блока (по умолчанию TJS).
         builder.Property(b => b.PriceSteps).HasJson();
         builder.Property(b => b.PriceCurrency).HasDefaultValue(Sitora.Domain.Enums.Currency.TJS);

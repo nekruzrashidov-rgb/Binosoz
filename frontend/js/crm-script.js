@@ -473,7 +473,15 @@
         const shapeForm = S.blockForms ? S.blockForms.shape(b, bs) : null;
         // Prices by floor (the owner and the object's head): the rule and «Пересчитать цены» for the free apartments.
         const priceForm = S.blockForms && S.api.isLeader() ? S.blockForms.prices(b, () => drawApts()) : null;
-        body.replaceChildren(buildingBar(bs, bid, 'catalog'), bform, locationForm(b), shapeForm, priceForm, amenForm, ecoForm, h('h3', { style: { marginTop: '10px' } }, t('cat.apts')), tools, holder);
+        // On the public site or hidden from it (leaders): deals, schedules and payments of a hidden building do not change.
+        const pubBox = h('input', { type: 'checkbox', checked: b.isPublished !== false, disabled: !S.api.isLeader() });
+        pubBox.addEventListener('change', async () => {
+          try { const r = await S.api.setPublished(b.id, pubBox.checked); b.isPublished = r.isPublished; S.toast(t(r.isPublished ? 'cat.published' : 'cat.hidden'), 'ok'); }
+          catch (er) { pubBox.checked = !pubBox.checked; S.err(er); }
+        });
+        const pubCard = h('div', { class: 'card stack' }, h('label', { class: 'check' }, pubBox, t('cat.onSite')),
+          b.isPublished === false ? S.chip('warn', t('cat.hidden')) : null, h('p', { class: 'hint' }, t('cat.onSiteHint')));
+        body.replaceChildren(buildingBar(bs, bid, 'catalog'), pubCard, bform, locationForm(b), shapeForm, priceForm, amenForm, ecoForm, h('h3', { style: { marginTop: '10px' } }, t('cat.apts')), tools, holder);
         async function drawApts() {
           const fl = floors.find((f) => String(f.id) === String(floorId)); holder.replaceChildren(S.skeleton(4, 38));
           const list = (await S.api.floorApartments(fl)).sort((a, c) => (a.planSlot || 0) - (c.planSlot || 0));
@@ -1170,7 +1178,7 @@
     }
     function buildingBar(bs, bid, tab) {
       if (bs.length < 2 && !S.api.isOwner()) return null;
-      const sel = S.select('building', bs.map((b) => [b.id, b.name]), bid, { 'aria-label': t('cust.building') });
+      const sel = S.select('building', bs.map((b) => [b.id, b.name + (b.isPublished === false ? ' · ' + t('cat.hiddenShort') : '')]), bid, { 'aria-label': t('cust.building') });
       sel.addEventListener('change', () => { S.store.set('sitora.crmBuilding', sel.value); S.crmGo(tab); });
       return h('div', { class: 'toolbar' }, bs.length > 1 ? h('div', { style: { minWidth: '240px' } }, S.field(t('cust.building'), sel)) : null, h('span', { class: 'spacer' }),
         S.api.isOwner() ? h('button', { class: 'btn ghost', onclick: () => buildingForm(() => S.crmGo(tab)) }, t('cat.newBuilding')) : null);

@@ -41,7 +41,7 @@ public class BrandService(
         // застройщику, и закэшированный по нему список не должен показаться на чужом сайте.
         var tg = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "tg";
         var buildings = await db.Buildings.AsNoTracking()
-            .Where(b => b.OrganizationId == organization.Id)
+            .Where(b => b.OrganizationId == organization.Id && b.IsPublished)
             .OrderBy(b => b.SortOrder).ThenBy(b => b.NameRu).ThenBy(b => b.Id)
             .Select(CatalogService.ToBuildingResponse(tg))
             .ToListAsync(ct);

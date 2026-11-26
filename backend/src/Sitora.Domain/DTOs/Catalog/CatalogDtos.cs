@@ -50,7 +50,12 @@ public record BuildingResponse(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? ElevatorsCount = null,
     // Коммерческих помещений и машино-мест (TotalApartments — только квартиры и пентхаусы).
     int CommercialUnits = 0,
-    int ParkingSpots = 0);
+    int ParkingSpots = 0,
+    // Дом на публичном сайте; false — скрыт (сотрудники видят его в CRM с пометкой).
+    bool IsPublished = true);
+
+// PUT /buildings/{id}/published: показать дом на сайте или скрыть (сделки, графики и платежи не меняются).
+public record SetPublishedRequest(bool IsPublished);
 
 // PUT /buildings/{id}/price-rule: правило целиком (валюта, ступени, цена м² пентхаусов); квартиры не меняет.
 public record SavePriceRuleRequest(Currency Currency = Currency.TJS, List<PriceStep>? Steps = null, decimal? PenthousePricePerM2 = null,

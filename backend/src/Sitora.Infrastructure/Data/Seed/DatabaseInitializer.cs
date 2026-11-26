@@ -84,10 +84,6 @@ public static class DatabaseInitializer
                     provider.GetRequiredService<Sitora.Domain.Interfaces.IAuditService>(), provider.GetRequiredService<IConfiguration>(), logger);
         }
 
-        // Блоки ЖК на проде — только по явному SEED_RICH_TOWER_BLOCKS=true (Actions → Seed prod), иначе база не трогается.
-        if (!isDevelopment && provider.GetRequiredService<IConfiguration>().GetValue<bool>(RichTowerBlocksSeeder.EnabledVariable))
-            await RichTowerBlocksSeeder.SeedAsync(db, provider.GetRequiredService<Sitora.Domain.Interfaces.IAuditService>(), logger);
-
         // Сотрудники из секретов SEED_STAFF_* (ObjectAdmin, Manager, Accountant, Content) — в любом окружении, после каталога.
         await StaffAccountsSeeder.SeedAsync(provider, logger);
         await DemoAccountsSeeder.SeedAsync(provider, logger);
