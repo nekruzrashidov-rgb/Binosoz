@@ -147,16 +147,42 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider t
         configurationBuilder.Properties<CashCategory>().HaveConversion<string>().HaveMaxLength(32);
     }
 
-    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
         StampTimestamps();
-        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        await ApartmentBuildingsAsync(cancellationToken);
+        return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         StampTimestamps();
+        ApartmentBuildingsAsync(CancellationToken.None).GetAwaiter().GetResult();
         return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    // Дом квартиры (Apartments.BuildingId) — дом её этажа: для новых квартир и перенесённых на другой этаж. Этаж,
+    // добавленный в том же сохранении, известен по навигации; остальные — одним запросом.
+    private async Task ApartmentBuildingsAsync(CancellationToken ct)
+    {
+        var pending = new List<Apartment>();
+        foreach (var entry in ChangeTracker.Entries<Apartment>())
+        {
+            if (entry.State != EntityState.Added && !(entry.State == EntityState.Modified && entry.Property(a => a.FloorId).IsModified))
+                continue;
+            if (entry.Entity.Floor is { BuildingId: var b } && b != Guid.Empty)
+                entry.Entity.BuildingId = b;
+            else
+                pending.Add(entry.Entity);
+        }
+        if (pending.Count == 0)
+            return;
+        var floorIds = pending.Select(a => a.FloorId).Distinct().ToList();
+        var buildings = await Floors.IgnoreQueryFilters().AsNoTracking().Where(f => floorIds.Contains(f.Id))
+            .ToDictionaryAsync(f => f.Id, f => f.BuildingId, ct);
+        foreach (var a in pending)
+            if (buildings.TryGetValue(a.FloorId, out var b))
+                a.BuildingId = b;
     }
 
     private void StampTimestamps()

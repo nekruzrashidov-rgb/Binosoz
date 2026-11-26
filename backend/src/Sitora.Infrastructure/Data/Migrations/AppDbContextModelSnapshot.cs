@@ -164,7 +164,6 @@ namespace Sitora.Infrastructure.Data.Migrations
                         .HasColumnType("numeric(18,2)");
 
                     b.Property<Guid>("BuildingId")
-                        .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")

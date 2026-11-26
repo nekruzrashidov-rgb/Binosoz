@@ -115,9 +115,9 @@ BEGIN
 
       apt_id := gen_random_uuid();
       apt_number := f * 100 + slot + 1;
-      INSERT INTO "Apartments" ("Id", "FloorId", "Number", "PlanSlot", "Model3dId", "Rooms", "Area", "PricePerM2", "Price",
+      INSERT INTO "Apartments" ("Id", "FloorId", "BuildingId", "Number", "PlanSlot", "Model3dId", "Rooms", "Area", "PricePerM2", "Price",
                                 "Currency", "Status", "CreatedAt", "UpdatedAt")
-      VALUES (apt_id, floor_id, apt_number, slot, NULL, rooms, area, ppm, ROUND(area * ppm / 100) * 100,
+      VALUES (apt_id, floor_id, building, apt_number, slot, NULL, rooms, area, ppm, ROUND(area * ppm / 100) * 100,
               'TJS', status, ts, ts);
 
       IF status = 'Sold' THEN
@@ -350,9 +350,9 @@ BEGIN
     1400, 'USD', 1500, 20000, 3, true, ts, ts);
   INSERT INTO "Floors" ("Id", "BuildingId", "Number", "PlanImageUrl", "CreatedAt", "UpdatedAt")
   SELECT gen_random_uuid(), b, n, NULL, ts, ts FROM unnest(ARRAY[-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]) AS n;
-  INSERT INTO "Apartments" ("Id", "FloorId", "Number", "PlanSlot", "Model3dId", "Rooms", "Area", "PricePerM2", "Price", "Currency",
+  INSERT INTO "Apartments" ("Id", "FloorId", "BuildingId", "Number", "PlanSlot", "Model3dId", "Rooms", "Area", "PricePerM2", "Price", "Currency",
     "Status", "Kind", "TerraceArea", "CreatedAt", "UpdatedAt")
-  SELECT gen_random_uuid(), f."Id", v.num, v.slot, NULL, v.rooms, v.area, v.ppm, v.price, 'USD', 'Free', v.kind, v.terrace, ts, ts
+  SELECT gen_random_uuid(), f."Id", b, v.num, v.slot, NULL, v.rooms, v.area, v.ppm, v.price, 'USD', 'Free', v.kind, v.terrace, ts, ts
   FROM (VALUES
     (-2, 29, 0, 0, 'Parking', 13.25, 1509.43, 20000, NULL::numeric),
     (-2, 30, 1, 0, 'Parking', 13.25, 1509.43, 20000, NULL::numeric),
@@ -604,9 +604,9 @@ BEGIN
     1400, 'USD', 1500, 20000, 3, true, ts, ts);
   INSERT INTO "Floors" ("Id", "BuildingId", "Number", "PlanImageUrl", "CreatedAt", "UpdatedAt")
   SELECT gen_random_uuid(), b, n, NULL, ts, ts FROM unnest(ARRAY[-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]) AS n;
-  INSERT INTO "Apartments" ("Id", "FloorId", "Number", "PlanSlot", "Model3dId", "Rooms", "Area", "PricePerM2", "Price", "Currency",
+  INSERT INTO "Apartments" ("Id", "FloorId", "BuildingId", "Number", "PlanSlot", "Model3dId", "Rooms", "Area", "PricePerM2", "Price", "Currency",
     "Status", "Kind", "TerraceArea", "CreatedAt", "UpdatedAt")
-  SELECT gen_random_uuid(), f."Id", v.num, v.slot, NULL, v.rooms, v.area, v.ppm, v.price, 'USD', 'Free', v.kind, v.terrace, ts, ts
+  SELECT gen_random_uuid(), f."Id", b, v.num, v.slot, NULL, v.rooms, v.area, v.ppm, v.price, 'USD', 'Free', v.kind, v.terrace, ts, ts
   FROM (VALUES
     (-2, 29, 0, 0, 'Parking', 13.25, 1509.43, 20000, NULL::numeric),
     (-2, 30, 1, 0, 'Parking', 13.25, 1509.43, 20000, NULL::numeric),
@@ -842,9 +842,9 @@ BEGIN
     1400, 'USD', 1500, 20000, 3, true, ts, ts);
   INSERT INTO "Floors" ("Id", "BuildingId", "Number", "PlanImageUrl", "CreatedAt", "UpdatedAt")
   SELECT gen_random_uuid(), b, n, NULL, ts, ts FROM unnest(ARRAY[-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]) AS n;
-  INSERT INTO "Apartments" ("Id", "FloorId", "Number", "PlanSlot", "Model3dId", "Rooms", "Area", "PricePerM2", "Price", "Currency",
+  INSERT INTO "Apartments" ("Id", "FloorId", "BuildingId", "Number", "PlanSlot", "Model3dId", "Rooms", "Area", "PricePerM2", "Price", "Currency",
     "Status", "Kind", "TerraceArea", "CreatedAt", "UpdatedAt")
-  SELECT gen_random_uuid(), f."Id", v.num, v.slot, NULL, v.rooms, v.area, v.ppm, v.price, 'USD', 'Free', v.kind, v.terrace, ts, ts
+  SELECT gen_random_uuid(), f."Id", b, v.num, v.slot, NULL, v.rooms, v.area, v.ppm, v.price, 'USD', 'Free', v.kind, v.terrace, ts, ts
   FROM (VALUES
     (-2, 29, 0, 0, 'Parking', 13.25, 1509.43, 20000, NULL::numeric),
     (-2, 30, 1, 0, 'Parking', 13.25, 1509.43, 20000, NULL::numeric),

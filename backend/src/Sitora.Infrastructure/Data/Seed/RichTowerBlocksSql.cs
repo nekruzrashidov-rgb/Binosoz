@@ -69,9 +69,9 @@ public static class RichTowerBlocksSql
               + x.ElevatorsCount + ", true, ts, ts);");
             L("  INSERT INTO \"Floors\" (\"Id\", \"BuildingId\", \"Number\", \"PlanImageUrl\", \"CreatedAt\", \"UpdatedAt\")");
             L("  SELECT gen_random_uuid(), b, n, NULL, ts, ts FROM unnest(ARRAY[" + string.Join(", ", x.Floors.Select(f => f.Number).OrderBy(n => n)) + "]) AS n;");
-            L("  INSERT INTO \"Apartments\" (\"Id\", \"FloorId\", \"Number\", \"PlanSlot\", \"Model3dId\", \"Rooms\", \"Area\", \"PricePerM2\", \"Price\", \"Currency\",");
+            L("  INSERT INTO \"Apartments\" (\"Id\", \"FloorId\", \"BuildingId\", \"Number\", \"PlanSlot\", \"Model3dId\", \"Rooms\", \"Area\", \"PricePerM2\", \"Price\", \"Currency\",");
             L("    \"Status\", \"Kind\", \"TerraceArea\", \"CreatedAt\", \"UpdatedAt\")");
-            L("  SELECT gen_random_uuid(), f.\"Id\", v.num, v.slot, NULL, v.rooms, v.area, v.ppm, v.price, " + Q(x.PriceCurrency.ToString()) + ", 'Free', v.kind, v.terrace, ts, ts");
+            L("  SELECT gen_random_uuid(), f.\"Id\", b, v.num, v.slot, NULL, v.rooms, v.area, v.ppm, v.price, " + Q(x.PriceCurrency.ToString()) + ", 'Free', v.kind, v.terrace, ts, ts");
             L("  FROM (VALUES");
             var rows = x.Floors.OrderBy(f => f.Number).SelectMany(f => f.Apartments.OrderBy(a => a.PlanSlot).Select(a =>
                 string.Create(Inv, $"    ({f.Number}, {a.Number}, {a.PlanSlot}, {a.Rooms}, '{a.Kind}', {a.Area}, {a.PricePerM2}, {a.Price}, {D(a.TerraceArea)}::numeric)"))).ToList();

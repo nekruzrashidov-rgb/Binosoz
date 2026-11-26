@@ -7,8 +7,8 @@ public class Apartment : BaseEntity
 {
     public Guid FloorId { get; set; }
     public Floor Floor { get; set; } = null!;
-    // Дом этажа — ставит база (триггер по FloorId), нужен для уникальности номера в пределах дома.
-    public Guid BuildingId { get; private set; }
+    // Дом этажа — ставит AppDbContext при сохранении; нужен для уникальности номера в пределах дома (блока).
+    public Guid BuildingId { get; set; }
 
     // Позиция на плане этажа: квартиры 0–7, магазины, машино-места паркинга — больше.
     public const int MaxPlanSlot = 99;

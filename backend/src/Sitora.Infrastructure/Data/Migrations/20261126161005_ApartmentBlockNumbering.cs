@@ -18,19 +18,10 @@ namespace Sitora.Infrastructure.Data.Migrations
                 nullable: false,
                 defaultValue: new Guid("00000000-0000-0000-0000-000000000000"));
 
-            // Дом квартиры — по этажу: у прежних строк сразу, у новых и перенесённых на другой этаж — триггером
-            // (EF и seed.sql вставляют квартиры без BuildingId).
+            // Дом квартиры — по этажу (у прежних строк). Новые и перенесённые на другой этаж ставит приложение
+            // (AppDbContext.SaveChanges), вставки seed.sql указывают его сами.
             migrationBuilder.Sql("""
                 UPDATE "Apartments" a SET "BuildingId" = f."BuildingId" FROM "Floors" f WHERE f."Id" = a."FloorId";
-
-                CREATE OR REPLACE FUNCTION apartments_set_building() RETURNS trigger LANGUAGE plpgsql AS $$
-                BEGIN
-                    SELECT f."BuildingId" INTO NEW."BuildingId" FROM "Floors" f WHERE f."Id" = NEW."FloorId";
-                    RETURN NEW;
-                END $$;
-
-                CREATE TRIGGER trg_apartments_building BEFORE INSERT OR UPDATE OF "FloorId", "BuildingId" ON "Apartments"
-                    FOR EACH ROW EXECUTE FUNCTION apartments_set_building();
 
                 -- Прежние дома не перенумеровываются: если номер уже повторяется в доме, миграция останавливается с
                 -- понятным текстом, ничего не меняя (номера правит сотрудник в CRM, затем миграцию запускают снова).
@@ -73,11 +64,6 @@ namespace Sitora.Infrastructure.Data.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql("""
-                DROP TRIGGER IF EXISTS trg_apartments_building ON "Apartments";
-                DROP FUNCTION IF EXISTS apartments_set_building();
-                """);
-
             migrationBuilder.DropIndex(
                 name: "IX_Apartments_BuildingId_Number_Commercial",
                 table: "Apartments");

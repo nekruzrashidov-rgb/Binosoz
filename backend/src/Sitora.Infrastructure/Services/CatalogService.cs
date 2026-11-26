@@ -465,6 +465,7 @@ public class CatalogService(
         if (!await db.Floors.AnyAsync(f => f.Id == request.FloorId, ct))
             throw new NotFoundException(FloorNotFound);
 
+        await EnsureNumberFreeAsync(request.FloorId, request.Number, ApartmentKind.Residential, null, ct);
         var apartment = new Apartment
         {
             FloorId = request.FloorId,
@@ -484,6 +485,7 @@ public class CatalogService(
     {
         var apartment = await FindApartmentAsync(id, ct);
 
+        await EnsureNumberFreeAsync(apartment.FloorId, request.Number, apartment.Kind, apartment.Id, ct);
         var before = Snapshot(apartment);
         apartment.Number = request.Number;
         apartment.Rooms = request.Rooms;
@@ -537,6 +539,20 @@ public class CatalogService(
     }
 
     // У квартиры два уникальных правила на этаже: номер и позиция на плане.
+    // Номер уникален в доме (блоке) и в своей серии: квартиры и пентхаусы, магазины (Н-), машино-места (М-). Тот же
+    // номер на этом же этаже — прежняя ошибка этажа; индексы базы — страховка от гонки двух запросов.
+    private async Task EnsureNumberFreeAsync(Guid floorId, int number, ApartmentKind kind, Guid? exceptId, CancellationToken ct)
+    {
+        var buildingId = await db.Floors.Where(f => f.Id == floorId).Select(f => f.BuildingId).SingleAsync(ct);
+        var homes = kind is ApartmentKind.Residential or ApartmentKind.Penthouse;
+        var taken = await db.Apartments.AsNoTracking()
+            .Where(a => a.BuildingId == buildingId && a.Number == number && a.Id != exceptId
+                        && (homes ? a.Kind == ApartmentKind.Residential || a.Kind == ApartmentKind.Penthouse : a.Kind == kind))
+            .Select(a => (Guid?)a.FloorId).FirstOrDefaultAsync(ct);
+        if (taken is { } onFloor)
+            throw new ConflictException(onFloor == floorId ? $"Квартира №{number} уже есть на этом этаже" : NumberTakenInBuilding + number);
+    }
+
     private async Task SaveApartmentAsync(int number, int planSlot, CancellationToken ct)
     {
         try

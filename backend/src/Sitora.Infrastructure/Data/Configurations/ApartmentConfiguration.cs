@@ -20,8 +20,7 @@ public class ApartmentConfiguration : IEntityTypeConfiguration<Apartment>
         // Вид помещения строкой, по умолчанию — квартира (у всех прежних строк).
         builder.Property(a => a.Kind).HasConversion<string>().HasMaxLength(16).HasDefaultValue(Sitora.Domain.Enums.ApartmentKind.Residential);
         builder.HasIndex(a => new { a.FloorId, a.Number }).IsUnique();
-        // BuildingId заполняет триггер базы по FloorId (миграция ApartmentBlockNumbering) — и для вставок из seed.sql.
-        builder.Property(a => a.BuildingId).ValueGeneratedOnAddOrUpdate();
+        // BuildingId — дом этажа; ставит AppDbContext при сохранении (ApartmentBuildings), seed.sql — сам.
         builder.HasIndex(a => new { a.BuildingId, a.Number }, HomeNumberIndex).IsUnique()
             .HasFilter("\"Kind\" IN ('Residential', 'Penthouse')");
         builder.HasIndex(a => new { a.BuildingId, a.Number }, ShopNumberIndex).IsUnique().HasFilter("\"Kind\" = 'Commercial'");
