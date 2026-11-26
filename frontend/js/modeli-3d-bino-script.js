@@ -597,13 +597,13 @@
       removeLabels('blocks'); removeLabels('dim');
       if (model.plain) return;
       blocks.forEach((b) => {
-        const el = document.createElement('div'); el.className = 'h3d-tag h3d-tag--block'; el.textContent = b.name || ('Блок ' + b.code);
-        addLabel(el, [b.center.x, b.H + 6, b.center.z], { group: 'blocks', prio: 8, free: true });
+        const el = document.createElement('div'); el.className = 'h3d-tag h3d-tag--block'; el.dataset.block = b.code; el.textContent = b.name || ('Блок ' + b.code);
+        addLabel(el, [b.center.x, b.H + 6, b.center.z], { group: 'blocks', prio: 8 });
       });
       dims.forEach((d) => {
         const el = document.createElement('div'); el.className = 'h3d-tag h3d-tag--dim';
         el.textContent = '≈ ' + Math.round(d.d) + ' ' + S.t('h3d.m') + ' · ' + S.t('h3d.byConcept');
-        d.label = addLabel(el, [d.mid.x, 2, d.mid.z], { group: 'dim', prio: 7, free: true });
+        d.label = addLabel(el, [d.mid.x, 2, d.mid.z], { group: 'dim', prio: 7 });
         d.label.on = currentView === 'top';
       });
     }
@@ -628,7 +628,7 @@
       removeLabels('yard');
       yardZones.filter((z) => z.kind !== 'parking_ramp').forEach((z) => {
         const el = document.createElement('div'); el.className = 'h3d-tag h3d-tag--yard'; el.textContent = S.t('amen.' + z.kind);
-        const c = z.mesh.userData.center; addLabel(el, [c.x, 4, c.z], { group: 'yard', prio: 6 });
+        const c = z.mesh.userData.center; const l = addLabel(el, [c.x, 1, c.z], { group: 'yard', prio: 6 }); l.on = yardView() && !parkingOn;
       });
       // Distances between neighbouring blocks (by their order), from the data — a line and a label on «Сверху».
       dims = [];
@@ -776,7 +776,7 @@
       // The yard and the trees stand on the parking's roof: hidden while it is shown.
       yardZones.forEach((z) => { z.mesh.visible = !parkingOn; });
       extras.visible = !parkingOn;
-      labels.forEach((l) => { if (l.group === 'yard') l.on = !parkingOn; });
+      labels.forEach((l) => { if (l.group === 'yard') l.on = !parkingOn && yardView(); });
       setXray(parkingOn);
       if (parkingOn) flyTo({ pol: 0.8, ty: -5, tx: 0, tz: 0, dist: complexR * 2.3 * (portrait() ? 1.4 : 1) }, 1);
     }
@@ -1042,12 +1042,14 @@
       }
     }
     let currentView = 'overview';
+    const yardView = () => currentView === 'yard' || currentView === 'top';
     function setView(name, dur) {
       if (mode !== 'house') return;
       currentView = VIEWS.includes(name) ? name : 'overview';
       autoRotate = false;
       // The distances between the blocks are drawn on «Сверху» only.
       dims.forEach((d) => { d.line.visible = currentView === 'top'; if (d.label) d.label.on = currentView === 'top'; });
+      labels.forEach((l) => { if (l.group === 'yard') l.on = !parkingOn && yardView(); });
       flyTo(viewGoal(currentView), dur == null ? 1.0 : dur);
       handlers.view(currentView);
     }
@@ -1063,11 +1065,13 @@
       return { x: p.x, y: floorMid(a.floor), z: p.z, ry: p.ry, nx: Math.sin(p.ry), nz: Math.cos(p.ry) };
     }
     // The camera to a block (or the whole complex with null): its centre, a distance for its height.
+    let focusCode = null;
     function focusBlock(code) {
       if (mode !== 'house') return;
       autoRotate = false;
       const bi = blocks.findIndex((b) => b.code === code);
-      if (bi < 0) { flyTo(viewGoal('overview'), 1); handlers.view(currentView = 'overview'); return; }
+      focusCode = bi < 0 ? null : code;
+      if (bi < 0) { flyTo(viewGoal('overview'), 1); handlers.view(currentView = 'overview'); labels.forEach((l) => { if (l.group === 'yard') l.on = !parkingOn && yardView(); }); return; }
       const b = blocks[bi];
       flyTo({ tx: b.center.x, tz: b.center.z, ty: b.H * 0.5, dist: Math.max(70, b.H * 2.2) * (portrait() ? 1.4 : 1), pol: 1.3 }, 1.1);
     }
@@ -1084,6 +1088,7 @@
     labelLayer.className = 'h3d-labels';
     container.appendChild(labelLayer);
     const labels = [], labelInset = { top: 0 };
+    let labelAvoid = null;
     const pv = new T.Vector3();
     function addLabel(el, pos, o) {
       const l = Object.assign({ el, pos: new T.Vector3(pos[0], pos[1], pos[2]), group: 'misc', prio: 0, on: true, w: 0, h: 0, shown: false }, o || {});
@@ -1098,6 +1103,8 @@
       if (!labels.length) return;
       const w = container.clientWidth, h = container.clientHeight, placed = [];
       const topInset = labelInset.top || 0;
+      const avoid = labelAvoid ? labelAvoid() : [];
+      const hit = (r, list) => list.some((p) => r.x0 < p.x1 && r.x1 > p.x0 && r.y0 < p.y1 && r.y1 > p.y0);
       labels.slice().sort((a, b) => b.prio - a.prio).forEach((l) => {
         let show = l.on;
         let x = 0, y = 0;
@@ -1108,8 +1115,16 @@
         }
         if (show) {
           if (!l.w) { l.w = l.el.offsetWidth || 90; l.h = l.el.offsetHeight || 26; }
-          const r = { x0: x - l.w / 2 - 3, y0: y - l.h - 8, x1: x + l.w / 2 + 3, y1: y - 4 };
-          if (r.y0 < topInset || (!l.free && placed.some((p) => r.x0 < p.x1 && r.x1 > p.x0 && r.y0 < p.y1 && r.y1 > p.y0))) show = false;
+          const base = { x0: x - l.w / 2 - 3, y0: y - l.h - 8, x1: x + l.w / 2 + 3, y1: y - 4 };
+          // Over its point first; covering a control or a more important label — up, down, left, right; nowhere — hidden.
+          const tries = l.free ? [[0, 0]] : [[0, 0], [0, -(l.h + 6)], [0, l.h + 12], [-(l.w / 2 + 12), 0], [l.w / 2 + 12, 0]];
+          let r = null;
+          for (const [dx, dy] of tries) {
+            const c = { x0: base.x0 + dx, y0: base.y0 + dy, x1: base.x1 + dx, y1: base.y1 + dy };
+            if (c.x0 < 0 || c.x1 > w || c.y0 < topInset || c.y1 > h || hit(c, avoid) || (!l.free && hit(c, placed))) continue;
+            r = c; break;
+          }
+          if (!r) show = false;
           else { placed.push(r); l.el.style.transform = 'translate3d(' + Math.round(r.x0 + 3) + 'px,' + Math.round(r.y0) + 'px,0)'; }
         }
         if (show !== l.shown) { l.shown = show; l.el.style.visibility = show ? 'visible' : 'hidden'; l.el.setAttribute('aria-hidden', String(!show)); }
@@ -1653,6 +1668,12 @@
       addLabel, removeLabels,
       // Labels never go under the page's top bar (px from the top of the scene).
       setLabelInset(top) { labelInset.top = top || 0; },
+      // Boxes (px in the scene) labels must not cover — the page's panels and buttons: fn() → [{ x0, y0, x1, y1 }].
+      setLabelAvoid(fn) { labelAvoid = fn || null; },
+      // The page changed a label's text: measure again.
+      labelsChanged() { labels.forEach((l) => { l.w = 0; l.h = 0; }); },
+      // The list's row under the pointer lights its apartment's windows (null — none).
+      hoverApartment(id) { const i = id == null || aptMap[id] == null ? -1 : aptMap[id]; if (i === hoverIdx) return; hoverIdx = i; resume(); },
       // World points for the page's labels.
       anchors() { return { top: [0, houseH() + 4, 0], H: houseH(), blocks: blocks.map((b) => ({ code: b.code, top: [b.center.x, b.H + 6, b.center.z] })) }; },
       roomAnchors() { return inside ? inside.rooms.map((r) => [r.x, inside.y + 1.3, r.z]) : []; },
@@ -1695,7 +1716,7 @@
           elevators: blocks.map((b) => ({ block: b.code, shafts: shafts.filter((s) => s.block === b.code).length })),
           amenities: yardZones.map((z) => z.kind),
           parking: { on: parkingOn, levels: [...new Set(apartmentInst.filter((a) => a.kind === 'parking').map((a) => a.floor))].sort((x, y) => x - y), spots: spotApt.length },
-          xray, selectedBlock: selBlock >= 0 && blocks[selBlock] ? blocks[selBlock].code : null,
+          xray, selectedBlock: selBlock >= 0 && blocks[selBlock] ? blocks[selBlock].code : null, focusBlock: focusCode, hover: hoverIdx >= 0 ? apartmentInst[hoverIdx].id : null,
           drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles };
       },
       destroy() {

@@ -19,7 +19,7 @@ async function openComplex(page) {
 test.describe('3D of the whole complex', () => {
   test.setTimeout(150000);
 
-  test('three blocks from the data, gaps ≥ 20 m, 3 lifts each, the yard, the parking levels, the concept caption', async ({ page }) => {
+  test('three blocks from the data, gaps ≥ 20 m, 3 lifts each, the yard, the parking levels, the concept caption', async ({ page, isMobile }) => {
     const errors = await openComplex(page);
     const s = await state(page);
     expect(s.blocks.map((b) => b.code)).toEqual(['A', 'B', 'C']);
@@ -40,7 +40,8 @@ test.describe('3D of the whole complex', () => {
     expect(p.spots).toBeGreaterThan(0);
     await page.locator('[data-mode="parking"]').click();
     await expect.poll(async () => (await state(page)).parking.on).toBe(false);
-    // «Сверху»: the distance labels from the scene's data.
+    // «Сверху»: the distance labels from the scene's data (on a phone the views are in the bottom sheet).
+    if (isMobile) await page.locator('.h3d-list-tab').click();
     await page.locator('[data-view="top"]').click();
     await expect(page.locator('.h3d-tag--dim').first()).toContainText('по концепту');
     expect(errors).toEqual([]);

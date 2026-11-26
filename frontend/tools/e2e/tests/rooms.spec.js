@@ -25,7 +25,7 @@ test('the 3D card names the same type', async ({ page, isMobile }) => {
   await mockCatalog(page);
   await page.goto('/apartments#3d');
   await page.waitForFunction(() => window.__house3d && document.querySelector('.h3d-full'), null, { timeout: 90000 });
-  if (isMobile) await page.locator('.h3d-list-toggle').click();
+  if (isMobile) await page.locator('.h3d-list-tab').click();
   await page.locator('.h3d-item', { hasText: '204' }).first().click();
   await expect(page.locator('.h3d-card-type')).toContainText('4-комнатная');
 });

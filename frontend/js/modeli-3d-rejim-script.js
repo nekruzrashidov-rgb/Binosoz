@@ -26,21 +26,80 @@
     scene.appendChild(ctx.box);
     const lastFocus = document.activeElement;
 
-    // ---------- top bar: back, title, time of day ----------
-    const back = h('button', { class: 'h3d-btn h3d-back', type: 'button', onclick: () => ctx.requestClose() }, '← ' + t('h3d.back'));
+    // ---------- the layout (≥ 1024 px): top left — «← Каталог», the kicker and the title of what is shown; top centre — the one
+    // main control «Весь ЖК · A · B · C»; top right — icons 36 px (time of day, parking, cut-away, full screen, close);
+    // bottom centre — the camera views; right — the floor scale of the chosen block; left — the folding list of apartments.
+    // On a phone (≤ 768 px) the list is a bottom sheet with the views inside. ----------
+    const blocks = house.blocks.filter((x) => x.code);
+    const complex = blocks.length > 1;
+    let cur = null; // the chosen block (letter) or null — the whole complex
+    const blockOf = (code) => blocks.find((x) => x.code === code) || null;
+    const inBlock = (a) => !cur || a.block === cur;
+
+    const back = h('button', { class: 'h3d-backlink', type: 'button', onclick: () => ctx.requestClose() }, h('span', { 'aria-hidden': 'true' }, '←'), h('span', { class: 'h3d-backlink-t' }, t('h3d.catalog')));
+    const headTitle = h('b', { class: 'h3d-head-title' });
+    const head = h('div', { class: 'h3d-head' }, back, h('div', { class: 'h3d-head-text' }, h('span', { class: 'h3d-head-kicker', 'data-brand': '' }, S.brandName()), headTitle));
+    function drawTitle() {
+      const b0 = blockOf(cur);
+      headTitle.textContent = b0 ? t('blk.block', { c: b0.code }) + ' · ' + S.fmt.n(b0.floors) + ' ' + S.plural(b0.floors, 'nr.floors') : complex ? t('blk.all') : (b.name || S.brandName());
+    }
+
+    // Segments: one button pressed, ←/→ move along (roving focus), Home/End — the ends.
+    function segment(cls, label, attr, items, onPick) {
+      const box = h('div', { class: 'h3d-seg ' + cls, role: 'group', 'aria-label': label });
+      box.addEventListener('keydown', (e) => {
+        const bs = S.$$('button', box); const i = bs.indexOf(document.activeElement);
+        if (i < 0) return;
+        const j = e.key === 'ArrowRight' ? Math.min(bs.length - 1, i + 1) : e.key === 'ArrowLeft' ? Math.max(0, i - 1) : e.key === 'Home' ? 0 : e.key === 'End' ? bs.length - 1 : -1;
+        if (j < 0) return;
+        e.preventDefault(); bs[j].focus(); bs[j].click();
+      });
+      box.draw = (sel) => {
+        const had = box.contains(document.activeElement);
+        box.replaceChildren(...items().map(([v, l, aria]) => h('button', { type: 'button', [attr]: v == null ? 'all' : v, 'aria-pressed': String(sel === v), tabindex: sel === v ? '0' : '-1', 'aria-label': aria || null, onclick: () => onPick(v) }, l)));
+        // Redrawn under the keyboard: the focus stays on the pressed button.
+        if (had) { const p = S.$('[aria-pressed="true"]', box); if (p) p.focus({ preventScroll: true }); }
+      };
+      return box;
+    }
+    const blockSeg = segment('h3d-seg--main h3d-blocks', t('blk.switch'), 'data-block', () => [[null, t('blk.all')]].concat(blocks.map((x) => [x.code, x.code, t('blk.block', { c: x.code })])), (v) => pickBlock(v));
+
+    // ---------- the icons: time of day (a card with the slider), parking, cut-away, full screen, close ----------
+    const tool = (icon, label, onclick, extra) => h('button', Object.assign({ class: 'h3d-tool', type: 'button', title: label, 'aria-label': label, onclick }, extra || {}), S.icon(icon));
+    const timeBtn = tool('sun', t('h3d.timeSlider'), () => togglePop(), { 'aria-expanded': 'false', 'aria-haspopup': 'dialog' });
+    const hasParking = complex && (ctx.units ? ctx.units() : []).some((a) => a.kind === 'parking');
+    const parkBtn = hasParking ? tool('car', t('blk.parking'), () => { house.setParking(!house.parking); parkBtn.setAttribute('aria-pressed', String(house.parking)); }, { 'aria-pressed': 'false', 'data-mode': 'parking' }) : null;
+    const xrayBtn = complex ? tool('layers', t('blk.xray'), () => { house.setXray(!house.state().xray); xrayBtn.setAttribute('aria-pressed', String(house.state().xray)); }, { 'aria-pressed': 'false', 'data-mode': 'xray' }) : null;
+    const fsOk = !!(document.fullscreenEnabled && root.requestFullscreen);
+    const fsBtn = fsOk ? tool('expand', t('h3d.fullscreen'), () => { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else root.requestFullscreen().catch(() => {}); }) : null;
+    const onFs = () => { if (!fsBtn) return; const on = document.fullscreenElement === root; fsBtn.setAttribute('aria-label', t(on ? 'h3d.fullscreenExit' : 'h3d.fullscreen')); fsBtn.title = fsBtn.getAttribute('aria-label'); };
+    document.addEventListener('fullscreenchange', onFs);
+    const closeBtn = tool('x', t('common.close'), () => ctx.requestClose(), { 'data-act': 'close' });
+    const tools = h('div', { class: 'h3d-tools', role: 'toolbar', 'aria-label': t('h3d.tools') }, timeBtn, parkBtn, xrayBtn, fsBtn, closeBtn);
+
     const slider = h('input', { type: 'range', min: 5, max: 22, step: 0.25, value: 12, 'aria-label': t('h3d.timeSlider'), class: 'h3d-range' });
     const clock = h('output', { class: 'h3d-clock', 'aria-live': 'off' }, '12:00');
-    const play = h('button', { class: 'h3d-icon', type: 'button', 'aria-label': t('h3d.play'), title: t('h3d.play') }, '▶');
-    const nowBtn = h('button', { class: 'h3d-chip', type: 'button', 'aria-pressed': 'true', title: t('h3d.nowHint') }, t('h3d.now'));
-    const presetSeg = h('div', { class: 'h3d-seg', role: 'group', 'aria-label': t('hero.time') }, ['day', 'dusk', 'night'].map((k) => h('button', { type: 'button', 'data-k': k, onclick: () => preset(k) }, t('time.' + k))));
-    const timeBox = h('div', { class: 'h3d-time' }, h('span', { 'aria-hidden': 'true', class: 'h3d-sym' }, '☀'), slider, h('span', { 'aria-hidden': 'true', class: 'h3d-sym' }, '☾'), clock, play, nowBtn, presetSeg);
-    const top = h('div', { class: 'h3d-top' }, back, h('div', { class: 'h3d-title' }, h('b', { 'data-brand': '' }, S.brandName()), h('span', null, t('h3d.kicker'))), timeBox);
-    root.appendChild(top);
+    const play = h('button', { class: 'h3d-pop-btn', type: 'button', 'aria-label': t('h3d.play'), title: t('h3d.play') }, '▶');
+    const nowBtn = h('button', { class: 'h3d-pop-btn', type: 'button', 'aria-pressed': 'true', title: t('h3d.nowHint') }, t('h3d.now'));
+    const presetSeg = h('div', { class: 'h3d-seg h3d-seg--sm', role: 'group', 'aria-label': t('hero.time') }, ['day', 'dusk', 'night'].map((k) => h('button', { type: 'button', 'data-k': k, onclick: () => preset(k) }, t('time.' + k))));
+    const pop = h('div', { class: 'h3d-pop', role: 'dialog', 'aria-label': t('h3d.timeSlider'), hidden: true },
+      h('div', { class: 'h3d-pop-row' }, h('span', { 'aria-hidden': 'true', class: 'h3d-sym' }, '☀'), slider, h('span', { 'aria-hidden': 'true', class: 'h3d-sym' }, '☾'), clock),
+      h('div', { class: 'h3d-pop-row' }, nowBtn, play, presetSeg));
+    function togglePop(v) {
+      const on = v == null ? pop.hidden : v;
+      pop.hidden = !on; timeBtn.setAttribute('aria-expanded', String(on));
+      if (on) slider.focus({ preventScroll: true });
+    }
+    const onDocDown = (e) => { if (!pop.hidden && !pop.contains(e.target) && !timeBtn.contains(e.target)) togglePop(false); };
+    document.addEventListener('pointerdown', onDocDown, true);
 
-    let nowTimer = 0, nowOn = true;
+    const top = h('div', { class: 'h3d-top' }, head, complex ? blockSeg : h('span', { class: 'h3d-top-gap' }), tools);
+    root.append(top, pop);
+
+    let nowTimer = 0;
     function showClock(x) { clock.textContent = hhmm(x); slider.value = String(Math.max(5, Math.min(22, x))); }
     function setNow(on) {
-      nowOn = on; nowBtn.setAttribute('aria-pressed', String(on));
+      nowBtn.setAttribute('aria-pressed', String(on));
       clearInterval(nowTimer);
       if (on) { stopPlay(); const tick = () => { const x = house.nowHours(); house.setClock(x, true); showClock(x); }; tick(); nowTimer = setInterval(tick, 60000); }
     }
@@ -62,69 +121,118 @@
       house.setClock(x, true); showClock(x); markPreset(k);
     }
 
-    // ---------- labels: the height over the house ----------
+    // ---------- labels: the height — only over the chosen block (one house without blocks: over the house) ----------
     const fh = b.floorHeight ? Number(b.floorHeight) : null;
-    const floors = b.floorsCount || house.floors;
-    const metres = Math.round(floors * (fh || 3.0));
-    const heightLabel = h('div', { class: 'h3d-tag h3d-tag--height' }, h('b', null, S.fmt.n(floors) + ' ' + S.plural(floors, 'nr.floors')), ' · ≈ ' + S.fmt.n(metres) + ' ' + t('h3d.m') + (fh ? '' : ' · ' + t('h3d.estimate')));
-    house.addLabel(heightLabel, house.anchors().top, { group: 'house', prio: 10, free: true });
-
-    // ---------- camera views ----------
-    const viewBar = h('nav', { class: 'h3d-views', 'aria-label': t('h3d.views') });
-    const listToggle = h('button', { class: 'h3d-btn h3d-list-toggle', type: 'button', 'aria-expanded': 'false', onclick: () => toggleList() });
-    function drawViews() {
-      viewBar.replaceChildren(listToggle, ...house.views.filter((v) => v !== 'area' || house.hasContext).map((v) =>
-        h('button', { class: 'h3d-chip', type: 'button', 'data-view': v, 'aria-pressed': String(house.currentView === v), onclick: () => { house.setView(v); } }, t('h3d.view.' + v))));
+    const heightText = (floors) => S.fmt.n(floors) + ' ' + S.plural(floors, 'nr.floors') + ' · ≈ ' + S.fmt.n(Math.round(floors * (fh || 3.0))) + ' ' + t('h3d.m') + (fh ? '' : ' · ' + t('h3d.estimate'));
+    if (!complex) {
+      const floors = b.floorsCount || house.floors;
+      house.addLabel(h('div', { class: 'h3d-tag h3d-tag--height' }, h('b', null, heightText(floors))), house.anchors().top, { group: 'house', prio: 10 });
     }
-    house.on('view', (v) => S.$$('[data-view]', viewBar).forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.view === v))));
-    root.appendChild(viewBar);
-
-    // ---------- the complex: «Весь ЖК / A / B / C», the parking mode, the cut-away ----------
-    const blocks = house.blocks.filter((x) => x.code);
-    const hasParking = ctx.apts().length && (ctx.units ? ctx.units() : []).some((a) => a.kind === 'parking');
-    const blockBar = h('div', { class: 'h3d-blocks', role: 'group', 'aria-label': t('blk.switch') });
-    function drawBlocks(cur) {
-      blockBar.replaceChildren(...(blocks.length > 1 ? [[null, t('blk.all')]].concat(blocks.map((x) => [x.code, x.name])) : []).map(([c, l]) =>
-        h('button', { class: 'h3d-chip', type: 'button', 'data-block': c || 'all', 'aria-pressed': String((cur || null) === c), onclick: () => { house.focusBlock(c); drawBlocks(c); } }, l)),
-        hasParking ? h('button', { class: 'h3d-chip', type: 'button', 'data-mode': 'parking', 'aria-pressed': String(house.parking), onclick: () => { house.setParking(!house.parking); drawBlocks(cur); } }, t('blk.parking')) : null,
-        blocks.length ? h('button', { class: 'h3d-chip', type: 'button', 'data-mode': 'xray', 'aria-pressed': String(house.state().xray), onclick: () => { house.setXray(!house.state().xray); drawBlocks(cur); } }, t('blk.xray')) : null);
+    // The block badges («Блок A») are the engine's; the chosen one also says its height.
+    function drawBadges() {
+      S.$$('.h3d-tag--block', root).forEach((el) => {
+        const b0 = blockOf(el.dataset.block); if (!b0) return;
+        el.replaceChildren(h('b', null, b0.name || t('blk.block', { c: b0.code })), cur === b0.code ? h('small', null, ' · ' + heightText(b0.floors)) : null);
+        el.classList.toggle('is-current', cur === b0.code);
+      });
+      house.labelsChanged();
     }
-    drawBlocks(null);
-    const conceptNote = h('p', { class: 'h3d-concept' }, t('viz.concept'));
-    root.append(blockBar, conceptNote);
 
-    // ---------- the list of apartments (left; a sheet from below on a phone) ----------
+    // ---------- camera views (bottom centre; on a phone — in the sheet) ----------
+    const viewSeg = segment('h3d-seg--views h3d-views', t('h3d.views'), 'data-view', () => house.views.filter((v) => v !== 'area' || house.hasContext).map((v) => [v, t('h3d.view.' + v)]), (v) => house.setView(v));
+    house.on('view', (v) => { viewSeg.draw(v); });
+    root.appendChild(viewSeg);
+
+    // ---------- the floor scale of the chosen block (right) ----------
+    const floorsBox = h('nav', { class: 'h3d-floors', 'aria-label': t('h3d.floorScale'), hidden: true });
+    root.appendChild(floorsBox);
+    let floorSel = null;
+    function drawFloors() {
+      floorsBox.hidden = !cur;
+      if (!cur) { floorsBox.replaceChildren(); return; }
+      const mine = ctx.apts().filter((a) => a.block === cur);
+      const nums = [...new Set(mine.map((a) => a.floor))].sort((x, y) => y - x);
+      floorsBox.replaceChildren(...nums.map((n) => {
+        const free = mine.some((a) => a.floor === n && a.status === 'free');
+        return h('button', { type: 'button', class: 'h3d-floor', 'aria-pressed': String(floorSel === n), 'aria-label': t('floor.n', { n }) + (free ? ' · ' + t('status.free') : ''), onclick: () => pickFloor(n) },
+          h('span', null, String(n)), free ? h('i', { class: 'h3d-floor-dot', 'aria-hidden': 'true' }) : null);
+      }));
+    }
+    function pickFloor(n) {
+      floorSel = floorSel === n ? null : n;
+      if (floorSel != null) house.selectFloor(floorSel, cur);
+      drawFloors(); drawList();
+    }
+
+    function pickBlock(code) {
+      cur = code; floorSel = null;
+      house.focusBlock(code);
+      blockSeg.draw(code); drawTitle(); drawBadges(); drawFloors(); drawList();
+      // The list opens with a block and folds for the whole complex (on a phone it stays as the user left it).
+      if (!phone()) toggleList(!!code);
+    }
+
+    // ---------- the list of apartments: a folding panel 340 px on the left (a bottom sheet on a phone) ----------
+    const phone = () => window.matchMedia('(max-width: 768px)').matches;
     const listBox = h('div', { class: 'h3d-items', role: 'listbox', 'aria-label': t('h3d.list'), tabindex: '0' });
     const filters = h('div', { class: 'h3d-filters' });
-    const list = h('aside', { class: 'h3d-list', 'aria-label': t('h3d.list') }, h('div', { class: 'h3d-list-head' }, h('b', { class: 'h3d-list-title' }), h('button', { class: 'h3d-icon h3d-list-close', type: 'button', 'aria-label': t('common.close'), onclick: () => toggleList(false) }, '×')), filters, listBox);
-    root.appendChild(list);
+    const listTitle = h('b', { class: 'h3d-list-title' });
+    const sheetSum = h('span', { class: 'h3d-sheet-sum' });
+    // The tab on the edge (desktop) and the handle of the sheet (phone) — one button.
+    const listTab = h('button', { class: 'h3d-list-tab', type: 'button', 'aria-expanded': 'false', onclick: () => toggleList() }, h('span', { class: 'h3d-sheet-grip', 'aria-hidden': 'true' }), h('span', { class: 'h3d-list-tab-t' }), sheetSum);
+    const listFold = h('button', { class: 'h3d-tool h3d-list-fold', type: 'button', title: t('h3d.listFold'), 'aria-label': t('h3d.listFold'), onclick: () => toggleList(false) }, S.icon('x'));
+    const sheetViews = h('div', { class: 'h3d-sheet-views' });
+    const list = h('aside', { class: 'h3d-list', 'aria-label': t('h3d.list') }, h('div', { class: 'h3d-list-head' }, listTitle, listFold), sheetViews, filters, listBox);
+    root.append(list, listTab);
     let listOpen = false;
-    function toggleList(v) { listOpen = v == null ? !listOpen : v; root.classList.toggle('list-open', listOpen); listToggle.setAttribute('aria-expanded', String(listOpen)); }
+    function toggleList(v) {
+      listOpen = v == null ? !listOpen : v;
+      root.classList.toggle('list-open', listOpen);
+      listTab.setAttribute('aria-expanded', String(listOpen));
+    }
+    // The views go into the sheet on a phone, under the scene on a wider screen.
+    function place() { const want = phone() ? sheetViews : root; if (viewSeg.parentNode !== want) want.appendChild(viewSeg); }
     const match = (a) => ctx.matches(a);
+    const cur$ = () => ((ctx.apts()[0] || {}).currency);
     function drawFilters() {
       const opts = ctx.roomOptions(ctx.apts());
       const pills = h('div', { class: 'h3d-pills', role: 'group', 'aria-label': t('filter.rooms') }, opts.map(([v, l]) => h('button', { type: 'button', class: 'h3d-chip', 'aria-pressed': String(st.rooms === v), onclick: () => { st.rooms = v; changed(); } }, l)));
-      const free = h('label', { class: 'h3d-check' }, h('input', { type: 'checkbox', checked: st.onlyFree, onchange: (e) => { st.onlyFree = e.target.checked; changed(); } }), t('filter.onlyFree'));
+      const sw = h('button', { type: 'button', class: 'h3d-switch', role: 'switch', 'aria-checked': String(!!st.onlyFree), onclick: () => { st.onlyFree = !st.onlyFree; changed(); } }, h('span', { class: 'h3d-switch-track', 'aria-hidden': 'true' }, h('i')), t('filter.onlyFree'));
       const all = ctx.apts();
-      const lo = Math.floor(Math.min(...all.map((a) => a.price)) / 10000) * 10000;
-      const out = h('b', null, S.fmt.money(st.priceCap, (ctx.apts()[0] || {}).currency));
+      const lo = all.length ? Math.floor(Math.min(...all.map((a) => a.price)) / 10000) * 10000 : 0;
+      const out = h('b', null, S.fmt.money(st.priceCap, cur$()));
       const price = h('input', { type: 'range', class: 'h3d-range', min: lo, max: st.maxPrice, step: 10000, value: st.priceCap, 'aria-label': t('filter.priceTo') });
-      price.addEventListener('input', () => { st.priceCap = +price.value; out.textContent = S.fmt.money(st.priceCap, (ctx.apts()[0] || {}).currency); drawList(); applyFilter(); });
+      price.addEventListener('input', () => { st.priceCap = +price.value; out.textContent = S.fmt.money(st.priceCap, cur$()); drawList(); applyFilter(); });
       price.addEventListener('change', () => ctx.onFilter());
-      filters.replaceChildren(pills, h('div', { class: 'h3d-price' }, h('span', null, t('filter.priceTo')), out), price, free);
+      filters.replaceChildren(pills,
+        h('div', { class: 'h3d-price' }, h('span', null, t('filter.priceTo')), out), price,
+        h('div', { class: 'h3d-price-ends', 'aria-hidden': 'true' }, h('span', null, S.fmt.money(lo, cur$())), h('span', null, S.fmt.money(st.maxPrice, cur$()))),
+        sw);
     }
     function changed() { drawFilters(); drawList(); applyFilter(); ctx.onFilter(); }
     function applyFilter() { house.setFilter(match); }
     let rows = [], active = -1;
     function drawList() {
-      const l = ctx.apts().filter(match).sort((x, y) => y.floor - x.floor || x.number - y.number);
-      S.$('.h3d-list-title', list).textContent = t('h3d.listN', { n: l.length });
-      listToggle.textContent = t('h3d.listBtn', { n: l.length });
+      const mine = ctx.apts().filter(inBlock);
+      const l = mine.filter((a) => match(a) && (floorSel == null || a.floor === floorSel))
+        .sort((x, y) => (x.block || '').localeCompare(y.block || '') || y.floor - x.floor || x.number - y.number);
+      listTitle.textContent = t('h3d.listN', { n: l.length });
+      S.$('.h3d-list-tab-t', listTab).textContent = t('h3d.listBtn', { n: l.length });
+      const prices = l.map((a) => a.price).filter((p) => p > 0);
+      sheetSum.textContent = prices.length ? t('home.chip.from', { p: S.fmt.money(Math.min(...prices), cur$()) }) : '';
       rows = l;
-      listBox.replaceChildren(...(l.length ? l.map((a, k) => h('div', { class: 'h3d-item st-' + a.status, role: 'option', id: 'h3d-opt-' + k, 'aria-selected': String(!!sel && sel.id === a.id), onclick: () => choose(a, true) },
-        h('span', { class: 'h3d-item-top' }, h('b', { 'aria-label': S.unitName(a) }, a.block ? S.aptNum(a) : t('nr.cat.aptN', { n: a.number })), h('span', { class: 'h3d-item-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status))),
-        h('span', { class: 'h3d-item-meta' }, (a.blockName ? a.blockName + ' · ' : '') + t('floor.n', { n: a.floor }) + ' · ' + S.fmt.rooms(a.rooms) + ' · ' + S.fmt.area(a.area)),
-        h('span', { class: 'h3d-item-price' }, S.fmt.money(a.price, a.currency), eqOf(a) ? h('small', null, ' ' + eqOf(a)) : null))) : [h('p', { class: 'h3d-empty' }, t('list.none'))]));
+      listBox.replaceChildren(...(l.length ? l.map((a, k) => {
+        const eq = eqOf(a);
+        const item = h('div', { class: 'h3d-item st-' + a.status, role: 'option', id: 'h3d-opt-' + k, 'aria-selected': String(!!sel && sel.id === a.id), 'aria-label': S.unitName(a), onclick: () => choose(a, true) },
+          h('span', { class: 'h3d-item-top' }, h('b', { class: 'h3d-item-no' }, a.block ? S.aptNum(a) : t('nr.cat.aptN', { n: a.number })),
+            a.kind === 'penthouse' ? h('span', { class: 'chip warn h3d-item-ph' }, t('kind.penthouseOne')) : null,
+            h('span', { class: 'h3d-item-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status))),
+          h('span', { class: 'h3d-item-meta' }, [t('floor.n', { n: a.floor }), S.fmt.rooms(a.rooms), S.fmt.area(a.area)].join(' · ')),
+          h('span', { class: 'h3d-item-price' }, S.fmt.money(a.price, a.currency), eq ? h('small', null, eq) : null));
+        item.addEventListener('pointerenter', () => house.hoverApartment(a.id));
+        item.addEventListener('pointerleave', () => house.hoverApartment(null));
+        return item;
+      }) : [h('p', { class: 'h3d-empty' }, t('list.none'))]));
       active = sel ? l.findIndex((a) => a.id === sel.id) : -1;
       if (active >= 0) listBox.setAttribute('aria-activedescendant', 'h3d-opt-' + active); else listBox.removeAttribute('aria-activedescendant');
     }
@@ -136,10 +244,14 @@
         S.$$('.h3d-item', listBox).forEach((x, k) => x.classList.toggle('is-active', k === active));
         const item = S.$('#h3d-opt-' + active, listBox); listBox.setAttribute('aria-activedescendant', 'h3d-opt-' + active);
         if (item && item.scrollIntoView) item.scrollIntoView({ block: 'nearest' });
+        house.hoverApartment(rows[active].id);
       } else if (e.key === 'Enter' && active >= 0) { e.preventDefault(); choose(rows[active], true); }
     });
+    listBox.addEventListener('blur', () => house.hoverApartment(null));
     // Price in dollars: by the National Bank rate from the API, marked as an estimate; no rate — no dollars.
     const eqOf = (a) => S.priceEq(a.price, a.currency, ctx.rate);
+    const conceptNote = h('p', { class: 'h3d-concept' }, t('viz.concept'));
+    root.appendChild(conceptNote);
 
     // ---------- the price card (right, bottom) ----------
     const card = h('section', { class: 'h3d-card', 'aria-live': 'polite', hidden: true });
@@ -150,7 +262,7 @@
       house.selectApartment(a.id, !!fly);
       ctx.onPick(a);
       drawCard(); drawList();
-      if (fly && window.matchMedia('(max-width: 760px)').matches) toggleList(false);
+      if (fly && phone()) toggleList(false);
     }
     function drawCard() {
       if (!sel) { card.hidden = true; return; }
@@ -225,7 +337,7 @@
       }).catch(() => { /* no file — no surroundings */ });
     }
     function showPois(pois) {
-      drawViews();
+      viewSeg.draw(house.currentView);
       house.removeLabels('poi');
       poiLabels = pois.filter((p) => p.dist <= 1500).sort((x, y) => x.dist - y.dist).map((p, k) => {
         const el = h('div', { class: 'h3d-tag h3d-tag--poi', 'data-cat': p.cat }, h('span', { class: 'h3d-poi-ic', 'aria-hidden': 'true' }, POI_ICON[p.cat] || '•'), h('b', null, p.name), h('small', null, distText(p.dist) + ' · ' + t('h3d.straight')));
@@ -244,39 +356,52 @@
       root.appendChild(hint);
     }
 
-    // ---------- keys ----------
+    // ---------- keys: Esc closes the time card, then the list, then the 3D ----------
     const onKey = (e) => {
       if (e.key !== 'Escape' || document.querySelector('.overlay')) return;
       e.preventDefault();
-      if (house.mode === 'walk') house.leaveWalk();
+      if (!pop.hidden) { togglePop(false); timeBtn.focus({ preventScroll: true }); }
+      else if (house.mode === 'walk') house.leaveWalk();
       else if (house.mode === 'inside') house.leaveInside();
-      else if (listOpen && window.matchMedia('(max-width: 760px)').matches) toggleList(false);
+      else if (listOpen && (complex || phone())) { toggleList(false); listTab.focus({ preventScroll: true }); }
       else ctx.requestClose();
     };
     document.addEventListener('keydown', onKey);
 
     let alive = true;
     house.setFocusMode(true); house.setAutoRotate(false);
-    const inset = () => house.setLabelInset(top.getBoundingClientRect().bottom - root.getBoundingClientRect().top);
-    inset(); window.addEventListener('resize', inset);
-    drawViews(); drawFilters(); drawList(); applyFilter();
+    // Labels stay out of the controls: the engine skips (or moves) a label over any of these boxes.
+    const avoid = [top, pop, viewSeg, floorsBox, list, listTab, card, conceptNote, poiBar, attribution, insideBar];
+    house.setLabelAvoid(() => {
+      const o = root.getBoundingClientRect();
+      return avoid.filter((x) => x.isConnected && !x.hidden && x.offsetParent !== null).map((x) => { const r = x.getBoundingClientRect(); return { x0: r.left - o.left, y0: r.top - o.top, x1: r.right - o.left, y1: r.bottom - o.top }; }).filter((r) => r.x1 > r.x0 && r.y1 > r.y0);
+    });
+    const onResize = () => place();
+    window.addEventListener('resize', onResize);
+    place();
+    drawTitle(); blockSeg.draw(null); viewSeg.draw(house.currentView); drawFilters(); drawList(); applyFilter(); drawBadges();
     if (ctx.selected) { sel = ctx.selected; drawCard(); drawList(); }
+    // One house without blocks: the list is open on a wide screen, as before; the complex starts folded.
+    if (!complex && !phone()) toggleList(true);
     house.setView('overview', 0.9);
     setNow(true);
     loadContext();
     root.dataset.mode = 'house'; walkBack.hidden = true;
     setTimeout(() => back.focus({ preventScroll: true }), 50);
-    window.__house3dMode = { root, choose: (id) => { const a = ctx.apts().find((x) => x.id === id); if (a) choose(a, true); } };
+    window.__house3dMode = { root, choose: (id) => { const a = ctx.apts().find((x) => x.id === id); if (a) choose(a, true); }, pickBlock };
 
     return {
       el: root,
-      refresh() { if (sel) sel = ctx.apts().find((x) => x.id === sel.id) || null; drawFilters(); drawList(); drawCard(); applyFilter(); },
+      refresh() { if (sel) sel = ctx.apts().find((x) => x.id === sel.id) || null; drawFilters(); drawList(); drawFloors(); drawCard(); applyFilter(); },
       close() {
         if (!alive) return; alive = false;
         clearInterval(nowTimer); stopPlay();
-        document.removeEventListener('keydown', onKey); window.removeEventListener('resize', inset); house.setLabelInset(0);
+        document.removeEventListener('keydown', onKey); document.removeEventListener('pointerdown', onDocDown, true); document.removeEventListener('fullscreenchange', onFs);
+        window.removeEventListener('resize', onResize); house.setLabelAvoid(null); house.hoverApartment(null);
+        if (document.fullscreenElement === root) document.exitFullscreen().catch(() => {});
         if (house.mode !== 'house') { house.leaveInside(); }
         house.removeLabels('poi'); house.removeLabels('house'); house.removeLabels('room');
+        cur = null; drawBadges(); house.focusBlock(null);
         if (house.parking) house.setParking(false);
         if (house.state().xray) house.setXray(false);
         house.setFilter(null); house.setFocusMode(false);
