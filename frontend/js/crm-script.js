@@ -471,11 +471,13 @@
         const amenForm = S.eco ? S.eco.amenitiesForm(b, (r) => { b.amenities = (r && r.amenities) || []; }) : null;
         // A block of the complex: the outline and the place on the site (blok-shakl-crm-script.js), Content and leaders.
         const shapeForm = S.blockForms ? S.blockForms.shape(b, bs) : null;
-        body.replaceChildren(buildingBar(bs, bid, 'catalog'), bform, locationForm(b), shapeForm, amenForm, ecoForm, h('h3', { style: { marginTop: '10px' } }, t('cat.apts')), tools, holder);
+        // Prices by floor (the owner and the object's head): the rule and «Пересчитать цены» for the free apartments.
+        const priceForm = S.blockForms && S.api.isLeader() ? S.blockForms.prices(b, () => drawApts()) : null;
+        body.replaceChildren(buildingBar(bs, bid, 'catalog'), bform, locationForm(b), shapeForm, priceForm, amenForm, ecoForm, h('h3', { style: { marginTop: '10px' } }, t('cat.apts')), tools, holder);
         async function drawApts() {
           const fl = floors.find((f) => String(f.id) === String(floorId)); holder.replaceChildren(S.skeleton(4, 38));
           const list = (await S.api.floorApartments(fl)).sort((a, c) => (a.planSlot || 0) - (c.planSlot || 0));
-          holder.replaceChildren(S.tbl([{ label: '№', render: (a) => h('b', null, a.number) }, { label: t('cat.slot'), render: (a) => a.planSlot }, { label: t('f.rooms'), render: (a) => S.fmt.rooms(a.rooms) }, { label: t('f.area'), r: true, num: true, render: (a) => S.fmt.area(a.area) }, { label: t('cat.pps'), r: true, num: true, render: (a) => S.fmt.n(a.pricePerSqm) }, { label: t('deal.price'), r: true, num: true, render: (a) => S.fmt.money(a.price, 'TJS') }, { label: t('deal.stage'), render: (a) => S.statusChip(a.status) }, { label: '', r: true, render: (a) => h('span', { class: 'row', style: { justifyContent: 'flex-end', gap: '6px', flexWrap: 'nowrap' } }, h('button', { class: 'btn ghost sm', onclick: () => aptForm(a, fl, drawApts) }, t('common.edit')), a.status === 'free' || a.status === 'onrequest' ? h('button', { class: 'btn soft sm', onclick: async (e) => { await S.busy(e.currentTarget, async () => { try { await S.api.onRequest(a.id, a.status === 'free'); drawApts(); } catch (er) { S.err(er); } }); } }, a.status === 'free' ? t('cat.toRequest') : t('cat.toFree')) : null) }], list, { empty: t('cat.noApts'), rowClass: (a) => 'apt-st st-' + a.status }));
+          holder.replaceChildren(S.tbl([{ label: '№', render: (a) => h('b', null, a.number) }, { label: t('cat.slot'), render: (a) => a.planSlot }, { label: t('f.rooms'), render: (a) => S.fmt.rooms(a.rooms) }, { label: t('f.area'), r: true, num: true, render: (a) => S.fmt.area(a.area) }, { label: t('cat.pps'), r: true, num: true, render: (a) => S.fmt.n(a.pricePerSqm) }, { label: t('deal.price'), r: true, num: true, render: (a) => S.fmt.money(a.price, a.currency) }, { label: t('deal.stage'), render: (a) => S.statusChip(a.status) }, { label: '', r: true, render: (a) => h('span', { class: 'row', style: { justifyContent: 'flex-end', gap: '6px', flexWrap: 'nowrap' } }, h('button', { class: 'btn ghost sm', onclick: () => aptForm(a, fl, drawApts) }, t('common.edit')), a.status === 'free' || a.status === 'onrequest' ? h('button', { class: 'btn soft sm', onclick: async (e) => { await S.busy(e.currentTarget, async () => { try { await S.api.onRequest(a.id, a.status === 'free'); drawApts(); } catch (er) { S.err(er); } }); } }, a.status === 'free' ? t('cat.toRequest') : t('cat.toFree')) : null) }], list, { empty: t('cat.noApts'), rowClass: (a) => 'apt-st st-' + a.status }));
         }
         drawApts();
       },
@@ -577,7 +579,7 @@
                 { label: '№', render: (a) => h('b', null, a.number) },
                 { label: t('f.rooms'), render: (a) => S.fmt.rooms(a.rooms) },
                 { label: t('f.area'), r: true, num: true, render: (a) => S.fmt.area(a.area) },
-                { label: t('deal.price'), r: true, num: true, render: (a) => S.fmt.money(a.price, 'TJS') },
+                { label: t('deal.price'), r: true, num: true, render: (a) => S.fmt.money(a.price, a.currency) },
                 { label: t('deal.stage'), render: (a) => S.statusChip(a.status) },
                 edit ? { label: '', r: true, render: (a) => h('button', { class: 'btn ghost sm', onclick: (e) => { e.stopPropagation(); aptForm(a, floors.find((f) => f.number === a.floor), again); } }, t('common.edit')) } : null,
               ].filter(Boolean), l, { empty: t(apts.length ? 'obj.noMatch' : 'cat.noApts'), onRow: (a) => aptPanel(a, again), rowClass: (a) => 'apt-st st-' + a.status }));

@@ -29,6 +29,9 @@ public class BuildingConfiguration : IEntityTypeConfiguration<Building>
         builder.Property(b => b.Setbacks).HasJson();
         builder.Property(b => b.BlockCode).HasMaxLength(4);
         builder.Property(b => b.SortOrder).HasDefaultValue(0);
+        // Правило цены: ступени — jsonb, цена м² пентхаусов — decimal(18,2), валюта каталога блока (по умолчанию TJS).
+        builder.Property(b => b.PriceSteps).HasJson();
+        builder.Property(b => b.PriceCurrency).HasDefaultValue(Sitora.Domain.Enums.Currency.TJS);
 
         // Эко-паспорт — в той же таблице, столбцы Eco*; все необязательные (не заполнен — Eco = null).
         builder.OwnsOne(b => b.Eco, eco =>

@@ -46,6 +46,11 @@ public class Building : BaseEntity
     public string? BlockCode { get; set; }
     public int SortOrder { get; set; }
 
+    // Правило цены (этап «Цена за м² по этажу»): ступени по этажам и цена м² пентхаусов последнего этажа, в валюте
+    // PriceCurrency. Меняет руководитель (PUT /buildings/{id}/price-rule), к свободным квартирам — «Пересчитать цены».
+    public List<PriceStep>? PriceSteps { get; set; }
+    public decimal? PenthousePricePerM2 { get; set; }
+    public Sitora.Domain.Enums.Currency PriceCurrency { get; set; } = Sitora.Domain.Enums.Currency.TJS;
 
     public List<Floor> Floors { get; set; } = [];
 }

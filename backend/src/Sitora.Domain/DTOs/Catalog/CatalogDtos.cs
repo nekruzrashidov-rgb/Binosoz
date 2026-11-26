@@ -40,7 +40,18 @@ public record BuildingResponse(
     int SortOrder = 0,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<double[]>? Footprint = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] SitePlacement? SitePosition = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<BuildingSetback>? Setbacks = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<BuildingSetback>? Setbacks = null,
+    // Правило цены блока: ступени по этажам, цена м² пентхаусов, валюта каталога; не задано — полей нет.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<PriceStep>? PriceSteps = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? PenthousePricePerM2 = null,
+    Currency PriceCurrency = Currency.TJS);
+
+// PUT /buildings/{id}/price-rule: правило целиком (валюта, ступени, цена м² пентхаусов); квартиры не меняет.
+public record SavePriceRuleRequest(Currency Currency = Currency.TJS, List<PriceStep>? Steps = null, decimal? PenthousePricePerM2 = null);
+
+// POST /buildings/{id}/price-rule/apply: сколько свободных квартир получили новую цену и сколько не тронуто
+// (бронь, продажа, «под запрос» или цена не изменилась).
+public record ApplyPriceRuleResponse(int Updated, int Unchanged, int Skipped);
 
 // PUT /buildings/{id}/shape: блок ЖК целиком. Пустой контур — «не блок» (сайт рисует обычный дом), места и уступов тогда нет.
 public record SaveBuildingShapeRequest(

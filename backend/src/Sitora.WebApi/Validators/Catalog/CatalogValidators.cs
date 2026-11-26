@@ -83,6 +83,37 @@ public class SaveBuildingShapeRequestValidator : AbstractValidator<SaveBuildingS
     }
 }
 
+// Правило цены: до 20 ступеней, этажи 1–100 (с ≤ по), ступени не пересекаются, цены м² — больше нуля и не больше
+// 1 000 000; цена пентхаусов — так же. Деньги — decimal.
+public class SavePriceRuleRequestValidator : AbstractValidator<SavePriceRuleRequest>
+{
+    public SavePriceRuleRequestValidator()
+    {
+        RuleFor(x => x.Currency).IsInEnum().WithMessage("Валюта — TJS или USD");
+        RuleFor(x => x.Steps).Must(s => s is null || s.Count <= 20).WithMessage("Ступеней цены — не больше 20");
+        RuleForEach(x => x.Steps).ChildRules(s =>
+        {
+            s.RuleFor(x => x.FromFloor).InclusiveBetween(1, 100).WithMessage("Этажи ступени — от 1 до 100");
+            s.RuleFor(x => x.ToFloor).InclusiveBetween(1, 100).WithMessage("Этажи ступени — от 1 до 100");
+            s.RuleFor(x => x).Must(x => x.FromFloor <= x.ToFloor).WithName("toFloor").WithMessage("Этаж «по» не может быть ниже этажа «с»");
+            s.RuleFor(x => x.PricePerM2).GreaterThan(0).LessThanOrEqualTo(1_000_000).WithMessage("Цена за м² — больше нуля и не больше 1 000 000");
+            s.RuleFor(x => x.PricePerM2To).GreaterThan(0).LessThanOrEqualTo(1_000_000).When(x => x.PricePerM2To is not null)
+                .WithMessage("Цена за м² — больше нуля и не больше 1 000 000");
+        });
+        RuleFor(x => x.Steps).Must(NotOverlap).WithMessage("Ступени цены не должны пересекаться по этажам");
+        RuleFor(x => x.PenthousePricePerM2).GreaterThan(0).LessThanOrEqualTo(1_000_000).When(x => x.PenthousePricePerM2 is not null)
+            .WithMessage("Цена за м² — больше нуля и не больше 1 000 000");
+    }
+
+    private static bool NotOverlap(List<Sitora.Domain.Entities.PriceStep>? steps)
+    {
+        if (steps is null)
+            return true;
+        var ordered = steps.OrderBy(s => s.FromFloor).ToList();
+        return ordered.Zip(ordered.Skip(1)).All(p => p.First.ToFloor < p.Second.FromFloor);
+    }
+}
+
 // План участка: контур участка и зоны двора известных видов, каждый — по правилам PolygonRules.
 public class SaveSitePlanRequestValidator : AbstractValidator<SaveSitePlanRequest>
 {

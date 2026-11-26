@@ -331,6 +331,53 @@ public class CatalogService(
             PlanGeometry.Place(PlanGeometry.Expand(fp), p.X, p.Y, p.RotationDeg);
     }
 
+    // Правило цены блока целиком (руководители). Квартиры не меняются — для этого «Пересчитать цены» (ApplyPriceRuleAsync).
+    public async Task<BuildingResponse> UpdatePriceRuleAsync(Guid id, SavePriceRuleRequest request, CancellationToken ct = default)
+    {
+        var building = await db.Buildings.FirstOrDefaultAsync(b => b.Id == id, ct)
+            ?? throw new NotFoundException(BuildingNotFound);
+        var before = new { building.PriceCurrency, building.PriceSteps, building.PenthousePricePerM2 };
+        building.PriceCurrency = request.Currency;
+        building.PriceSteps = request.Steps is { Count: > 0 } ? request.Steps.OrderBy(s => s.FromFloor).ToList() : null;
+        building.PenthousePricePerM2 = request.PenthousePricePerM2;
+        audit.Record(nameof(Building), building.Id, "PriceRuleUpdated", before, new { building.PriceCurrency, building.PriceSteps, building.PenthousePricePerM2 });
+        await SaveAsync("Правило цены изменено другим пользователем", ct);
+        return await GetBuildingAsync(id, ct);
+    }
+
+    // «Пересчитать цены»: новая цена по правилу — только свободным квартирам блока (бронь, продажа и «под запрос» не
+    // трогаются). Каждое изменение цены — запись PriceChanged в AuditLog, всё одним SaveChanges (одна транзакция);
+    // кэш каталога сбрасывается. Последний этаж — пентхаусы (своя цена м²).
+    public async Task<ApplyPriceRuleResponse> ApplyPriceRuleAsync(Guid id, CancellationToken ct = default)
+    {
+        var building = await db.Buildings.FirstOrDefaultAsync(b => b.Id == id, ct)
+            ?? throw new NotFoundException(BuildingNotFound);
+        if (building.PriceSteps is not { Count: > 0 })
+            throw new BusinessRuleException("Сначала задайте цены по этажам");
+        var apartments = await db.Apartments.Include(a => a.Floor).Where(a => a.Floor.BuildingId == id).ToListAsync(ct);
+        int updated = 0, unchanged = 0, skipped = 0;
+        foreach (var a in apartments)
+        {
+            var ppm = PriceRules.PricePerM2(building, a.Floor.Number, a.Floor.Number == building.FloorsCount);
+            if (a.Status != ApartmentStatus.Free || ppm is null)
+            {
+                skipped++;
+                continue;
+            }
+            if (a.PricePerM2 == ppm && a.Currency == building.PriceCurrency)
+            {
+                unchanged++;
+                continue;
+            }
+            var before = new { a.PricePerM2, a.Price, a.Currency };
+            a.SetPricing(a.Area, ppm.Value, building.PriceCurrency);
+            audit.Record(nameof(Apartment), a.Id, "PriceChanged", before, new { a.PricePerM2, a.Price, a.Currency, Source = "PriceRule" });
+            updated++;
+        }
+        await SaveAsync("Квартира изменена другим пользователем", ct);
+        return new ApplyPriceRuleResponse(updated, unchanged, skipped);
+    }
+
     private static object ShapeSnapshot(Building b) => new { b.BlockCode, b.SortOrder, b.Footprint, b.SitePosition, b.Setbacks };
 
     public async Task<SitePlan?> GetSitePlanAsync(CancellationToken ct = default)
@@ -556,7 +603,10 @@ public class CatalogService(
         b.SortOrder,
         b.Footprint,
         b.SitePosition,
-        b.Setbacks);
+        b.Setbacks,
+        b.PriceSteps,
+        b.PenthousePricePerM2,
+        b.PriceCurrency);
 
     private static readonly Expression<Func<Floor, FloorResponse>> ToFloorResponse = f => new FloorResponse(
         f.Id,

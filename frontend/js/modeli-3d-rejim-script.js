@@ -93,9 +93,9 @@
       const free = h('label', { class: 'h3d-check' }, h('input', { type: 'checkbox', checked: st.onlyFree, onchange: (e) => { st.onlyFree = e.target.checked; changed(); } }), t('filter.onlyFree'));
       const all = ctx.apts();
       const lo = Math.floor(Math.min(...all.map((a) => a.price)) / 10000) * 10000;
-      const out = h('b', null, S.fmt.money(st.priceCap, 'TJS'));
+      const out = h('b', null, S.fmt.money(st.priceCap, (ctx.apts()[0] || {}).currency));
       const price = h('input', { type: 'range', class: 'h3d-range', min: lo, max: st.maxPrice, step: 10000, value: st.priceCap, 'aria-label': t('filter.priceTo') });
-      price.addEventListener('input', () => { st.priceCap = +price.value; out.textContent = S.fmt.money(st.priceCap, 'TJS'); drawList(); applyFilter(); });
+      price.addEventListener('input', () => { st.priceCap = +price.value; out.textContent = S.fmt.money(st.priceCap, (ctx.apts()[0] || {}).currency); drawList(); applyFilter(); });
       price.addEventListener('change', () => ctx.onFilter());
       filters.replaceChildren(pills, h('div', { class: 'h3d-price' }, h('span', null, t('filter.priceTo')), out), price, free);
     }
@@ -110,7 +110,7 @@
       listBox.replaceChildren(...(l.length ? l.map((a, k) => h('div', { class: 'h3d-item st-' + a.status, role: 'option', id: 'h3d-opt-' + k, 'aria-selected': String(!!sel && sel.id === a.id), onclick: () => choose(a, true) },
         h('span', { class: 'h3d-item-top' }, h('b', null, t('nr.cat.aptN', { n: a.number })), h('span', { class: 'h3d-item-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status))),
         h('span', { class: 'h3d-item-meta' }, t('floor.n', { n: a.floor }) + ' · ' + S.fmt.rooms(a.rooms) + ' · ' + S.fmt.area(a.area)),
-        h('span', { class: 'h3d-item-price' }, S.fmt.money(a.price, 'TJS'), usd(a.price) ? h('small', null, ' ≈ $' + S.fmt.n(usd(a.price))) : null))) : [h('p', { class: 'h3d-empty' }, t('list.none'))]));
+        h('span', { class: 'h3d-item-price' }, S.fmt.money(a.price, a.currency), eqOf(a) ? h('small', null, ' ' + eqOf(a)) : null))) : [h('p', { class: 'h3d-empty' }, t('list.none'))]));
       active = sel ? l.findIndex((a) => a.id === sel.id) : -1;
       if (active >= 0) listBox.setAttribute('aria-activedescendant', 'h3d-opt-' + active); else listBox.removeAttribute('aria-activedescendant');
     }
@@ -125,7 +125,7 @@
       } else if (e.key === 'Enter' && active >= 0) { e.preventDefault(); choose(rows[active], true); }
     });
     // Price in dollars: by the National Bank rate from the API, marked as an estimate; no rate — no dollars.
-    const usd = (p) => (ctx.rate && ctx.rate.rate ? Math.round(p / ctx.rate.rate) : null);
+    const eqOf = (a) => S.priceEq(a.price, a.currency, ctx.rate);
 
     // ---------- the price card (right, bottom) ----------
     const card = h('section', { class: 'h3d-card', 'aria-live': 'polite', hidden: true });
@@ -140,15 +140,15 @@
     }
     function drawCard() {
       if (!sel) { card.hidden = true; return; }
-      const a = sel, d = usd(a.price);
+      const a = sel, d = eqOf(a);
       card.hidden = false;
       const phone = ctx.phone;
       card.replaceChildren(
         h('button', { class: 'h3d-icon h3d-card-x', type: 'button', 'aria-label': t('common.close'), onclick: () => { sel = null; house.clearSelection(); drawCard(); drawList(); } }, '×'),
         h('div', { class: 'h3d-card-kicker' }, t('nr.cat.aptN', { n: a.number }) + ' · ' + t('floor.n', { n: a.floor })),
         h('div', { class: 'h3d-card-type' }, S.roomsKind.label(a.rooms) + ' · ' + S.fmt.area(a.area)),
-        h('div', { class: 'h3d-card-price' }, S.fmt.money(a.price, 'TJS')),
-        d ? h('div', { class: 'h3d-card-usd' }, '≈ $' + S.fmt.n(d) + ' · ' + t('price.estimate')) : null,
+        h('div', { class: 'h3d-card-price' }, S.fmt.money(a.price, a.currency)),
+        d ? h('div', { class: 'h3d-card-usd' }, d + ' · ' + t('price.estimate')) : null,
         h('div', { class: 'h3d-card-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status)),
         h('div', { class: 'h3d-card-acts' },
           a.status === 'free' ? h('button', { class: 'btn nr-btn nr-btn--primary', type: 'button', onclick: () => ctx.book(a) }, t('book.cta')) : h('p', { class: 'h3d-card-off' }, t('book.unavailable')),

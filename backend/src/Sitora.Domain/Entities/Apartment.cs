@@ -28,7 +28,8 @@ public class Apartment : BaseEntity
     public static decimal CalculatePrice(decimal area, decimal pricePerM2) =>
         Math.Round(area * pricePerM2 / 100m, 0, MidpointRounding.AwayFromZero) * 100m;
 
-    public void SetPricing(decimal area, decimal pricePerM2)
+    // Цена = площадь × цена м², округление до сотни (CalculatePrice); валюта — валюта каталога дома (TJS или USD).
+    public void SetPricing(decimal area, decimal pricePerM2, Currency? currency = null)
     {
         if (area <= 0)
             throw new BusinessRuleException("Площадь должна быть больше нуля");
@@ -38,6 +39,8 @@ public class Apartment : BaseEntity
         Area = area;
         PricePerM2 = pricePerM2;
         Price = CalculatePrice(area, pricePerM2);
+        if (currency is { } c)
+            Currency = c;
     }
 
     public void SetOnRequest(bool onRequest)

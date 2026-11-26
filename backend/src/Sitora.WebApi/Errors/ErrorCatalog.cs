@@ -223,6 +223,15 @@ public static class ErrorCatalog
         E("План участка изменён другим пользователем", "site_plan_conflict", "Нақшаи қитъаро корбари дигар тағйир дод", "The site plan was changed by another user");
         E("Зон участка — не больше 40", "too_many_site_zones", "Минтақаҳои қитъа — на зиёда аз 40", "No more than 40 site zones");
         E("Неизвестная зона участка", "unknown_site_zone", "Минтақаи номаълуми қитъа", "Unknown site zone");
+        // ---------- цена за м² по этажам ----------
+        E("Валюта — TJS или USD", "invalid_currency", "Асъор — TJS ё USD", "The currency is TJS or USD");
+        E("Ступеней цены — не больше 20", "too_many_price_steps", "Зинаҳои нарх — на зиёда аз 20", "No more than 20 price steps");
+        E("Этажи ступени — от 1 до 100", "invalid_price_step_floor", "Ошёнаҳои зина — аз 1 то 100", "The step's floors are from 1 to 100");
+        E("Этаж «по» не может быть ниже этажа «с»", "price_step_reversed", "Ошёнаи «то» аз ошёнаи «аз» паст буда наметавонад", "The «to» floor cannot be below the «from» floor");
+        E("Цена за м² — больше нуля и не больше 1 000 000", "invalid_price_per_m2", "Нархи 1 м² — аз сифр зиёд ва на бештар аз 1 000 000", "The price per m² is above zero and at most 1,000,000");
+        E("Ступени цены не должны пересекаться по этажам", "price_steps_overlap", "Зинаҳои нарх набояд аз рӯи ошёна ҳамдигарро буранд", "Price steps must not overlap by floors");
+        E("Сначала задайте цены по этажам", "price_rule_missing", "Аввал нархҳоро аз рӯи ошёна муайян кунед", "Set the prices by floor first");
+        E("Правило цены изменено другим пользователем", "price_rule_conflict", "Қоидаи нархро корбари дигар тағйир дод", "The price rule was changed by another user");
         E("Этаж не найден", "floor_not_found", "Ошёна ёфт нашуд", "Floor not found");
         E("Квартира не найдена", "apartment_not_found", "Манзил ёфт нашуд", "Apartment not found");
         E("План этажа не задан", "floor_plan_not_found", "Нақшаи ошёна муайян нашудааст", "The floor plan is not set");

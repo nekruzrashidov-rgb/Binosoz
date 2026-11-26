@@ -524,8 +524,22 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("PenthousePricePerM2")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<int?>("PlannedApartments")
                         .HasColumnType("integer");
+
+                    b.Property<string>("PriceCurrency")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasDefaultValue("TJS");
+
+                    b.Property<string>("PriceSteps")
+                        .HasColumnType("jsonb");
 
                     b.Property<string>("Setbacks")
                         .HasColumnType("jsonb");

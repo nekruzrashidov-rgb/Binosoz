@@ -198,6 +198,8 @@
   S.views.apartments = function (root) {
     const cfg = window.SITORA_CONFIG || {};
     const st = { building: null, floors: [], apts: [], rate: null, sel: null, floor: null, floorRooms: 'all', rooms: 'all', maxPrice: 0, priceCap: 0, sort: 'price', onlyFree: true, shown: 12, time: 'dusk', calcApt: null };
+    // The catalogue's currency: the apartments' own (the blocks of Rich Tower — USD), TJS without data.
+    const cur = () => (st.apts[0] && st.apts[0].currency) || 'TJS';
     let house = null, alive = true, full = null, wantFull = location.hash === '#3d', pushedFull = false;
     const page = h('div', { class: 'page-in nr nr-cat' });
     root.appendChild(page);
@@ -392,7 +394,7 @@
       const prices = (free.length ? free : st.apts).map((a) => a.price).filter((p) => p > 0);
       const stat = (v, l) => h('div', null, h('dt', null, l), h('dd', null, v));
       topStats.replaceChildren(stat(S.fmt.n(free.length), t('wow.cat.free')),
-        prices.length ? stat(S.fmt.money(Math.min(...prices), 'TJS'), t('wow.cat.from')) : null,
+        prices.length ? stat(S.fmt.money(Math.min(...prices), cur()), t('wow.cat.from')) : null,
         stat(S.fmt.n(st.building.floorsCount || st.floors.length), t('wow.cat.floors')));
     }
     function renderEco() {
@@ -452,7 +454,7 @@
         h('span', { class: 'nr-unit-top' }, h('b', null, t('nr.cat.aptN', { n: a.number })), h('span', { class: 'nr-unit-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status))),
         h('span', { class: 'nr-unit-type' }, S.roomsKind.label(a.rooms)),
         h('span', { class: 'nr-unit-meta' }, S.fmt.area(a.area)),
-        h('span', { class: 'nr-unit-price' }, S.fmt.money(a.price, 'TJS')))));
+        h('span', { class: 'nr-unit-price' }, S.fmt.money(a.price, cur())))));
       panel.replaceChildren(
         h('div', { class: 'nr-panel-head' },
           h('div', null, h('div', { class: 'nr-kicker' }, t('nr.cat.selFloor')), h('h2', { class: 'nr-panel-floor' }, t('floor.n', { n: f }))),
@@ -464,18 +466,18 @@
     function detail(a) {
       const plan = h('canvas', { class: 'nr-detail-plan', width: 300, height: 200, role: 'img', 'aria-label': S.roomsKind.label(a.rooms) });
       drawFloorPlan(plan, S.roomsKind.group(a.rooms));
-      const eq = st.rate ? Math.round(a.price / st.rate.rate) : null;
+      const eq = S.priceEq(a.price, a.currency, st.rate);
       const m = cheapestMonthly(a.price);
       const badge = S.eco && S.eco.badge(st.building.eco);
       return h('div', { class: 'nr-detail' }, h('div', { class: 'nr-detail-pic' }, plan),
         h('div', { class: 'nr-detail-body' },
           h('div', { class: 'nr-detail-kicker' }, t('nr.cat.aptN', { n: a.number }) + ' · ' + t('floor.n', { n: a.floor })),
           h('h3', { class: 'nr-detail-type' }, S.roomsKind.label(a.rooms)),
-          h('dl', { class: 'nr-detail-facts' }, h('div', null, h('dt', null, t('nr.cat.area')), h('dd', null, S.fmt.area(a.area))), h('div', null, h('dt', null, t('nr.cat.sqm')), h('dd', null, S.fmt.money(sqmPrice(a), 'TJS')))),
+          h('dl', { class: 'nr-detail-facts' }, h('div', null, h('dt', null, t('nr.cat.area')), h('dd', null, S.fmt.area(a.area))), h('div', null, h('dt', null, t('nr.cat.sqm')), h('dd', null, S.fmt.money(sqmPrice(a), cur())))),
           h('div', { class: 'nr-detail-label' }, t('nr.cat.price')),
-          h('div', { class: 'nr-detail-price' }, S.fmt.money(a.price, 'TJS')),
-          eq ? h('div', { class: 'nr-detail-note' }, '≈ $' + S.fmt.n(eq) + ' · ' + t('price.estimate')) : null,
-          m ? h('div', { class: 'nr-detail-month' }, t('nr.cat.perMonth', { s: S.fmt.money(m.monthly, 'TJS') }), h('small', null, t('nr.cat.perMonthNote', { d: S.fmt.n(m.down), t: termText(m.months) }))) : null,
+          h('div', { class: 'nr-detail-price' }, S.fmt.money(a.price, cur())),
+          eq ? h('div', { class: 'nr-detail-note' }, eq + ' · ' + t('price.estimate')) : null,
+          m ? h('div', { class: 'nr-detail-month' }, t('nr.cat.perMonth', { s: S.fmt.money(m.monthly, cur()) }), h('small', null, t('nr.cat.perMonthNote', { d: S.fmt.n(m.down), t: termText(m.months) }))) : null,
           badge ? h('a', { href: '#eco', class: 'eco-badge-link', onclick: (e) => { e.preventDefault(); scrollTo('eco'); } }, badge) : null,
           a.status === 'free'
             ? h('button', { class: 'btn nr-btn nr-btn--primary block', type: 'button', onclick: () => bookModal(a) }, t('book.cta'))
@@ -492,7 +494,7 @@
       const form = h('form', { class: 'stack', novalidate: true }, S.field(t('f.name'), name), S.field(t('f.phone'), phone, t('f.phoneHint')), h('p', { class: 'hint' }, t('book.note')), S.privacyNote());
       const btn = h('button', { class: 'btn gold', type: 'submit' }, t('book.confirm'));
       form.id = 'bookform'; btn.setAttribute('form', 'bookform');
-      const md = S.modal({ title: t('book.title', { n: a.number }), body: [h('div', { class: 'card flat', style: { marginBottom: '14px' } }, h('div', { class: 'row between' }, h('b', null, t('apt.title', { n: a.number })), S.fmt.money(a.price, 'TJS')), h('div', { class: 'muted' }, t('floor.n', { n: a.floor }) + ' · ' + S.fmt.rooms(a.rooms) + ' · ' + S.fmt.area(a.area))), form], actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
+      const md = S.modal({ title: t('book.title', { n: a.number }), body: [h('div', { class: 'card flat', style: { marginBottom: '14px' } }, h('div', { class: 'row between' }, h('b', null, t('apt.title', { n: a.number })), S.fmt.money(a.price, cur())), h('div', { class: 'muted' }, t('floor.n', { n: a.floor }) + ' · ' + S.fmt.rooms(a.rooms) + ' · ' + S.fmt.area(a.area))), form], actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
       form.addEventListener('submit', async (e) => {
         e.preventDefault(); S.showErrors(form, null);
         if (!namePhoneOk(form, name, phone)) return;
@@ -543,10 +545,10 @@
       function draw() {
         const down = Math.round(price * cs.down / 100), months = cs.years * 12;
         monthlyNow = Math.round((price - down) / months);
-        out.down.textContent = cs.down + '% · ' + S.fmt.money(down, 'TJS');
+        out.down.textContent = cs.down + '% · ' + S.fmt.money(down, cur());
         out.years.textContent = counted(cs.years, 'nr.yearsN');
-        out.monthly.textContent = S.fmt.money(monthlyNow, 'TJS');
-        out.note.textContent = (a ? t('nr.cat.calcFor', { n: a.number, p: S.fmt.money(price, 'TJS') }) + ' · ' : '') + (x && x.zero ? t('nr.cat.zero') : t('nr.calc.totalAsk'));
+        out.monthly.textContent = S.fmt.money(monthlyNow, cur());
+        out.note.textContent = (a ? t('nr.cat.calcFor', { n: a.number, p: S.fmt.money(price, cur()) }) + ' · ' : '') + (x && x.zero ? t('nr.cat.zero') : t('nr.calc.totalAsk'));
       }
       const utilHost = h('div', { class: 'util-host' });
       const send = h('button', { class: 'btn nr-btn nr-btn--primary', type: 'button', onclick: () => leadModal(t('lead.calc', { p: S.fmt.n(price), d: cs.down, m: cs.years * 12, mo: S.fmt.n(monthlyNow) }), a && a.id) }, t('calc.send'));
@@ -575,7 +577,7 @@
           h('div', { class: 'nr-layout-pic' }, canvas),
           h('div', { class: 'nr-layout-body' },
             h('div', { class: 'nr-layout-top' }, h('span', { class: 'nr-layout-type' }, typeLabel), h('span', { class: 'nr-layout-area' }, (lo === hi ? S.fmt.n(lo) : S.fmt.n(lo) + '–' + S.fmt.n(hi)) + ' ' + t('u.m2'))),
-            h('div', { class: 'nr-layout-bottom' }, prices.length ? h('span', { class: 'nr-layout-price' }, t('home.chip.from', { p: S.fmt.money(Math.min(...prices), 'TJS') })) : h('span'),
+            h('div', { class: 'nr-layout-bottom' }, prices.length ? h('span', { class: 'nr-layout-price' }, t('home.chip.from', { p: S.fmt.money(Math.min(...prices), cur()) })) : h('span'),
               h('span', { class: 'nr-layout-more' }, t('nr.look'), arrow()))));
       }).filter(Boolean);
       plansSection.hidden = !cards.length;
@@ -603,8 +605,8 @@
     function renderApartments() {
       const rooms = roomOptions(st.apts);
       const minP = Math.floor(Math.min(...st.apts.map((a) => a.price)) / PRICE_STEP) * PRICE_STEP;
-      const price = h('input', { type: 'range', id: 'f-price', min: minP, max: st.maxPrice, step: PRICE_STEP, value: st.priceCap, oninput: (e) => { st.priceCap = +e.target.value; priceVal.textContent = S.fmt.money(st.priceCap, 'TJS'); st.shown = 12; drawList(); } });
-      const priceVal = h('b', null, S.fmt.money(st.priceCap, 'TJS'));
+      const price = h('input', { type: 'range', id: 'f-price', min: minP, max: st.maxPrice, step: PRICE_STEP, value: st.priceCap, oninput: (e) => { st.priceCap = +e.target.value; priceVal.textContent = S.fmt.money(st.priceCap, cur()); st.shown = 12; drawList(); } });
+      const priceVal = h('b', null, S.fmt.money(st.priceCap, cur()));
       const sort = S.select('sort', [['price', t('sort.price')], ['priceDesc', t('sort.priceDesc')], ['area', t('sort.area')], ['floor', t('sort.floor')]], st.sort); sort.addEventListener('change', () => { st.sort = sort.value; drawList(); });
       const grid = h('div', { class: 'nr-unit-grid', id: 'apt-grid' });
       const more = h('div', { class: 'nr-more' });
@@ -641,8 +643,8 @@
         h('span', { class: 'nr-unit-card-body' },
           h('span', { class: 'nr-unit-top' }, h('b', null, t('nr.cat.aptN', { n: a.number })), h('span', { class: 'nr-unit-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status))),
           h('span', { class: 'nr-unit-type' }, S.roomsKind.label(a.rooms)),
-          h('span', { class: 'nr-unit-meta' }, t('floor.n', { n: a.floor }) + ' · ' + S.fmt.area(a.area) + ' · ' + S.fmt.n(sqmPrice(a)) + ' TJS / ' + t('u.m2')),
-          h('span', { class: 'nr-unit-price' }, S.fmt.money(a.price, 'TJS'))));
+          h('span', { class: 'nr-unit-meta' }, t('floor.n', { n: a.floor }) + ' · ' + S.fmt.area(a.area) + ' · ' + S.fmt.money(sqmPrice(a), a.currency) + ' / ' + t('u.m2')),
+          h('span', { class: 'nr-unit-price' }, S.fmt.money(a.price, cur()))));
     }
 
     function scrollTo(id) { const el = document.getElementById(id === 'home' ? 'hero-top' : id); if (el) el.scrollIntoView({ behavior: S.motionOk === false ? 'auto' : 'smooth', block: 'start' }); }
@@ -694,6 +696,8 @@
     const c = contacts();
     // state: 'loading' → 'ready' (a building with apartments) | 'empty' (no building or no apartments yet) | 'error'.
     const d = { state: 'loading', b: null, apts: [], types: [] };
+    // Prices in the apartments' own currency (the blocks of Rich Tower — USD).
+    const lcur = () => (d.apts[0] && d.apts[0].currency) || 'TJS';
     let alive = true;
     const page = h('div', { class: 'page-in nr nr-home' });
     root.appendChild(page);
@@ -836,7 +840,7 @@
       return h('a', { class: 'nr-layout', href: '/apartments?rooms=' + x.rooms }, h('div', { class: 'nr-layout-pic' }, planCanvas),
         h('div', { class: 'nr-layout-body' },
           h('div', { class: 'nr-layout-top' }, h('span', { class: 'nr-layout-type' }, x.label), h('span', { class: 'nr-layout-area' }, area + ' ' + t('u.m2'))),
-          h('div', { class: 'nr-layout-bottom' }, h('span', { class: 'nr-layout-price' }, t('home.chip.from', { p: S.fmt.money(x.priceFrom, 'TJS') })),
+          h('div', { class: 'nr-layout-bottom' }, h('span', { class: 'nr-layout-price' }, t('home.chip.from', { p: S.fmt.money(x.priceFrom, lcur()) })),
             h('span', { class: 'nr-layout-more' }, t('nr.look'), arrow()))));
     }
     // Installment: the terms on the left, on the right the calculator over the prices of the free apartments.
@@ -864,11 +868,11 @@
       };
       function draw() {
         const down = Math.round(st.price * st.down / 100), months = st.years * 12;
-        out.price.textContent = S.fmt.money(st.price, 'TJS');
-        out.down.textContent = st.down + '% · ' + S.fmt.money(down, 'TJS');
+        out.price.textContent = S.fmt.money(st.price, lcur());
+        out.down.textContent = st.down + '% · ' + S.fmt.money(down, lcur());
         out.years.textContent = counted(st.years, 'plan.years');
-        out.monthly.textContent = S.fmt.money(Math.round((st.price - down) / months), 'TJS');
-        out.total.textContent = terms.zero ? t('nr.calc.totalZero', { s: S.fmt.money(st.price, 'TJS') }) : t('nr.calc.totalAsk');
+        out.monthly.textContent = S.fmt.money(Math.round((st.price - down) / months), lcur());
+        out.total.textContent = terms.zero ? t('nr.calc.totalZero', { s: S.fmt.money(st.price, lcur()) }) : t('nr.calc.totalAsk');
       }
       const calc = h('div', { class: 'nr-calc', id: 'calc' }, h('div', { class: 'nr-calc-title' }, t('nr.calc.title')),
         range('nr-price', t('nr.calc.price'), lo, hi, step, 'price'),

@@ -104,6 +104,24 @@ public class BuildingsController(ICatalogService catalog) : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public Task<BuildingResponse> UpdateShape(Guid id, SaveBuildingShapeRequest request, CancellationToken ct) =>
         catalog.UpdateBuildingShapeAsync(id, request, ct);
+
+    /// <summary>Правило цены блока (владелец и руководитель объекта): валюта, ступени «этажи с–по → цена м²» (с ценой «до» —
+    /// ровно по этажам), цена м² пентхаусов последнего этажа. Квартиры не меняются. Журнал PriceRuleUpdated.</summary>
+    [HttpPut("{id:guid}/price-rule")]
+    [Authorize(Roles = Roles.Leaders)]
+    [ProducesResponseType<BuildingResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    public Task<BuildingResponse> UpdatePriceRule(Guid id, SavePriceRuleRequest request, CancellationToken ct) =>
+        catalog.UpdatePriceRuleAsync(id, request, ct);
+
+    /// <summary>«Пересчитать цены»: новая цена по правилу всем свободным квартирам блока; брони, проданные и «под запрос» не
+    /// меняются. Каждое изменение — PriceChanged в журнале (в той же транзакции), кэш каталога сбрасывается.</summary>
+    [HttpPost("{id:guid}/price-rule/apply")]
+    [Authorize(Roles = Roles.Leaders)]
+    [ProducesResponseType<ApplyPriceRuleResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    public Task<ApplyPriceRuleResponse> ApplyPriceRule(Guid id, CancellationToken ct) =>
+        catalog.ApplyPriceRuleAsync(id, ct);
 }
 
 // План общего участка ЖК своей организации (руководители): контур и зоны двора. На сайте — в GET /public/brand (sitePlan).

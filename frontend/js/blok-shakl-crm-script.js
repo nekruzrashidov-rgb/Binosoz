@@ -100,5 +100,88 @@
     return form;
   }
 
-  S.blockForms = { shape, draw };
+  // ---------- prices by floor ----------
+  // The price per m² of floor n by the rule (the same as PriceRules.PricePerM2 on the server): a step with «до» changes evenly
+  // by floor, rounded to 1; below the first step — its price, above the last — its last price; the top floor — penthouses.
+  function ppmOf(steps, n, floors, penthouse) {
+    if (n === floors && penthouse > 0) return penthouse;
+    const list = (steps || []).filter((s) => s.fromFloor > 0 && s.toFloor >= s.fromFloor && s.pricePerM2 > 0).slice().sort((a, b) => a.fromFloor - b.fromFloor);
+    if (!list.length) return null;
+    const s = list.find((x) => n >= x.fromFloor && n <= x.toFloor);
+    if (!s) return n < list[0].fromFloor ? list[0].pricePerM2 : (list[list.length - 1].pricePerM2To || list[list.length - 1].pricePerM2);
+    if (!(s.pricePerM2To > 0) || s.toFloor === s.fromFloor) return s.pricePerM2;
+    return Math.round(s.pricePerM2 + (s.pricePerM2To - s.pricePerM2) * (n - s.fromFloor) / (s.toFloor - s.fromFloor));
+  }
+
+  // A bar per floor: the price per m², the top floor (penthouses) in the accent colour.
+  function chart(canvas, steps, floors, penthouse, cur) {
+    const W = 520, H = 180, dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = W * dpr; canvas.height = H * dpr; canvas.style.width = '100%'; canvas.style.maxWidth = W + 'px';
+    const g = canvas.getContext('2d'); if (!g) return;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const css = getComputedStyle(canvas.isConnected ? canvas : document.documentElement);
+    const tok = (n, f) => (css.getPropertyValue(n) || '').trim() || f;
+    g.fillStyle = tok('--surface', '#fbf8f2'); g.fillRect(0, 0, W, H);
+    const vals = Array.from({ length: floors }, (_, i) => ppmOf(steps, i + 1, floors, penthouse));
+    const max = Math.max(1, ...vals.filter(Boolean)), bw = (W - 40) / floors;
+    g.font = '10px Manrope, system-ui, sans-serif'; g.textAlign = 'center';
+    vals.forEach((v, i) => {
+      if (!v) return;
+      const hh = (H - 40) * v / max, x = 30 + i * bw;
+      g.fillStyle = i === floors - 1 ? tok('--accent-text', '#8a4e2a') : tok('--muted', '#6b6258');
+      g.fillRect(x + 1, H - 20 - hh, Math.max(1, bw - 2), hh);
+      if (floors <= 30 || i % 2 === 0) { g.fillStyle = tok('--ink', '#1b1815'); g.fillText(String(i + 1), x + bw / 2, H - 6); }
+    });
+    g.textAlign = 'left'; g.fillStyle = tok('--ink', '#1b1815'); g.fillText(S.fmt.money(max, cur) + ' / ' + t('u.m2'), 30, 12);
+  }
+
+  function prices(b, onApplied) {
+    const rows = h('tbody');
+    const cur = S.select('currency', [['USD', 'USD'], ['TJS', 'TJS']], b.priceCurrency || 'USD');
+    const pent = S.input('penthousePricePerM2', { type: 'number', min: 0, step: '1', inputmode: 'decimal', value: b.penthousePricePerM2 == null ? '' : b.penthousePricePerM2 });
+    const canvas = h('canvas', { class: 'blk-price-chart', role: 'img', 'aria-label': t('blkp.chart'), width: 520, height: 180 });
+    const n = (v) => S.input('n', { type: 'number', min: 0, step: '1', inputmode: 'decimal', value: v == null ? '' : v, 'aria-label': ' ' });
+    function addRow(s) {
+      const from = n(s && s.fromFloor), to = n(s && s.toFloor), p = n(s && s.pricePerM2), pTo = n(s && s.pricePerM2To);
+      from.setAttribute('aria-label', t('blkp.from')); to.setAttribute('aria-label', t('blkp.to')); p.setAttribute('aria-label', t('blkp.ppm')); pTo.setAttribute('aria-label', t('blkp.ppmTo'));
+      const tr = h('tr', null, h('td', null, from), h('td', null, to), h('td', null, p), h('td', null, pTo),
+        h('td', null, h('button', { class: 'btn ghost sm', type: 'button', 'aria-label': t('blkp.remove'), onclick: () => { tr.remove(); redraw(); } }, '×')));
+      [from, to, p, pTo].forEach((el) => el.addEventListener('input', redraw));
+      rows.append(tr);
+    }
+    const num = (el) => (el.value.trim() === '' ? null : Number(el.value.replace(',', '.')));
+    const read = () => [...rows.children].map((tr) => { const i = tr.querySelectorAll('input'); return { fromFloor: num(i[0]), toFloor: num(i[1]), pricePerM2: num(i[2]), pricePerM2To: num(i[3]) }; })
+      .filter((s) => s.fromFloor != null && s.toFloor != null && s.pricePerM2 != null);
+    function redraw() { chart(canvas, read(), b.floorsCount || 1, num(pent), cur.value); }
+    (b.priceSteps || []).forEach(addRow);
+    if (!rows.children.length) addRow(null);
+    pent.addEventListener('input', redraw); cur.addEventListener('change', redraw);
+    const save = h('button', { class: 'btn', type: 'submit' }, t('common.save'));
+    const apply = h('button', { class: 'btn ghost', type: 'button' }, t('blkp.apply'));
+    const form = h('form', { class: 'card stack blk-prices', novalidate: true },
+      h('h3', null, t('blkp.title')), h('p', { class: 'muted' }, t('blkp.hint')),
+      h('div', { class: 'tbl-wrap' }, h('table', { class: 'tbl' }, h('thead', null, h('tr', null, h('th', null, t('blkp.from')), h('th', null, t('blkp.to')), h('th', null, t('blkp.ppm')), h('th', null, t('blkp.ppmTo')), h('th'))), rows)),
+      h('div', null, h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { addRow(null); } }, t('blkp.add'))),
+      h('div', { class: 'grid g2' }, S.field(t('blkp.penthouse'), pent, t('blkp.penthouseHint')), S.field(t('blkp.currency'), cur)),
+      canvas, h('div', { class: 'row' }, save, apply));
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault(); S.showErrors(form, null);
+      await S.busy(save, async () => {
+        try { const r = await S.api.savePriceRule(b.id, { currency: cur.value, steps: read(), penthousePricePerM2: num(pent) }); Object.assign(b, { priceSteps: r.priceSteps, penthousePricePerM2: r.penthousePricePerM2, priceCurrency: r.priceCurrency }); S.toast(t('common.saved'), 'ok'); }
+        catch (er) { S.showErrors(form, er); }
+      });
+    });
+    apply.addEventListener('click', () => {
+      const md = S.modal({ title: t('blkp.apply'), body: h('p', null, t('blkp.applyText')), actions: [
+        h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')),
+        h('button', { class: 'btn', type: 'button', onclick: (ev) => S.busy(ev.currentTarget, async () => {
+          try { const r = await S.api.applyPriceRule(b.id); md.close(); S.toast(t('blkp.applied', { u: r.updated, s: r.skipped + r.unchanged }), 'ok'); if (onApplied) onApplied(); }
+          catch (er) { md.close(); S.err(er); }
+        }) }, t('blkp.applyGo'))] });
+    });
+    requestAnimationFrame(redraw);
+    return form;
+  }
+
+  S.blockForms = { shape, draw, prices, ppmOf };
 })();

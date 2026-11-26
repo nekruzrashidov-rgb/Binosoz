@@ -92,6 +92,14 @@
   S.brandName = () => { const v = String((S.brandInfo && S.brandInfo.name) || '').trim(); return v || S.t('brand.name'); };
   S.brandAddress = (address) => { const v = String(address || '').trim().replace(/\s+/g, ' '); return v === RU_ADDRESS ? S.t('contact.address') : v; };
 
+  // The price in the other currency by the NBT rate (rate — TJS for 1 USD): a USD catalogue shows «≈ … TJS по курсу НБТ»,
+  // a TJS one «≈ $…». Always an estimate (the caller adds «оценочно по курсу»); no rate — null.
+  S.priceEq = (price, cur, rate) => {
+    const r = rate && +rate.rate;
+    if (!r || !(price > 0)) return null;
+    return String(cur || 'TJS').toUpperCase() === 'USD' ? S.t('price.eqTjs', { s: S.fmt.n(Math.round(price * r)) }) : '≈ $' + S.fmt.n(Math.round(price / r));
+  };
+
   // ---------- formatting ----------
   const nf = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
   S.fmt = {

@@ -59,8 +59,6 @@ public static class RichTowerBlocksSeeder
     private static readonly (int Rooms, decimal Area)[] Layout = [(1, 46m), (2, 68m), (3, 92m), (2, 70m), (0, 34m), (2, 66m), (1, 48m), (0, 36m)];
     private const int RandomSeed = 20261126;
 
-    public static decimal PricePerM2(int floor) => 9200m + floor * 95m;
-
     [SuppressMessage("Security", "CA5394", Justification = "Генератор с фиксированным зерном нужен для одинаковых статусов квартир при каждом запуске; к безопасности отношения не имеет.")]
     public static async Task SeedAsync(AppDbContext db, IAuditService audit, ILogger logger)
     {
@@ -87,7 +85,11 @@ public static class RichTowerBlocksSeeder
                 Footprint = spec.Footprint.Select(p => p.ToArray()).ToList(),
                 SitePosition = spec.Position,
                 Setbacks = [new BuildingSetback { FromFloor = spec.TopFrom, Footprint = spec.Top.Select(p => p.ToArray()).ToList() }],
-                Amenities = [.. Amenities]
+                Amenities = [.. Amenities],
+                // Цена за м² по этажам в USD (PriceDefaults): 3–6 — 1 200, 7–19 — до 900, выше — 900, пентхаусы — 1 400.
+                PriceCurrency = PriceDefaults.Currency,
+                PriceSteps = PriceDefaults.Steps(spec.Floors),
+                PenthousePricePerM2 = PriceDefaults.PenthousePricePerM2
             };
             for (var floorNumber = 1; floorNumber <= spec.Floors; floorNumber++)
             {
@@ -97,7 +99,7 @@ public static class RichTowerBlocksSeeder
                 {
                     var (rooms, area) = Layout[slot];
                     var apartment = new Apartment { Number = floorNumber * 100 + slot + 1, Rooms = rooms, PlanSlot = slot };
-                    apartment.SetPricing(area, PricePerM2(floorNumber));
+                    apartment.SetPricing(area, PriceRules.PricePerM2(building, floorNumber, floorNumber == spec.Floors)!.Value, building.PriceCurrency);
                     var roll = random.NextDouble();
                     if (roll < soldProbability)
                         apartment.Sell();

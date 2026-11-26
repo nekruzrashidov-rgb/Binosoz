@@ -76,7 +76,10 @@
         latitude: b.latitude == null ? null : num(b.latitude), longitude: b.longitude == null ? null : num(b.longitude), floorHeight: b.floorHeight == null ? null : num(b.floorHeight),
         // A block of the complex (letter, order, outline in metres, place on the site, setbacks): null — a plain building.
         blockCode: b.blockCode || null, sortOrder: num(b.sortOrder || 0), footprint: Array.isArray(b.footprint) && b.footprint.length >= 3 ? b.footprint : null,
-        sitePosition: b.sitePosition || null, setbacks: Array.isArray(b.setbacks) ? b.setbacks : [] };
+        sitePosition: b.sitePosition || null, setbacks: Array.isArray(b.setbacks) ? b.setbacks : [],
+        // The price rule of a block: steps «floors from–to → price per m²», the penthouses' price, the catalogue currency.
+        priceSteps: Array.isArray(b.priceSteps) ? b.priceSteps : [], penthousePricePerM2: b.penthousePricePerM2 == null ? null : num(b.penthousePricePerM2),
+        priceCurrency: String(b.priceCurrency || 'TJS').toUpperCase() };
     },
     floor(f) { return { id: f.id, number: num(pick(f, ['number', 'floorNumber', 'level'], 0)), commercial: !!pick(f, ['isCommercial', 'commercial'], false), total: num(pick(f, ['totalApartments', 'apartmentsCount', 'total'], 0)), free: num(pick(f, ['freeApartments', 'freeCount', 'free'], 0)) }; },
     apt(a, floorNo) {
@@ -510,6 +513,9 @@
     saveInstallmentSettings(b) { return request('PUT', '/owner/installment-settings', { body: b }); },
     saveBuildingLocation(id, body) { return request('PUT', '/buildings/' + id + '/location', { body }).then(M.building); },
     // A block of the complex: the letter, the order, the outline, the place on the site and the setbacks — as a whole.
+    savePriceRule(id, body) { return request('PUT', '/buildings/' + id + '/price-rule', { body }).then(M.building); },
+    // «Пересчитать цены»: { updated, unchanged, skipped } — only free apartments get the new price.
+    applyPriceRule(id) { return request('POST', '/buildings/' + id + '/price-rule/apply'); },
     saveBuildingShape(id, body) { return request('PUT', '/buildings/' + id + '/shape', { body }).then(M.building); },
     // The plan of the complex's site (the outline, the yard's zones) of the own organization; null — not set.
     sitePlan() { return request('GET', '/owner/site-plan').then((r) => r || null); },
