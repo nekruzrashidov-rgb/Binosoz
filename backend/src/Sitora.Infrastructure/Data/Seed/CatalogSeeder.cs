@@ -2,15 +2,22 @@ using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Sitora.Domain.Entities;
+using Sitora.Domain.Interfaces;
 
 namespace Sitora.Infrastructure.Data.Seed;
 
 public static class CatalogSeeder
 {
-    public const string BuildingName = "Некруз Резиденс";
-    // Прежнее название дома из сидера: базы разработки, созданные до переименования, получают новое.
-    public const string LegacyBuildingName = "Sitora Residence";
-    // 20 жилых этажей по 8 квартир = 160 квартир, как в 3D-модели комплекса (nekruz3d.html).
+    // ЖК «Rich Tower» (docs/DECISIONS.md, «Rich Tower»). Прежние названия дома из сидера и seed.sql — базы, созданные до
+    // переименования, получают новое; сидеры, которые ищут этот дом (сотрудники, демо-доступ), ищут по всем этим именам.
+    public const string BuildingName = "Rich Tower";
+    public static readonly string[] LegacyBuildingNames = ["Sitora Residence", "Некруз Резиденс"];
+    public static readonly string[] BuildingNames = [BuildingName, .. LegacyBuildingNames];
+    public const string OrganizationName = "Rich Tower";
+    // Прежние имена организации по умолчанию: «Sitora» (имя проекта, миграция MultiTenancy) и «Некруз Резиденс».
+    public static readonly string[] LegacyOrganizationNames = ["Sitora", "Некруз Резиденс"];
+    public const string RenamedAction = "Renamed";
+    // 20 жилых этажей по 8 квартир = 160 квартир.
     public const int ResidentialFloors = 20;
     // Сколько этажей было в сидере до этого: базы разработки, созданные раньше, получают недостающие этажи.
     private const int PreviousResidentialFloors = 16;
@@ -29,12 +36,11 @@ public static class CatalogSeeder
     public static int ApartmentNumber(int floor, int position) => floor * 100 + position;
 
     [SuppressMessage("Security", "CA5394", Justification = "Генератор с фиксированным зерном нужен для одинаковых статусов квартир при каждом запуске; к безопасности отношения не имеет.")]
-    public static async Task SeedAsync(AppDbContext db, ILogger logger)
+    public static async Task SeedAsync(AppDbContext db, IAuditService audit, ILogger logger)
     {
+        await RenameAsync(db, audit, logger);
         if (await db.Buildings.AnyAsync())
         {
-            await db.Buildings.Where(b => b.NameRu == LegacyBuildingName)
-                .ExecuteUpdateAsync(u => u.SetProperty(b => b.NameRu, BuildingName).SetProperty(b => b.NameTg, b => b.NameTg == LegacyBuildingName ? BuildingName : b.NameTg));
             await AddMissingFloorsAsync(db, logger);
             return;
         }
@@ -51,7 +57,7 @@ public static class CatalogSeeder
             // Нейтральное описание без оценок («бизнес-класс» и т. п. — только если их подтвердит застройщик) и его перевод.
             DescriptionRu = "Жилой дом с коммерческим первым этажом",
             DescriptionTg = "Бинои истиқоматӣ бо ошёнаи якуми тиҷоратӣ",
-            NameEn = "Nekruz Residence",
+            NameEn = BuildingName,
             DescriptionEn = "A residential building with a commercial ground floor"
         };
 
@@ -91,6 +97,36 @@ public static class CatalogSeeder
             floor.Apartments.Add(apartment);
         }
         return floor;
+    }
+
+    // Прежние имена организации по умолчанию и дома из сидера меняются на «Rich Tower»; имя, заданное владельцем, не
+    // трогается. Запись Renamed в AuditLog сохраняется тем же SaveChanges, что и новое имя.
+    private static async Task RenameAsync(AppDbContext db, IAuditService audit, ILogger logger)
+    {
+        var organization = await db.Organizations.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(o => o.Id == Organization.DefaultId && LegacyOrganizationNames.Contains(o.Name));
+        if (organization is not null)
+        {
+            audit.Record(nameof(Organization), organization.Id, RenamedAction, new { organization.Name }, new { Name = OrganizationName }, organization.Id);
+            logger.LogInformation("Организация «{Old}» переименована в «{New}»", organization.Name, OrganizationName);
+            organization.Name = OrganizationName;
+        }
+
+        var buildings = await db.Buildings.IgnoreQueryFilters()
+            .Where(b => b.OrganizationId == Organization.DefaultId && LegacyBuildingNames.Contains(b.NameRu)).ToListAsync();
+        foreach (var building in buildings)
+        {
+            audit.Record(nameof(Building), building.Id, RenamedAction, new { building.NameRu, building.NameTg, building.NameEn },
+                new { NameRu = BuildingName }, building.OrganizationId);
+            if (LegacyBuildingNames.Contains(building.NameTg) || building.NameTg == "Некрӯз Резиденс")
+                building.NameTg = BuildingName;
+            if (building.NameEn is "Nekruz Residence" or "Sitora Residence")
+                building.NameEn = BuildingName;
+            building.NameRu = BuildingName;
+        }
+
+        if (organization is not null || buildings.Count > 0)
+            await db.SaveChangesAsync();
     }
 
     // База разработки с прежними 16 этажами: дом из сидера получает этажи 17–20 и новые числа (20 этажей, 160 квартир).

@@ -1337,7 +1337,7 @@
     }
 
     function buildingStep() {
-      const nameRu = S.input('nameRu', { placeholder: 'Некруз Резиденс' }), nameTg = S.input('nameTg', { placeholder: 'Некруз Резиденс' });
+      const nameRu = S.input('nameRu', { placeholder: 'Блок A' }), nameTg = S.input('nameTg', { placeholder: 'Блоки A' });
       const city = S.select('city', CITIES.map((c) => [c, t('wiz.city.' + c)]), 'dushanbe');
       const cityOther = S.input('cityOther');
       const other = h('div', { hidden: true }, S.field(t('wiz.cityName') + ' *', cityOther));

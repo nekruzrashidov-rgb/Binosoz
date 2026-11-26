@@ -496,6 +496,8 @@
     async utility(apartmentId) { const r = await request('GET', '/apartments/' + apartmentId + '/utility', { auth: false }); return r && r.costPerYearTjs !== undefined ? r : null; },
     greenSettings() { return request('GET', '/owner/green-settings'); },
     // «Зелёный эффект»: the public aggregate of the developer's site (ORG_SLUG) and the CRM statistics with months.
+    // The developer's sign (name, contacts, buildings) by ORG_SLUG: the complex's name on the site comes from here.
+    publicBrand() { return cfgSlug() ? request('GET', '/public/brand', { auth: false, query: { slug: cfgSlug() } }) : Promise.resolve(null); },
     greenImpact() { return request('GET', '/public/green-impact', { auth: false, query: { organization: cfgSlug() } }); },
     greenStats() { return request('GET', '/stats/green'); },
     saveGreenSettings(b) { return request('PUT', '/owner/green-settings', { body: b }); },

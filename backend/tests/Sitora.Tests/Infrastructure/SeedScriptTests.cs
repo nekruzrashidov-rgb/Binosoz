@@ -8,7 +8,7 @@ namespace Sitora.Tests.Infrastructure;
 // так тест ловит расхождение скрипта со схемой. Повторный запуск ничего не дублирует, сам запуск — в AuditLog.
 public class SeedScriptTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFactory>
 {
-    private const string SeedName = "Некруз Резиденс";
+    private const string SeedName = "Rich Tower";
 
     [Fact]
     public async Task SeedSql_RunsOnCurrentSchema_IsIdempotent_AndAudited()

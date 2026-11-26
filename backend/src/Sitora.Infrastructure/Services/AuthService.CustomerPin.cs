@@ -336,7 +336,7 @@ public partial class AuthService
             // Сбой почтового сервиса не меняет ответ: иначе по ошибке 500 было бы видно, что почта зарегистрирована.
             try
             {
-                // Отправитель — застройщик покупателя («Некруз Резиденс <no-reply@…>»), а не платформа.
+                // Отправитель — застройщик покупателя («Rich Tower <no-reply@…>»), а не платформа.
                 await email.SendAsync(CodeMessage(purpose, address, brand, code) with { FromName = brand }, ct);
             }
             catch (Exception e) when (e is not OperationCanceledException)

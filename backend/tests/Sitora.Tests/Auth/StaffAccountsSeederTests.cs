@@ -57,7 +57,7 @@ public class StaffAccountsSeederTests(StaffAccountsFactory factory) : IClassFixt
         var ownerBuildings = await owner.GetFromJsonAsync<PagedResult<BuildingResponse>>("/api/v1/buildings", TestJson.Options);
         Assert.Contains(neighbour.Id, ownerBuildings!.Items.Select(b => b.Id));
 
-        // ObjectAdmin — только дом «Некруз Резиденс»: пользователи его дома есть, журнала организации нет.
+        // ObjectAdmin — только дом «Rich Tower»: пользователи его дома есть, журнала организации нет.
         var objectAdmin = await factory.CreateClientForAsync(StaffAccountsFactory.ObjectAdminEmail, factory.ObjectAdminPassword);
         var me = await objectAdmin.GetFromJsonAsync<CurrentUserResponse>("/api/v1/auth/me", TestJson.Options);
         Assert.Equal((RoleNames.ObjectAdmin, Organization.DefaultId), (me!.Role, me.OrganizationId));

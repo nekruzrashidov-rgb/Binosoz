@@ -32,7 +32,7 @@ public interface ISmsSender
 }
 
 // Html — необязательная оформленная версия; Text уходит всегда, для почтовых программ без HTML.
-// FromName — имя отправителя («Некруз Резиденс <no-reply@…>»): имя организации-застройщика; null — Email:FromName.
+// FromName — имя отправителя («Rich Tower <no-reply@…>»): имя организации-застройщика; null — Email:FromName.
 public record EmailMessage(string To, string Subject, string Text, string? Html = null, string? FromName = null);
 
 public interface IEmailSender

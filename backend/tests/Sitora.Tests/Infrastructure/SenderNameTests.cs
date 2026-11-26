@@ -17,8 +17,8 @@ public class SenderNameTests(SitoraApiFactory factory) : IClassFixture<SitoraApi
     [Fact]
     public void Gmail_FromIsOrganization_WhenMessageHasIt()
     {
-        var withBrand = GmailEmailSender.BuildMime(Options(), new EmailMessage("a@example.test", "Тема", "Текст", null, "Некруз Резиденс"), DateTimeOffset.UtcNow);
-        var expected = GmailEmailSender.BuildMime(new EmailOptions { From = "no-reply@nekruz.test", FromName = "Некруз Резиденс" },
+        var withBrand = GmailEmailSender.BuildMime(Options(), new EmailMessage("a@example.test", "Тема", "Текст", null, "Rich Tower"), DateTimeOffset.UtcNow);
+        var expected = GmailEmailSender.BuildMime(new EmailOptions { From = "no-reply@nekruz.test", FromName = "Rich Tower" },
             new EmailMessage("a@example.test", "Тема", "Текст"), DateTimeOffset.UtcNow);
         var platform = GmailEmailSender.BuildMime(Options(), new EmailMessage("a@example.test", "Тема", "Текст"), DateTimeOffset.UtcNow);
 

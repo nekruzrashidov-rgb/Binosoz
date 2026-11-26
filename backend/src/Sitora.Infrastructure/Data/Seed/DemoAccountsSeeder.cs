@@ -12,7 +12,7 @@ namespace Sitora.Infrastructure.Data.Seed;
 
 // Демо-доступ для жюри — только при SEED_DEMO_ACCOUNTS=true, пароли только из секретов SEED_DEMO_BUYER_PASSWORD и
 // SEED_DEMO_MANAGER_PASSWORD (без пароля учётная запись не создаётся). Работает в любом окружении: на проде его запускает
-// Actions → Seed prod (образ API с --migrate) после seed.sql, когда дом «Некруз Резиденс» уже есть.
+// Actions → Seed prod (образ API с --migrate) после seed.sql, когда дом «Rich Tower» уже есть.
 //  * demo-manager@binosoz.tj — менеджер «только чтение + чат» (DemoReadOnlyMiddleware запрещает остальные изменения);
 //  * demo-buyer@binosoz.tj — покупатель с одной сделкой: график платежей, два платежа, сообщения в чате, акт сверки и
 //    график в PDF (настоящие, сформированы QuestPDF и учтены в «Зелёном эффекте» с числом страниц из файла).
@@ -33,7 +33,7 @@ public static class DemoAccountsSeeder
         var db = provider.GetRequiredService<AppDbContext>();
         var users = provider.GetRequiredService<UserManager<AppUser>>();
         var building = await db.Buildings.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(b => b.OrganizationId == Organization.DefaultId && b.NameRu == CatalogSeeder.BuildingName);
+            .FirstOrDefaultAsync(b => b.OrganizationId == Organization.DefaultId && CatalogSeeder.BuildingNames.Contains(b.NameRu));
         if (building is null)
         {
             logger.LogWarning("Демо-доступ не создан: нет дома «{Name}» (сначала заполните каталог: seed.sql)", CatalogSeeder.BuildingName);

@@ -3,9 +3,9 @@
    Without this script the page stays Russian with a line in Tajik and English under it. */
 (function () {
   const T = {
-    ru: { title: 'Нет подключения', text: 'Проверьте интернет и обновите страницу. Страницы, которые вы уже открывали, доступны и без сети.', reload: 'Обновить', brand: 'Некруз Резиденс' },
-    tg: { title: 'Пайвастшавӣ нест', text: 'Интернетро санҷед ва саҳифаро аз нав кушоед. Саҳифаҳое, ки шумо аллакай кушода будед, бе шабака ҳам дастрасанд.', reload: 'Аз нав кушодан', brand: 'Некрӯз Резиденс' },
-    en: { title: 'No connection', text: 'Check the internet and reload the page. The pages you have already opened work without the network.', reload: 'Reload', brand: 'Nekruz Residence' },
+    ru: { title: 'Нет подключения', text: 'Проверьте интернет и обновите страницу. Страницы, которые вы уже открывали, доступны и без сети.', reload: 'Обновить', brand: 'Rich Tower' },
+    tg: { title: 'Пайвастшавӣ нест', text: 'Интернетро санҷед ва саҳифаро аз нав кушоед. Саҳифаҳое, ки шумо аллакай кушода будед, бе шабака ҳам дастрасанд.', reload: 'Аз нав кушодан', brand: 'Rich Tower' },
+    en: { title: 'No connection', text: 'Check the internet and reload the page. The pages you have already opened work without the network.', reload: 'Reload', brand: 'Rich Tower' },
   };
   let lang = 'ru';
   try { const v = window.localStorage.getItem('sitora.lang'); if (v && T[v]) lang = v; } catch (e) { /* storage may be blocked */ }

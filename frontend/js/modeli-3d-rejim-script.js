@@ -34,7 +34,7 @@
     const nowBtn = h('button', { class: 'h3d-chip', type: 'button', 'aria-pressed': 'true', title: t('h3d.nowHint') }, t('h3d.now'));
     const presetSeg = h('div', { class: 'h3d-seg', role: 'group', 'aria-label': t('hero.time') }, ['day', 'dusk', 'night'].map((k) => h('button', { type: 'button', 'data-k': k, onclick: () => preset(k) }, t('time.' + k))));
     const timeBox = h('div', { class: 'h3d-time' }, h('span', { 'aria-hidden': 'true', class: 'h3d-sym' }, '☀'), slider, h('span', { 'aria-hidden': 'true', class: 'h3d-sym' }, '☾'), clock, play, nowBtn, presetSeg);
-    const top = h('div', { class: 'h3d-top' }, back, h('div', { class: 'h3d-title' }, h('b', null, b.name || t('brand.name')), h('span', null, t('h3d.kicker'))), timeBox);
+    const top = h('div', { class: 'h3d-top' }, back, h('div', { class: 'h3d-title' }, h('b', { 'data-brand': '' }, S.brandName()), h('span', null, t('h3d.kicker'))), timeBox);
     root.appendChild(top);
 
     let nowTimer = 0, nowOn = true;

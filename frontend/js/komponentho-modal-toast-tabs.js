@@ -83,12 +83,13 @@
     return s;
   };
   S.logo = () => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); const id = 'lg' + (++logoN); s.setAttribute('viewBox', '0 0 32 32'); s.setAttribute('width', 28); s.setAttribute('height', 28); s.setAttribute('aria-hidden', 'true'); s.innerHTML = '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e0874a"/><stop offset="1" stop-color="#9a4f1c"/></linearGradient></defs><path d="M16 1.5l4 9.3 10 1.2-7.4 6.9 2 10L16 23.7 7.4 28.9l2-10L2 12l10-1.2z" fill="url(#' + id + ')"/><path d="M16 1.5l4 9.3 10 1.2-7.4 6.9 2 10L16 23.7z" fill="#f0c89a" opacity=".92"/>'; return s; };
-  // The complex's name and address in the page language. The API and config.js hold them in Russian; the default
-  // complex («Некруз Резиденс», пр. Борбад, 15) is shown from i18n (brand.name, contact.address), any other as it is.
-  const RU_NAME = /^Некр[уӯ]з\s+Резиденс$/i, RU_ADDRESS = 'г. Душанбе, пр. Борбад, 15';
+  // The complex's name comes from the API (the organization's name, GET /public/brand → S.brandInfo); until it answers
+  // and without the API — «Rich Tower» (brand.name). The address of config.js is shown in the page language
+  // (contact.address), any other as it is.
+  const RU_ADDRESS = 'г. Душанбе, пр. Борбад, 15';
   // «Отправляя, вы соглашаетесь с политикой конфиденциальности» — под формами заявки и регистрации.
   S.privacyNote = () => S.h('p', { class: 'consent-note' }, S.t('privacy.consent') + ' ', S.h('a', { href: '/privacy' }, S.t('privacy.consentLink')), '.');
-  S.brandName = (name) => { const v = String(name || '').trim(); return !v || RU_NAME.test(v) || v === 'Nekruz Residence' ? S.t('brand.name') : v; };
+  S.brandName = () => { const v = String((S.brandInfo && S.brandInfo.name) || '').trim(); return v || S.t('brand.name'); };
   S.brandAddress = (address) => { const v = String(address || '').trim().replace(/\s+/g, ' '); return v === RU_ADDRESS ? S.t('contact.address') : v; };
 
   // ---------- formatting ----------

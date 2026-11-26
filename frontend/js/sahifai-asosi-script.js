@@ -155,7 +155,7 @@
     const col = (title, ...items) => h('div', { class: 'foot-col' }, h('h2', null, title), ...items);
     return h('footer', { class: 'footer lux-footer' }, h('div', { class: 'wrap' },
       h('div', { class: 'foot-grid' },
-        h('div', { class: 'foot-brand' }, h('a', { class: 'row', href: '/', style: { gap: '12px' } }, S.towerLogo(), h('b', null, t('brand.name'))), h('p', null, t('foot.tagline')),
+        h('div', { class: 'foot-brand' }, h('a', { class: 'row', href: '/', style: { gap: '12px' } }, S.towerLogo(), h('b', { 'data-brand': '' }, S.brandName())), h('p', null, t('foot.tagline')),
           h('div', { class: 'foot-social' },
             c.telegram ? h('a', { class: 'soc tg', href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener', 'aria-label': 'Telegram', title: 'Telegram' }, landIcon('send')) : null,
             c.phone ? h('a', { class: 'soc wa', href: 'https://wa.me/' + phoneDigits(c.phone), target: '_blank', rel: 'noopener', 'aria-label': 'WhatsApp', title: 'WhatsApp' }, landIcon('chat')) : null,
@@ -165,7 +165,7 @@
         col(t('foot.apts'), h('a', { href: '/apartments' }, t('foot.catalog')), h('a', { href: '/apartments#calc' }, t('foot.calc')), h('a', { href: '/apartments' }, t('foot.3d'))),
         col(t('foot.info'), h('a', { href: '/#why' }, t('foot.why')), h('a', { href: '/#steps' }, t('foot.steps')), h('a', { href: '/login' }, t('foot.cabinet'))),
         col(t('foot.contacts'), h('span', null, c.address || ''), c.phone ? h('a', { href: 'tel:+' + phoneDigits(c.phone) }, c.phone) : null, c.telegram ? h('a', { href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, c.telegram) : null, h('a', { href: '/contact' }, t('foot.write')))),
-      h('div', { class: 'foot-bottom' }, h('span', null, '© ' + new Date().getFullYear() + ' ' + t('brand.name') + '. ' + t('footer.rights') + ' · ' + t('footer.platform')),
+      h('div', { class: 'foot-bottom' }, h('span', null, '© ' + new Date().getFullYear() + ' ' + S.brandName() + '. ' + t('footer.rights') + ' · ' + t('footer.platform')),
         h('a', { class: 'foot-privacy', href: '/privacy' }, t('privacy.link')),
         h('span', { class: 'foot-dev' }, t('foot.dev') + ' ', h('a', { href: '/register' }, t('foot.devLink')))),
       h('p', { class: 'foot-demo' }, t('foot.demo'), frontendVersion())));
@@ -652,7 +652,7 @@
     return () => { alive = false; window.removeEventListener('popstate', onPop); if (full) { full.close(); full = null; } if (house) { house.destroy(); if (window.__house3d === house) delete window.__house3d; } };
   };
 
-  /* ---------- landing (design «Некруз Резиденс», docs/design/Main.dc.html) ----------
+  /* ---------- landing (design docs/design/Main.dc.html) ----------
      Everything that is a fact about the house comes from the API: name, floors, apartments, free ones, prices, year,
      description, amenities, eco passport, installment terms. Without the data a block is not shown; without a building —
      one honest card «Продажи скоро откроются». The pictures are renders of the site's 3D model, signed as such. */
@@ -701,6 +701,7 @@
     // 1. Hero: the render of the 3D model on the whole width, the name, two actions and a band of live numbers.
     const heroKicker = h('div', { class: 'nr-kicker nr-kicker--light' });
     const heroTitle = fromShell('heroTitle') || h('h1', { class: 'nr-hero-title' });
+    heroTitle.setAttribute('data-brand', '');
     const heroSub = fromShell('heroSub') || h('p', { class: 'nr-hero-sub' });
     heroSub.textContent = t('nr.hero.sub');
     const heroStats = h('dl', { class: 'nr-hero-stats', hidden: true });
@@ -779,7 +780,7 @@
       const b = d.b, ready = d.state === 'ready';
       const year = b && b.completionYear;
       heroKicker.replaceChildren(h('span', { class: 'nr-kicker-line', 'aria-hidden': 'true' }), year ? t('nr.hero.kicker', { y: year }) : t('nr.hero.city'));
-      heroTitle.textContent = S.brandName(b && b.name);
+      heroTitle.textContent = S.brandName();
       // Live numbers: floors, apartments, free now, year of completion — each only when the API has it.
       const free = d.apts.filter((a) => a.status === 'free').length;
       const stat = (v, label) => h('div', { class: 'nr-stat' }, h('dt', null, label), h('dd', null, v));
@@ -1249,7 +1250,7 @@
     const page = document.body && document.body.dataset.page;
     if (!['home', 'apartments', 'about', 'gallery', 'contact'].includes(page) || document.querySelector('script[type="application/ld+json"]')) return;
     const c = contacts();
-    const name = t('brand.name');
+    const name = S.brandName();
     const address = c.address ? { '@type': 'PostalAddress', streetAddress: c.address, addressLocality: 'Душанбе', addressCountry: 'TJ' } : undefined;
     const data = { '@context': 'https://schema.org', '@graph': [
       { '@type': 'Organization', '@id': location.origin + '/#org', name, url: location.origin + '/', logo: location.origin + '/favicon.svg', telephone: c.phone || undefined, address },

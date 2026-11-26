@@ -15,7 +15,7 @@
     root.appendChild(page);
 
     // 1. Hero: the render of the 3D model, the name and the numbers of the building (each only when the API has it).
-    const title = h('h1', { class: 'nr-page-title nr-about-title' }, S.brandName());
+    const title = h('h1', { class: 'nr-page-title nr-about-title', 'data-brand': '' }, S.brandName());
     const chips = h('ul', { class: 'nr-chips' });
     const hero = h('section', { class: 'nr-about-hero nr-dark' },
       h('figure', { class: 'nr-hero-media' }, site.renderImg('tower-dusk-wide', '100vw', t('nr.render.alt'), true),
@@ -65,7 +65,7 @@
         if (!id || !alive) { settle(); return; }
         const b = await S.api.building(id);
         if (!alive) return;
-        title.textContent = S.brandName(b.name);
+        title.textContent = S.brandName();
         const apts = b.plannedApartments || b.total || 0;
         const desc = S.localText(b, 'description');
         const address = S.brandAddress(b.address) || site.contacts().address;

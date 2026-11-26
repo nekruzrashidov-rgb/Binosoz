@@ -232,7 +232,7 @@
       onclick: toggleTheme
     }, S.icon(isDark() ? 'sun' : 'moon'));
     // The buyer sees the complex's name; Binosoz (the platform) only on the developers' page (/register) and in the footer.
-    const siteBrand = page === 'register' ? 'BINOSOZ' : t('brand.name');
+    const siteBrand = page === 'register' ? 'BINOSOZ' : S.brandName();
     // The wordmark of the design: the first word in large spaced capitals, the rest small in copper under it.
     const words = siteBrand.split(/\s+/);
     const mark = h('span', { class: 'brand-word' }, h('b', null, words[0]), words.length > 1 ? ' ' : null, words.length > 1 ? h('small', null, words.slice(1).join(' ')) : null);
@@ -272,13 +272,14 @@
   const META = { home: 'meta.home', apartments: 'meta.apartments', about: 'meta.about', gallery: 'meta.gallery', contact: 'meta.contact', register: 'meta.register', privacy: 'meta.privacy' };
   const descTag = document.querySelector('meta[name="description"]');
   const htmlDesc = descTag ? descTag.getAttribute('content') : '';
+  // The HTML holds «Rich Tower» (the first paint, search engines); the name from the API replaces it. Binosoz stays as it is.
+  const HTML_BRAND = 'Rich Tower';
   function setTitle() {
-    if (descTag && META[page]) descTag.setAttribute('content', S.lang === 'ru' ? htmlDesc : t(META[page]));
-    if (S.lang === 'ru') { document.title = htmlTitle; return; }
-    // The complex's own name is translated too ("Nekruz Residence" in English); Binosoz stays as it is.
-    const last = htmlTitle.split(' — ').pop();
-    const brand = last === 'Некруз Резиденс' ? t('brand.name') : last;
-    document.title = page === 'home' ? t('brand.name') + ' — ' + t('home.tagline') : TITLES[page] ? t(TITLES[page]) + ' — ' + brand : document.title;
+    const brand = S.brandName(), swap = (s) => String(s).split(HTML_BRAND).join(brand);
+    if (descTag && META[page]) descTag.setAttribute('content', S.lang === 'ru' ? swap(htmlDesc) : t(META[page], { b: brand }));
+    const last = htmlTitle.split(' — ').pop(), own = last === HTML_BRAND;
+    if (S.lang === 'ru') { document.title = own || page === 'home' ? swap(htmlTitle) : htmlTitle; return; }
+    document.title = page === 'home' ? brand + ' — ' + t('home.tagline') : TITLES[page] ? t(TITLES[page]) + ' — ' + (own ? brand : last) : document.title;
   }
 
   // Sections marked .section-reveal (and the site's .reveal blocks) slide up once they come into view. They are hidden
@@ -380,6 +381,16 @@
     else app.replaceChildren(...[skip, header, main].filter(Boolean));
     // The real height of the top bar (taller with the "as owner" banner): sticky bars under it (CRM tabs) start there.
     if ('ResizeObserver' in window) new ResizeObserver(() => document.documentElement.style.setProperty('--hdr-h', header.offsetHeight + 'px')).observe(header);
+    // The complex's name from the API (not awaited: the page draws with «Rich Tower» and is redrawn if the name differs).
+    if (isPublic || page === 'cabinet' || page === 'login') S.api.publicBrand().then((b) => {
+      if (!b || !b.name) return;
+      const before = S.brandName(); S.brandInfo = b;
+      if (S.brandName() === before) return;
+      drawHeader(); setTitle();
+      // Texts already drawn with the name (the landing's title, the footer, the 3D title) are marked data-brand.
+      S.$$('[data-brand]').forEach((el) => { el.textContent = S.brandName(); });
+      S.bus.emit('brand', b);
+    }).catch(() => { /* no API: «Rich Tower» stays */ });
     await S.api.restore();
     if (guarded && !S.api.isAuthed) { location.replace('/login'); return; }
     // Invitation links of older letters (/login#invite=…) now open their own page.

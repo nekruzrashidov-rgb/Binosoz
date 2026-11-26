@@ -91,7 +91,7 @@
   // The greeting and quick questions follow the mode and the role: guest, buyer, platform owner (SuperAdmin) or staff.
   function getGreeting() {
     if (isPublic) return t('ai.helloGuest');
-    if (S.api.isCustomer()) return t('ai.helloBuyer');
+    if (S.api.isCustomer()) return t('ai.helloBuyer', { b: S.brandName() });
     if (S.api.isPlatform()) return t('ai.helloPlatform');
     return t('ai.helloStaff');
   }

@@ -11,7 +11,7 @@
   const enter = (r) => { S.toast(t('login.welcome'), 'ok'); S.go(S.homeFor(r.user)); };
 
   // The login pages have no site header: the logo above the card leads back to the site.
-  const loginBrand = () => h('a', { class: 'login-brand', href: '/', 'aria-label': t('brand.name') }, S.logo(), h('span', null, t('brand.name')));
+  const loginBrand = () => h('a', { class: 'login-brand', href: '/', 'aria-label': S.brandName() }, S.logo(), h('span', null, S.brandName()));
 
   // A password with a show/hide button (👁); the label still points at the input itself.
   function passwordField(label, name, autocomplete, hint) {
@@ -389,7 +389,7 @@
       const src = (w) => '/img/renders/tower-night-tall-' + w + '.webp';
       const pic = h('figure', { class: 'lg-pic', 'aria-hidden': 'true' },
         h('img', { src: src(1600), srcset: [800, 1600, 2400].map((w) => src(w) + ' ' + w + 'w').join(', '), sizes: '(max-width: 768px) 100vw, 55vw', width: 2400, height: 3000, alt: '', decoding: 'async' }));
-      const words = t('brand.name').split(/\s+/);
+      const words = S.brandName().split(/\s+/);
       const lang = h('div', { class: 'seg lg-lang', role: 'group', 'aria-label': 'Language' }, S.LANGS.map(([k, l]) => h('button', { type: 'button', class: S.lang === k ? 'on' : '', 'aria-pressed': String(S.lang === k), onclick: () => { if (S.lang !== k) S.setLang(k); } }, l)));
       // The theme switch, as in the header of the other pages.
       const theme = h('button', { type: 'button', class: 'lg-theme' });
@@ -609,7 +609,7 @@
       const pdf = h('button', { class: 'ptrack-pdf', type: 'button', onclick: (e) => { e.stopPropagation(); S.busy(e.currentTarget, () => S.api.openDoc('/deals/' + deal.dealId + '/statement.pdf', { date: S.today() }, t('cab.pdfAct')).catch(S.err)); } }, '⬇ ' + t('pcard.pdf'));
       const front = h('div', { class: 'ptrack-front' },
         h('span', { class: 'ptrack-ornament', 'aria-hidden': 'true' }),
-        h('div', { class: 'ptrack-head' }, h('div', { class: 'ptrack-brand' }, '💎 ' + t('brand.name').toUpperCase()), pdf),
+        h('div', { class: 'ptrack-head' }, h('div', { class: 'ptrack-brand' }, '💎 ' + S.brandName().toUpperCase()), pdf),
         h('div', { class: 'ptrack-name' }, ov.customerName || ''),
         h('div', { class: 'ptrack-apt' }, t('cab.aptNo', { n: deal.apartmentNumber }) + ' · ' + t('pcard.floor', { n: deal.floor })),
         h('div', { class: 'ptrack-bar-track' }, bar),

@@ -3,7 +3,7 @@ using Sitora.Domain.Entities;
 
 namespace Sitora.Infrastructure.Data.Seed;
 
-// Этапы стройки «Некруз Резиденс» с примерными процентами для разработки.
+// Этапы стройки «Rich Tower» с примерными процентами для разработки.
 public static class ConstructionSeeder
 {
     public static readonly (string Name, int Percent)[] Stages =
@@ -20,7 +20,7 @@ public static class ConstructionSeeder
 
     public static async Task SeedAsync(AppDbContext db)
     {
-        var buildingId = await db.Buildings.Where(b => b.NameRu == CatalogSeeder.BuildingName).Select(b => (Guid?)b.Id).FirstOrDefaultAsync();
+        var buildingId = await db.Buildings.Where(b => CatalogSeeder.BuildingNames.Contains(b.NameRu)).Select(b => (Guid?)b.Id).FirstOrDefaultAsync();
         if (buildingId is null || await db.ConstructionStages.AnyAsync(s => s.BuildingId == buildingId))
             return;
 

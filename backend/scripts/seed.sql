@@ -1,9 +1,9 @@
--- Demo catalog for an empty production database (Render): «Некруз Резиденс», Dushanbe, 20 floors, 160 apartments.
+-- Demo catalog for an empty production database (Render): «Rich Tower», Dushanbe, 20 floors, 160 apartments.
 --
 -- Run once against the Render PostgreSQL (External Database URL from the Render dashboard):
 --   psql "postgresql://USER:PASSWORD@HOST/DB?sslmode=require" -f backend/scripts/seed.sql
 --
--- * Idempotent: if the organization already has a building named «Некруз Резиденс», nothing is changed.
+-- * Idempotent: if the organization already has a building named «Rich Tower», nothing is changed.
 -- * Atomic: everything is one DO block — on any error nothing is left half-written.
 -- * Floors: 0 (commercial, no apartments) and 1–20 (residential), 8 apartments each, numbers floor×100 + slot+1 (101 … 2008).
 -- * Types by plan slot: 0–1 — 1 room 42.5 m² at 7 500 TJS/m²; 2–3 — 2 rooms 68.0 m² at 7 000; 4–5 — 3 rooms 92.0 m² at 6 800;
@@ -19,7 +19,43 @@
 -- * A third DO block (organization marked demo, no issued PDFs yet): demo completed deals for the sold apartments with
 --   issued PDFs (3 schedules × 2 pages, 2 statements × 1 page each), so «Зелёный эффект» shows meaningful demo numbers.
 -- * A fourth DO block (any run): active demo bookings get ExpiresAt = now() + 48 h again (the CRM funnel shows «47 ч», not
---   «20 дн»), and the default organization still named «Sitora» (the old project name) is renamed to «Некруз Резиденс».
+--   «20 дн»).
+-- * The first DO block (any run): the default organization still named «Sitora» or «Некруз Резиденс» and the building named
+--   «Некруз Резиденс» are renamed to «Rich Tower» (AuditLog Renamed); a name set by the owner is never changed.
+-- Первым делом (каждый запуск): ЖК называется «Rich Tower» (docs/DECISIONS.md, «Rich Tower»). Меняются только прежние
+-- имена — организации «Sitora» (имя проекта) и «Некруз Резиденс», дома «Некруз Резиденс»; имя, заданное владельцем, не
+-- трогается. Каждое переименование — запись Renamed в AuditLog.
+DO $$
+DECLARE
+  org constant uuid := '01a20000-0000-7000-8000-000000000001';
+  old_name text;
+  b record;
+BEGIN
+  SELECT "Name" INTO old_name FROM "Organizations" WHERE "Id" = org AND "Name" IN ('Sitora', 'Некруз Резиденс');
+  IF old_name IS NOT NULL THEN
+    UPDATE "Organizations" SET "Name" = 'Rich Tower', "UpdatedAt" = now() WHERE "Id" = org;
+    INSERT INTO "AuditLog" ("Id", "UserId", "OrganizationId", "ImpersonatedById", "Entity", "EntityId", "Action", "Before", "After",
+                            "At", "Ip", "CreatedAt", "UpdatedAt")
+    VALUES (gen_random_uuid(), NULL, org, NULL, 'Organization', org, 'Renamed', jsonb_build_object('Name', old_name),
+            jsonb_build_object('Name', 'Rich Tower', 'source', 'scripts/seed.sql'), now(), NULL, now(), now());
+    RAISE NOTICE 'Организация «%» переименована в «Rich Tower»', old_name;
+  END IF;
+
+  FOR b IN SELECT "Id", "NameTg", "NameEn" FROM "Buildings" WHERE "OrganizationId" = org AND "NameRu" = 'Некруз Резиденс' LOOP
+    UPDATE "Buildings" SET "NameRu" = 'Rich Tower',
+      "NameTg" = CASE WHEN "NameTg" IN ('Некруз Резиденс', 'Некрӯз Резиденс') THEN 'Rich Tower' ELSE "NameTg" END,
+      "NameEn" = CASE WHEN "NameEn" = 'Nekruz Residence' THEN 'Rich Tower' ELSE "NameEn" END,
+      "UpdatedAt" = now()
+    WHERE "Id" = b."Id";
+    INSERT INTO "AuditLog" ("Id", "UserId", "OrganizationId", "ImpersonatedById", "Entity", "EntityId", "Action", "Before", "After",
+                            "At", "Ip", "CreatedAt", "UpdatedAt")
+    VALUES (gen_random_uuid(), NULL, org, NULL, 'Building', b."Id", 'Renamed',
+            jsonb_build_object('NameRu', 'Некруз Резиденс', 'NameTg', b."NameTg", 'NameEn', b."NameEn"),
+            jsonb_build_object('NameRu', 'Rich Tower', 'source', 'scripts/seed.sql'), now(), NULL, now(), now());
+    RAISE NOTICE 'Дом «Некруз Резиденс» переименован в «Rich Tower»';
+  END LOOP;
+END $$;
+
 DO $$
 DECLARE
   org        constant uuid := '01a20000-0000-7000-8000-000000000001';
@@ -42,15 +78,15 @@ BEGIN
     RAISE EXCEPTION 'Нет организации по умолчанию %: сначала запустите API, чтобы он создал её', org;
   END IF;
 
-  IF EXISTS (SELECT 1 FROM "Buildings" WHERE "OrganizationId" = org AND "NameRu" = 'Некруз Резиденс') THEN
-    RAISE NOTICE 'Дом «Некруз Резиденс» уже есть — заполнение пропущено';
+  IF EXISTS (SELECT 1 FROM "Buildings" WHERE "OrganizationId" = org AND "NameRu" = 'Rich Tower') THEN
+    RAISE NOTICE 'Дом «Rich Tower» уже есть — заполнение пропущено';
     RETURN;
   END IF;
 
   building := gen_random_uuid();
   INSERT INTO "Buildings" ("Id", "OrganizationId", "NameRu", "NameTg", "Address", "FloorsCount", "DescriptionRu", "DescriptionTg",
                            "ModelUrl", "CompletionYear", "PlannedApartments", "CreatedAt", "UpdatedAt")
-  VALUES (building, org, 'Некруз Резиденс', 'Некруз Резиденс', 'г. Душанбе, пр. Борбад, 15', 20,
+  VALUES (building, org, 'Rich Tower', 'Rich Tower', 'г. Душанбе, пр. Борбад, 15', 20,
           'Жилой дом на 20 этажей с коммерческим первым этажом', 'Бинои истиқоматии 20-ошёна бо ошёнаи якуми тиҷоратӣ', NULL, 2026, 160, ts, ts);
 
   -- Commercial floor: no apartments.
@@ -102,7 +138,7 @@ BEGIN
           jsonb_build_object('source', 'scripts/seed.sql', 'floors', 20, 'apartments', 160, 'sold', sold_n, 'booked', booked_n),
           ts, NULL, ts, ts);
 
-  RAISE NOTICE 'Создан дом «Некруз Резиденс»: 21 этаж (0 — коммерческий), 160 квартир, продано %, в брони %', sold_n, booked_n;
+  RAISE NOTICE 'Создан дом «Rich Tower»: 21 этаж (0 — коммерческий), 160 квартир, продано %, в брони %', sold_n, booked_n;
 END $$;
 
 -- Демо-значения: эко-паспорт и удобства дома, тарифы и условия рассрочки организации — те же, что в GreenDemoSeeder.cs
@@ -117,13 +153,13 @@ DECLARE
 BEGIN
   -- Описание без непроверенного «бизнес-класса» и его перевод; описание, заданное застройщиком, не трогаем.
   UPDATE "Buildings" SET "DescriptionRu" = 'Жилой дом на 20 этажей с коммерческим первым этажом', "UpdatedAt" = now()
-  WHERE "OrganizationId" = org AND "NameRu" = 'Некруз Резиденс'
+  WHERE "OrganizationId" = org AND "NameRu" = 'Rich Tower'
     AND "DescriptionRu" = 'Жилой комплекс бизнес-класса с коммерческим первым этажом';
   GET DIAGNOSTICS n = ROW_COUNT;
   IF n > 0 THEN RAISE NOTICE 'Описание дома заменено на нейтральное'; END IF;
 
   UPDATE "Buildings" SET "DescriptionTg" = 'Бинои истиқоматии 20-ошёна бо ошёнаи якуми тиҷоратӣ', "UpdatedAt" = now()
-  WHERE "OrganizationId" = org AND "NameRu" = 'Некруз Резиденс' AND "DescriptionTg" IS NULL AND "DescriptionRu" = 'Жилой дом на 20 этажей с коммерческим первым этажом';
+  WHERE "OrganizationId" = org AND "NameRu" = 'Rich Tower' AND "DescriptionTg" IS NULL AND "DescriptionRu" = 'Жилой дом на 20 этажей с коммерческим первым этажом';
   GET DIAGNOSTICS n = ROW_COUNT;
   IF n > 0 THEN RAISE NOTICE 'Описание дома на таджикском заполнено'; END IF;
 
@@ -141,20 +177,20 @@ BEGIN
     "EcoHeatingType" = 'Central',
     "EcoEstimatedKwhPerM2Year" = 120,
     "UpdatedAt" = now()
-  WHERE "OrganizationId" = org AND "NameRu" = 'Некруз Резиденс'
+  WHERE "OrganizationId" = org AND "NameRu" = 'Rich Tower'
     AND "EcoEnergyClass" IS NULL AND "EcoEstimatedKwhPerM2Year" IS NULL;
   GET DIAGNOSTICS n = ROW_COUNT;
   IF n > 0 THEN RAISE NOTICE 'Эко-паспорт дома заполнен демо-значениями'; END IF;
 
   -- Английские тексты дома и эко-паспорта (сайт на EN, A-10) — перевод тех же текстов; только пустые поля.
   UPDATE "Buildings" SET
-    "NameEn" = COALESCE("NameEn", 'Nekruz Residence'),
+    "NameEn" = COALESCE("NameEn", 'Rich Tower'),
     "DescriptionEn" = COALESCE("DescriptionEn", CASE WHEN "DescriptionRu" = 'Жилой дом на 20 этажей с коммерческим первым этажом'
       THEN 'A 20-storey residential building with a commercial ground floor' END),
     "EcoWallInsulationEn" = COALESCE("EcoWallInsulationEn", CASE WHEN "EcoWallInsulationRu" = 'Минеральная вата 100 мм' THEN 'Mineral wool, 100 mm' END),
     "EcoWindowsEn" = COALESCE("EcoWindowsEn", CASE WHEN "EcoWindowsRu" = 'Двухкамерный стеклопакет' THEN 'Double-chamber glazing units' END),
     "UpdatedAt" = now()
-  WHERE "OrganizationId" = org AND "NameRu" = 'Некруз Резиденс'
+  WHERE "OrganizationId" = org AND "NameRu" = 'Rich Tower'
     AND ("NameEn" IS NULL OR "DescriptionEn" IS NULL OR "EcoWallInsulationEn" IS NULL OR "EcoWindowsEn" IS NULL);
   GET DIAGNOSTICS n = ROW_COUNT;
   IF n > 0 THEN RAISE NOTICE 'Английские тексты дома заполнены'; END IF;
@@ -172,7 +208,7 @@ BEGIN
   UPDATE "Buildings" SET
     "Amenities" = ARRAY['underground_parking', 'closed_yard', 'playground', 'cctv', 'elevators', 'landscaping'],
     "UpdatedAt" = now()
-  WHERE "OrganizationId" = org AND "NameRu" = 'Некруз Резиденс' AND cardinality("Amenities") = 0;
+  WHERE "OrganizationId" = org AND "NameRu" = 'Rich Tower' AND cardinality("Amenities") = 0;
   GET DIAGNOSTICS n = ROW_COUNT;
   IF n > 0 THEN RAISE NOTICE 'Удобства дома заполнены демо-значениями'; END IF;
 
@@ -187,7 +223,7 @@ BEGIN
 END $$;
 
 -- Демо-сделки для «Зелёного эффекта» (только у организации, помеченной демо: на сайте бейдж «Демо-данные»).
--- У проданных квартир «Некруз Резиденс» без сделки появляется завершённая демо-сделка с демо-клиентом, и по каждой —
+-- У проданных квартир «Rich Tower» без сделки появляется завершённая демо-сделка с демо-клиентом, и по каждой —
 -- выданные онлайн PDF: 3 графика платежей (по 2 страницы) и 2 акта сверки (по 1 странице) за последние месяцы.
 -- Ничего не перезаписывает: запускается, только если у организации ещё нет ни одного выданного PDF.
 -- Менеджер сделки — первый сотрудник организации; если сотрудников нет, блок пропускается.
@@ -220,7 +256,7 @@ BEGIN
   FOR apt IN
     SELECT a."Id", a."Number", a."Price", a."Currency" FROM "Apartments" a
     JOIN "Floors" f ON f."Id" = a."FloorId" JOIN "Buildings" b ON b."Id" = f."BuildingId"
-    WHERE b."OrganizationId" = org AND b."NameRu" = 'Некруз Резиденс' AND a."Status" = 'Sold'
+    WHERE b."OrganizationId" = org AND b."NameRu" = 'Rich Tower' AND a."Status" = 'Sold'
       AND NOT EXISTS (SELECT 1 FROM "Deals" d WHERE d."ApartmentId" = a."Id")
     ORDER BY a."Number"
   LOOP
@@ -250,9 +286,8 @@ BEGIN
   IF deals_n > 0 THEN RAISE NOTICE 'Демо-сделок с выданными PDF: % (по 5 документов, 8 страниц)', deals_n; END IF;
 END $$;
 
--- Каждый запуск: демо-брони снова держатся 48 часов, как обещает сайт (C-05, docs/DECISIONS.md), и старое имя
--- организации «Sitora» меняется на «Некруз Резиденс» (R-01). Трогаются только действующие демо-брони (лид
--- «Демо-данные: бронь квартиры …» организации по умолчанию) и только имя «Sitora» — имя, заданное владельцем, не меняется.
+-- Каждый запуск: демо-брони снова держатся 48 часов, как обещает сайт (C-05, docs/DECISIONS.md). Трогаются только
+-- действующие демо-брони (лид «Демо-данные: бронь квартиры …» организации по умолчанию).
 DO $$
 DECLARE
   org constant uuid := '01a20000-0000-7000-8000-000000000001';
@@ -271,13 +306,4 @@ BEGIN
     RAISE NOTICE 'Демо-брони продлены на 48 часов: %', n;
   END IF;
 
-  UPDATE "Organizations" SET "Name" = 'Некруз Резиденс', "UpdatedAt" = now() WHERE "Id" = org AND "Name" = 'Sitora';
-  GET DIAGNOSTICS n = ROW_COUNT;
-  IF n > 0 THEN
-    INSERT INTO "AuditLog" ("Id", "UserId", "OrganizationId", "ImpersonatedById", "Entity", "EntityId", "Action", "Before", "After",
-                            "At", "Ip", "CreatedAt", "UpdatedAt")
-    VALUES (gen_random_uuid(), NULL, org, NULL, 'Organization', org, 'Renamed', jsonb_build_object('Name', 'Sitora'),
-            jsonb_build_object('Name', 'Некруз Резиденс', 'source', 'scripts/seed.sql'), now(), NULL, now(), now());
-    RAISE NOTICE 'Организация «Sitora» переименована в «Некруз Резиденс»';
-  END IF;
 END $$;

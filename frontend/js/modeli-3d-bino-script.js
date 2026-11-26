@@ -419,7 +419,7 @@
       };
 
       // ============================================================
-      // DUSHANBE-STYLE BUILDING (Nekruz Residence look)
+      // DUSHANBE-STYLE BUILDING
       // ============================================================
 
       // --- Main body (floors 2+) ---
@@ -543,7 +543,7 @@
       const frieze = new T.Mesh(new T.BoxGeometry(entW + 0.6, 1.4, 0.55), corniceM);
       frieze.position.set(0, GROUND_H + 1.0, D / 2 + 0.4); frieze.castShadow = true; tower.add(frieze);
       // Sign plate
-      signMat = new T.MeshBasicMaterial({ map: signTexture('НЕКРУЗ'), toneMapped: false });
+      signMat = new T.MeshBasicMaterial({ map: signTexture(String((S.brandName && S.brandName()) || '').toUpperCase()), toneMapped: false });
       const sign = new T.Mesh(new T.PlaneGeometry(10.4, 1.1), signMat);
       sign.position.set(0, GROUND_H + 1.0, D / 2 + 0.72); tower.add(sign);
       // Entrance steps

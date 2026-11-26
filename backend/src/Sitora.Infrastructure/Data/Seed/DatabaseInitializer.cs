@@ -65,7 +65,7 @@ public static class DatabaseInitializer
         if (isDevelopment)
         {
             await SeedDevelopmentUsersAsync(provider, logger);
-            await CatalogSeeder.SeedAsync(db, logger);
+            await CatalogSeeder.SeedAsync(db, provider.GetRequiredService<Sitora.Domain.Interfaces.IAuditService>(), logger);
             await SalesSeeder.SeedAsync(db,
                 provider.GetRequiredService<EncryptionService>(),
                 provider.GetRequiredService<TimeProvider>(),
@@ -75,10 +75,10 @@ public static class DatabaseInitializer
             // Демо-значения «зелёной» части; тесты выключают (Seed:GreenDemo=false), чтобы начинать с пустого паспорта.
             if (provider.GetRequiredService<IConfiguration>().GetValue("Seed:GreenDemo", true))
                 await GreenDemoSeeder.SeedAsync(db, logger);
-            // Второй застройщик; тесты его выключают (Seed:RichTower=false), чтобы данные сидера были предсказуемы.
-            if (provider.GetRequiredService<IConfiguration>().GetValue("Seed:RichTower", true))
-                await RichTowerSeeder.SeedAsync(db, provider.GetRequiredService<UserManager<AppUser>>(),
-                    provider.GetRequiredService<IConfiguration>(), logger);
+            // Второй застройщик; тесты его выключают (Seed:SecondBuilder=false), чтобы данные сидера были предсказуемы.
+            if (provider.GetRequiredService<IConfiguration>().GetValue("Seed:SecondBuilder", true))
+                await SecondBuilderSeeder.SeedAsync(db, provider.GetRequiredService<UserManager<AppUser>>(),
+                    provider.GetRequiredService<Sitora.Domain.Interfaces.IAuditService>(), provider.GetRequiredService<IConfiguration>(), logger);
         }
 
         // Сотрудники из секретов SEED_STAFF_* (ObjectAdmin, Manager, Accountant, Content) — в любом окружении, после каталога.

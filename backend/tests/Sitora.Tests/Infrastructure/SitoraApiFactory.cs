@@ -146,7 +146,7 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Seed:GreenDemo", "false");
         builder.UseSetting("Auth:SmsLoginEnabled", SmsLoginEnabled ? "true" : "false");
         // Второй застройщик из сидера разработки не нужен: изоляцию проверяют тесты со своими организациями.
-        builder.UseSetting("Seed:RichTower", "false");
+        builder.UseSetting("Seed:SecondBuilder", "false");
         // Код 123456 для любой почты (Development) выключен: тесты проверяют настоящие коды; режим проверяет DevFixedCodeTests.
         builder.UseSetting("Auth:DevFixedCodeForAnyEmail", "false");
         // Бот Telegram «настроен»: сам Telegram подменён FakeTelegramNotifier, в сеть ничего не уходит.

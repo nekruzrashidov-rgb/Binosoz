@@ -5,7 +5,7 @@ using Sitora.Domain.Enums;
 
 namespace Sitora.Infrastructure.Data.Seed;
 
-// Демо-значения эко-паспорта и удобств дома «Некруз Резиденс», «зелёных» настроек и условий рассрочки организации по умолчанию.
+// Демо-значения эко-паспорта и удобств дома «Rich Tower», «зелёных» настроек и условий рассрочки организации по умолчанию.
 // Правдоподобные, но не официальные: организация помечается IsDemo — на сайте бейдж «Демо-данные».
 // Те же значения записывает backend/scripts/seed.sql (SeedSqlTests сверяет). Коэффициент CO₂ не задаётся:
 // проверенного источника для него нет (docs/DECISIONS.md), без него CO₂ на сайте не показывается.
@@ -45,7 +45,7 @@ public static class GreenDemoSeeder
     public static async Task SeedAsync(AppDbContext db, ILogger logger)
     {
         var building = await db.Buildings.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(b => b.OrganizationId == Organization.DefaultId && b.NameRu == CatalogSeeder.BuildingName);
+            .FirstOrDefaultAsync(b => b.OrganizationId == Organization.DefaultId && CatalogSeeder.BuildingNames.Contains(b.NameRu));
         if (building is not null && building.Eco is null)
             building.Eco = Eco();
         if (building is not null && building.Amenities.Count == 0)
