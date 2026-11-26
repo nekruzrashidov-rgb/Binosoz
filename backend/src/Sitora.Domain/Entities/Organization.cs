@@ -35,6 +35,10 @@ public class Organization : BaseEntity
     // Условия рассрочки для сайта (столбцы Installment*).
     public OrganizationInstallmentSettings Installment { get; set; } = new();
 
+    // План общего участка ЖК (контур, двор, площадки) — для 3D всего ЖК; не задан — сайт рисует только блоки.
+    // Меняется через PUT /owner/site-plan (AuditLog).
+    public SitePlan? SitePlan { get; set; }
+
     public List<Building> Buildings { get; set; } = [];
 }
 

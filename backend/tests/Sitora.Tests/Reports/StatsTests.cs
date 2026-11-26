@@ -90,9 +90,14 @@ public class StatsTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFacto
 
         var rows = await owner.GetFromJsonAsync<List<BuildingStatsRow>>("/api/v1/stats/buildings", TestJson.Options);
 
-        var building = Assert.Single(rows!, r => r.TotalApartments > 0);
-        Assert.Equal(building.TotalApartments, building.Free + building.Booked + building.Sold + building.OnRequest);
-        Assert.Equal(Math.Round((decimal)(building.Booked + building.Sold) / building.TotalApartments, 4), building.OccupancyRate);
+        // Прежний дом сидера и три блока ЖК: у каждого статусы складываются в число квартир.
+        var buildings = rows!.Where(r => r.TotalApartments > 0).ToList();
+        Assert.Equal(4, buildings.Count);
+        foreach (var building in buildings)
+        {
+            Assert.Equal(building.TotalApartments, building.Free + building.Booked + building.Sold + building.OnRequest);
+            Assert.Equal(Math.Round((decimal)(building.Booked + building.Sold) / building.TotalApartments, 4), building.OccupancyRate);
+        }
     }
 
     [Fact]

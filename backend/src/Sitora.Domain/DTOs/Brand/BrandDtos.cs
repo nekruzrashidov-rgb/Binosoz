@@ -26,7 +26,10 @@ public record PublicBrandResponse(
     string? Telegram,
     string? Address,
     IReadOnlyList<BuildingResponse> Buildings,
-    string? Email = null);
+    string? Email = null,
+    // План участка ЖК (контур, двор, площадки); не задан — поля нет.
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    Sitora.Domain.Entities.SitePlan? SitePlan = null);
 
 // Владелец меняет название, короткое имя (поддомен), цвет и контакты. Свой домен задаёт создатель платформы.
 public record UpdateBrandRequest(string Name, string Slug, string? PrimaryColor, string? Phone, string? Telegram, string? Address, string? Email = null);

@@ -23,6 +23,12 @@ public class BuildingConfiguration : IEntityTypeConfiguration<Building>
         builder.Property(b => b.Longitude).HasPrecision(9, 6);
         builder.Property(b => b.FloorHeight).HasPrecision(4, 2);
         builder.Property(b => b.Amenities).HasColumnType("text[]").HasDefaultValueSql("'{}'::text[]").IsRequired();
+        // Блок ЖК: контур, место на участке и уступы — jsonb; буква блока до 4 символов.
+        builder.Property(b => b.Footprint).HasJson();
+        builder.Property(b => b.SitePosition).HasJson();
+        builder.Property(b => b.Setbacks).HasJson();
+        builder.Property(b => b.BlockCode).HasMaxLength(4);
+        builder.Property(b => b.SortOrder).HasDefaultValue(0);
 
         // Эко-паспорт — в той же таблице, столбцы Eco*; все необязательные (не заполнен — Eco = null).
         builder.OwnsOne(b => b.Eco, eco =>

@@ -463,6 +463,10 @@ namespace Sitora.Infrastructure.Data.Migrations
                         .HasColumnType("text[]")
                         .HasDefaultValueSql("'{}'::text[]");
 
+                    b.Property<string>("BlockCode")
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)");
+
                     b.Property<int?>("CompletionYear")
                         .HasColumnType("integer");
 
@@ -487,6 +491,9 @@ namespace Sitora.Infrastructure.Data.Migrations
 
                     b.Property<int>("FloorsCount")
                         .HasColumnType("integer");
+
+                    b.Property<string>("Footprint")
+                        .HasColumnType("jsonb");
 
                     b.Property<decimal?>("Latitude")
                         .HasPrecision(9, 6)
@@ -519,6 +526,17 @@ namespace Sitora.Infrastructure.Data.Migrations
 
                     b.Property<int?>("PlannedApartments")
                         .HasColumnType("integer");
+
+                    b.Property<string>("Setbacks")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("SitePosition")
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("SortOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1551,6 +1569,9 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Property<string>("PrimaryColor")
                         .HasMaxLength(7)
                         .HasColumnType("character varying(7)");
+
+                    b.Property<string>("SitePlan")
+                        .HasColumnType("jsonb");
 
                     b.Property<string>("Slug")
                         .IsRequired()

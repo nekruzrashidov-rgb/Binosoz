@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Sitora.Domain.DTOs.Settings;
+using Sitora.Domain.Entities;
 using Sitora.Domain.Enums;
 
 namespace Sitora.Domain.DTOs.Catalog;
@@ -33,7 +34,24 @@ public record BuildingResponse(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? FloorHeight = null,
     // Английские название и описание (A-10): не заданы — полей нет, сайт на EN показывает русский текст с пометкой.
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? NameEn = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? DescriptionEn = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? DescriptionEn = null,
+    // Блок ЖК: буква, порядок, контур в плане (м; точка [x, y] или [x, y, r]), место на участке, уступы. Не заданы — полей нет.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? BlockCode = null,
+    int SortOrder = 0,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<double[]>? Footprint = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] SitePlacement? SitePosition = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<BuildingSetback>? Setbacks = null);
+
+// PUT /buildings/{id}/shape: блок ЖК целиком. Пустой контур — «не блок» (сайт рисует обычный дом), места и уступов тогда нет.
+public record SaveBuildingShapeRequest(
+    string? BlockCode = null,
+    int SortOrder = 0,
+    List<double[]>? Footprint = null,
+    SitePlacement? SitePosition = null,
+    List<BuildingSetback>? Setbacks = null);
+
+// PUT /owner/site-plan: план участка ЖК целиком; пустой контур — плана нет.
+public record SaveSitePlanRequest(List<double[]>? Boundary = null, List<SiteZone>? Zones = null);
 
 // PUT /buildings/{id}/location: координаты задаются парой (обе или ни одной), пустое значение — «не задано».
 public record SaveBuildingLocationRequest(decimal? Latitude = null, decimal? Longitude = null, decimal? FloorHeight = null);

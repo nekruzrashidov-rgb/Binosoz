@@ -201,6 +201,28 @@ public static class ErrorCatalog
 
         // ---------- каталог ----------
         E("Дом не найден", "building_not_found", "Бино ёфт нашуд", "Building not found");
+        // ---------- блоки ЖК на участке (контур, место, уступы, план участка) ----------
+        E("Буква блока — от 1 до 4 латинских букв или цифр", "invalid_block_code", "Ҳарфи блок — аз 1 то 4 ҳарфи лотинӣ ё рақам", "The block code is 1 to 4 Latin letters or digits");
+        E("Порядок блока — от 0 до 1000", "invalid_block_order", "Тартиби блок — аз 0 то 1000", "The block order is from 0 to 1000");
+        E("Контур — от 3 до 64 вершин", "polygon_vertex_count", "Контур — аз 3 то 64 қулла", "An outline has 3 to 64 vertices");
+        E("Точка контура — числа x и y (м, не дальше 1000 м) и необязательный радиус скругления 0–50 м", "polygon_invalid_point",
+            "Нуқтаи контур — рақамҳои x ва y (м, на дуртар аз 1000 м) ва радиуси ихтиёрии гирдкунӣ 0–50 м",
+            "An outline point is the numbers x and y (m, within 1000 m) and an optional corner radius of 0–50 m");
+        E("Контур не должен пересекать сам себя", "polygon_self_intersection", "Контур набояд худашро бурад", "The outline must not cross itself");
+        E("Площадь контура должна быть больше нуля", "polygon_zero_area", "Масоҳати контур бояд аз сифр зиёд бошад", "The outline's area must be greater than zero");
+        E("Место блока на участке — не дальше 2000 м", "invalid_site_position", "Ҷои блок дар қитъа — на дуртар аз 2000 м", "The block's place on the site is within 2000 m");
+        E("Поворот блока — от -360 до 360°", "invalid_block_rotation", "Гардиши блок — аз -360 то 360°", "The block's rotation is from -360 to 360°");
+        E("Уступов — не больше 10", "too_many_setbacks", "Пиллаҳо — на зиёда аз 10", "No more than 10 setbacks");
+        E("Уступ начинается со 2-го этажа или выше", "invalid_setback_floor", "Пилла аз ошёнаи 2-юм ё болотар сар мешавад", "A setback starts on floor 2 or higher");
+        E("Уступ начинается выше последнего этажа", "setback_above_roof", "Пилла аз ошёнаи охирин болотар сар мешавад", "The setback starts above the top floor");
+        E("Контур уступа выходит за контур блока", "setback_outside_block", "Контури пилла аз контури блок берун мебарояд", "The setback's outline goes beyond the block's outline");
+        E("Блоки на участке пересекаются", "blocks_overlap", "Блокҳо дар қитъа ҳамдигарро мебуранд", "The blocks overlap on the site");
+        P("Расстояние между блоками меньше допустимого: ", "blocks_too_close", "Масофаи байни блокҳо аз иҷозатдодашуда камтар аст: ",
+            "The distance between the blocks is less than allowed: ");
+        E("Блок с такой буквой уже есть", "block_code_taken", "Блок бо чунин ҳарф аллакай ҳаст", "A block with this code already exists");
+        E("План участка изменён другим пользователем", "site_plan_conflict", "Нақшаи қитъаро корбари дигар тағйир дод", "The site plan was changed by another user");
+        E("Зон участка — не больше 40", "too_many_site_zones", "Минтақаҳои қитъа — на зиёда аз 40", "No more than 40 site zones");
+        E("Неизвестная зона участка", "unknown_site_zone", "Минтақаи номаълуми қитъа", "Unknown site zone");
         E("Этаж не найден", "floor_not_found", "Ошёна ёфт нашуд", "Floor not found");
         E("Квартира не найдена", "apartment_not_found", "Манзил ёфт нашуд", "Apartment not found");
         E("План этажа не задан", "floor_plan_not_found", "Нақшаи ошёна муайян нашудааст", "The floor plan is not set");

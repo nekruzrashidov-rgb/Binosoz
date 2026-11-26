@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Sitora.Domain.Common;
 using Sitora.Domain.DTOs.Catalog;
 using Sitora.Domain.DTOs.Common;
@@ -21,8 +22,12 @@ public class CatalogService(
     ICurrentUser currentUser,
     ApartmentImporter importer,
     ITariffService tariffs,
-    TimeProvider timeProvider) : ICatalogService
+    TimeProvider timeProvider,
+    IConfiguration configuration) : ICatalogService
 {
+    // Наименьший разрыв между блоками ЖК на участке, м (Catalog__MinBlockGapMeters; по умолчанию 20).
+    public const double DefaultMinBlockGap = 20;
+    private double MinBlockGap => configuration.GetValue("Catalog:MinBlockGapMeters", DefaultMinBlockGap);
     private const string BuildingNotFound = "Дом не найден";
     private const string FloorNotFound = "Этаж не найден";
     private const string ApartmentNotFound = "Квартира не найдена";
@@ -52,7 +57,7 @@ public class CatalogService(
             if (slug is not null)
                 query = query.Where(b => b.Organization.Slug == slug);
             var total = await query.CountAsync(ct);
-            var items = await query.OrderBy(b => b.NameRu).ThenBy(b => b.Id)
+            var items = await query.OrderBy(b => b.SortOrder).ThenBy(b => b.NameRu).ThenBy(b => b.Id)
                 .Skip(p.Skip).Take(p.PageSize)
                 .Select(ToBuildingResponse(tg))
                 .ToListAsync(ct);
@@ -270,6 +275,85 @@ public class CatalogService(
         return await GetBuildingAsync(id, ct);
     }
 
+    // Блок ЖК: буква, порядок, контур, место на участке, уступы — целиком. Контур уже проверен валидатором (вершины,
+    // площадь, самопересечения); здесь — то, для чего нужна база: уступ внутри контура и не выше крыши, буква не занята,
+    // блоки организации на участке не пересекаются и стоят не ближе Catalog:MinBlockGapMeters. Ошибка — 400, AuditLog —
+    // в том же SaveChanges, кэш каталога сбрасывается.
+    public async Task<BuildingResponse> UpdateBuildingShapeAsync(Guid id, SaveBuildingShapeRequest request, CancellationToken ct = default)
+    {
+        var building = await db.Buildings.FirstOrDefaultAsync(b => b.Id == id, ct)
+            ?? throw new NotFoundException(BuildingNotFound);
+        var code = string.IsNullOrWhiteSpace(request.BlockCode) ? null : request.BlockCode.Trim().ToUpperInvariant();
+        var footprint = request.Footprint is { Count: > 0 } ? request.Footprint : null;
+        var setbacks = footprint is null ? null : request.Setbacks?.Where(s => s.Footprint.Count > 0).OrderBy(s => s.FromFloor).ToList();
+        var position = footprint is null ? null : request.SitePosition ?? new SitePlacement();
+
+        if (code is not null && await db.Buildings.AnyAsync(b => b.OrganizationId == building.OrganizationId && b.Id != id && b.BlockCode == code, ct))
+            throw new ConflictException("Блок с такой буквой уже есть");
+        if (footprint is not null)
+        {
+            var outline = PlanGeometry.Expand(footprint);
+            foreach (var s in setbacks ?? [])
+            {
+                if (s.FromFloor > building.FloorsCount)
+                    throw new BadRequestException("Уступ начинается выше последнего этажа");
+                if (!PlanGeometry.Inside(outline, PlanGeometry.Expand(s.Footprint), 0.05))
+                    throw new BadRequestException("Контур уступа выходит за контур блока");
+            }
+
+            var placed = Placed(footprint, position!);
+            var others = await db.Buildings.AsNoTracking()
+                .Where(b => b.OrganizationId == building.OrganizationId && b.Id != id && b.Footprint != null && b.SitePosition != null)
+                .Select(b => new { b.NameRu, b.Footprint, b.SitePosition })
+                .ToListAsync(ct);
+            foreach (var other in others)
+            {
+                var gap = PlanGeometry.Distance(placed, Placed(other.Footprint!, other.SitePosition!));
+                if (gap <= 1e-6)
+                    throw new BadRequestException("Блоки на участке пересекаются");
+                if (gap < MinBlockGap - 1e-6)
+                    throw new BadRequestException(string.Create(CultureInfo.InvariantCulture,
+                        $"Расстояние между блоками меньше допустимого: {gap:0.#} м, нужно не меньше {MinBlockGap:0.#} м"));
+            }
+        }
+
+        var before = ShapeSnapshot(building);
+        building.BlockCode = code;
+        building.SortOrder = request.SortOrder;
+        building.Footprint = footprint;
+        building.SitePosition = position;
+        building.Setbacks = setbacks is { Count: > 0 } ? setbacks : null;
+        audit.Record(nameof(Building), building.Id, "ShapeUpdated", before, ShapeSnapshot(building));
+        await SaveAsync("Блок с такой буквой уже есть", ct);
+        return await GetBuildingAsync(id, ct);
+
+        static IReadOnlyList<PlanGeometry.P> Placed(List<double[]> fp, SitePlacement p) =>
+            PlanGeometry.Place(PlanGeometry.Expand(fp), p.X, p.Y, p.RotationDeg);
+    }
+
+    private static object ShapeSnapshot(Building b) => new { b.BlockCode, b.SortOrder, b.Footprint, b.SitePosition, b.Setbacks };
+
+    public async Task<SitePlan?> GetSitePlanAsync(CancellationToken ct = default)
+    {
+        var organizationId = currentUser.OrganizationId ?? throw new NotFoundException("Организация не найдена");
+        return await db.Organizations.AsNoTracking().Where(o => o.Id == organizationId).Select(o => o.SitePlan).FirstOrDefaultAsync(ct);
+    }
+
+    // План участка своей организации целиком (руководители); пустой контур — плана нет. AuditLog, сброс кэша каталога.
+    public async Task<SitePlan?> UpdateSitePlanAsync(SaveSitePlanRequest request, CancellationToken ct = default)
+    {
+        var organizationId = currentUser.OrganizationId ?? throw new NotFoundException("Организация не найдена");
+        var organization = await db.Organizations.FirstAsync(o => o.Id == organizationId, ct);
+        var before = organization.SitePlan;
+        organization.SitePlan = request.Boundary is { Count: >= 3 }
+            ? new SitePlan { Boundary = request.Boundary, Zones = request.Zones ?? [] }
+            : null;
+        audit.Record(nameof(Organization), organization.Id, "SitePlanUpdated", before is null ? null : new { before.Boundary, before.Zones },
+            organization.SitePlan is null ? null : new { organization.SitePlan.Boundary, organization.SitePlan.Zones }, organization.Id);
+        await SaveAsync("План участка изменён другим пользователем", ct);
+        return organization.SitePlan;
+    }
+
     private static object EcoSnapshot(BuildingEcoInfo e) => new
     {
         e.EnergyClass, e.WallInsulationRu, e.WallInsulationTg, e.WindowsRu, e.WindowsTg, e.WallInsulationEn, e.WindowsEn, e.SolarPanelsKw,
@@ -467,7 +551,12 @@ public class CatalogService(
         b.Longitude,
         b.FloorHeight,
         b.NameEn,
-        b.DescriptionEn);
+        b.DescriptionEn,
+        b.BlockCode,
+        b.SortOrder,
+        b.Footprint,
+        b.SitePosition,
+        b.Setbacks);
 
     private static readonly Expression<Func<Floor, FloorResponse>> ToFloorResponse = f => new FloorResponse(
         f.Id,

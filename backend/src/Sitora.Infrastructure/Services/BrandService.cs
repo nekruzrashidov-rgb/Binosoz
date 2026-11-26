@@ -42,13 +42,14 @@ public class BrandService(
         var tg = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "tg";
         var buildings = await db.Buildings.AsNoTracking()
             .Where(b => b.OrganizationId == organization.Id)
-            .OrderBy(b => b.NameRu).ThenBy(b => b.Id)
+            .OrderBy(b => b.SortOrder).ThenBy(b => b.NameRu).ThenBy(b => b.Id)
             .Select(CatalogService.ToBuildingResponse(tg))
             .ToListAsync(ct);
         buildings = await CatalogService.WithExpiredReleasedAsync(db, timeProvider, buildings, ct);
 
         return new PublicBrandResponse(organization.Id, organization.Name, organization.Slug, organization.LogoUrl,
-            organization.PrimaryColor, organization.Phone, organization.Telegram, organization.Address, buildings, organization.Email);
+            organization.PrimaryColor, organization.Phone, organization.Telegram, organization.Address, buildings, organization.Email,
+            organization.SitePlan is { Boundary.Count: >= 3 } plan ? plan : null);
     }
 
     // Свой домен проверяется первым; иначе нужен ровно один уровень под доменом платформы: slug.sitora.tj.

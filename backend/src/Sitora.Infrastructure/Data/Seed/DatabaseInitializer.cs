@@ -75,11 +75,18 @@ public static class DatabaseInitializer
             // Демо-значения «зелёной» части; тесты выключают (Seed:GreenDemo=false), чтобы начинать с пустого паспорта.
             if (provider.GetRequiredService<IConfiguration>().GetValue("Seed:GreenDemo", true))
                 await GreenDemoSeeder.SeedAsync(db, logger);
+            // Три блока ЖК «Rich Tower» (концепт); тесты, которым они мешают, выключают их (Seed:RichTowerBlocks=false).
+            if (provider.GetRequiredService<IConfiguration>().GetValue("Seed:RichTowerBlocks", true))
+                await RichTowerBlocksSeeder.SeedAsync(db, provider.GetRequiredService<Sitora.Domain.Interfaces.IAuditService>(), logger);
             // Второй застройщик; тесты его выключают (Seed:SecondBuilder=false), чтобы данные сидера были предсказуемы.
             if (provider.GetRequiredService<IConfiguration>().GetValue("Seed:SecondBuilder", true))
                 await SecondBuilderSeeder.SeedAsync(db, provider.GetRequiredService<UserManager<AppUser>>(),
                     provider.GetRequiredService<Sitora.Domain.Interfaces.IAuditService>(), provider.GetRequiredService<IConfiguration>(), logger);
         }
+
+        // Блоки ЖК на проде — только по явному SEED_RICH_TOWER_BLOCKS=true (Actions → Seed prod), иначе база не трогается.
+        if (!isDevelopment && provider.GetRequiredService<IConfiguration>().GetValue<bool>(RichTowerBlocksSeeder.EnabledVariable))
+            await RichTowerBlocksSeeder.SeedAsync(db, provider.GetRequiredService<Sitora.Domain.Interfaces.IAuditService>(), logger);
 
         // Сотрудники из секретов SEED_STAFF_* (ObjectAdmin, Manager, Accountant, Content) — в любом окружении, после каталога.
         await StaffAccountsSeeder.SeedAsync(provider, logger);

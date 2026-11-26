@@ -469,7 +469,9 @@
         const ecoForm = S.eco ? S.eco.form(b, (r) => { b.eco = r && r.eco; }) : null;
         // Amenities of the building: the site lists only these (Content and leaders).
         const amenForm = S.eco ? S.eco.amenitiesForm(b, (r) => { b.amenities = (r && r.amenities) || []; }) : null;
-        body.replaceChildren(buildingBar(bs, bid, 'catalog'), bform, locationForm(b), amenForm, ecoForm, h('h3', { style: { marginTop: '10px' } }, t('cat.apts')), tools, holder);
+        // A block of the complex: the outline and the place on the site (blok-shakl-crm-script.js), Content and leaders.
+        const shapeForm = S.blockForms ? S.blockForms.shape(b, bs) : null;
+        body.replaceChildren(buildingBar(bs, bid, 'catalog'), bform, locationForm(b), shapeForm, amenForm, ecoForm, h('h3', { style: { marginTop: '10px' } }, t('cat.apts')), tools, holder);
         async function drawApts() {
           const fl = floors.find((f) => String(f.id) === String(floorId)); holder.replaceChildren(S.skeleton(4, 38));
           const list = (await S.api.floorApartments(fl)).sort((a, c) => (a.planSlot || 0) - (c.planSlot || 0));

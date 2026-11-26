@@ -35,5 +35,17 @@ public class Building : BaseEntity
     public decimal? Longitude { get; set; }
     public decimal? FloorHeight { get; set; }
 
+    // Блок ЖК на общем участке (docs/DECISIONS.md, «Rich Tower: 3 блока»). Контур в плане — многоугольник в метрах
+    // (точка [x, y] или [x, y, r] — радиус скругления угла), место на участке, уступы верхних этажей; пока у застройщика
+    // нет проекта, это концепт, и сайт так и подписывает. Не задано — сайт рисует обычный прямоугольный дом.
+    // Меняются только через PUT /buildings/{id}/shape (проверка контура, пересечений и разрыва между блоками, AuditLog).
+    public List<double[]>? Footprint { get; set; }
+    public SitePlacement? SitePosition { get; set; }
+    public List<BuildingSetback>? Setbacks { get; set; }
+    // Буква блока (A, B, C — до 4 символов) и порядок на сайте; дом без буквы — не блок ЖК.
+    public string? BlockCode { get; set; }
+    public int SortOrder { get; set; }
+
+
     public List<Floor> Floors { get; set; } = [];
 }

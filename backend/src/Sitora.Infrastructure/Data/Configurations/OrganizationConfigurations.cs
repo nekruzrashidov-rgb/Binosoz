@@ -12,6 +12,8 @@ public class OrganizationConfiguration : IEntityTypeConfiguration<Organization>
         builder.Property(o => o.Name).HasMaxLength(200).IsRequired();
         builder.Property(o => o.Slug).HasMaxLength(64).IsRequired();
         builder.HasIndex(o => o.Slug).IsUnique();
+        // План участка ЖК — jsonb, не задан — null.
+        builder.Property(o => o.SitePlan).HasJson();
         builder.Property(o => o.LogoUrl).HasMaxLength(500);
         builder.Property(o => o.LogoFileKey).HasMaxLength(300);
         builder.Property(o => o.LogoContentType).HasMaxLength(100);

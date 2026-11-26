@@ -73,12 +73,15 @@
         // Amenities (keys of BuildingAmenities) and the developer's installment terms: only what the API has.
         amenities: Array.isArray(b.amenities) ? b.amenities : [], installment: b.installment || null,
         // The point on the map and the floor height (3D model): null — not set (no surroundings; the height is an estimate).
-        latitude: b.latitude == null ? null : num(b.latitude), longitude: b.longitude == null ? null : num(b.longitude), floorHeight: b.floorHeight == null ? null : num(b.floorHeight) };
+        latitude: b.latitude == null ? null : num(b.latitude), longitude: b.longitude == null ? null : num(b.longitude), floorHeight: b.floorHeight == null ? null : num(b.floorHeight),
+        // A block of the complex (letter, order, outline in metres, place on the site, setbacks): null — a plain building.
+        blockCode: b.blockCode || null, sortOrder: num(b.sortOrder || 0), footprint: Array.isArray(b.footprint) && b.footprint.length >= 3 ? b.footprint : null,
+        sitePosition: b.sitePosition || null, setbacks: Array.isArray(b.setbacks) ? b.setbacks : [] };
     },
     floor(f) { return { id: f.id, number: num(pick(f, ['number', 'floorNumber', 'level'], 0)), commercial: !!pick(f, ['isCommercial', 'commercial'], false), total: num(pick(f, ['totalApartments', 'apartmentsCount', 'total'], 0)), free: num(pick(f, ['freeApartments', 'freeCount', 'free'], 0)) }; },
     apt(a, floorNo) {
       const area = num(pick(a, ['area', 'totalArea', 'squareMeters'], 0)), pps = num(pick(a, ['pricePerM2', 'pricePerSqm', 'pricePerSquareMeter'], 0));
-      return { id: a.id, floorId: pick(a, ['floorId'], null), buildingId: pick(a, ['buildingId'], null), floor: floorNo !== undefined ? floorNo : num(pick(a, ['floorNumber', 'floor'], 0)), number: pick(a, ['number', 'apartmentNumber'], ''), rooms: num(pick(a, ['rooms', 'roomsCount'], 0)), area, pricePerSqm: pps, price: num(pick(a, ['price', 'totalPrice'], area * pps)), status: normStatus(pick(a, ['status'], 'free')), planSlot: pick(a, ['planSlot'], null) === null ? null : num(a.planSlot), model3dId: pick(a, ['model3dId'], null) };
+      return { id: a.id, floorId: pick(a, ['floorId'], null), buildingId: pick(a, ['buildingId'], null), floor: floorNo !== undefined ? floorNo : num(pick(a, ['floorNumber', 'floor'], 0)), number: pick(a, ['number', 'apartmentNumber'], ''), rooms: num(pick(a, ['rooms', 'roomsCount'], 0)), area, pricePerSqm: pps, price: num(pick(a, ['price', 'totalPrice'], area * pps)), currency: String(pick(a, ['currency'], 'TJS')).toUpperCase(), status: normStatus(pick(a, ['status'], 'free')), planSlot: pick(a, ['planSlot'], null) === null ? null : num(a.planSlot), model3dId: pick(a, ['model3dId'], null) };
     },
     lead(l) { return { id: l.id, name: pick(l, ['name', 'fullName', 'customerName'], ''), phone: pick(l, ['phone', 'phoneNumber'], ''), comment: pick(l, ['comment', 'message'], ''), status: leadStatus(pick(l, ['status'], 'New')), apiStatus: String(pick(l, ['status'], 'New')), managerId: pick(l, ['managerId'], null), assignee: pick(l, ['assignee', 'assignedTo', 'managerName', 'responsibleName'], ''), createdAt: pick(l, ['createdAt', 'created'], ''), apartmentId: pick(l, ['apartmentId'], null), source: String(pick(l, ['source'], 'Website')) }; },
     customer(c) { return { id: c.id, fullName: pick(c, ['fullName', 'name'], ''), phone: pick(c, ['phone'], ''), email: pick(c, ['email'], ''), passport: pick(c, ['passportData', 'passport', 'passportNumber'], ''), createdAt: pick(c, ['createdAt'], ''), dealsCount: pick(c, ['dealsCount'], null), deals: arr(c.deals).map(M.deal) }; },
@@ -506,6 +509,11 @@
     installmentSettings() { return request('GET', '/owner/installment-settings'); },
     saveInstallmentSettings(b) { return request('PUT', '/owner/installment-settings', { body: b }); },
     saveBuildingLocation(id, body) { return request('PUT', '/buildings/' + id + '/location', { body }).then(M.building); },
+    // A block of the complex: the letter, the order, the outline, the place on the site and the setbacks — as a whole.
+    saveBuildingShape(id, body) { return request('PUT', '/buildings/' + id + '/shape', { body }).then(M.building); },
+    // The plan of the complex's site (the outline, the yard's zones) of the own organization; null — not set.
+    sitePlan() { return request('GET', '/owner/site-plan').then((r) => r || null); },
+    saveSitePlan(body) { return request('PUT', '/owner/site-plan', { body }).then((r) => r || null); },
     saveBuildingAmenities(id, keys) { return request('PUT', '/buildings/' + id + '/amenities', { body: { amenities: keys } }).then(M.building); },
     // Eco passport of a building (Content and leaders): the whole passport, empty fields — «not filled».
     saveBuildingEco(id, eco) { return request('PUT', '/buildings/' + id + '/eco', { body: eco }).then(M.building); },
