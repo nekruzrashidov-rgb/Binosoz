@@ -57,7 +57,7 @@ public class AuditService(AppDbContext db, ICurrentUser currentUser, TimeProvide
         {
             var s = subjects[a.Id];
             return new AuditLogResponse(a.Id, s.ActorId, s.ActorEmail, a.Entity, a.EntityId, a.Action, a.Before, a.After, a.At,
-                a.OrganizationId, a.ImpersonatedById, s.ActorName, s.BySystem, s.EntityName, s.ApartmentNumber);
+                a.OrganizationId, a.ImpersonatedById, s.ActorName, s.BySystem, s.EntityName, s.ApartmentNumber, s.ApartmentCode);
         }).ToList();
         return new PagedResult<AuditLogResponse>(items, p.Page, p.PageSize, total);
     }

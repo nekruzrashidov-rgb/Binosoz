@@ -342,7 +342,7 @@
           onHover: (a, x, y) => {
             if (!a) { tip.hidden = true; return; }
             const apt = st.apts.find((z) => z.id === a.id) || a;
-            tip.replaceChildren(h('b', null, '№ ' + apt.number), ' · ' + S.fmt.rooms(apt.rooms) + ' · ' + S.fmt.area(apt.area) + ' · ' + t('status.' + apt.status));
+            tip.replaceChildren(h('b', null, S.aptShort(apt)), ' · ' + S.fmt.rooms(apt.rooms) + ' · ' + S.fmt.area(apt.area) + ' · ' + t('status.' + apt.status));
             tip.style.left = Math.min(x, houseBox.clientWidth - 260) + 'px'; tip.style.top = y + 'px'; tip.hidden = false;
           },
         });
@@ -518,7 +518,7 @@
       const badge = S.eco && S.eco.badge(st.building.eco);
       return h('div', { class: 'nr-detail' + (plan ? '' : ' nr-detail--unit') }, plan ? h('div', { class: 'nr-detail-pic' }, plan) : null,
         h('div', { class: 'nr-detail-body' },
-          h('div', { class: 'nr-detail-kicker' }, (a.blockName ? a.blockName + ' · ' : '') + S.unitName(a) + ' · ' + S.floorName({ number: a.floor, parking: a.floor < 0 })),
+          h('div', { class: 'nr-detail-kicker' }, S.unitName(a) + ' · ' + S.floorName({ number: a.floor, parking: a.floor < 0 })),
           h('h3', { class: 'nr-detail-type' }, S.unitType(a), a.kind === 'penthouse' ? h('span', { class: 'chip warn nr-badge-ph' }, t('kind.penthouseOne')) : null),
           h('dl', { class: 'nr-detail-facts' }, h('div', null, h('dt', null, t('nr.cat.area')), h('dd', null, S.fmt.area(a.area))), a.kind === 'parking' ? null : h('div', null, h('dt', null, t('nr.cat.sqm')), h('dd', null, S.fmt.money(sqmPrice(a), cur()))),
             a.terraceArea ? h('div', null, h('dt', null, t('unit.terrace')), h('dd', null, S.fmt.area(a.terraceArea))) : null,

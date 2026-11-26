@@ -422,7 +422,8 @@ TwoFactorRequired = { requiresTwoFactor: true, tempToken, expiresAt }
 | POST | `/apartments/{id}/bookings` | `{ name, phone }` (гость) или `{ customerId }` (менеджер) → `BookingResponse`; 409, если квартира занята. Бронь с сайта (гость или покупатель): лимит формы — 30 в час на IP, не больше одной активной брони на телефон и `Booking__GuestActivePerIp` (3) активных на IP — иначе 429 `booking_ip_limit` | `book()` |
 
 Состав ответов:
-- `ApartmentResponse`: `id, floorId, buildingId, floorNumber, number, rooms, area, pricePerM2, price, currency, status, planSlot (0–7), model3dId`.
+- `ApartmentResponse`: `id, floorId, buildingId, floorNumber, number, rooms, area, pricePerM2, price, currency, status, planSlot (0–99), model3dId, kind, terraceArea?, blockCode?`. В блоке ЖК номер — в своей серии блока: квартиры 1…N, магазины (`kind: Commercial`) — Н-1…, машино-места (`Parking`) — М-1…; показ — «Блок A, кв. 45» / «A-45». Номер уникален в доме и серии: повтор при создании или правке — 409 `apartment_number_taken`.
+- Номер с блоком в других ответах: сделки (`DealResponse`), брони, кабинет (`CabinetDealResponse`), чат (`ChatConversationResponse`), воронка CRM (`PipelineCard`), отчёты платежей и долгов — рядом с `apartmentNumber` поля `blockCode` (null у дома без блока) и `apartmentKind`; журнал аудита — `apartmentCode` («A-45»).
 - `BuildingResponse`: `name` на языке запроса, `nameRu/Tg`, `descriptionRu/Tg`, `totalApartments`, `freeApartments`.
 
 ### Удобства дома и условия рассрочки

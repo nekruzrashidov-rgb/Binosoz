@@ -126,7 +126,19 @@
   // groups 0 (studio), 1, 2, 3, 4 (four rooms and more); the label names the real number of rooms.
   // Kinds of premises: an apartment (and a penthouse) is a home; a shop and a parking space have their own names.
   S.isHome = (a) => !a || !a.kind || a.kind === 'residential' || a.kind === 'penthouse';
-  S.unitName = (a) => (a && a.kind === 'commercial' ? S.t('unit.shop', { n: a.number }) : a && a.kind === 'parking' ? S.t('unit.spot', { n: a.number }) : a && a.kind === 'penthouse' ? S.t('unit.penthouse', { n: a.number }) : S.t('nr.cat.aptN', { n: a.number }));
+  // Numbers (from the API): in a block of the complex homes go 1…N, shops Н-1…, parking spaces М-1…; the block letter comes
+  // with the number — «Блок A, кв. 45», short «A-45». The older building without blocks keeps its plain numbers.
+  // unitOf() reads both a catalog unit ({ number, block, kind }) and a deal/booking/report row ({ apartmentNumber, blockCode, apartmentKind }).
+  S.unitOf = (x) => ({ block: (x && (x.block || x.blockCode)) || null, kind: String((x && (x.apartmentKind || x.kind)) || 'residential').toLowerCase(), number: x ? (x.apartmentNumber != null ? x.apartmentNumber : x.number) : '' });
+  S.unitCode = (kind, n) => (kind === 'commercial' ? 'Н-' : kind === 'parking' ? 'М-' : '') + n;
+  // The number for a table cell or a title: «A-45» in a block, «№ 1201» elsewhere (aptNum — without «№»).
+  S.aptNum = (x) => { const u = S.unitOf(x); return (u.block ? u.block + '-' : '') + S.unitCode(u.kind, u.number); };
+  S.aptShort = (x) => { const u = S.unitOf(x); return u.block ? S.aptNum(u) : '№ ' + S.unitCode(u.kind, u.number); };
+  S.unitName = (x) => {
+    const a = S.unitOf(x); const code = S.unitCode(a.kind, a.number);
+    if (a.block) return S.t('unit.inBlock', { b: a.block, u: S.t(a.kind === 'commercial' ? 'unit.shopIn' : a.kind === 'parking' ? 'unit.spotIn' : a.kind === 'penthouse' ? 'unit.penthouseIn' : 'unit.aptIn', { n: code }) });
+    return a.kind === 'commercial' ? S.t('unit.shop', { n: code }) : a.kind === 'parking' ? S.t('unit.spot', { n: code }) : a.kind === 'penthouse' ? S.t('unit.penthouse', { n: code }) : S.t('nr.cat.aptN', { n: code });
+  };
   S.unitType = (a) => (a && a.kind === 'commercial' ? S.t('unit.shopType') : a && a.kind === 'parking' ? S.t('unit.spotType') : a && a.kind === 'penthouse' ? S.t('unit.penthouseType', { n: a.rooms }) : S.roomsKind.label(a.rooms));
   // The penthouses' ceiling: not in the API yet — 3,6 m marked «оценка» (an estimate).
   S.PENTHOUSE_CEILING = 3.6;
@@ -331,7 +343,7 @@
     },
     entity(x) {
       const kind = t('audit.ent.' + x.entity, null, x.entity);
-      const parts = [x.apartmentNumber != null ? t('audit.apt', { n: x.apartmentNumber }) : null, x.entityName || null].filter(Boolean);
+      const parts = [x.apartmentNumber != null ? t('audit.apt', { n: x.apartmentCode || x.apartmentNumber }) : null, x.entityName || null].filter(Boolean);
       if (parts.length) return kind + ' · ' + parts.join(' · ');
       const id = typeof x.entityId === 'string' && x.entityId.length > 12 ? x.entityId.replace(/-/g, '').slice(-8).toUpperCase() : '';
       return id && !/^0+$/.test(id) ? kind + ' #' + id : kind;

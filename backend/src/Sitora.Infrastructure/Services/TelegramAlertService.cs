@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Sitora.Domain.Common;
 using Sitora.Domain.Enums;
 using Sitora.Domain.Interfaces;
 using Sitora.Infrastructure.Data;
@@ -14,22 +15,27 @@ public static class TelegramMessages
 {
     private static readonly CultureInfo Russian = CultureInfo.GetCultureInfo("ru-RU");
 
+    // Квартира дома без блока — «кв. 12», как раньше; в блоке ЖК — «кв. 45 в блоке A», магазин — «пом. Н-3 в блоке A».
+    private static string Apt(UnitRef u) => u.Block is null && u.Kind is ApartmentKind.Residential or ApartmentKind.Penthouse ? $"кв. {u.Number}" : u.InText();
+
+    private static string Capitalize(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..];
+
     public static string Money(decimal amount, Currency currency) => $"{amount.ToString("#,0.00", Russian)} {currency}";
 
-    public static string Payment(string customer, int apartment, decimal amount, Currency currency, DateOnly paidAt) =>
-        $"💰 *Новый платёж*\n{Escape(customer)}, кв. {apartment}, {Money(amount, currency)}, {paidAt:dd.MM.yyyy}";
+    public static string Payment(string customer, UnitRef apartment, decimal amount, Currency currency, DateOnly paidAt) =>
+        $"💰 *Новый платёж*\n{Escape(customer)}, {Apt(apartment)}, {Money(amount, currency)}, {paidAt:dd.MM.yyyy}";
 
-    public static string Overdue(string customer, int apartment, decimal amount, Currency currency, int days) =>
-        $"🔴 *Просрочка*\n{Escape(customer)}, кв. {apartment}, {Money(amount, currency)}, просрочено {days} дн.";
+    public static string Overdue(string customer, UnitRef apartment, decimal amount, Currency currency, int days) =>
+        $"🔴 *Просрочка*\n{Escape(customer)}, {Apt(apartment)}, {Money(amount, currency)}, просрочено {days} дн.";
 
     public static string Reminder(decimal amount, Currency currency, DateOnly due) =>
         $"🟡 *Напоминание*\nПлатёж {Money(amount, currency)} через 3 дня, {due:dd.MM.yyyy}";
 
-    public static string Booking(int apartment, string client, decimal price, Currency currency) =>
-        $"🏠 *Новая бронь*\nКв. {apartment}, {Escape(client)}, {Money(price, currency)}";
+    public static string Booking(UnitRef apartment, string client, decimal price, Currency currency) =>
+        $"🏠 *Новая бронь*\n{Capitalize(Apt(apartment))}, {Escape(client)}, {Money(price, currency)}";
 
-    public static string Lead(string name, string? building, int? apartment) =>
-        $"📝 *Новая заявка*\n{Escape(name)}" + (building is null ? "" : $", {Escape(building)}") + (apartment is null ? "" : $", кв. {apartment}");
+    public static string Lead(string name, string? building, UnitRef? apartment) =>
+        $"📝 *Новая заявка*\n{Escape(name)}" + (building is null ? "" : $", {Escape(building)}") + (apartment is { } a ? $", {Apt(a)}" : "");
 
     public static string WeeklyReport(string building, DateOnly start, DateOnly end, string? link) =>
         $"📊 *Еженедельный отчёт готов*\n{Escape(building)}, {start:dd.MM.yyyy} — {end:dd.MM.yyyy}" + (link is null ? "" : $"\n{link}");
@@ -49,22 +55,22 @@ public class TelegramAlertService(AppDbContext db, ITelegramNotifier telegram, I
     public Task PaymentReceivedAsync(Guid paymentId, CancellationToken ct = default) => SafeAsync("о платеже", async () =>
     {
         var p = await db.Payments.IgnoreQueryFilters().AsNoTracking().Where(x => x.Id == paymentId)
-            .Select(x => new { x.Amount, x.Currency, x.PaidAt, x.Deal.Customer.FullName, x.Deal.Apartment.Number,
-                x.Deal.Apartment.Floor.BuildingId, x.Deal.Apartment.Floor.Building.OrganizationId })
+            .Select(x => new { x.Amount, x.Currency, x.PaidAt, x.Deal.Customer.FullName, x.Deal.Apartment.Number, x.Deal.Apartment.Kind,
+                x.Deal.Apartment.Floor.Building.BlockCode, x.Deal.Apartment.Floor.BuildingId, x.Deal.Apartment.Floor.Building.OrganizationId })
             .SingleAsync(ct);
         await SendToStaffAsync(p.OrganizationId, p.BuildingId, [RoleNames.Owner, RoleNames.Accountant],
-            TelegramMessages.Payment(p.FullName, p.Number, p.Amount, p.Currency, p.PaidAt), ct);
+            TelegramMessages.Payment(p.FullName, new UnitRef(p.Number, p.BlockCode, p.Kind), p.Amount, p.Currency, p.PaidAt), ct);
     });
 
     public Task BookingCreatedAsync(Guid bookingId, CancellationToken ct = default) => SafeAsync("о брони", async () =>
     {
         var b = await db.Bookings.IgnoreQueryFilters().AsNoTracking().Where(x => x.Id == bookingId)
-            .Select(x => new { x.Apartment.Number, x.Apartment.Price, x.Apartment.Currency,
+            .Select(x => new { x.Apartment.Number, x.Apartment.Kind, x.Apartment.Floor.Building.BlockCode, x.Apartment.Price, x.Apartment.Currency,
                 Client = x.Customer != null ? x.Customer.FullName : x.Lead != null ? x.Lead.Name : "",
                 x.Apartment.Floor.BuildingId, x.Apartment.Floor.Building.OrganizationId })
             .SingleAsync(ct);
         await SendToStaffAsync(b.OrganizationId, b.BuildingId, [RoleNames.Owner, RoleNames.Manager],
-            TelegramMessages.Booking(b.Number, b.Client, b.Price, b.Currency), ct);
+            TelegramMessages.Booking(new UnitRef(b.Number, b.BlockCode, b.Kind), b.Client, b.Price, b.Currency), ct);
     });
 
     public Task LeadCreatedAsync(Guid leadId, CancellationToken ct = default) => SafeAsync("о заявке", async () =>
@@ -72,10 +78,12 @@ public class TelegramAlertService(AppDbContext db, ITelegramNotifier telegram, I
         var l = await db.Leads.IgnoreQueryFilters().AsNoTracking().Where(x => x.Id == leadId)
             .Select(x => new { x.Name, x.OrganizationId, x.BuildingId,
                 Building = db.Buildings.IgnoreQueryFilters().Where(b => b.Id == x.BuildingId).Select(b => b.NameRu).FirstOrDefault(),
-                Apartment = x.Apartment != null ? (int?)x.Apartment.Number : null })
+                Apartment = x.Apartment != null ? (int?)x.Apartment.Number : null,
+                Block = x.Apartment != null ? x.Apartment.Floor.Building.BlockCode : null,
+                Kind = x.Apartment != null ? x.Apartment.Kind : ApartmentKind.Residential })
             .SingleAsync(ct);
         await SendToStaffAsync(l.OrganizationId, l.BuildingId, [RoleNames.Owner, RoleNames.Manager],
-            TelegramMessages.Lead(l.Name, l.Building, l.Apartment), ct);
+            TelegramMessages.Lead(l.Name, l.Building, l.Apartment is { } n ? new UnitRef(n, l.Block, l.Kind) : null), ct);
     });
 
     public Task WeeklyReportReadyAsync(Guid reportId, CancellationToken ct = default) => SafeAsync("об отчёте", async () =>

@@ -139,12 +139,12 @@
         S.$$('.btn svg', bar).forEach((s) => { s.style.cssText = 'width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2'; });
         body.replaceChildren(bar, holder);
         const draw = () => holder.replaceChildren(S.tbl([
-          { label: '#', render: (d) => shortId(d.id) }, { label: t('deal.apt'), render: (d) => h('b', null, '№ ' + d.apartmentNumber) }, { label: t('deal.customer'), render: (d) => d.customerName }, { label: t('deal.stage'), render: (d) => S.stageChip(d.stage) },
+          { label: '#', render: (d) => shortId(d.id) }, { label: t('deal.apt'), render: (d) => h('b', null, S.aptShort(d)) }, { label: t('deal.customer'), render: (d) => d.customerName }, { label: t('deal.stage'), render: (d) => S.stageChip(d.stage) },
           { label: t('deal.price'), r: true, num: true, render: (d) => S.fmt.money(d.price - d.discount, d.currency) },
           // The real API's list has no paid sum (it is in each deal's schedule): the column shows only when it is known.
           list.some((d) => d.paid !== null) ? { label: t('sch.paid'), r: true, num: true, render: (d) => S.fmt.money(d.paid, d.currency) } : null,
           { label: t('deal.manager'), render: (d) => d.managerName || managers[d.managerId] || '' }].filter(Boolean),
-          list.filter((d) => (stage === 'all' || d.stage === stage) && (!q || (d.customerName + ' ' + d.apartmentNumber + ' ' + d.id).toLowerCase().includes(q))), { onRow: (d) => dealDrawer(d.id, load), empty: t('deal.none') }));
+          list.filter((d) => (stage === 'all' || d.stage === stage) && (!q || (d.customerName + ' ' + d.apartmentNumber + ' ' + S.aptNum(d) + ' ' + d.id).toLowerCase().includes(q))), { onRow: (d) => dealDrawer(d.id, load), empty: t('deal.none') }));
         // The list carries the manager's id only: names come from the staff list (leaders may read it) and from the signed-in user.
         let managers = {};
         const loadManagers = async () => {
@@ -241,7 +241,7 @@
             const r = await S.api.reportPayments(from.value, to.value);
             const totals = Object.keys(r.totals || {}).map((c) => h('div', { class: 'card kpi' }, h('span', null, t('rep.total') + ' ' + c), h('b', { style: { fontSize: '22px' } }, S.fmt.money(r.totals[c], c)), h('i')));
             holder.replaceChildren(h('div', { class: 'grid g4', style: { marginBottom: '14px' } }, totals, r.totalTjs !== null && r.totalTjs !== undefined ? h('div', { class: 'card kpi', style: { '--k': 'var(--good)' } }, h('span', null, t('rep.totalTjs')), h('b', { style: { fontSize: '22px' } }, S.fmt.money(r.totalTjs, 'TJS')), h('i')) : null),
-              S.tbl([{ label: t('doc.date'), render: (p) => S.fmt.date(p.date) }, { label: t('deal.apt'), render: (p) => (p.apartmentNumber ? '№ ' + p.apartmentNumber : '#' + p.dealId) }, { label: t('deal.customer'), render: (p) => p.customerName }, { label: t('pay.amount'), r: true, num: true, render: (p) => (p.reversal ? '− ' : '') + S.fmt.money(p.amount, p.currency) }, { label: t('pay.tjs'), r: true, num: true, render: (p) => (p.reversal ? '− ' : '') + S.fmt.money(p.amountTjs, 'TJS') }, { label: t('pay.rate'), r: true, num: true, render: (p) => p.rate || '—' }, { label: t('pay.comment'), render: (p) => p.comment }], r.rows, { rowClass: (p) => (p.reversal ? 'rev' : ''), onRow: (p) => dealDrawer(p.dealId, null, p), empty: t('rep.none') }));
+              S.tbl([{ label: t('doc.date'), render: (p) => S.fmt.date(p.date) }, { label: t('deal.apt'), render: (p) => (p.apartmentNumber ? S.aptShort(p) : '#' + p.dealId) }, { label: t('deal.customer'), render: (p) => p.customerName }, { label: t('pay.amount'), r: true, num: true, render: (p) => (p.reversal ? '− ' : '') + S.fmt.money(p.amount, p.currency) }, { label: t('pay.tjs'), r: true, num: true, render: (p) => (p.reversal ? '− ' : '') + S.fmt.money(p.amountTjs, 'TJS') }, { label: t('pay.rate'), r: true, num: true, render: (p) => p.rate || '—' }, { label: t('pay.comment'), render: (p) => p.comment }], r.rows, { rowClass: (p) => (p.reversal ? 'rev' : ''), onRow: (p) => dealDrawer(p.dealId, null, p), empty: t('rep.none') }));
           } catch (e) { holder.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
         }
         load();
@@ -254,7 +254,7 @@
         body.replaceChildren(h('div', { class: 'toolbar' }, S.field(t('rep.asOf'), asOf), h('div', { style: { alignSelf: 'flex-end', display: 'flex', gap: '8px' } }, go, xl)), holder);
         async function load() {
           holder.replaceChildren(S.skeleton(4, 38));
-          try { const r = await S.api.reportDebts(asOf.value); holder.replaceChildren(S.tbl([{ label: t('deal.customer'), render: (d) => h('b', null, d.customerName) }, { label: t('f.phone'), render: (d) => d.phone }, { label: t('deal.apt'), render: (d) => '№ ' + d.apartmentNumber }, { label: t('debt.amount'), r: true, num: true, render: (d) => S.chip('Overdue', S.fmt.money(d.overdue, d.currency)) }, { label: t('debt.since'), render: (d) => S.fmt.date(d.since) }, { label: t('debt.days'), r: true, num: true, render: (d) => d.days }, { label: t('sch.left'), r: true, num: true, render: (d) => S.fmt.money(d.remaining, d.currency) }], r.rows, { onRow: (d) => dealDrawer(d.dealId, null, d), empty: t('debt.none') })); } catch (e) { holder.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
+          try { const r = await S.api.reportDebts(asOf.value); holder.replaceChildren(S.tbl([{ label: t('deal.customer'), render: (d) => h('b', null, d.customerName) }, { label: t('f.phone'), render: (d) => d.phone }, { label: t('deal.apt'), render: (d) => S.aptShort(d) }, { label: t('debt.amount'), r: true, num: true, render: (d) => S.chip('Overdue', S.fmt.money(d.overdue, d.currency)) }, { label: t('debt.since'), render: (d) => S.fmt.date(d.since) }, { label: t('debt.days'), r: true, num: true, render: (d) => d.days }, { label: t('sch.left'), r: true, num: true, render: (d) => S.fmt.money(d.remaining, d.currency) }], r.rows, { onRow: (d) => dealDrawer(d.dealId, null, d), empty: t('debt.none') })); } catch (e) { holder.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
         }
         load();
       },
@@ -535,7 +535,7 @@
               h('span', { class: 'avatar' }, S.fmt.initials(c.customerName)),
               h('span', { class: 'chat-row-main' },
                 h('span', { class: 'row between', style: { flexWrap: 'nowrap', gap: '8px' } }, h('b', null, c.customerName), h('small', { class: 'muted' }, S.fmt.dt(c.lastMessageAt))),
-                h('small', { class: 'muted' }, [c.customerPhone, c.buildingName, t('apt.title', { n: c.apartmentNumber })].filter(Boolean).join(' · ')),
+                h('small', { class: 'muted' }, [c.customerPhone, c.buildingName, (c.blockCode ? S.unitName(c) : t('apt.title', { n: c.apartmentNumber }))].filter(Boolean).join(' · ')),
                 h('span', { class: 'chat-last' }, (c.lastFromCustomer ? '' : t('chats.you') + ' ') + c.lastMessage)),
               c.unread ? h('span', { class: 'badge', 'aria-label': t('chats.unread', { n: c.unread }) }, c.unread) : null)))
               : S.empty(t(search.value.trim() ? 'chats.noMatch' : 'chats.none'), 'send'));
@@ -788,7 +788,7 @@
       try {
         const c = await S.api.customer(id);
         holder.replaceChildren(h('dl', { class: 'kv' }, h('dt', null, t('f.fullName')), h('dd', null, c.fullName), h('dt', null, t('f.phone')), h('dd', null, c.phone), h('dt', null, t('f.email')), h('dd', null, c.email || '—'), h('dt', null, t('f.passport')), h('dd', null, c.passport || '—')),
-          h('h3', { style: { margin: '16px 0 8px' } }, t('crm.deals')), S.tbl([{ label: t('deal.apt'), render: (d) => '№ ' + d.apartmentNumber }, { label: t('deal.stage'), render: (d) => S.stageChip(d.stage) }, { label: t('deal.price'), r: true, num: true, render: (d) => S.fmt.money(d.price - d.discount, d.currency) }], c.deals, { onRow: (d) => dealDrawer(d.id, null), empty: t('deal.none') }));
+          h('h3', { style: { margin: '16px 0 8px' } }, t('crm.deals')), S.tbl([{ label: t('deal.apt'), render: (d) => S.aptShort(d) }, { label: t('deal.stage'), render: (d) => S.stageChip(d.stage) }, { label: t('deal.price'), r: true, num: true, render: (d) => S.fmt.money(d.price - d.discount, d.currency) }], c.deals, { onRow: (d) => dealDrawer(d.id, null), empty: t('deal.none') }));
       } catch (e) { holder.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
     }
 
@@ -1201,7 +1201,7 @@
       const tabsDef = () => [['overview', t('deal.tab.overview')], ['schedule', t('deal.tab.schedule')], ['payments', t('deal.tab.payments')], ['docs', t('deal.tab.docs')], ['chat', t('deal.tab.chat')], ['ai', t('deal.tab.ai')]];
       function draw() {
         const content = h('div', { class: 'stack' });
-        body.replaceChildren(h('div', { class: 'row between', style: { paddingRight: '40px', marginBottom: '14px' } }, h('div', null, h('h2', { style: { margin: 0, padding: 0 } }, t('deal.title', { n: d.apartmentNumber })), h('div', { class: 'muted', style: { fontWeight: 600 } }, (d.customerName || '—') + ' · #' + shortId(d.id))), d.readOnly ? null : S.stageChip(d.stage)),
+        body.replaceChildren(h('div', { class: 'row between', style: { paddingRight: '40px', marginBottom: '14px' } }, h('div', null, h('h2', { style: { margin: 0, padding: 0 } }, (d.blockCode ? S.unitName(d) : t('deal.title', { n: d.apartmentNumber }))), h('div', { class: 'muted', style: { fontWeight: 600 } }, (d.customerName || '—') + ' · #' + shortId(d.id))), d.readOnly ? null : S.stageChip(d.stage)),
           h('div', { class: 'tabs' }, tabsDef().map(([k, l]) => h('button', { class: tab === k ? 'on' : '', onclick: () => { tab = k; draw(); } }, l))), content);
         panes[tab](content);
       }
@@ -1216,7 +1216,7 @@
             if (idx && !reason.value.trim()) { S.showErrors(sf, { message: t('val.reason'), errors: { reason: [t('val.reason')] } }); return; }
             if (stageSel.value === 'Cancelled' && !(await S.confirm(t('deal.cancelConfirm'), t('deal.cancelDo'), true))) return;
             await S.busy(btn, async () => { try { await S.api.setStage(d.id, stageSel.value, reason.value.trim()); S.toast(t('common.saved'), 'ok'); await reload(); } catch (er) { S.showErrors(sf, er); } }); });
-          c.append(h('div', { class: 'card flat' }, h('dl', { class: 'kv' }, kv(t('deal.customer'), d.customerName), kv(t('f.phone'), d.customerPhone), kv(t('deal.apt'), '№ ' + d.apartmentNumber + ' · ' + t('floor.n', { n: d.floor })), kv(t('f.rooms'), S.fmt.rooms(d.rooms)), kv(t('f.area'), S.fmt.area(d.area)), kv(t('deal.price'), S.fmt.money(d.price, d.currency)), d.discount ? kv(t('deal.discount'), '− ' + S.fmt.money(d.discount, d.currency) + (d.discountReason ? ' (' + d.discountReason + ')' : '')) : null, kv(t('deal.manager'), d.managerName), kv(t('sch.paid'), S.fmt.money(d.paid, d.currency)), kv(t('sch.left'), S.fmt.money(d.remaining, d.currency)), kv(t('deal.since'), S.fmt.date(d.createdAt)))), canMove ? sf : null);
+          c.append(h('div', { class: 'card flat' }, h('dl', { class: 'kv' }, kv(t('deal.customer'), d.customerName), kv(t('f.phone'), d.customerPhone), kv(t('deal.apt'), S.aptShort(d) + ' · ' + t('floor.n', { n: d.floor })), kv(t('f.rooms'), S.fmt.rooms(d.rooms)), kv(t('f.area'), S.fmt.area(d.area)), kv(t('deal.price'), S.fmt.money(d.price, d.currency)), d.discount ? kv(t('deal.discount'), '− ' + S.fmt.money(d.discount, d.currency) + (d.discountReason ? ' (' + d.discountReason + ')' : '')) : null, kv(t('deal.manager'), d.managerName), kv(t('sch.paid'), S.fmt.money(d.paid, d.currency)), kv(t('sch.left'), S.fmt.money(d.remaining, d.currency)), kv(t('deal.since'), S.fmt.date(d.createdAt)))), canMove ? sf : null);
         },
         async schedule(c) {
           c.replaceChildren(S.skeleton(3, 50)); const s = await getSched();

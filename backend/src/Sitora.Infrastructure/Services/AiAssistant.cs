@@ -154,6 +154,8 @@ public class AiAssistant(IChatModel model, ICurrentUser currentUser, IOptions<Cl
                 d.Id,
                 Name = d.Customer.FullName,
                 d.Apartment.Number,
+                d.Apartment.Kind,
+                Block = d.Apartment.Floor.Building.BlockCode,
                 Floor = d.Apartment.Floor.Number,
                 d.Apartment.Rooms,
                 d.Apartment.Area,
@@ -197,7 +199,7 @@ public class AiAssistant(IChatModel model, ICurrentUser currentUser, IOptions<Cl
             {
                 "=== BUYER CONTEXT ===",
                 $"Name: {d.Name}",
-                $"Apartment: №{d.Number}, floor {d.Floor}, {d.Rooms} rooms, {d.Area.ToString("0.##", Invariant)} m²",
+                $"Apartment: {(d.Block is null ? "№" + d.Number : UnitNames.Full(d.Block, d.Kind, d.Number, "en") + " («" + UnitNames.Full(d.Block, d.Kind, d.Number) + "»)")}, floor {d.Floor}, {d.Rooms} rooms, {d.Area.ToString("0.##", Invariant)} m²",
                 $"Price: {Money(d.Price)} | Paid: {Money(d.Paid)} ({percent}%) | Remaining: {Money(remaining)}",
                 next is not null ? $"Next payment: {Date(next.DueDate)} — {Money(next.AmountDue - next.AmountPaid)}"
                     : schedule.Count == 0 ? "Next payment: no payment schedule yet" : "Next payment: none scheduled"
@@ -228,6 +230,8 @@ public class AiAssistant(IChatModel model, ICurrentUser currentUser, IOptions<Cl
             {
                 Buyer = d.Customer.FullName,
                 Apartment = d.Apartment.Number,
+                d.Apartment.Kind,
+                Block = d.Apartment.Floor.Building.BlockCode,
                 Floor = d.Apartment.Floor.Number,
                 d.Apartment.Floor.BuildingId,
                 Building = d.Apartment.Floor.Building.NameRu,
@@ -247,7 +251,7 @@ public class AiAssistant(IChatModel model, ICurrentUser currentUser, IOptions<Cl
         string Money(decimal amount) => amount.ToString("N2", Russian) + " " + deal.Currency;
         string Date(DateOnly date) => date.ToString("dd.MM.yyyy", Russian);
 
-        var context = $"покупатель {deal.Buyer}, квартира {deal.Apartment}, этаж {deal.Floor}, {deal.Building}";
+        var context = $"покупатель {deal.Buyer}, {(deal.Block is null ? "квартира " + deal.Apartment : UnitNames.Full(deal.Block, deal.Kind, deal.Apartment))}, этаж {deal.Floor}, {deal.Building}";
         if (deal.CompletionYear is { } year)
             context += $", плановая сдача дома — {year} год";
         if (stages.Count > 0)

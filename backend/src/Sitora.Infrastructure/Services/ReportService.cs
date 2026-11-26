@@ -31,7 +31,7 @@ public class ReportService(AppDbContext db, TimeProvider timeProvider) : IReport
             .Select(p => new PaymentReportRow(
                 p.Id, p.PaidAt, p.DealId, p.Deal.Customer.FullName, p.Deal.Apartment.Floor.Building.NameRu,
                 p.Deal.Apartment.Number, p.Amount, p.Currency, p.RateUsed, p.AmountTjs, p.Method,
-                p.ReversalOfId != null, p.Comment))
+                p.ReversalOfId != null, p.Comment, p.Deal.Apartment.Floor.Building.BlockCode, p.Deal.Apartment.Kind))
             .ToListAsync(ct);
 
         var totals = rows.GroupBy(r => r.Currency)
@@ -56,6 +56,8 @@ public class ReportService(AppDbContext db, TimeProvider timeProvider) : IReport
                 p.Deal.Customer.Phone,
                 Building = p.Deal.Apartment.Floor.Building.NameRu,
                 Apartment = p.Deal.Apartment.Number,
+                p.Deal.Apartment.Kind,
+                p.Deal.Apartment.Floor.Building.BlockCode,
                 // Оплачено к этой дате; более поздние платежи и сторно не учитываются.
                 PaidAsOf = db.Payments.Where(x => x.DealId == p.DealId && x.PaidAt <= date).Sum(x => (decimal?)x.AmountInDealCurrency) ?? 0
             })
@@ -80,7 +82,9 @@ public class ReportService(AppDbContext db, TimeProvider timeProvider) : IReport
                 overdueItems.Sum(i => i.AmountDue - i.AmountPaid),
                 oldest,
                 date.DayNumber - oldest.DayNumber,
-                row.Plan.Total - row.PaidAsOf));
+                row.Plan.Total - row.PaidAsOf,
+                row.BlockCode,
+                row.Kind));
         }
 
         rows = rows.OrderByDescending(r => r.DaysOverdue).ThenByDescending(r => r.Overdue).ToList();

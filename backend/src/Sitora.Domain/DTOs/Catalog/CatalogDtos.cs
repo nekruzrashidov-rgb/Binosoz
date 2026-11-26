@@ -154,7 +154,9 @@ public record ApartmentResponse(
     int PlanSlot,
     string? Model3dId,
     ApartmentKind Kind = ApartmentKind.Residential,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? TerraceArea = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? TerraceArea = null,
+    // Блок ЖК («A»): номер для людей — «Блок A, кв. 45», кратко «A-45» (UnitNames); у дома без блока — null.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? BlockCode = null);
 
 public record SaveBuildingRequest(
     string NameRu,

@@ -73,7 +73,7 @@ public record SetRateRequest(DateOnly Date, Currency Currency, decimal RateToTjs
 
 public record StatementPayment(DateOnly PaidAt, decimal Amount, Currency Currency, decimal? RateUsed, decimal AmountInDealCurrency, bool IsReversal);
 
-public record DealHeader(Guid DealId, string BuildingName, int FloorNumber, int ApartmentNumber, string CustomerName);
+public record DealHeader(Guid DealId, string BuildingName, int FloorNumber, int ApartmentNumber, string CustomerName, string? BlockCode = null, ApartmentKind ApartmentKind = ApartmentKind.Residential);
 
 // Данные PDF графика платежей: шапка сделки и тот же график, что отдаёт GET /deals/{id}/schedule.
 public record ScheduleDocumentData(DealHeader Deal, ScheduleResponse Schedule, DateOnly AsOf, DateTime GeneratedAtUtc);
@@ -93,4 +93,7 @@ public record StatementData(
     decimal Paid,
     decimal Debt,
     decimal Remaining,
-    IReadOnlyList<StatementPayment> Payments);
+    IReadOnlyList<StatementPayment> Payments,
+    // Блок ЖК и вид помещения — номер для людей «Блок A, кв. 45» (UnitNames); у дома без блока BlockCode = null.
+    string? BlockCode = null,
+    ApartmentKind ApartmentKind = ApartmentKind.Residential);

@@ -28,6 +28,8 @@ public class CatalogService(
     // Наименьший разрыв между блоками ЖК на участке, м (Catalog__MinBlockGapMeters; по умолчанию 20).
     public const double DefaultMinBlockGap = 20;
     private double MinBlockGap => configuration.GetValue("Catalog:MinBlockGapMeters", DefaultMinBlockGap);
+    // Номер помещения уже есть в этом доме (уникальность в пределах блока, своя серия у квартир, магазинов, машино-мест).
+    public const string NumberTakenInBuilding = "Этот номер уже занят в этом доме (блоке): ";
     private const string BuildingNotFound = "Дом не найден";
     private const string FloorNotFound = "Этаж не найден";
     private const string ApartmentNotFound = "Квартира не найдена";
@@ -543,9 +545,12 @@ public class CatalogService(
         }
         catch (DbUpdateException e) when (e.IsUniqueViolation())
         {
-            throw new ConflictException(e.ViolatedConstraint() == ApartmentConfiguration.PlanSlotIndex
+            var constraint = e.ViolatedConstraint();
+            throw new ConflictException(constraint == ApartmentConfiguration.PlanSlotIndex
                 ? $"Позиция {planSlot} на плане этого этажа уже занята другой квартирой"
-                : $"Квартира №{number} уже есть на этом этаже");
+                : constraint is ApartmentConfiguration.HomeNumberIndex or ApartmentConfiguration.ShopNumberIndex or ApartmentConfiguration.SpotNumberIndex
+                    ? NumberTakenInBuilding + number
+                    : $"Квартира №{number} уже есть на этом этаже");
         }
 
         await cache.InvalidateAsync(ct);
@@ -668,5 +673,6 @@ public class CatalogService(
         a.PlanSlot,
         a.Model3dId,
         a.Kind,
-        a.TerraceArea);
+        a.TerraceArea,
+        a.Floor.Building.BlockCode);
 }

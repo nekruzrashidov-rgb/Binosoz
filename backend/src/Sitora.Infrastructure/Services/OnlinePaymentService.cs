@@ -31,7 +31,7 @@ public class OnlinePaymentService(
         // GetScheduleAsync проверяет, что сделка своя (чужая — 404), и даёт остаток и ближайший платёж.
         var schedule = await payments.GetScheduleAsync(dealId, ct);
         var deal = await db.Deals.AsNoTracking().Where(d => d.Id == dealId)
-            .Select(d => new { d.Stage, d.Apartment.Number }).SingleAsync(ct);
+            .Select(d => new { d.Stage, d.Apartment.Number, d.Apartment.Kind, d.Apartment.Floor.Building.BlockCode }).SingleAsync(ct);
         if (deal.Stage == DealStage.Cancelled)
             throw new BusinessRuleException("Сделка отменена");
         if (schedule.Remaining <= 0)
@@ -45,7 +45,7 @@ public class OnlinePaymentService(
             throw new BusinessRuleException($"Сумма больше остатка по договору. Остаток: {schedule.Remaining:0.00} {schedule.Currency}");
 
         var init = await gateway.InitiateAsync(new PaymentInitRequest(dealId, amount, schedule.Currency.ToString(),
-            $"Оплата по договору: кв. {deal.Number}", SafeReturnUrl(request.ReturnUrl), $"/api/v1/payment/webhook/{gateway.ProviderName.ToLowerInvariant()}"));
+            $"Оплата по договору: {(deal.BlockCode is null ? $"кв. {deal.Number}" : new UnitRef(deal.Number, deal.BlockCode, deal.Kind).InText())}", SafeReturnUrl(request.ReturnUrl), $"/api/v1/payment/webhook/{gateway.ProviderName.ToLowerInvariant()}"));
         if (!init.Success || init.GatewayPaymentId is null || init.PaymentUrl is null)
             throw new ServiceUnavailableException(init.ErrorMessage ?? "Платёжный шлюз не принял платёж, попробуйте позже");
 

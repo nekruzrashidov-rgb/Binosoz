@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Sitora.Domain.Common;
 using Sitora.Domain.DTOs.Chat;
 using Sitora.Domain.DTOs.Common;
 using Sitora.Domain.Entities;
@@ -84,6 +85,8 @@ public class ChatService(
                 d.Customer.FullName,
                 d.Customer.Phone,
                 d.Apartment.Number,
+                d.Apartment.Kind,
+                d.Apartment.Floor.Building.BlockCode,
                 d.Apartment.Floor.Building.NameRu,
                 d.Apartment.Floor.Building.NameTg,
                 Last = db.ChatMessages.Where(m => m.DealId == d.Id).OrderByDescending(m => m.CreatedAt)
@@ -95,7 +98,7 @@ public class ChatService(
             .ToListAsync(ct);
         var tg = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "tg";
         return rows.Select(r => new ChatConversationResponse(r.Id, r.FullName, r.Phone, r.Number, tg ? r.NameTg : r.NameRu,
-            r.Last.Text, r.Last.CreatedAt, r.Last.FromCustomer, r.Unread)).ToList();
+            r.Last.Text, r.Last.CreatedAt, r.Last.FromCustomer, r.Unread, r.BlockCode, r.Kind)).ToList();
     }
 
     public async Task<ChatMessageResponse> SendAsync(Guid dealId, string text, CancellationToken ct = default)
@@ -113,7 +116,7 @@ public class ChatService(
         await db.SaveChangesAsync(ct);
 
         var info = await db.Deals.AsNoTracking().Where(d => d.Id == dealId)
-            .Select(d => new { CustomerUserId = d.Customer.UserId, ApartmentNumber = d.Apartment.Number })
+            .Select(d => new { CustomerUserId = d.Customer.UserId, ApartmentNumber = d.Apartment.Number, d.Apartment.Kind, d.Apartment.Floor.Building.BlockCode })
             .SingleAsync(ct);
         var senderName = await db.Users.Where(u => u.Id == senderId).Select(u => u.FullName).SingleAsync(ct);
         var response = new ChatMessageResponse(message.Id, dealId, senderId, senderName, message.FromCustomer, message.Text, message.CreatedAt, null);
@@ -125,7 +128,7 @@ public class ChatService(
         if (message.FromCustomer || recipient is not null)
         {
             await SafeAsync(() => notifications.SendAsync(recipient,
-                $"Новое сообщение по кв. №{info.ApartmentNumber} от {senderName}: {Shorten(text)}", ct), "отправить уведомление о сообщении");
+                $"Новое сообщение по {new UnitRef(info.ApartmentNumber, info.BlockCode, info.Kind).InText()} от {senderName}: {Shorten(text)}", ct), "отправить уведомление о сообщении");
         }
         if (!message.FromCustomer)
             await buyers.ChatMessageAsync(dealId, ct);

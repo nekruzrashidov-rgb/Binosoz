@@ -55,7 +55,8 @@ public class CrmService(AppDbContext db, TimeProvider timeProvider) : ICrmServic
             var count = await dealsQuery.CountAsync(ct);
             var cards = await dealsQuery.OrderByDescending(d => d.UpdatedAt).Take(CardsPerColumn)
                 .Select(d => new PipelineCard(PipelineCardKind.Deal, d.Id, d.Customer.FullName, d.Customer.Phone,
-                    d.ApartmentId, d.Apartment.Number, d.Price - d.Discount, d.Currency, d.CreatedAt, null))
+                    d.ApartmentId, d.Apartment.Number, d.Price - d.Discount, d.Currency, d.CreatedAt, null,
+                    d.Apartment.Floor.Building.BlockCode, d.Apartment.Kind))
                 .ToListAsync(ct);
 
             // Заявки и брони без сделки показываем в колонках «Заявка» и «Бронь», чтобы менеджер видел их сразу.
@@ -65,7 +66,8 @@ public class CrmService(AppDbContext db, TimeProvider timeProvider) : ICrmServic
                 count += await leads.CountAsync(ct);
                 cards.AddRange(await leads.OrderByDescending(l => l.CreatedAt).Take(CardsPerColumn)
                     .Select(l => new PipelineCard(PipelineCardKind.Lead, l.Id, l.Name, l.Phone,
-                        l.ApartmentId, l.Apartment != null ? l.Apartment.Number : null, null, null, l.CreatedAt, null))
+                        l.ApartmentId, l.Apartment != null ? l.Apartment.Number : null, null, null, l.CreatedAt, null,
+                        l.Apartment != null ? l.Apartment.Floor.Building.BlockCode : null, l.Apartment != null ? l.Apartment.Kind : ApartmentKind.Residential))
                     .ToListAsync(ct));
             }
             else if (stage == DealStage.Booking)
@@ -76,7 +78,8 @@ public class CrmService(AppDbContext db, TimeProvider timeProvider) : ICrmServic
                     .Select(b => new PipelineCard(PipelineCardKind.Booking, b.Id,
                         b.Customer != null ? b.Customer.FullName : b.Lead!.Name,
                         b.Customer != null ? b.Customer.Phone : b.Lead!.Phone,
-                        b.ApartmentId, b.Apartment.Number, b.Apartment.Price, b.Apartment.Currency, b.CreatedAt, b.ExpiresAt))
+                        b.ApartmentId, b.Apartment.Number, b.Apartment.Price, b.Apartment.Currency, b.CreatedAt, b.ExpiresAt,
+                        b.Apartment.Floor.Building.BlockCode, b.Apartment.Kind))
                     .ToListAsync(ct));
             }
 

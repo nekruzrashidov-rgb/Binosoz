@@ -11,7 +11,7 @@ using Sitora.Infrastructure.Integrations;
 namespace Sitora.Infrastructure.Services;
 
 // Пункт графика, о котором напоминаем покупателю.
-public record PaymentNotice(Guid DealId, DateOnly DueDate, decimal Left, Currency Currency, int Apartment,
+public record PaymentNotice(Guid DealId, DateOnly DueDate, decimal Left, Currency Currency, UnitRef Apartment,
     Guid? CustomerUserId, Guid OrganizationId, int OverdueDays);
 
 // Сообщения покупателю о его сделке. Напоминания о платежах — в кабинет, Telegram и на почту; остальные события
@@ -122,7 +122,7 @@ public class BuyerNotifier(
         var b = await BookingAsync(bookingId, ct);
         if (b is not null)
             await TelegramAsync(b.UserId, b.OrganizationId, null, BuyerEvents.BookingCreated,
-                lang => BuyerTexts.BookingCreated(lang, b.Number, DushanbeTime.ToLocal(b.ExpiresAt), CabinetUrl), null, ct);
+                lang => BuyerTexts.BookingCreated(lang, b.Unit, DushanbeTime.ToLocal(b.ExpiresAt), CabinetUrl), null, ct);
     });
 
     // За 6 часов до конца брони; ключ с моментом окончания: продлённая бронь напомнит ещё раз — перед новым сроком.
@@ -131,7 +131,7 @@ public class BuyerNotifier(
         var b = await BookingAsync(bookingId, ct);
         if (b is not null)
             await TelegramAsync(b.UserId, b.OrganizationId, null, BuyerEvents.BookingExpiring,
-                lang => BuyerTexts.BookingExpiring(lang, b.Number, DushanbeTime.ToLocal(b.ExpiresAt), CabinetUrl),
+                lang => BuyerTexts.BookingExpiring(lang, b.Unit, DushanbeTime.ToLocal(b.ExpiresAt), CabinetUrl),
                 $"{BuyerEvents.BookingExpiring}:{bookingId:N}:{b.ExpiresAt:yyyyMMddHHmm}", ct);
     });
 
@@ -140,7 +140,7 @@ public class BuyerNotifier(
         var b = await BookingAsync(bookingId, ct);
         if (b is not null)
             await TelegramAsync(b.UserId, b.OrganizationId, null, BuyerEvents.BookingReleased,
-                lang => BuyerTexts.BookingReleased(lang, b.Number, CabinetUrl), $"{BuyerEvents.BookingReleased}:{bookingId:N}", ct);
+                lang => BuyerTexts.BookingReleased(lang, b.Unit, CabinetUrl), $"{BuyerEvents.BookingReleased}:{bookingId:N}", ct);
     });
 
     public Task DealStageChangedAsync(Guid dealId, CancellationToken ct = default) => SafeAsync("об этапе сделки", async () =>
@@ -148,18 +148,18 @@ public class BuyerNotifier(
         var d = await DealAsync(dealId, ct);
         if (d is not null)
             await TelegramAsync(d.UserId, d.OrganizationId, dealId, BuyerEvents.DealStage,
-                lang => BuyerTexts.DealStageChanged(lang, d.Number, d.Stage, CabinetUrl), null, ct);
+                lang => BuyerTexts.DealStageChanged(lang, d.Unit, d.Stage, CabinetUrl), null, ct);
     });
 
     public Task PaymentReceivedAsync(Guid paymentId, CancellationToken ct = default) => SafeAsync("о принятом платеже", async () =>
     {
         var p = await db.Payments.IgnoreQueryFilters().AsNoTracking().Where(x => x.Id == paymentId)
             .Select(x => new { x.DealId, x.Amount, x.Currency, x.PaidAt, x.Deal.Customer.UserId, x.Deal.Apartment.Number,
-                x.Deal.Apartment.Floor.Building.OrganizationId })
+                x.Deal.Apartment.Floor.Building.OrganizationId, x.Deal.Apartment.Floor.Building.BlockCode, x.Deal.Apartment.Kind })
             .FirstOrDefaultAsync(ct);
         if (p is not null)
             await TelegramAsync(p.UserId, p.OrganizationId, p.DealId, BuyerEvents.PaymentReceived,
-                lang => BuyerTexts.PaymentReceived(lang, p.Number, p.Amount, p.Currency, p.PaidAt, CabinetUrl), $"{BuyerEvents.PaymentReceived}:{paymentId:N}", ct);
+                lang => BuyerTexts.PaymentReceived(lang, new UnitRef(p.Number, p.BlockCode, p.Kind), p.Amount, p.Currency, p.PaidAt, CabinetUrl), $"{BuyerEvents.PaymentReceived}:{paymentId:N}", ct);
     });
 
     // Ссылка — на кабинет, не на файл: файл открывается только после входа.
@@ -168,7 +168,7 @@ public class BuyerNotifier(
         var d = await DealAsync(dealId, ct);
         if (d is not null)
             await TelegramAsync(d.UserId, d.OrganizationId, dealId, BuyerEvents.DocumentAdded,
-                lang => BuyerTexts.DocumentAdded(lang, d.Number, CabinetUrl), null, ct);
+                lang => BuyerTexts.DocumentAdded(lang, d.Unit, CabinetUrl), null, ct);
     });
 
     // Сообщение менеджера, когда покупателя нет в кабинете; текст чата в Telegram не уходит — только «вам написали».
@@ -181,21 +181,29 @@ public class BuyerNotifier(
         if (lastSeen is { } seen && Now - seen < OfflineAfter)
             return;
         await TelegramAsync(userId, d.OrganizationId, dealId, BuyerEvents.ChatMessage,
-            lang => BuyerTexts.ChatMessage(lang, d.Number, CabinetUrl), null, ct);
+            lang => BuyerTexts.ChatMessage(lang, d.Unit, CabinetUrl), null, ct);
     });
 
-    private record BookingInfo(Guid? UserId, int Number, DateTime ExpiresAt, Guid OrganizationId);
+    private record BookingInfo(Guid? UserId, int Number, DateTime ExpiresAt, Guid OrganizationId, string? Block, ApartmentKind Kind)
+    {
+        public UnitRef Unit => new(Number, Block, Kind);
+    }
 
     private Task<BookingInfo?> BookingAsync(Guid bookingId, CancellationToken ct) =>
         db.Bookings.IgnoreQueryFilters().AsNoTracking().Where(b => b.Id == bookingId && b.CustomerId != null)
-            .Select(b => new BookingInfo(b.Customer!.UserId, b.Apartment.Number, b.ExpiresAt, b.Apartment.Floor.Building.OrganizationId))
+            .Select(b => new BookingInfo(b.Customer!.UserId, b.Apartment.Number, b.ExpiresAt, b.Apartment.Floor.Building.OrganizationId,
+                b.Apartment.Floor.Building.BlockCode, b.Apartment.Kind))
             .FirstOrDefaultAsync(ct);
 
-    private record DealInfo(Guid? UserId, int Number, DealStage Stage, Guid OrganizationId);
+    private record DealInfo(Guid? UserId, int Number, DealStage Stage, Guid OrganizationId, string? Block, ApartmentKind Kind)
+    {
+        public UnitRef Unit => new(Number, Block, Kind);
+    }
 
     private Task<DealInfo?> DealAsync(Guid dealId, CancellationToken ct) =>
         db.Deals.IgnoreQueryFilters().AsNoTracking().Where(d => d.Id == dealId)
-            .Select(d => new DealInfo(d.Customer.UserId, d.Apartment.Number, d.Stage, d.Apartment.Floor.Building.OrganizationId))
+            .Select(d => new DealInfo(d.Customer.UserId, d.Apartment.Number, d.Stage, d.Apartment.Floor.Building.OrganizationId,
+                d.Apartment.Floor.Building.BlockCode, d.Apartment.Kind))
             .FirstOrDefaultAsync(ct);
 
     private async Task TelegramAsync(Guid? userId, Guid organizationId, Guid? dealId, string evt, Func<string, string> text, string? dedupeKey, CancellationToken ct)

@@ -516,7 +516,7 @@
           h('div', null, h('h1', { class: 'cab-welcome-name' }, t('cab.hi', { name: firstName(ov.customerName) })), h('p', { class: 'cab-welcome-sub' }, aptTitle(deal))),
           picker()),
         h('div', { class: 'cab-welcome-stats' },
-          stat(h('div', { class: 'cab-stat-val' }, '№ ' + deal.apartmentNumber), t('wow.cab.apt')),
+          stat(h('div', { class: 'cab-stat-val' }, S.aptShort(deal)), t('wow.cab.apt')),
           stat(h('div', { class: 'cab-stat-val' }, deal.paidPercent + '%'), t('wow.cab.paid')),
           stat(next, t('wow.cab.next'))),
         progress(deal.paidPercent, true));
@@ -587,7 +587,7 @@
         } catch (er) { S.err(er); }
       }) }, '📋 ' + t('cab.contractPdf'));
       return h('div', { class: 'card cab-apt' },
-        h('div', { class: 'row between' }, h('h2', null, '🏠 ' + d.buildingName + ', ' + t('cab.aptNo', { n: d.apartmentNumber })), S.stageChip(d.stage)),
+        h('div', { class: 'row between' }, h('h2', null, '🏠 ' + (d.blockCode ? S.unitName(d) : d.buildingName + ', ' + t('cab.aptNo', { n: d.apartmentNumber }))), S.stageChip(d.stage)),
         h('div', { class: 'cab-meta' }, h('span', null, t('cab.area') + ': ' + S.fmt.area(d.area)), h('span', null, S.fmt.rooms(d.rooms)), h('span', null, t('cab.floor') + ': ' + d.floor)),
         h('dl', { class: 'cab-money' },
           h('div', null, h('dt', null, t('cab.price')), h('dd', null, S.fmt.money(d.finalPrice, d.currency))),
@@ -611,7 +611,7 @@
         h('span', { class: 'ptrack-ornament', 'aria-hidden': 'true' }),
         h('div', { class: 'ptrack-head' }, h('div', { class: 'ptrack-brand' }, '💎 ' + S.brandName().toUpperCase()), pdf),
         h('div', { class: 'ptrack-name' }, ov.customerName || ''),
-        h('div', { class: 'ptrack-apt' }, t('cab.aptNo', { n: deal.apartmentNumber }) + ' · ' + t('pcard.floor', { n: deal.floor })),
+        h('div', { class: 'ptrack-apt' }, (deal.blockCode ? S.unitName(deal) : t('cab.aptNo', { n: deal.apartmentNumber })) + ' · ' + t('pcard.floor', { n: deal.floor })),
         h('div', { class: 'ptrack-bar-track' }, bar),
         h('div', { class: 'ptrack-pct' }, t('pcard.paidPct', { n: pct })),
         h('dl', { class: 'ptrack-sums' },
@@ -871,7 +871,7 @@
       const x = new Date(d); if (Number.isNaN(x.getTime())) return d || '';
       return x.getDate() + ' ' + t('cab.month.' + x.getMonth()) + ' ' + x.getFullYear();
     }
-    function aptTitle(d) { return d.buildingName + ' — ' + t('cab.aptNo', { n: d.apartmentNumber }) + ', ' + S.fmt.rooms(d.rooms); }
+    function aptTitle(d) { return (d.blockCode ? S.unitName(d) : d.buildingName + ' — ' + t('cab.aptNo', { n: d.apartmentNumber })) + ', ' + S.fmt.rooms(d.rooms); }
     // In the CRM the name is often written surname first, so the whole name is safer than a guessed "first name".
     function firstName(n) { return n || (S.api.user && S.api.user.name) || ''; }
     return () => { stopped = true; fab.remove(); };

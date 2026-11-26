@@ -100,12 +100,12 @@ public class BookingService(
         }
 
         await cache.InvalidateAsync(ct);
-        await NotifyAsync($"Новая бронь{(isStaff ? "" : " с сайта")}: {clientName}, {clientPhone}, кв. №{apartment.Number}, " +
+        await NotifyAsync($"Новая бронь{(isStaff ? "" : " с сайта")}: {clientName}, {clientPhone}, {UnitNames.Full(await BlockCodeAsync(apartment.Id, ct), apartment.Kind, apartment.Number)}, " +
                           $"до {booking.ExpiresAt.Add(DushanbeOffset):dd.MM.yyyy HH:mm} (Душанбе)", ct);
         await telegram.BookingCreatedAsync(booking.Id, ct);
         await buyers.BookingCreatedAsync(booking.Id, ct);
 
-        return ToResponse(booking, apartment.Number);
+        return await ResponseAsync(booking, apartment, ct);
     }
 
     public async Task<BookingResponse> ExtendAsync(Guid id, CancellationToken ct = default)
@@ -119,7 +119,7 @@ public class BookingService(
 
         await SaveAsync(ct);
         await transaction.CommitAsync(ct);
-        return ToResponse(booking, apartment.Number);
+        return await ResponseAsync(booking, apartment, ct);
     }
 
     public async Task<BookingResponse> CancelAsync(Guid id, string reason, CancellationToken ct = default)
@@ -140,7 +140,7 @@ public class BookingService(
 
             await cache.InvalidateAsync(ct);
             await buyers.BookingReleasedAsync(booking.Id, ct);
-            return ToResponse(booking, apartment.Number);
+            return await ResponseAsync(booking, apartment, ct);
         }
     }
 
@@ -301,6 +301,9 @@ public class BookingService(
 
     private static object Snapshot(Booking b) => new { b.ApartmentId, b.CustomerId, b.LeadId, b.ExpiresAt, b.Status, b.CancelReason };
 
-    private static BookingResponse ToResponse(Booking b, int apartmentNumber) =>
-        new(b.Id, b.ApartmentId, apartmentNumber, b.CustomerId, b.LeadId, b.ExpiresAt, b.Status, b.CreatedAt);
+    private Task<string?> BlockCodeAsync(Guid apartmentId, CancellationToken ct) =>
+        db.Apartments.AsNoTracking().Where(a => a.Id == apartmentId).Select(a => a.Floor.Building.BlockCode).FirstOrDefaultAsync(ct);
+
+    private async Task<BookingResponse> ResponseAsync(Booking b, Apartment a, CancellationToken ct) =>
+        new(b.Id, b.ApartmentId, a.Number, b.CustomerId, b.LeadId, b.ExpiresAt, b.Status, b.CreatedAt, await BlockCodeAsync(a.Id, ct), a.Kind);
 }

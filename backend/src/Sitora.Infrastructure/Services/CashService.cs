@@ -222,8 +222,8 @@ public class CashService(
 
     private async Task<Dictionary<Guid, string>> DealTextsAsync(List<Guid> dealIds, CancellationToken ct) =>
         await db.Deals.Where(d => dealIds.Contains(d.Id))
-            .Select(d => new { d.Id, Buyer = d.Customer.FullName, d.Apartment.Number })
-            .ToDictionaryAsync(d => d.Id, d => $"{d.Buyer}, кв. №{d.Number}", ct);
+            .Select(d => new { d.Id, Buyer = d.Customer.FullName, d.Apartment.Number, d.Apartment.Kind, d.Apartment.Floor.Building.BlockCode })
+            .ToDictionaryAsync(d => d.Id, d => $"{d.Buyer}, {new UnitRef(d.Number, d.BlockCode, d.Kind).InText()}", ct);
 
     private async Task<Building> FindBuildingAsync(Guid buildingId, CancellationToken ct) =>
         await db.Buildings.AsNoTracking().FirstOrDefaultAsync(b => b.Id == buildingId, ct)

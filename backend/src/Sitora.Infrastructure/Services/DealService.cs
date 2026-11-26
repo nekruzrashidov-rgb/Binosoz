@@ -220,5 +220,7 @@ public class DealService(
         d.Currency,
         d.BookingId,
         d.CreatedAt,
-        d.UpdatedAt);
+        d.UpdatedAt,
+        d.Apartment.Floor.Building.BlockCode,
+        d.Apartment.Kind);
 }

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Sitora.Domain.Common;
 using Sitora.Domain.Entities;
 using Sitora.Infrastructure.Data;
 using Sitora.Infrastructure.Data.Seed;
@@ -9,7 +10,7 @@ namespace Sitora.Infrastructure.Services;
 // сам пользователь (вход, регистрация, сброс пароля до входа), то он и есть автор. «Система» — только сидер и фоновые
 // задачи. Объект — имя или номер квартиры вместо «AppUser #5C086CDE». Тексты действий переводит сайт (audit.act.*).
 public sealed record AuditSubject(Guid? ActorId, string? ActorName, string? ActorEmail, bool BySystem,
-    string? EntityName, int? ApartmentNumber);
+    string? EntityName, int? ApartmentNumber, string? ApartmentCode = null);
 
 public static class AuditPresenter
 {
@@ -39,33 +40,33 @@ public static class AuditPresenter
             .ToDictionaryAsync(u => u.Id, ct);
 
         var names = new Dictionary<Guid, string>();
-        var apartments = new Dictionary<Guid, int>();
+        var apartments = new Dictionary<Guid, UnitRef>();
 
         var dealIds = Ids(nameof(Deal));
         if (dealIds.Length > 0)
             foreach (var d in await db.Deals.AsNoTracking().Where(d => dealIds.Contains(d.Id))
-                         .Select(d => new { d.Id, d.Apartment.Number, d.Customer.FullName }).ToListAsync(ct))
+                         .Select(d => new { d.Id, d.Apartment.Number, d.Apartment.Kind, d.Apartment.Floor.Building.BlockCode, d.Customer.FullName }).ToListAsync(ct))
             {
-                apartments[d.Id] = d.Number;
+                apartments[d.Id] = new UnitRef(d.Number, d.BlockCode, d.Kind);
                 names[d.Id] = d.FullName;
             }
 
         var paymentIds = Ids(nameof(Payment));
         if (paymentIds.Length > 0)
             foreach (var p in await db.Payments.AsNoTracking().Where(p => paymentIds.Contains(p.Id))
-                         .Select(p => new { p.Id, p.Deal.Apartment.Number, p.Deal.Customer.FullName }).ToListAsync(ct))
+                         .Select(p => new { p.Id, p.Deal.Apartment.Number, p.Deal.Apartment.Kind, p.Deal.Apartment.Floor.Building.BlockCode, p.Deal.Customer.FullName }).ToListAsync(ct))
             {
-                apartments[p.Id] = p.Number;
+                apartments[p.Id] = new UnitRef(p.Number, p.BlockCode, p.Kind);
                 names[p.Id] = p.FullName;
             }
 
         var bookingIds = Ids(nameof(Booking));
         if (bookingIds.Length > 0)
             foreach (var b in await db.Bookings.AsNoTracking().Where(b => bookingIds.Contains(b.Id))
-                         .Select(b => new { b.Id, b.Apartment.Number, Name = b.Customer != null ? b.Customer.FullName : b.Lead != null ? b.Lead.Name : null })
+                         .Select(b => new { b.Id, b.Apartment.Number, b.Apartment.Kind, b.Apartment.Floor.Building.BlockCode, Name = b.Customer != null ? b.Customer.FullName : b.Lead != null ? b.Lead.Name : null })
                          .ToListAsync(ct))
             {
-                apartments[b.Id] = b.Number;
+                apartments[b.Id] = new UnitRef(b.Number, b.BlockCode, b.Kind);
                 if (b.Name is not null)
                     names[b.Id] = b.Name;
             }
@@ -73,8 +74,8 @@ public static class AuditPresenter
         var apartmentIds = Ids(nameof(Apartment));
         if (apartmentIds.Length > 0)
             foreach (var a in await db.Apartments.AsNoTracking().Where(a => apartmentIds.Contains(a.Id))
-                         .Select(a => new { a.Id, a.Number }).ToListAsync(ct))
-                apartments[a.Id] = a.Number;
+                         .Select(a => new { a.Id, a.Number, a.Kind, a.Floor.Building.BlockCode }).ToListAsync(ct))
+                apartments[a.Id] = new UnitRef(a.Number, a.BlockCode, a.Kind);
 
 
         var leadIds = Ids(nameof(Lead));
@@ -110,7 +111,9 @@ public static class AuditPresenter
             else if (names.TryGetValue(r.EntityId, out var name))
                 entityName = name;
             result[r.Id] = new AuditSubject(actorId, actor?.FullName, actor?.Email, actorId is null, entityName,
-                apartments.TryGetValue(r.EntityId, out var number) ? number : null);
+                apartments.TryGetValue(r.EntityId, out var unit) ? unit.Number : null,
+                // Код для людей: «A-45», «A-Н-3»; у дома без блока — null (сайт покажет просто номер).
+                apartments.TryGetValue(r.EntityId, out var coded) && coded.Block is not null ? coded.ToString() : null);
         }
         return result;
     }

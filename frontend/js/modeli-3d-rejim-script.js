@@ -122,7 +122,7 @@
       listToggle.textContent = t('h3d.listBtn', { n: l.length });
       rows = l;
       listBox.replaceChildren(...(l.length ? l.map((a, k) => h('div', { class: 'h3d-item st-' + a.status, role: 'option', id: 'h3d-opt-' + k, 'aria-selected': String(!!sel && sel.id === a.id), onclick: () => choose(a, true) },
-        h('span', { class: 'h3d-item-top' }, h('b', null, t('nr.cat.aptN', { n: a.number })), h('span', { class: 'h3d-item-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status))),
+        h('span', { class: 'h3d-item-top' }, h('b', { 'aria-label': S.unitName(a) }, a.block ? S.aptNum(a) : t('nr.cat.aptN', { n: a.number })), h('span', { class: 'h3d-item-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status))),
         h('span', { class: 'h3d-item-meta' }, (a.blockName ? a.blockName + ' · ' : '') + t('floor.n', { n: a.floor }) + ' · ' + S.fmt.rooms(a.rooms) + ' · ' + S.fmt.area(a.area)),
         h('span', { class: 'h3d-item-price' }, S.fmt.money(a.price, a.currency), eqOf(a) ? h('small', null, ' ' + eqOf(a)) : null))) : [h('p', { class: 'h3d-empty' }, t('list.none'))]));
       active = sel ? l.findIndex((a) => a.id === sel.id) : -1;
@@ -159,7 +159,7 @@
       const phone = ctx.phone;
       card.replaceChildren(
         h('button', { class: 'h3d-icon h3d-card-x', type: 'button', 'aria-label': t('common.close'), onclick: () => { sel = null; house.clearSelection(); drawCard(); drawList(); } }, '×'),
-        h('div', { class: 'h3d-card-kicker' }, (a.blockName ? a.blockName + ' · ' : '') + S.unitName(a) + ' · ' + S.floorName({ number: a.floor, parking: a.floor < 0 })),
+        h('div', { class: 'h3d-card-kicker' }, S.unitName(a) + ' · ' + S.floorName({ number: a.floor, parking: a.floor < 0 })),
         h('div', { class: 'h3d-card-type' }, S.roomsKind.label(a.rooms) + ' · ' + S.fmt.area(a.area)),
         h('div', { class: 'h3d-card-price' }, S.fmt.money(a.price, a.currency)),
         d ? h('div', { class: 'h3d-card-usd' }, d + ' · ' + t('price.estimate')) : null,

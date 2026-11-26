@@ -163,6 +163,10 @@ namespace Sitora.Infrastructure.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<Guid>("BuildingId")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -224,6 +228,18 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.HasIndex("FloorId", "PlanSlot")
                         .IsUnique()
                         .HasDatabaseName("IX_Apartments_FloorId_PlanSlot");
+
+                    b.HasIndex(new[] { "BuildingId", "Number" }, "IX_Apartments_BuildingId_Number_Commercial")
+                        .IsUnique()
+                        .HasFilter("\"Kind\" = 'Commercial'");
+
+                    b.HasIndex(new[] { "BuildingId", "Number" }, "IX_Apartments_BuildingId_Number_Home")
+                        .IsUnique()
+                        .HasFilter("\"Kind\" IN ('Residential', 'Penthouse')");
+
+                    b.HasIndex(new[] { "BuildingId", "Number" }, "IX_Apartments_BuildingId_Number_Parking")
+                        .IsUnique()
+                        .HasFilter("\"Kind\" = 'Parking'");
 
                     b.ToTable("Apartments", null, t =>
                         {

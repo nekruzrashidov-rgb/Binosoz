@@ -165,6 +165,7 @@ public static class ErrorCatalog
         E("Введите код входа", "pin_required", "Рамзи воридшавиро ворид кунед", "Enter the sign-in code");
         E("Введите код из письма", "code_required", "Рамзи мактубро ворид кунед", "Enter the code from the e-mail");
         P("Не удалось создать учётную запись покупателя: ", "customer_account_failed", "Сохтани ҳисоби харидор муяссар нашуд: ", "Could not create the buyer account: ");
+        P(Sitora.Infrastructure.Services.CatalogService.NumberTakenInBuilding, "apartment_number_taken", "Ин рақам дар ин бино (блок) аллакай банд аст: ", "This number is already taken in this building (block): ");
         P("Неизвестная роль: ", "unknown_role", "Нақши номаълум: ", "Unknown role: ");
         P("Роль должна быть одной из: ", "invalid_role", "Нақш бояд яке аз инҳо бошад: ", "The role must be one of: ");
 
