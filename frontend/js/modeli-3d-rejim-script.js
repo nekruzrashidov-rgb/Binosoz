@@ -79,6 +79,20 @@
     house.on('view', (v) => S.$$('[data-view]', viewBar).forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.view === v))));
     root.appendChild(viewBar);
 
+    // ---------- the complex: «Весь ЖК / A / B / C», the parking mode, the cut-away ----------
+    const blocks = house.blocks.filter((x) => x.code);
+    const hasParking = ctx.apts().length && (ctx.units ? ctx.units() : []).some((a) => a.kind === 'parking');
+    const blockBar = h('div', { class: 'h3d-blocks', role: 'group', 'aria-label': t('blk.switch') });
+    function drawBlocks(cur) {
+      blockBar.replaceChildren(...(blocks.length > 1 ? [[null, t('blk.all')]].concat(blocks.map((x) => [x.code, x.name])) : []).map(([c, l]) =>
+        h('button', { class: 'h3d-chip', type: 'button', 'data-block': c || 'all', 'aria-pressed': String((cur || null) === c), onclick: () => { house.focusBlock(c); drawBlocks(c); } }, l)),
+        hasParking ? h('button', { class: 'h3d-chip', type: 'button', 'data-mode': 'parking', 'aria-pressed': String(house.parking), onclick: () => { house.setParking(!house.parking); drawBlocks(cur); } }, t('blk.parking')) : null,
+        blocks.length ? h('button', { class: 'h3d-chip', type: 'button', 'data-mode': 'xray', 'aria-pressed': String(house.state().xray), onclick: () => { house.setXray(!house.state().xray); drawBlocks(cur); } }, t('blk.xray')) : null);
+    }
+    drawBlocks(null);
+    const conceptNote = h('p', { class: 'h3d-concept' }, t('viz.concept'));
+    root.append(blockBar, conceptNote);
+
     // ---------- the list of apartments (left; a sheet from below on a phone) ----------
     const listBox = h('div', { class: 'h3d-items', role: 'listbox', 'aria-label': t('h3d.list'), tabindex: '0' });
     const filters = h('div', { class: 'h3d-filters' });
@@ -109,7 +123,7 @@
       rows = l;
       listBox.replaceChildren(...(l.length ? l.map((a, k) => h('div', { class: 'h3d-item st-' + a.status, role: 'option', id: 'h3d-opt-' + k, 'aria-selected': String(!!sel && sel.id === a.id), onclick: () => choose(a, true) },
         h('span', { class: 'h3d-item-top' }, h('b', null, t('nr.cat.aptN', { n: a.number })), h('span', { class: 'h3d-item-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status))),
-        h('span', { class: 'h3d-item-meta' }, t('floor.n', { n: a.floor }) + ' · ' + S.fmt.rooms(a.rooms) + ' · ' + S.fmt.area(a.area)),
+        h('span', { class: 'h3d-item-meta' }, (a.blockName ? a.blockName + ' · ' : '') + t('floor.n', { n: a.floor }) + ' · ' + S.fmt.rooms(a.rooms) + ' · ' + S.fmt.area(a.area)),
         h('span', { class: 'h3d-item-price' }, S.fmt.money(a.price, a.currency), eqOf(a) ? h('small', null, ' ' + eqOf(a)) : null))) : [h('p', { class: 'h3d-empty' }, t('list.none'))]));
       active = sel ? l.findIndex((a) => a.id === sel.id) : -1;
       if (active >= 0) listBox.setAttribute('aria-activedescendant', 'h3d-opt-' + active); else listBox.removeAttribute('aria-activedescendant');
@@ -145,7 +159,7 @@
       const phone = ctx.phone;
       card.replaceChildren(
         h('button', { class: 'h3d-icon h3d-card-x', type: 'button', 'aria-label': t('common.close'), onclick: () => { sel = null; house.clearSelection(); drawCard(); drawList(); } }, '×'),
-        h('div', { class: 'h3d-card-kicker' }, t('nr.cat.aptN', { n: a.number }) + ' · ' + t('floor.n', { n: a.floor })),
+        h('div', { class: 'h3d-card-kicker' }, (a.blockName ? a.blockName + ' · ' : '') + S.unitName(a) + ' · ' + S.floorName({ number: a.floor, parking: a.floor < 0 })),
         h('div', { class: 'h3d-card-type' }, S.roomsKind.label(a.rooms) + ' · ' + S.fmt.area(a.area)),
         h('div', { class: 'h3d-card-price' }, S.fmt.money(a.price, a.currency)),
         d ? h('div', { class: 'h3d-card-usd' }, d + ' · ' + t('price.estimate')) : null,
@@ -263,6 +277,8 @@
         document.removeEventListener('keydown', onKey); window.removeEventListener('resize', inset); house.setLabelInset(0);
         if (house.mode !== 'house') { house.leaveInside(); }
         house.removeLabels('poi'); house.removeLabels('house'); house.removeLabels('room');
+        if (house.parking) house.setParking(false);
+        if (house.state().xray) house.setXray(false);
         house.setFilter(null); house.setFocusMode(false);
         house.on('select', ctx.onModelSelect || (() => {})); house.on('view', () => {}); house.on('mode', () => {});
         if (next && next.parentNode === home) home.insertBefore(ctx.box, next); else home.appendChild(ctx.box);
