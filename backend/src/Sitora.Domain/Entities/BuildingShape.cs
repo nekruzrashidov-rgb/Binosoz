@@ -13,6 +13,8 @@ public class BuildingSetback
 {
     public int FromFloor { get; set; }
     public List<double[]> Footprint { get; set; } = [];
+    // Глубина полосы квартир этих этажей, м (пентхаусы глубже типовых); не задано — FloorPlanMath.PenthouseDepth.
+    public double? PlanDepth { get; set; }
 }
 
 // План общего участка ЖК (метры, те же оси, что у SitePosition блоков): контур участка и зоны двора. Зона рисуется на сайте

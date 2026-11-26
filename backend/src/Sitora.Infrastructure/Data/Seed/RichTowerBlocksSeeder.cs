@@ -23,8 +23,9 @@ public static class RichTowerBlocksSeeder
 
     // Unit* — набор квартир типового этажа по порядку раскладки: доли площади полосы и комнаты (0 — студия). Угловые и
     // торцевые (окна на две стороны) — самые большие, 3–4 комнаты; в середине фасадов — студии, 1- и 2-комнатные.
+    // Top* — последний этаж, пентхаусы: контур уступа, глубина полосы (м), доли площади 4 пентхаусов (угловые — больше).
     public record BlockSpec(string Code, int Floors, int SortOrder, double[][] Footprint, SitePlacement Position, int TopFrom, double[][] Top,
-        double[] UnitWeights, int[] UnitRooms);
+        double[] UnitWeights, int[] UnitRooms, double TopDepth, double[] TopWeights);
 
     // Контуры — метры, обход по часовой стрелке на плане (x вправо, y вниз), первая вершина — начало раскладки квартир.
     public static readonly BlockSpec[] Blocks =
@@ -33,18 +34,18 @@ public static class RichTowerBlocksSeeder
             [[10, 0], [38, 0], [38, 18], [19, 18], [19, 34], [0, 34], [0, 0, 6]],
             new SitePlacement { X = -89, Y = -50, RotationDeg = 0 }, 22,
             [[10, 2.5], [38, 2.5], [38, 18], [19, 18], [19, 34], [2.5, 34], [2.5, 2.5, 5]],
-            [0.6, 1.75, 0.8, 1.0, 1.75, 0.6, 0.8, 1.7], [0, 4, 1, 2, 4, 0, 1, 3]),
+            [0.6, 1.75, 0.8, 1.0, 1.75, 0.6, 0.8, 1.7], [0, 4, 1, 2, 4, 0, 1, 3], 6.5, [1, 1, 1, 1]),
         new("B", 20, 2,
             [[24, 0], [31, 0], [32.5, -1.5], [37.5, -1.5], [39, 0], [46, 0], [50, 4], [50, 16], [46, 20], [39, 20], [37.5, 21.5], [32.5, 21.5],
              [31, 20], [19, 20], [17.5, 21.5], [12.5, 21.5], [11, 20], [4, 20], [0, 16], [0, 4], [4, 0], [11, 0], [12.5, -1.5], [17.5, -1.5], [19, 0]],
             new SitePlacement { X = -25, Y = -60, RotationDeg = 0 }, 20,
-            [[24, 1], [46, 1], [49, 4], [49, 16], [46, 19], [4, 19], [1, 16], [1, 4], [4, 1]],
-            [0.55, 0.85, 1.8, 0.95, 0.55, 0.85, 1.8, 0.95], [0, 1, 4, 2, 0, 1, 4, 2]),
+            [[24, 0], [43, 0], [47, 4], [47, 16], [43, 20], [7, 20], [3, 16], [3, 4], [7, 0]],
+            [0.55, 0.85, 1.8, 0.95, 0.55, 0.85, 1.8, 0.95], [0, 1, 4, 2, 0, 1, 4, 2], 8, [1, 1, 1, 1]),
         new("C", 20, 3,
             [[21, 0], [42, 0, 8], [42, 28], [27, 28], [27, 15], [15, 15], [15, 28], [0, 28], [0, 0, 8]],
             new SitePlacement { X = 81, Y = -55, RotationDeg = 90 }, 20,
             [[21, 1.5], [40.5, 1.5, 7], [40.5, 28], [27, 28], [27, 15], [15, 15], [15, 28], [1.5, 28], [1.5, 1.5, 7]],
-            [0.55, 1.6, 0.8, 1.0, 1.0, 0.8, 1.6, 0.55], [0, 4, 1, 2, 2, 1, 4, 0]),
+            [0.55, 1.6, 0.8, 1.0, 1.0, 0.8, 1.6, 0.55], [0, 4, 1, 2, 2, 1, 4, 0], 6.5, [0.97, 1.03, 1.03, 0.97]),
     ];
 
     // Участок и двор (концепт): детская площадка и мини-футбольное поле — только потому, что они есть в удобствах блоков.
@@ -95,7 +96,7 @@ public static class RichTowerBlocksSeeder
                 SortOrder = spec.SortOrder,
                 Footprint = spec.Footprint.Select(p => p.ToArray()).ToList(),
                 SitePosition = spec.Position,
-                Setbacks = [new BuildingSetback { FromFloor = spec.TopFrom, Footprint = spec.Top.Select(p => p.ToArray()).ToList() }],
+                Setbacks = [new BuildingSetback { FromFloor = spec.TopFrom, Footprint = spec.Top.Select(p => p.ToArray()).ToList(), PlanDepth = spec.TopDepth }],
                 Amenities = [.. Amenities],
                 // Цена за м² по этажам в USD (PriceDefaults): 3–6 — 1 200, 7–19 — до 900, выше — 900, пентхаусы — 1 400.
                 PriceCurrency = PriceDefaults.Currency,
@@ -136,7 +137,28 @@ public static class RichTowerBlocksSeeder
             }
             // Площади квартир — доли полосы этажа (FloorPlanMath): сумма с коридором и лифтовым узлом = площадь этажа.
             var areas = FloorPlanMath.UnitAreas(spec.Footprint, FloorPlanMath.Depth, spec.UnitWeights);
-            for (var floorNumber = CommercialFloors + 1; floorNumber <= spec.Floors; floorNumber++)
+            // Последний этаж — 4 пентхауса по 4 комнаты (гостиная-кухня и 3 спальни) на уступе; терраса — кольцо между контуром
+            // блока и контуром уступа, по долям площади; в цену м² терраса не входит.
+            {
+                var penthouses = FloorPlanMath.UnitAreas(spec.Top, spec.TopDepth, spec.TopWeights);
+                var terrace = PlanGeometry.Area(PlanGeometry.Expand(spec.Footprint)) - PlanGeometry.Area(PlanGeometry.Expand(spec.Top));
+                var sum = penthouses.Sum();
+                var floor = new Floor { Number = spec.Floors };
+                for (var slot = 0; slot < penthouses.Length; slot++)
+                {
+                    var penthouse = new Apartment
+                    {
+                        Number = spec.Floors * 100 + slot + 1, Rooms = 4, PlanSlot = slot, Kind = ApartmentKind.Penthouse,
+                        TerraceArea = Math.Round((decimal)terrace * penthouses[slot] / sum, 1, MidpointRounding.AwayFromZero)
+                    };
+                    penthouse.SetPricing(penthouses[slot], PriceDefaults.PenthousePricePerM2, building.PriceCurrency);
+                    if (random.NextDouble() < 0.15)
+                        penthouse.Sell();
+                    floor.Apartments.Add(penthouse);
+                }
+                building.Floors.Add(floor);
+            }
+            for (var floorNumber = CommercialFloors + 1; floorNumber < spec.Floors; floorNumber++)
             {
                 var floor = new Floor { Number = floorNumber };
                 var soldProbability = Math.Max(0, 0.6 - (floorNumber - 1) * 0.04);

@@ -78,6 +78,7 @@ public class SaveBuildingShapeRequestValidator : AbstractValidator<SaveBuildingS
         RuleForEach(x => x.Setbacks).ChildRules(s =>
         {
             s.RuleFor(x => x.FromFloor).InclusiveBetween(2, 100).WithMessage("Уступ начинается со 2-го этажа или выше");
+            s.RuleFor(x => x.PlanDepth).InclusiveBetween(4, 14).When(x => x.PlanDepth is not null).WithMessage("Глубина квартир уступа — от 4 до 14 м");
             PolygonRules.Apply(s.RuleFor(x => (List<double[]>?)x.Footprint));
         });
     }

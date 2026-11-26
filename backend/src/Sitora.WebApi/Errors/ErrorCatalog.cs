@@ -214,6 +214,7 @@ public static class ErrorCatalog
         E("Поворот блока — от -360 до 360°", "invalid_block_rotation", "Гардиши блок — аз -360 то 360°", "The block's rotation is from -360 to 360°");
         E("Уступов — не больше 10", "too_many_setbacks", "Пиллаҳо — на зиёда аз 10", "No more than 10 setbacks");
         E("Уступ начинается со 2-го этажа или выше", "invalid_setback_floor", "Пилла аз ошёнаи 2-юм ё болотар сар мешавад", "A setback starts on floor 2 or higher");
+        E("Глубина квартир уступа — от 4 до 14 м", "invalid_setback_depth", "Чуқурии манзилҳои пилла — аз 4 то 14 м", "The setback's apartment depth is 4 to 14 m");
         E("Уступ начинается выше последнего этажа", "setback_above_roof", "Пилла аз ошёнаи охирин болотар сар мешавад", "The setback starts above the top floor");
         E("Контур уступа выходит за контур блока", "setback_outside_block", "Контури пилла аз контури блок берун мебарояд", "The setback's outline goes beyond the block's outline");
         E("Блоки на участке пересекаются", "blocks_overlap", "Блокҳо дар қитъа ҳамдигарро мебуранд", "The blocks overlap on the site");

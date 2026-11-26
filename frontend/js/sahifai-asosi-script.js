@@ -478,8 +478,11 @@
       return h('div', { class: 'nr-detail' + (plan ? '' : ' nr-detail--unit') }, plan ? h('div', { class: 'nr-detail-pic' }, plan) : null,
         h('div', { class: 'nr-detail-body' },
           h('div', { class: 'nr-detail-kicker' }, S.unitName(a) + ' · ' + S.floorName({ number: a.floor, parking: a.floor < 0 })),
-          h('h3', { class: 'nr-detail-type' }, S.unitType(a)),
-          h('dl', { class: 'nr-detail-facts' }, h('div', null, h('dt', null, t('nr.cat.area')), h('dd', null, S.fmt.area(a.area))), a.kind === 'parking' ? null : h('div', null, h('dt', null, t('nr.cat.sqm')), h('dd', null, S.fmt.money(sqmPrice(a), cur())))),
+          h('h3', { class: 'nr-detail-type' }, S.unitType(a), a.kind === 'penthouse' ? h('span', { class: 'chip warn nr-badge-ph' }, t('kind.penthouseOne')) : null),
+          h('dl', { class: 'nr-detail-facts' }, h('div', null, h('dt', null, t('nr.cat.area')), h('dd', null, S.fmt.area(a.area))), a.kind === 'parking' ? null : h('div', null, h('dt', null, t('nr.cat.sqm')), h('dd', null, S.fmt.money(sqmPrice(a), cur()))),
+            a.terraceArea ? h('div', null, h('dt', null, t('unit.terrace')), h('dd', null, S.fmt.area(a.terraceArea))) : null,
+            a.kind === 'penthouse' ? h('div', null, h('dt', null, t('unit.ceiling')), h('dd', null, t('unit.ceilingEst', { h: String(S.PENTHOUSE_CEILING).replace('.', ',') }))) : null),
+          a.terraceArea ? h('p', { class: 'nr-detail-note' }, t('unit.terraceNote')) : null,
           h('div', { class: 'nr-detail-label' }, t('nr.cat.price')),
           h('div', { class: 'nr-detail-price' }, S.fmt.money(a.price, cur())),
           eq ? h('div', { class: 'nr-detail-note' }, eq + ' · ' + t('price.estimate')) : null,
@@ -599,10 +602,11 @@
       return [['all', t('filter.all')]].concat(S.roomsKind.types.filter((g) => list.some((a) => S.roomsKind.group(a.rooms) === g)).map((g) => [String(g), S.roomsKind.pill(g)]));
     }
     function filtered() {
-      let l = (st.kind === 'commercial' ? st.units.filter((a) => a.kind === 'commercial') : st.kind === 'parking' ? st.units.filter((a) => a.kind === 'parking') : st.apts).slice();
+      let l = (st.kind === 'commercial' ? st.units.filter((a) => a.kind === 'commercial') : st.kind === 'parking' ? st.units.filter((a) => a.kind === 'parking')
+        : st.kind === 'penthouse' ? st.apts.filter((a) => a.kind === 'penthouse') : st.apts).slice();
       if (st.onlyFree) l = l.filter((a) => a.status === 'free');
-      if (st.rooms !== 'all' && !st.kind) l = l.filter((a) => S.roomsKind.match(a, st.rooms));
-      if (st.priceCap && !st.kind) l = l.filter((a) => a.price <= st.priceCap);
+      if (st.rooms !== 'all' && (!st.kind || st.kind === 'penthouse')) l = l.filter((a) => S.roomsKind.match(a, st.rooms));
+      if (st.priceCap && (!st.kind || st.kind === 'penthouse')) l = l.filter((a) => a.price <= st.priceCap);
       const cls = st.building && st.building.eco && st.building.eco.energyClass;
       if (cls && st.minClass && st.minClass !== 'any' && S.eco.rank(cls) > S.eco.rank(st.minClass)) l = [];
       const s = { price: (a, b) => a.price - b.price, priceDesc: (a, b) => b.price - a.price, area: (a, b) => b.area - a.area, floor: (a, b) => b.floor - a.floor }[st.sort];
@@ -625,7 +629,7 @@
       aptSection.replaceChildren(h('div', { class: 'nr-wrap' },
         h('div', { class: 'nr-head-row' }, h('div', null, kicker(t('nr.cat.allKicker')), h('h2', { class: 'nr-h2' }, t('apts.title'))), count),
         kindPills(),
-        h('div', { class: 'nr-filters', hidden: !!st.kind },
+        h('div', { class: 'nr-filters', hidden: !!st.kind && st.kind !== 'penthouse' },
           h('div', { class: 'nr-filter' }, h('span', { class: 'nr-filter-label', id: 'f-rooms' }, t('filter.rooms')), h('div', { class: 'nr-pills', role: 'group', 'aria-labelledby': 'f-rooms' }, rooms.map(([v, l]) => h('button', { type: 'button', class: 'nr-pill', 'aria-pressed': String(st.rooms === v), onclick: (e) => { st.rooms = v; st.shown = 12; S.$$('.nr-pill', e.currentTarget.parentNode).forEach((p) => p.setAttribute('aria-pressed', String(p === e.currentTarget))); drawList(); } }, l)))),
           h('div', { class: 'nr-filter nr-range' }, h('div', { class: 'nr-range-top' }, h('label', { for: 'f-price' }, t('filter.priceTo')), priceVal), price),
           h('div', { class: 'nr-filter' }, S.field(t('filter.sort'), sort)),
@@ -637,8 +641,8 @@
     // Kinds of premises in the list: shown only when the API has shops or parking spaces.
     function kindPills() {
       const has = (k) => st.units.some((a) => a.kind === k);
-      if (!has('commercial') && !has('parking')) return null;
-      const opts = [['', t('kind.homes')]].concat(has('commercial') ? [['commercial', t('kind.commercial')]] : []).concat(has('parking') ? [['parking', t('kind.parking')]] : []);
+      if (!has('commercial') && !has('parking') && !has('penthouse')) return null;
+      const opts = [['', t('kind.homes')]].concat(has('penthouse') ? [['penthouse', t('kind.penthouse')]] : []).concat(has('commercial') ? [['commercial', t('kind.commercial')]] : []).concat(has('parking') ? [['parking', t('kind.parking')]] : []);
       return h('div', { class: 'nr-pills nr-kinds', role: 'group', 'aria-label': t('kind.label') }, opts.map(([v, l]) =>
         h('button', { type: 'button', class: 'nr-pill', 'aria-pressed': String((st.kind || '') === v), 'data-kind': v || 'homes', onclick: () => { st.kind = v; st.shown = 12; renderApartments(); } }, l)));
     }
@@ -657,7 +661,7 @@
         h('span', { class: 'nr-unit-card-pic' }, plan),
         h('span', { class: 'nr-unit-card-body' },
           h('span', { class: 'nr-unit-top' }, h('b', null, S.unitName(a)), h('span', { class: 'nr-unit-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status))),
-          h('span', { class: 'nr-unit-type' }, S.unitType(a)),
+          h('span', { class: 'nr-unit-type' }, S.unitType(a), a.kind === 'penthouse' ? h('span', { class: 'chip warn nr-badge-ph' }, t('kind.penthouseOne')) : null),
           h('span', { class: 'nr-unit-meta' }, S.floorName({ number: a.floor, parking: a.floor < 0 }) + ' · ' + S.fmt.area(a.area) + (a.kind === 'parking' ? '' : ' · ' + S.fmt.money(sqmPrice(a), a.currency) + ' / ' + t('u.m2'))),
           h('span', { class: 'nr-unit-price' }, S.fmt.money(a.price, cur()))));
     }

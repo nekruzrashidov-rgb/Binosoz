@@ -126,8 +126,10 @@
   // groups 0 (studio), 1, 2, 3, 4 (four rooms and more); the label names the real number of rooms.
   // Kinds of premises: an apartment (and a penthouse) is a home; a shop and a parking space have their own names.
   S.isHome = (a) => !a || !a.kind || a.kind === 'residential' || a.kind === 'penthouse';
-  S.unitName = (a) => (a && a.kind === 'commercial' ? S.t('unit.shop', { n: a.number }) : a && a.kind === 'parking' ? S.t('unit.spot', { n: a.number }) : S.t('nr.cat.aptN', { n: a.number }));
-  S.unitType = (a) => (a && a.kind === 'commercial' ? S.t('unit.shopType') : a && a.kind === 'parking' ? S.t('unit.spotType') : S.roomsKind.label(a.rooms));
+  S.unitName = (a) => (a && a.kind === 'commercial' ? S.t('unit.shop', { n: a.number }) : a && a.kind === 'parking' ? S.t('unit.spot', { n: a.number }) : a && a.kind === 'penthouse' ? S.t('unit.penthouse', { n: a.number }) : S.t('nr.cat.aptN', { n: a.number }));
+  S.unitType = (a) => (a && a.kind === 'commercial' ? S.t('unit.shopType') : a && a.kind === 'parking' ? S.t('unit.spotType') : a && a.kind === 'penthouse' ? S.t('unit.penthouseType', { n: a.rooms }) : S.roomsKind.label(a.rooms));
+  // The penthouses' ceiling: not in the API yet — 3,6 m marked «оценка» (an estimate).
+  S.PENTHOUSE_CEILING = 3.6;
   // Floor numbers as the plan writes them: −2, −1, 1, 2… (a real minus sign).
   S.floorNo = (n) => (+n < 0 ? '−' + Math.abs(+n) : String(n));
   S.floorName = (f) => (f.parking ? S.t('floor.parkingN', { n: S.floorNo(f.number) }) : S.t('floor.n', { n: f.number }));

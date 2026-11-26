@@ -21,6 +21,9 @@ public class Apartment : BaseEntity
     public int Rooms { get; set; }
 
     public ApartmentKind Kind { get; set; } = ApartmentKind.Residential;
+
+    // Своя терраса пентхауса на крыше уступа, м² — отдельно от площади, в цену м² не входит.
+    public decimal? TerraceArea { get; set; }
     public decimal Area { get; private set; }
     public decimal PricePerM2 { get; private set; }
     public decimal Price { get; private set; }

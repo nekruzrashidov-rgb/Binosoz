@@ -148,7 +148,8 @@ public record ApartmentResponse(
     ApartmentStatus Status,
     int PlanSlot,
     string? Model3dId,
-    ApartmentKind Kind = ApartmentKind.Residential);
+    ApartmentKind Kind = ApartmentKind.Residential,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? TerraceArea = null);
 
 public record SaveBuildingRequest(
     string NameRu,

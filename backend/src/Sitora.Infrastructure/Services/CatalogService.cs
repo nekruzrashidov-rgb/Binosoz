@@ -646,5 +646,6 @@ public class CatalogService(
         a.Status,
         a.PlanSlot,
         a.Model3dId,
-        a.Kind);
+        a.Kind,
+        a.TerraceArea);
 }
