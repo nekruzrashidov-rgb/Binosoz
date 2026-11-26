@@ -57,19 +57,80 @@ public class ExchangeRateService(
 
     public async Task UpdateFromProviderAsync(CancellationToken ct = default)
     {
-        var today = DushanbeTime.Today(timeProvider.GetUtcNow().UtcDateTime);
-        var rate = await provider.GetUsdRateAsync(today, ct);
-        if (rate is not > 0)
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var today = DushanbeTime.Today(now);
+        var result = await provider.FetchUsdRateAsync(today, ct);
+        // Попытка и её итог сохраняются всегда (C-09): в CRM → «Курс» видно, когда пробовали и почему не вышло.
+        await SetSettingAsync(PlatformSettingKeys.RatesLastAttemptAt, Iso(now), ct);
+        if (result.Rate is not > 0)
+        {
+            await SetSettingAsync(PlatformSettingKeys.RatesLastResult, Truncate(result.Error ?? "курс не получен"), ct);
+            await db.SaveChangesAsync(ct);
             return;
+        }
+        await SetSettingAsync(PlatformSettingKeys.RatesLastResult, OkResult, ct);
+        await SetSettingAsync(PlatformSettingKeys.RatesLastSuccessAt, Iso(now), ct);
 
         // Общий курс, введённый вручную, загрузка не перезаписывает.
         if (await db.ExchangeRates.AnyAsync(r => r.OrganizationId == null && r.Currency == Currency.USD
                                                  && r.Date == today && r.Source == RateSource.Manual, ct))
+        {
+            await db.SaveChangesAsync(ct);
             return;
+        }
 
-        await UpsertAsync(null, Currency.USD, today, rate.Value, RateSource.Nbt, ct);
+        await UpsertAsync(null, Currency.USD, today, result.Rate.Value, RateSource.Nbt, ct);
         await db.SaveChangesAsync(ct);
-        logger.LogInformation("Загружен курс НБТ на {Date}: {Rate}", today, rate);
+        logger.LogInformation("Загружен курс НБТ на {Date}: {Rate}", today, result.Rate);
+    }
+
+    private const string OkResult = "ok";
+
+    public async Task<RateUpdateStatus> GetUpdateStatusAsync(CancellationToken ct = default)
+    {
+        var keys = new[] { PlatformSettingKeys.RatesLastAttemptAt, PlatformSettingKeys.RatesLastResult, PlatformSettingKeys.RatesLastSuccessAt };
+        var values = await db.PlatformSettings.AsNoTracking().Where(s => keys.Contains(s.Key)).ToDictionaryAsync(s => s.Key, s => s.Value, ct);
+        var lastNbt = await db.ExchangeRates.AsNoTracking()
+            .Where(r => r.OrganizationId == null && r.Currency == Currency.USD && r.Source == RateSource.Nbt)
+            .OrderByDescending(r => r.Date).Select(r => (DateOnly?)r.Date).FirstOrDefaultAsync(ct);
+        var result = values.GetValueOrDefault(PlatformSettingKeys.RatesLastResult);
+        return new RateUpdateStatus(ParseTime(values.GetValueOrDefault(PlatformSettingKeys.RatesLastAttemptAt)),
+            result is null ? null : result == OkResult,
+            result is null or OkResult ? null : result,
+            ParseTime(values.GetValueOrDefault(PlatformSettingKeys.RatesLastSuccessAt)),
+            lastNbt);
+    }
+
+    public async Task<bool> NeedsCatchUpAsync(CancellationToken ct = default)
+    {
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var today = DushanbeTime.Today(now);
+        var latest = await db.ExchangeRates.AsNoTracking()
+            .Where(r => r.OrganizationId == null && r.Currency == Currency.USD)
+            .OrderByDescending(r => r.Date).Select(r => (DateOnly?)r.Date).FirstOrDefaultAsync(ct);
+        if (latest is { } date && date >= today.AddDays(-1))
+            return false;
+        // Не чаще раза в час: Render будит сервис много раз за день, неудачная попытка не повторяется на каждом старте.
+        var attempt = ParseTime(await db.PlatformSettings.AsNoTracking()
+            .Where(s => s.Key == PlatformSettingKeys.RatesLastAttemptAt).Select(s => s.Value).FirstOrDefaultAsync(ct));
+        return attempt is null || now - attempt.Value >= TimeSpan.FromHours(1);
+    }
+
+    private static string Iso(DateTime utc) => utc.ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static DateTime? ParseTime(string? value) =>
+        DateTime.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AdjustToUniversal, out var t)
+            ? DateTime.SpecifyKind(t, DateTimeKind.Utc) : null;
+
+    private static string Truncate(string text) => text.Length <= 300 ? text : text[..300];
+
+    private async Task SetSettingAsync(string key, string value, CancellationToken ct)
+    {
+        var setting = await db.PlatformSettings.FirstOrDefaultAsync(s => s.Key == key, ct);
+        if (setting is null)
+            db.PlatformSettings.Add(setting = new PlatformSetting { Key = key });
+        setting.Value = value;
+        setting.UpdatedAt = timeProvider.GetUtcNow().UtcDateTime;
     }
 
     // Последний курс не позже даты: общий или своей организации; на одну дату ручной курс организации важнее общего.

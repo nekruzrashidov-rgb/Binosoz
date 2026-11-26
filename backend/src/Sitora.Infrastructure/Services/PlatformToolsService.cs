@@ -33,21 +33,24 @@ public class PlatformToolsService(AppDbContext db, IAuditService audit, TimeProv
             logs = logs.Where(a => a.At < to);
 
         var total = await logs.CountAsync(ct);
-        var items = await (
+        var page = await (
                 from a in logs
-                join u in db.Users on a.UserId equals u.Id into users
-                from u in users.DefaultIfEmpty()
                 join o in db.Organizations.IgnoreQueryFilters() on a.OrganizationId equals o.Id into orgs
                 from o in orgs.DefaultIfEmpty()
                 orderby a.At descending, a.Id descending
-                // Вход и другие действия до аутентификации пишутся без UserId: тогда пользователь — сам объект записи (AppUser).
-                select new PlatformActivityItem(a.Id, a.At, a.Action, a.Entity, a.EntityId, a.OrganizationId,
-                    o != null ? o.Name : null,
-                    u != null ? u.Email
-                        : a.Entity == nameof(AppUser) ? db.Users.Where(x => x.Id == a.EntityId).Select(x => x.Email).FirstOrDefault() : null,
-                    a.Ip, a.ImpersonatedById != null))
+                select new { Log = a, OrganizationName = o != null ? o.Name : null })
             .Skip(p.Skip).Take(p.PageSize)
             .ToListAsync(ct);
+        // Вход и другие действия до аутентификации пишутся без UserId: тогда пользователь — сам объект записи (AppUser).
+        var subjects = await AuditPresenter.DescribeAsync(db,
+            page.Select(x => new AuditPresenter.Row(x.Log.Id, x.Log.UserId, x.Log.Entity, x.Log.EntityId, x.Log.Action)).ToList(), ct);
+        var items = page.Select(x =>
+        {
+            var (a, s) = (x.Log, subjects[x.Log.Id]);
+            return new PlatformActivityItem(a.Id, a.At, a.Action, a.Entity, a.EntityId, a.OrganizationId, x.OrganizationName,
+                s.ActorEmail, a.Ip, a.ImpersonatedById != null, s.ActorName, s.BySystem, s.EntityName, s.ApartmentNumber,
+                a.Before, a.After);
+        }).ToList();
         return new PagedResult<PlatformActivityItem>(items, p.Page, p.PageSize, total);
     }
 
@@ -102,9 +105,10 @@ public class PlatformToolsService(AppDbContext db, IAuditService audit, TimeProv
         return new PlatformSettingsResponse(
             values.TryGetValue(PlatformSettingKeys.MaxOrganizations, out var max) && int.TryParse(max, NumberStyles.None, CultureInfo.InvariantCulture, out var m) ? m : null,
             values.TryGetValue(PlatformSettingKeys.DemoMode, out var demo) && demo == "true",
-            Version,
+            BuildInfo.Version,
             values.GetValueOrDefault(PlatformSettingKeys.ContactEmail),
-            organizations);
+            organizations,
+            BuildInfo.BuiltAt);
     }
 
     public async Task<PlatformSettingsResponse> UpdateSettingsAsync(UpdatePlatformSettingsRequest request, CancellationToken ct = default)
@@ -168,15 +172,5 @@ public class PlatformToolsService(AppDbContext db, IAuditService audit, TimeProv
     {
         if (await db.PlatformSettings.FirstOrDefaultAsync(s => s.Key == key, ct) is { } setting)
             db.PlatformSettings.Remove(setting);
-    }
-
-    // «1.0.0 (4ac525d)»: версия сборки и коммит, из которого она собрана.
-    private static readonly string Version = ReadVersion();
-
-    private static string ReadVersion()
-    {
-        var info = typeof(PlatformToolsService).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "1.0.0";
-        var plus = info.IndexOf('+');
-        return plus < 0 ? info : $"{info[..plus]} ({info[(plus + 1)..Math.Min(info.Length, plus + 8)]})";
     }
 }

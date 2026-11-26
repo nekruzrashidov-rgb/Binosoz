@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sitora.Domain.Entities;
 using Sitora.Domain.Interfaces;
@@ -185,6 +186,24 @@ public static class DependencyInjection
         jobs.AddOrUpdate<PaymentReminderJob>(PaymentReminderJob.Id, job => job.RunAsync(CancellationToken.None), PaymentReminderJob.Schedule);
         jobs.AddOrUpdate<BookingExpiryNoticeJob>(BookingExpiryNoticeJob.Id, job => job.RunAsync(CancellationToken.None), BookingExpiryNoticeJob.Schedule);
         jobs.AddOrUpdate<WeeklyOwnerReportJob>(WeeklyOwnerReportJob.Id, job => job.RunAsync(CancellationToken.None), WeeklyOwnerReportJob.Schedule);
+    }
+
+    // Курс НБТ старше суток (сервер спал в часы расписания UpdateRatesJob) — разовая загрузка в очередь Hangfire.
+    // Ошибка проверки не мешает старту: в худшем случае курс загрузит расписание.
+    public static async Task EnqueueRateCatchUpAsync(this IServiceProvider services, ILogger logger)
+    {
+        try
+        {
+            await using var scope = services.CreateAsyncScope();
+            if (!await scope.ServiceProvider.GetRequiredService<IExchangeRateService>().NeedsCatchUpAsync())
+                return;
+            scope.ServiceProvider.GetRequiredService<IBackgroundJobClient>().Enqueue<UpdateRatesJob>(job => job.RunAsync(CancellationToken.None));
+            logger.LogInformation("Курс НБТ старше суток — поставлена разовая загрузка курса");
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            logger.LogWarning(e, "Не удалось проверить, нужен ли догон курса НБТ");
+        }
     }
 
     // Почтовый сервис выбирается настройкой Email__Provider: Smtp, Resend или Dev (письма в лог, только для разработки).

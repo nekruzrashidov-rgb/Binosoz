@@ -17,6 +17,8 @@ namespace Sitora.Infrastructure.Data.Seed;
 // Почта занята пользователем другой роли или другой организации — ошибка (остальные роли всё равно обрабатываются).
 public static class StaffAccountsSeeder
 {
+    // FullName — прежнее имя сидера по-русски: новые сотрудники получают часть почты до «@» (одинаково на всех языках,
+    // как владелец и создатель платформы, R-02), а у уже созданных это старое имя заменяется так же.
     public sealed record StaffAccount(string Prefix, string Role, string FullName)
     {
         public string EmailVariable => Prefix + "_EMAIL";
@@ -90,7 +92,7 @@ public static class StaffAccountsSeeder
         var user = await users.FindByEmailAsync(email);
         if (user is null)
         {
-            user = new AppUser { UserName = email, Email = email, EmailConfirmed = true, FullName = account.FullName, OrganizationId = Organization.DefaultId };
+            user = new AppUser { UserName = email, Email = email, EmailConfirmed = true, FullName = DatabaseInitializer.SeedName(null, email), OrganizationId = Organization.DefaultId };
             await using var transaction = await db.Database.BeginTransactionAsync();
             var created = await users.CreateAsync(user, password);
             if (!created.Succeeded)
@@ -115,6 +117,16 @@ public static class StaffAccountsSeeder
         {
             db.UserBuildings.Add(new UserBuilding { UserId = user.Id, BuildingId = buildingId.Value });
             await db.SaveChangesAsync();
+        }
+
+        if (user.FullName == account.FullName)
+        {
+            audit.Record(nameof(AppUser), user.Id, DatabaseInitializer.NameSetAction, new { user.FullName },
+                new { FullName = DatabaseInitializer.SeedName(null, email) }, Organization.DefaultId);
+            user.FullName = DatabaseInitializer.SeedName(null, email);
+            var renamed = await users.UpdateAsync(user);
+            if (!renamed.Succeeded)
+                throw new InvalidOperationException("не удалось обновить имя: " + SeedPasswords.Describe(renamed.Errors));
         }
 
         var changed = await SeedPasswords.SyncAsync(db, users, audit, timeProvider, user, password, account.PasswordVariable);

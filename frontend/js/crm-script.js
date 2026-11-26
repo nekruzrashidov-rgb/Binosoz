@@ -176,6 +176,8 @@
             h('div', { class: 'row between' }, h('b', null, tp.name), S.chip(tp.type, t('tpl.type.' + tp.type))),
             h('p', { class: 'tpl-text' }, highlightVars(tp.text)),
             h('div', { class: 'row', style: { gap: '8px' } },
+              // C-12: the platform does not send SMS or WhatsApp — the text is copied and pasted by hand.
+              h('button', { class: 'btn soft sm', type: 'button', onclick: () => S.copy(tp.text) }, t('tpl.copy')),
               h('button', { class: 'btn soft sm', type: 'button', onclick: () => form(tp) }, t('common.edit')),
               h('button', { class: 'btn ghost sm', type: 'button', onclick: async (e) => { if (!(await S.confirm(t('tpl.delAsk', { n: tp.name }), t('common.delete'), true))) return; await S.busy(e.currentTarget, () => S.api.deleteTemplate(tp.id)); S.toast(t('tpl.deleted'), 'ok'); load(); } }, t('common.delete'))))))
             : h('div', { class: 'empty card' }, t('tpl.none')));
@@ -278,7 +280,7 @@
         async function draw() {
           floorsRow.querySelectorAll('button').forEach((b) => b.classList.toggle('on', +b.dataset.floor === floor));
           tip.hidden = true;
-          if (!withPlan.includes(floor)) { stage.replaceChildren(h('p', { class: 'muted' }, t('fplan.none'))); return; }
+          if (!withPlan.includes(floor)) { await drawScheme(); return; }
           stage.replaceChildren(S.skeleton(1, 120));
           try {
             // The server colours the drawing and strips scripts when the template is saved; parse it as SVG, not HTML.
@@ -289,10 +291,50 @@
             stage.replaceChildren(svg);
           } catch (e) { stage.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
         }
+        // C-10: no uploaded plan — a scheme of the floor from its apartments: each one is its typical layout
+        // (planirovki-data.js, as on the site) scaled to its area, in the order of the plan slots, along both sides of
+        // the corridor. Signed «схема, не чертёж»; the developer's own plan is uploaded as before.
+        async function drawScheme() {
+          stage.replaceChildren(S.skeleton(1, 120));
+          let apts = [];
+          try {
+            const f = (await S.api.floors(bsel.value)).find((x) => x.number === floor);
+            apts = f ? await S.api.floorApartments(f) : [];
+          } catch (e) { stage.replaceChildren(h('div', { class: 'form-err' }, e.message)); return; }
+          if (!apts.length || !S.plans) { stage.replaceChildren(h('p', { class: 'muted' }, t('fplan.none'))); return; }
+          apts.sort((a, b) => (a.planSlot ?? 1e6) - (b.planSlot ?? 1e6) || String(a.number).localeCompare(String(b.number), undefined, { numeric: true }));
+          const NS = 'http://www.w3.org/2000/svg', SCALE = 14, GAP = 0.3, CORRIDOR = 2;
+          const el = (tag, attrs, text) => { const n = document.createElementNS(NS, tag); Object.entries(attrs).forEach(([k, v]) => n.setAttribute(k, String(v))); if (text != null) n.textContent = text; return n; };
+          const sized = apts.map((a) => ({ a, p: S.plans.layout(S.roomsKind.group(a.rooms), a.area) }));
+          const half = Math.ceil(sized.length / 2), rows = [sized.slice(0, half), sized.slice(half)];
+          const rowW = (row) => row.reduce((s, x) => s + x.p.w + GAP, GAP);
+          const rowD = (row) => Math.max(0, ...row.map((x) => x.p.d));
+          const W = Math.max(rowW(rows[0]), rowW(rows[1])), D0 = rowD(rows[0]), D1 = rowD(rows[1]);
+          const H = D0 + CORRIDOR + D1 + GAP * 2;
+          const svg = el('svg', { viewBox: `0 0 ${W * SCALE} ${H * SCALE}`, class: 'fp-scheme', role: 'img', 'aria-label': t('fplan.scheme') });
+          svg.append(el('rect', { x: 0, y: (GAP + D0) * SCALE, width: W * SCALE, height: CORRIDOR * SCALE, class: 'fp-corridor' }));
+          svg.append(el('text', { x: (W / 2) * SCALE, y: (GAP + D0 + CORRIDOR / 2) * SCALE + 4, 'text-anchor': 'middle', class: 'fp-label muted' }, t('fplan.corridor')));
+          rows.forEach((row, ri) => {
+            let x = GAP;
+            row.forEach(({ a, p }) => {
+              const y = ri === 0 ? GAP + D0 - p.d : GAP + D0 + CORRIDOR;
+              const g = el('g', { class: 'fp-apt st-' + a.status, tabindex: 0, role: 'button', 'data-apartment-id': a.id, 'data-number': a.number, 'data-status': a.status, 'data-scheme': '1' });
+              const label = t('fplan.aptTitle', { n: a.number, r: S.fmt.rooms(a.rooms), s: a.area, st: t('fplan.st.' + a.status, null, a.status) });
+              g.setAttribute('aria-label', label);
+              g.append(el('title', {}, label), el('rect', { x: x * SCALE, y: y * SCALE, width: p.w * SCALE, height: p.d * SCALE, rx: 2 }),
+                el('text', { x: (x + p.w / 2) * SCALE, y: (y + p.d / 2) * SCALE, 'text-anchor': 'middle', class: 'fp-num' }, String(a.number)),
+                el('text', { x: (x + p.w / 2) * SCALE, y: (y + p.d / 2) * SCALE + 16, 'text-anchor': 'middle', class: 'fp-label' }, t('fplan.aptShort', { r: S.fmt.rooms(a.rooms), s: a.area })));
+              svg.append(g);
+              x += p.w + GAP;
+            });
+          });
+          stage.replaceChildren(h('p', { class: 'fp-scheme-note' }, t('fplan.schemeNote')), svg);
+        }
         function open(r) {
           const st = r.dataset.status, dealId = r.dataset.dealId;
           if (st === 'free') bookForm({ id: r.dataset.apartmentId, number: r.dataset.number }, draw);
           else if (dealId) dealDrawer(dealId, draw);
+          else if (r.dataset.scheme) S.toast(t('fplan.schemeBusy', { n: r.dataset.number, st: t('fplan.st.' + st, null, st) }), 'info');
           else S.toast(st === 'booked' ? t('fplan.noDeal') : t('fplan.unavailable'), 'info');
         }
         stage.addEventListener('click', (e) => { const r = e.target.closest('.fp-apt'); if (r) open(r); });
@@ -386,9 +428,23 @@
         const btn = h('button', { class: 'btn', type: 'submit' }, t('rate.save'));
         const form = h('form', { class: 'card stack', novalidate: true, style: { maxWidth: '420px' } }, h('h3', null, t('rate.set')), S.field(t('rate.value'), rate, t('rate.hint')), S.field(t('rep.asOf'), date, t('rate.dateHint')), btn);
         form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => { try { await S.api.setRate(+rate.value, date.value); S.toast(t('rate.saved'), 'ok'); draw(); } catch (er) { S.showErrors(form, er); } }); });
-        body.replaceChildren(holder, form);
+        // C-09: when the NBT rate was loaded last and how it went (ok / the error), so a stale rate has a visible reason.
+        const status = h('div', { class: 'card stack rate-status', style: { maxWidth: '420px' } });
+        body.replaceChildren(holder, status, form);
+        async function drawStatus() {
+          let st;
+          try { st = await S.api.rateStatus(); } catch (e) { status.remove(); return; }
+          const res = st.ok == null ? h('span', { class: 'muted' }, t('rate.stNever')) : st.ok ? S.chip('good', t('rate.stOk')) : S.chip('bad', t('rate.stErr', { e: st.error || '—' }));
+          status.replaceChildren(h('h3', null, t('rate.stTitle')),
+            h('dl', { class: 'kv' },
+              h('dt', null, t('rate.stAttempt')), h('dd', null, st.lastAttemptAt ? S.fmt.dt(st.lastAttemptAt) : '—'),
+              h('dt', null, t('rate.stResult')), h('dd', null, res),
+              h('dt', null, t('rate.stSuccess')), h('dd', null, st.lastSuccessAt ? S.fmt.dt(st.lastSuccessAt) : '—'),
+              h('dt', null, t('rate.stNbtDate')), h('dd', null, st.lastNbtDate ? S.fmt.date(st.lastNbtDate) : '—')),
+            h('p', { class: 'hint' }, t('rate.stHint')));
+        }
         async function draw() { try { const r = await S.api.rate(); holder.replaceChildren(h('div', { class: 'card kpi', style: { maxWidth: '420px', '--k': 'var(--gold)' } }, h('span', null, t('rate.current')), h('b', null, r.rate + ' TJS'), h('div', { class: 'muted' }, t('rate.on', { d: S.fmt.date(r.date) })), h('i'))); } catch (e) { holder.replaceChildren(h('div', { class: 'card kpi' }, h('span', null, t('rate.current')), h('b', null, '—'), h('div', { class: 'muted' }, t('rate.none')))); } }
-        draw();
+        draw(); drawStatus();
       },
 
       async catalog(body) {
@@ -447,8 +503,10 @@
       async audit(body) {
         // Entity names as the server writes them (class names); the demo calls users "User".
         const userEntity = S.isDemo() ? 'User' : 'AppUser';
-        const holder = h('div'); const sel = S.select('entity', [['', t('filter.all')], ['Deal', 'Deal'], ['Payment', 'Payment'], ['Apartment', 'Apartment'], ['Booking', 'Booking'], ['Lead', 'Lead'], [userEntity, 'User'], ['Impersonation', t('audit.viaPlatform')], ['Invitation', 'Invitation']], '');
-        const load = async () => { holder.replaceChildren(S.skeleton(6, 34)); const l = await S.api.audit(sel.value); holder.replaceChildren(S.tbl([{ label: t('audit.when'), render: (a) => S.fmt.dt(a.at) }, { label: t('audit.who'), render: (a) => (a.viaPlatform ? h('span', null, a.user, ' ', S.chip('warn', t('audit.viaPlatform'))) : a.user) }, { label: t('audit.action'), render: (a) => h('b', null, a.action) }, { label: t('audit.entity'), render: (a) => a.entity + ' #' + shortId(a.entityId) }, { label: t('audit.change'), render: (a) => h('code', { style: { fontSize: '12px', color: 'var(--ink-2)' } }, [a.before ? JSON.stringify(a.before) : '', a.before && a.after ? ' → ' : '', a.after ? JSON.stringify(a.after) : ''].join('')) }], l, { empty: t('audit.none') })); };
+        const ent = (e) => [e, t('audit.ent.' + e, null, e)];
+        const holder = h('div'); const sel = S.select('entity', [['', t('filter.all')], ent('Deal'), ent('Payment'), ent('Apartment'), ent('Booking'), ent('Lead'), [userEntity, t('audit.ent.AppUser')], ['Impersonation', t('audit.viaPlatform')], ent('Invitation')], '');
+        // C-06: readable action, object and author; the short summary, the raw JSON only under «Подробнее».
+        const load = async () => { holder.replaceChildren(S.skeleton(6, 34)); const l = await S.api.audit(sel.value); holder.replaceChildren(S.tbl([{ label: t('audit.when'), render: (a) => S.fmt.dt(a.at) }, { label: t('audit.who'), render: (a) => (a.viaPlatform ? h('span', null, S.audit.who(a), ' ', S.chip('warn', t('audit.viaPlatform'))) : S.audit.who(a)) }, { label: t('audit.action'), render: (a) => h('b', null, S.audit.action(a.action)) }, { label: t('audit.entity'), render: (a) => S.audit.entity(a) }, { label: t('audit.change'), render: (a) => S.audit.change(a) }], l, { empty: t('audit.none') })); };
         sel.addEventListener('change', load); body.replaceChildren(h('div', { class: 'toolbar' }, h('div', { style: { minWidth: '200px' } }, S.field(t('audit.entity'), sel))), holder); load();
       },
 
@@ -593,6 +651,8 @@
         let br;
         try { br = await S.api.ownerBrand(); } catch (e) { body.replaceChildren(h('div', { class: 'form-err' }, e.message)); return; }
         const bs = await S.api.buildings().catch(() => []);
+        // C-07: the tariff the platform gave (the same as on the platform → «Застройщики»), no invented «Стандарт».
+        const tariff = await S.api.ownTariff().catch(() => null);
         const inp = (n, v, o) => S.input(n, Object.assign({ value: v || '' }, o || {}));
         const name = inp('name', br.name), slug = inp('slug', br.slug), phone = inp('phone', br.phone, { type: 'tel', placeholder: '+992 …' }), tg = inp('telegram', br.telegram, { placeholder: '@company' }), addr = inp('address', br.address), email = inp('email', br.email, { type: 'email' });
         const color = h('input', { type: 'color', class: 'color-inp', name: 'primaryColor', id: 'set-color', value: br.primaryColor || '#c9a227' });
@@ -625,12 +685,18 @@
         const del = h('button', { class: 'btn ghost', type: 'button', onclick: (e) => S.busy(e.currentTarget, async () => { try { br = await S.api.deleteLogo(); drawLogo(); } catch (er) { S.err(er); } }) }, t('set.logoDelete'));
         drawLogo();
 
-        const LIMIT = 3;
+        const maxB = tariff && tariff.maxBuildings != null ? tariff.maxBuildings : null;
+        const count = tariff ? tariff.buildings : bs.length;
+        const planCard = h('div', { class: 'card stack' }, h('h3', null, t('set.plan')),
+          h('dl', { class: 'kv' }, h('dt', null, t('set.tariff')), h('dd', null, tariff && tariff.name ? tariff.name : h('span', { class: 'muted' }, t('set.noTariff'))),
+            h('dt', null, t('set.objects')), h('dd', null, maxB != null ? t('set.objectsN', { n: count, m: maxB }) : t('set.objectsNoLimit', { n: count })),
+            tariff && tariff.maxUsers != null ? [h('dt', null, t('set.staff')), h('dd', null, t('set.objectsN', { n: tariff.users, m: tariff.maxUsers }))] : null,
+            tariff && tariff.endsAt ? [h('dt', null, t('set.tariffEnds')), h('dd', null, S.fmt.date(tariff.endsAt))] : null),
+          maxB != null ? S.bar((count * 100) / maxB, count >= maxB ? 'warn' : '') : null,
+          h('p', { class: 'hint' }, t(tariff && tariff.name ? 'set.planHint' : 'set.noTariffHint')));
         body.replaceChildren(h('div', { class: 'set-grid' }, form, h('div', { class: 'stack' },
           h('div', { class: 'card stack' }, h('h3', null, t('set.logo')), logoBox, h('p', { class: 'hint' }, t('set.logoHint')), h('div', { class: 'row' }, file, upload, del)),
-          h('div', { class: 'card stack' }, h('h3', null, t('set.plan')),
-            h('dl', { class: 'kv' }, h('dt', null, t('set.tariff')), h('dd', null, t('set.standard')), h('dt', null, t('set.objects')), h('dd', null, t('set.objectsN', { n: bs.length, m: LIMIT }))),
-            S.bar((bs.length * 100) / LIMIT, bs.length >= LIMIT ? 'warn' : ''), h('p', { class: 'hint' }, t('set.planHint'))))));
+          planCard)));
         // Tariffs and coefficients of the green features (owner): the utility calculator and the CO₂ figure use only these.
         if (S.eco) body.append(S.eco.settingsForm());
         // Installment terms for the site (owner): the landing and the calculator show only what is set here.

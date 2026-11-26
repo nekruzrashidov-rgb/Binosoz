@@ -148,7 +148,8 @@ jobs:
             -e SEED_DEMO_ACCOUNTS=true -e SEED_DEMO_BUYER_PASSWORD -e SEED_DEMO_MANAGER_PASSWORD "$image" --migrate
 
       # Первый владелец организации (Admin) и суперадмин платформы — только если заданы секреты.
-      # Владелец создаётся, пока в организации нет владельцев; существующим паролям ничего не делается.
+      # Владелец создаётся, пока в организации нет владельцев; у существующего с той же почтой пароль приводится к секрету,
+      # имя — к OWNER_NAME / SUPERADMIN_NAME, если заданы.
       # Остальные роли — следующий шаг (секреты SEED_STAFF_*) или приглашение из CRM (письмо со ссылкой).
       - name: Владелец и суперадмин
         env:
@@ -157,6 +158,9 @@ jobs:
           BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.OWNER_PASSWORD || secrets.BOOTSTRAP_ADMIN_PASSWORD }}
           ADMIN_EMAIL: ${{ secrets.SUPERADMIN_EMAIL || secrets.ADMIN_EMAIL }}
           ADMIN_PASSWORD: ${{ secrets.SUPERADMIN_PASSWORD || secrets.ADMIN_PASSWORD }}
+          # Имена (необязательно): секрет или переменная репозитория; без них — часть почты до «@» (R-02).
+          OWNER_NAME: ${{ secrets.OWNER_NAME || vars.OWNER_NAME }}
+          SUPERADMIN_NAME: ${{ secrets.SUPERADMIN_NAME || vars.SUPERADMIN_NAME }}
         run: |
           if [ -z "$BOOTSTRAP_ADMIN_EMAIL$ADMIN_EMAIL" ]; then
             echo "Секреты BOOTSTRAP_ADMIN_EMAIL и ADMIN_EMAIL не заданы — владелец и суперадмин не создаются."
@@ -164,7 +168,8 @@ jobs:
           fi
           image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/binosoz-api:latest"
           docker run --rm -e ASPNETCORE_ENVIRONMENT=Production -e "ConnectionStrings__Default=$CS" \
-            -e BOOTSTRAP_ADMIN_EMAIL -e BOOTSTRAP_ADMIN_PASSWORD -e ADMIN_EMAIL -e ADMIN_PASSWORD "$image" --migrate
+            -e BOOTSTRAP_ADMIN_EMAIL -e BOOTSTRAP_ADMIN_PASSWORD -e ADMIN_EMAIL -e ADMIN_PASSWORD \
+            -e OWNER_NAME -e SUPERADMIN_NAME "$image" --migrate
 
       # Сотрудники демо-организации для входа под каждой ролью (docs/ROLES_LOGIN.md). В лог — только строки сидера
       # «Сотрудник <роль> <почта>: создан / пароль обновлён / уже есть / пропущен»; пароли он не пишет.

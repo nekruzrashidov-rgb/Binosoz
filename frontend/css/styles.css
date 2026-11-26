@@ -201,6 +201,17 @@ button { cursor: pointer; }
 .fp-stage svg { display: block; max-width: 100%; height: auto; }
 .fp-apt { cursor: pointer; transition: opacity .15s; }
 .fp-apt:hover, .fp-apt:focus { opacity: .8; outline: none; stroke-width: 3; }
+/* C-10: the floor scheme built from the apartments when no plan is uploaded («схема, не чертёж»). */
+.fp-scheme { display: block; width: 100%; max-width: 1100px; height: auto; font-family: var(--font); }
+.fp-scheme .fp-corridor { fill: var(--surface-2); }
+.fp-scheme .fp-apt rect { stroke-width: 1.5; }
+.fp-scheme .st-free rect { fill: var(--good-soft); stroke: var(--good); }
+.fp-scheme .st-booked rect { fill: var(--warn-soft); stroke: var(--warn); }
+.fp-scheme .st-sold rect { fill: var(--bad-soft); stroke: var(--bad); }
+.fp-scheme .st-onrequest rect { fill: var(--surface-2); stroke: var(--muted); }
+.fp-scheme .fp-num { fill: var(--ink); font-size: 16px; font-weight: 700; }
+.fp-scheme .fp-label { fill: var(--ink-2); font-size: 11px; }
+.fp-scheme-note { margin: 0 0 10px; font-size: 13px; color: var(--muted); }
 .fp-tip { position: absolute; z-index: 5; pointer-events: none; padding: 6px 10px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); font-size: 13px; white-space: nowrap; }
 .bell { position: relative; }
 .bell-btn { position: relative; }
@@ -538,6 +549,9 @@ body.has-demo-bar .settings-fab { bottom: calc(52px + env(safe-area-inset-bottom
   transition: transform 0.2s, box-shadow 0.2s;
 }
 .ai-fab:hover { transform: scale(1.08); box-shadow: 0 6px 28px color-mix(in srgb, var(--accent) 55%, transparent); }
+/* On a phone ✦ slides away while the page scrolls down and comes back on the way up (R-05). */
+.ai-fab.away { transform: translateY(calc(100% + 40px)); opacity: 0; pointer-events: none; }
+@media (prefers-reduced-motion: no-preference) { .ai-fab { transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s; } }
 .ai-fab.hidden { display: none; }
 /* Closed, the panel waits off-screen and is hidden from focus; open, it slides in. */
 .ai-panel {
@@ -1438,7 +1452,7 @@ a.float-card.tg:hover { border-color: rgba(34, 158, 217, 0.75); background: rgba
 .cab-reply p { margin: 6px 0 0; white-space: pre-wrap; }
 .cab-fab { display: none; }
 @media (max-width: 760px) {
-  .cab { padding-top: 18px; }
+  .cab { padding-top: 18px; padding-bottom: calc(152px + env(safe-area-inset-bottom, 0px)); }
   .cab-head { align-items: stretch; }
   .cab-picker { max-width: none; width: 100%; }
   .cab-tab { flex: 0 0 auto; padding: 10px 13px; font-size: 13px; }
@@ -1575,6 +1589,9 @@ body.menu-open { overflow: hidden; }
   .mob-sidebar-toggle svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; }
   .mob-backdrop { display: none; position: fixed; inset: 0; z-index: var(--z-backdrop); background: rgba(0, 0, 0, 0.5); }
   .mob-backdrop.open { display: block; }
+  /* R-05 / C-13: the floating ☰ (bottom 80 px + 44 px) and ✦ (24 px + 52 px) must not cover the last table row or form
+     field — the page ends below them, with the phone's safe area. */
+  .ws .main { padding-bottom: calc(144px + env(safe-area-inset-bottom, 0px)); }
 }
 @keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
@@ -3205,3 +3222,16 @@ body:is([data-page='crm'], [data-page='cabinet'], [data-page='platform']) h1, bo
 /* Padding, not display: .desk-only and the header media rules hide the phone on narrow screens. */
 .top-phone { padding-block: 12px; }
 .crumbs a { display: inline-flex; align-items: center; min-height: 24px; }
+/* Journal (CRM «Журнал», platform «Активность»): short summary, raw JSON only under «Подробнее» (C-06 / R-04). */
+.audit-sum { margin-top: 4px; font-size: 13px; color: var(--ink-2); }
+.audit-raw { margin-top: 4px; font-size: 12px; }
+.audit-raw summary { cursor: pointer; color: var(--accent-text); min-height: 24px; display: inline-flex; align-items: center; }
+.audit-raw code { display: block; margin-top: 4px; color: var(--ink-2); white-space: pre-wrap; word-break: break-word; max-width: 46ch; }
+/* K-02: the menu under the name in the top bar (profile and settings, devices, sign out). */
+.user-menu-box { position: relative; }
+button.userchip { cursor: pointer; color: var(--ink); font: inherit; font-weight: 700; font-size: 13px; min-height: 40px; }
+button.userchip:hover, button.userchip[aria-expanded='true'] { border-color: var(--field-line); }
+.user-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: var(--z-menu); min-width: 220px; padding: 6px; display: grid; gap: 2px; background: var(--surface); border: 1px solid var(--line); border-radius: 2px; box-shadow: var(--shadow-lg); }
+.user-menu[hidden] { display: none; }
+.user-menu-item { display: block; width: 100%; min-height: 44px; padding: 10px 12px; text-align: left; background: transparent; border: 0; border-radius: 2px; color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; }
+.user-menu-item:hover, .user-menu-item:focus-visible { background: var(--surface-2); }

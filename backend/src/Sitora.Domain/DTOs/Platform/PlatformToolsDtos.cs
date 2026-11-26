@@ -13,7 +13,13 @@ public record PlatformActivityItem(
     string? OrganizationName,
     string? UserEmail,
     string? Ip,
-    bool Impersonated);
+    bool Impersonated,
+    string? UserName = null,
+    bool BySystem = false,
+    string? EntityName = null,
+    int? ApartmentNumber = null,
+    string? Before = null,
+    string? After = null);
 
 // Уведомление от платформы: всем пользователям организации или всем пользователям всех организаций (OrganizationId = null).
 // Type: info, warning, error.
@@ -21,7 +27,9 @@ public record PlatformNotificationRequest(Guid? OrganizationId, string Type, str
 
 public record PlatformNotificationResponse(int Recipients);
 
-public record PlatformSettingsResponse(int? MaxOrganizations, bool DemoMode, string Version, string? ContactEmail, int Organizations);
+// Version — фактическая сборка, как в /health/live: короткий SHA коммита («dev» без него), BuiltAt — время сборки (R-07).
+public record PlatformSettingsResponse(int? MaxOrganizations, bool DemoMode, string Version, string? ContactEmail, int Organizations,
+    string? BuiltAt = null);
 
 // PATCH: меняются только переданные поля; ClearMaxOrganizations = true снимает ограничение.
 public record UpdatePlatformSettingsRequest(int? MaxOrganizations, bool? ClearMaxOrganizations, bool? DemoMode, string? ContactEmail);

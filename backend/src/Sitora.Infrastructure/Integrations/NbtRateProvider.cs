@@ -18,22 +18,55 @@ public class NbtRateProvider(IHttpClientFactory http, IConfiguration configurati
 
     static NbtRateProvider() => Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
-    public async Task<decimal?> GetUsdRateAsync(DateOnly date, CancellationToken ct = default)
+    public async Task<decimal?> GetUsdRateAsync(DateOnly date, CancellationToken ct = default) =>
+        (await FetchUsdRateAsync(date, ct)).Rate;
+
+    // Причина неудачи — короткий текст для статуса в CRM и для лога (C-09): адрес сайта НБТ без секретов, тело ответа
+    // в лог не пишется. Выходные: НБТ отдаёт последний опубликованный курс — он и берётся.
+    public async Task<RateFetchResult> FetchUsdRateAsync(DateOnly date, CancellationToken ct = default)
     {
         var url = $"{configuration["Nbt:Url"] ?? DefaultUrl}?date={date:yyyy-MM-dd}&export=xmlout";
+        string error;
+        Exception? exception = null;
         try
         {
-            var bytes = await http.CreateClient(HttpClientName).GetByteArrayAsync(url, ct);
-            var rate = ParseUsdRate(bytes);
-            if (rate is null)
-                logger.LogWarning("НБТ: курс USD на {Date} не найден в ответе", date);
-            return rate;
+            using var response = await http.CreateClient(HttpClientName).GetAsync(url, ct);
+            if (!response.IsSuccessStatusCode)
+                error = $"сайт НБТ ответил {(int)response.StatusCode}";
+            else
+            {
+                var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+                var rate = ParseUsdRate(bytes);
+                if (rate is not null)
+                    return new RateFetchResult(rate, null);
+                error = LooksLikeXml(bytes) ? "в ответе НБТ нет курса USD" : "сайт НБТ ответил не XML (возможно, страница-заглушка)";
+            }
         }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+        catch (TaskCanceledException e) when (!ct.IsCancellationRequested)
         {
-            logger.LogWarning(e, "НБТ: не удалось получить курс на {Date}", date);
-            return null;
+            exception = e;
+            error = "сайт НБТ не ответил вовремя (таймаут)";
         }
+        catch (HttpRequestException e)
+        {
+            exception = e;
+            error = e.HttpRequestError switch
+            {
+                HttpRequestError.NameResolutionError => "адрес nbt.tj не найден (DNS)",
+                HttpRequestError.ConnectionError => "нет соединения с nbt.tj",
+                HttpRequestError.SecureConnectionError => "ошибка TLS при соединении с nbt.tj",
+                _ => "ошибка сети: " + e.HttpRequestError
+            };
+        }
+        logger.LogWarning(exception, "НБТ: курс USD на {Date} не получен — {Reason}", date, error);
+        return new RateFetchResult(null, error);
+    }
+
+    private static bool LooksLikeXml(byte[] bytes)
+    {
+        var start = Encoding.ASCII.GetString(bytes, 0, Math.Min(bytes.Length, 64)).TrimStart('﻿', ' ', '\r', '\n', '\t');
+        return start.StartsWith('<') && !start.StartsWith("<!DOCTYPE html", StringComparison.OrdinalIgnoreCase)
+            && !start.StartsWith("<html", StringComparison.OrdinalIgnoreCase);
     }
 
     // Курс USD за 1 доллар (Value / Nominal); null, если в ответе его нет или ответ не XML.

@@ -44,7 +44,17 @@ public interface IRateProvider
 {
     // Официальный курс USD к сомони от НБТ на дату; null, если получить не удалось.
     Task<decimal?> GetUsdRateAsync(DateOnly date, CancellationToken ct = default);
+
+    // То же с причиной неудачи (для статуса «последняя загрузка» в CRM → «Курс», C-09): Error — короткий текст без
+    // секретов («таймаут 20 с», «сайт ответил 503», «в ответе нет курса USD»).
+    async Task<RateFetchResult> FetchUsdRateAsync(DateOnly date, CancellationToken ct = default)
+    {
+        var rate = await GetUsdRateAsync(date, ct);
+        return rate is > 0 ? new RateFetchResult(rate, null) : new RateFetchResult(null, "курс не получен");
+    }
 }
+
+public record RateFetchResult(decimal? Rate, string? Error);
 
 public interface IFileStorage
 {

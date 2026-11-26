@@ -190,9 +190,9 @@
           try {
             const list = await S.api.tariffs();
             holder.replaceChildren(h('div', { class: 'tariff-grid' }, list.map((p) => h('div', { class: 'card tariff-card' + (p.isActive ? '' : ' off') },
-              h('div', { class: 'row between' }, h('h3', null, p.name), p.isActive ? null : S.chip('Blocked', t('plat.tariffOff'))),
+              h('div', { class: 'row between' }, h('h3', null, p.localName || p.name), p.isActive ? null : S.chip('Blocked', t('plat.tariffOff'))),
               h('div', { class: 'tariff-price' }, S.fmt.money(p.price, p.currency), h('small', null, ' ' + t('plat.perMonth'))),
-              h('ul', null, h('li', null, limit(p.maxBuildings, 'plat.maxBuildings')), h('li', null, limit(p.maxUsers, 'plat.maxUsers')), p.features.map((f) => h('li', null, f))),
+              h('ul', null, h('li', null, limit(p.maxBuildings, 'plat.maxBuildings')), h('li', null, limit(p.maxUsers, 'plat.maxUsers')), (p.localFeatures || p.features).map((f) => h('li', null, f))),
               h('div', { class: 'hint' }, t('plat.tariffOrgs', { n: p.organizationsCount })),
               h('div', { class: 'row', style: { gap: '6px' } }, h('button', { class: 'btn ghost sm', onclick: () => tariffForm(p, load) }, t('common.edit')))))));
           } catch (e) { fail(holder, e); }
@@ -281,7 +281,7 @@
         const pager = h('div', { class: 'row between', style: { marginTop: '12px' } });
         const [orgs, actions] = await Promise.all([S.api.organizations().catch(() => []), S.api.platformActivityActions().catch(() => [])]);
         const org = S.select('org', [['', t('pact.allOrgs')], ...orgs.map((o) => [o.id, o.name])], '');
-        const act = S.select('action', [['', t('pact.allActions')], ...actions.map((a) => [a, t('audit.act.' + a, null, a)])], '');
+        const act = S.select('action', [['', t('pact.allActions')], ...actions.map((a) => [a, S.audit.action(a)])], '');
         const from = S.input('from', { type: 'date' }), to = S.input('to', { type: 'date' });
         // The date filter is by Dushanbe days: [from 00:00; to + 1 day 00:00) in UTC+5.
         const utc = (d, addDay) => { if (!d) return ''; const x = new Date(d + 'T00:00:00+05:00'); if (addDay) x.setUTCDate(x.getUTCDate() + 1); return x.toISOString(); };
@@ -294,10 +294,11 @@
             const r = await S.api.platformActivity(q);
             holder.replaceChildren(S.tbl([
               { label: t('pact.time'), render: (x) => S.fmt.dt(x.at) },
-              { label: t('pact.action'), render: (x) => h('span', { class: 'chip act-' + kind(x.action) }, t('audit.act.' + x.action, null, x.action)) },
-              { label: t('pact.entity'), render: (x) => t('audit.ent.' + x.entity, null, x.entity) },
+              // R-04: readable action with a short summary (raw JSON under «Подробнее»), object and author.
+              { label: t('pact.action'), render: (x) => h('div', null, h('span', { class: 'chip act-' + kind(x.action) }, S.audit.action(x.action)), h('div', { class: 'audit-sum' }, S.audit.change(x))) },
+              { label: t('pact.entity'), render: (x) => S.audit.entity(x) },
               { label: t('pact.org'), render: (x) => x.organizationName || h('span', { class: 'muted' }, t('pact.platform')) },
-              { label: t('pact.user'), render: (x) => [x.userEmail || h('span', { class: 'muted' }, t('audit.system', null, 'система')), x.impersonated ? h('small', { class: 'muted' }, ' · ' + t('pact.asOwner')) : null] },
+              { label: t('pact.user'), render: (x) => [S.audit.who(x), x.impersonated ? h('small', { class: 'muted' }, ' · ' + t('pact.asOwner')) : null] },
               { label: 'IP', render: (x) => h('code', null, x.ip || '—') }], r.items, { empty: t('pact.none') }));
             const pages = Math.max(1, Math.ceil(r.totalCount / r.pageSize));
             pager.replaceChildren(h('span', { class: 'muted' }, t('pact.total', { n: r.totalCount })),
@@ -341,13 +342,16 @@
         try { s = await S.api.platformSettings(); } catch (e) { fail(holder, e); return; }
         const max = S.input('max', { type: 'number', min: 1, step: 1, value: s.maxOrganizations == null ? '' : s.maxOrganizations, placeholder: t('pset.noLimit') });
         const demo = h('input', { type: 'checkbox', class: 'switch', checked: s.demoMode, 'aria-label': t('pset.demo') });
-        const version = S.input('version', { value: s.version, readonly: true });
+        // R-07: the real build (as /health/live), not a version typed by hand.
+        const version = h('div', { class: 'field' }, h('label', null, t('pset.version')),
+          h('div', null, h('code', null, s.version), s.builtAt ? h('span', { class: 'muted' }, ' · ' + t('pset.builtAt', { d: S.fmt.dt(s.builtAt) })) : null),
+          h('div', { class: 'hint' }, t('pset.versionHint')));
         const email = S.input('email', { type: 'email', value: s.contactEmail || '', placeholder: 'support@binosoz.tj' });
         const save = h('button', { class: 'btn', type: 'submit' }, t('common.save'));
         const form = h('form', { class: 'stack', novalidate: true },
           S.field(t('pset.max'), max, t('pset.maxHint', { n: s.organizations })),
           h('label', { class: 'switch-row' }, demo, h('span', null, t('pset.demo')), h('small', { class: 'muted' }, t('pset.demoHint'))),
-          S.field(t('pset.version'), version), S.field(t('pset.email'), email), save);
+          version, S.field(t('pset.email'), email), save);
         form.addEventListener('submit', (e) => {
           e.preventDefault(); S.showErrors(form, null);
           S.busy(save, async () => {
@@ -452,18 +456,27 @@
       const maxB = S.input('maxBuildings', { type: 'number', min: 1, value: p && p.maxBuildings !== null ? p.maxBuildings : '', placeholder: t('plat.unlimited') });
       const maxU = S.input('maxUsers', { type: 'number', min: 1, value: p && p.maxUsers !== null ? p.maxUsers : '', placeholder: t('plat.unlimited') });
       const features = h('textarea', { class: 'inp', name: 'features', rows: 4 }, p ? p.features.join('\n') : '');
+      // R-03: name and features in Tajik and English; empty — the Russian text is shown.
+      const nameTg = S.input('nameTg', { value: p && p.nameTg ? p.nameTg : '' }), nameEn = S.input('nameEn', { value: p && p.nameEn ? p.nameEn : '' });
+      const featuresTg = h('textarea', { class: 'inp', name: 'featuresTg', rows: 3 }, p && p.featuresTg ? p.featuresTg.join('\n') : '');
+      const featuresEn = h('textarea', { class: 'inp', name: 'featuresEn', rows: 3 }, p && p.featuresEn ? p.featuresEn.join('\n') : '');
       const active = h('input', { type: 'checkbox', checked: p ? p.isActive : true });
-      const form = h('form', { class: 'stack', id: 'tariffform', novalidate: true }, S.field(t('plat.name'), name),
+      const form = h('form', { class: 'stack', id: 'tariffform', novalidate: true }, S.field(t('plat.name') + ' (RU)', name),
+        h('div', { class: 'grid g2' }, S.field(t('plat.name') + ' (TJ)', nameTg, t('plat.trEmpty')), S.field(t('plat.name') + ' (EN)', nameEn)),
         h('div', { class: 'grid g2' }, S.field(t('plat.price'), price), S.field(t('plat.currency'), currency)),
         h('div', { class: 'grid g2' }, S.field(t('plat.maxBuildingsLabel'), maxB, t('plat.emptyUnlimited')), S.field(t('plat.maxUsersLabel'), maxU)),
-        S.field(t('plat.features'), features, t('plat.featuresHint')), h('label', { class: 'check' }, active, ' ', t('plat.tariffActive')));
+        S.field(t('plat.features') + ' (RU)', features, t('plat.featuresHint')),
+        h('div', { class: 'grid g2' }, S.field(t('plat.features') + ' (TJ)', featuresTg, t('plat.trEmpty')), S.field(t('plat.features') + ' (EN)', featuresEn)),
+        h('label', { class: 'check' }, active, ' ', t('plat.tariffActive')));
+      const lines = (el) => el.value.split('\n').map((f) => f.trim()).filter(Boolean);
       const btn = h('button', { class: 'btn', type: 'submit', form: 'tariffform' }, t('common.save'));
       const md = S.modal({ title: p ? p.name : t('plat.newTariff'), body: form, actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
       const intOrNull = (el) => (el.value.trim() === '' ? null : Number(el.value));
       form.addEventListener('submit', async (e) => { e.preventDefault(); S.showErrors(form, null); await S.busy(btn, async () => {
         try {
           await S.api.saveTariff(p && p.id, { name: name.value.trim(), price: Number(price.value || 0), currency: currency.value, maxBuildings: intOrNull(maxB), maxUsers: intOrNull(maxU),
-            features: features.value.split('\n').map((f) => f.trim()).filter(Boolean), isActive: active.checked });
+            features: lines(features), isActive: active.checked, nameTg: nameTg.value.trim() || null, nameEn: nameEn.value.trim() || null,
+            featuresTg: lines(featuresTg), featuresEn: lines(featuresEn) });
           S.toast(t('common.saved'), 'ok'); md.close(); done();
         } catch (er) { S.showErrors(form, er); }
       }); });
@@ -473,7 +486,7 @@
     async function assignForm(o, done) {
       const [orgs, plans] = await Promise.all([o ? Promise.resolve([o]) : S.api.organizations(), S.api.tariffs()]);
       const org = S.select('organizationId', orgs.map((x) => [x.id, x.name]), o ? o.id : undefined);
-      const plan = S.select('tariffPlanId', plans.filter((p) => p.isActive).map((p) => [p.id, p.name + ' · ' + S.fmt.money(p.price, p.currency)]));
+      const plan = S.select('tariffPlanId', plans.filter((p) => p.isActive).map((p) => [p.id, (p.localName || p.name) + ' · ' + S.fmt.money(p.price, p.currency)]));
       const ends = S.input('endsAt', { type: 'date' });
       const paid = h('input', { type: 'checkbox' });
       const form = h('form', { class: 'stack', id: 'assignform', novalidate: true }, S.field(t('plat.org'), org), S.field(t('plat.tariff'), plan),

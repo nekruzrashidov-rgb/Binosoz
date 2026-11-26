@@ -110,9 +110,12 @@ public static class DatabaseInitializer
             // Владелец уже есть: если это он и есть (та же почта) — пароль приводится к секрету, как у сотрудников
             // SEED_STAFF_* (забыли пароль — поменяли секрет и снова «Seed prod»). Чужого владельца не трогаем.
             var existing = await userManager.FindByEmailAsync(email.Trim());
-            if (existing is not null && await userManager.IsInRoleAsync(existing, RoleNames.Owner)
-                && await SyncSeedPasswordAsync(provider, userManager, existing, password, "BOOTSTRAP_ADMIN_PASSWORD"))
+            if (existing is null || !await userManager.IsInRoleAsync(existing, RoleNames.Owner))
+                return;
+            if (await SyncSeedPasswordAsync(provider, userManager, existing, password, "BOOTSTRAP_ADMIN_PASSWORD"))
                 logger.LogInformation("Владелец {Email}: пароль обновлён из секрета", existing.Email);
+            if (await SyncSeedNameAsync(provider, userManager, existing, configuration[OwnerNameVariable], OldOwnerName, OwnerNameVariable))
+                logger.LogInformation("Владелец {Email}: имя обновлено", existing.Email);
             return;
         }
 
@@ -121,7 +124,7 @@ public static class DatabaseInitializer
             UserName = email,
             Email = email,
             EmailConfirmed = true,
-            FullName = "Владелец",
+            FullName = SeedName(configuration[OwnerNameVariable], email),
             OrganizationId = Organization.DefaultId
         };
         var result = await userManager.CreateAsync(user, password);
@@ -153,6 +156,8 @@ public static class DatabaseInitializer
             if (!string.IsNullOrWhiteSpace(existingPassword)
                 && await SyncSeedPasswordAsync(provider, userManager, user, existingPassword, "ADMIN_PASSWORD"))
                 logger.LogInformation("Создатель платформы {Email}: пароль обновлён из секрета", email);
+            if (await SyncSeedNameAsync(provider, userManager, user, configuration[SuperAdminNameVariable], OldSuperAdminName, SuperAdminNameVariable))
+                logger.LogInformation("Создатель платформы {Email}: имя обновлено", email);
             return;
         }
 
@@ -163,13 +168,51 @@ public static class DatabaseInitializer
             return;
         }
 
-        user = new AppUser { UserName = email, Email = email, EmailConfirmed = true, FullName = "Создатель платформы" };
+        user = new AppUser { UserName = email, Email = email, EmailConfirmed = true,
+            FullName = SeedName(configuration[SuperAdminNameVariable], email) };
         var result = await userManager.CreateAsync(user, password);
         if (!result.Succeeded)
             throw new InvalidOperationException("Не удалось создать создателя платформы: " +
                                                 string.Join("; ", result.Errors.Select(e => e.Description)));
         await userManager.AddToRoleAsync(user, RoleNames.SuperAdmin);
         logger.LogInformation("Создан создатель платформы {Email}", email);
+    }
+
+    // Имена владельца и создателя платформы — из необязательных секретов OWNER_NAME и SUPERADMIN_NAME (R-02): раньше
+    // сидер писал «Владелец» и «Создатель платформы» по-русски, и так их видели на всех языках. Без секрета — часть почты
+    // до «@» (не зависит от языка). Заданный секрет обновляет имя и у существующего; без секрета меняется только старое
+    // имя сидера — имя, которое человек задал сам, не трогается.
+    public const string OwnerNameVariable = "OWNER_NAME";
+    public const string SuperAdminNameVariable = "SUPERADMIN_NAME";
+    public const string NameSetAction = "NameSetFromSeedSecret";
+    private const string OldOwnerName = "Владелец";
+    private const string OldSuperAdminName = "Создатель платформы";
+
+    public static string SeedName(string? configured, string email)
+    {
+        if (!string.IsNullOrWhiteSpace(configured))
+            return configured.Trim();
+        var at = email.IndexOf('@', StringComparison.Ordinal);
+        return at > 0 ? email[..at].Trim() : email.Trim();
+    }
+
+    private static async Task<bool> SyncSeedNameAsync(IServiceProvider provider, UserManager<AppUser> userManager,
+        AppUser user, string? configured, string oldSeederName, string secretName)
+    {
+        if (string.IsNullOrWhiteSpace(configured) && user.FullName != oldSeederName)
+            return false;
+        var name = SeedName(configured, user.Email ?? user.UserName ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(name) || name == user.FullName)
+            return false;
+        // Запись в AuditLog и новое имя сохраняются одним SaveChanges (UpdateAsync).
+        provider.GetRequiredService<Sitora.Domain.Interfaces.IAuditService>().Record(nameof(AppUser), user.Id, NameSetAction,
+            new { user.FullName }, new { FullName = name, Secret = string.IsNullOrWhiteSpace(configured) ? null : secretName },
+            user.OrganizationId);
+        user.FullName = name;
+        var result = await userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+            throw new InvalidOperationException($"Не удалось обновить имя {user.Email}: " + SeedPasswords.Describe(result.Errors));
+        return true;
     }
 
     // Пароль владельца и создателя платформы приводится к секрету только вне Development: в Development их пароли

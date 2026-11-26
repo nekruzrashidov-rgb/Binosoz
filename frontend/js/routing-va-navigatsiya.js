@@ -145,10 +145,60 @@
     const who = !u
       ? h('a', { class: 'btn sm', href: '/login' }, t('nav.login'))
       : h('div', { class: 'row', style: { gap: '8px', flexWrap: 'nowrap' } },
-        h('span', { class: 'userchip', title: [u.email || u.phone, t('role.' + u.role, null, u.role), u.organizationName].filter(Boolean).join(' · ') }, h('span', { class: 'avatar' }, S.fmt.initials(u.name)), h('span', { class: 'nm' }, u.name, u.organizationName ? h('small', { class: 'org' }, u.organizationName) : null)),
+        userMenu(u),
         h('button', { class: 'icon-btn', title: t('nav.logout'), 'aria-label': t('nav.logout'), onclick: async () => { S.leaving = true; await S.api.logout(); location.href = '/'; } }, S.icon('out')));
     header.replaceChildren(impBanner(), h('div', { class: 'wrap top-in' }, h('a', { class: 'brand', href: '/', 'aria-label': 'Binosoz' }, S.logo(), h('span', null, 'BINOSOZ')), menu, h('span', { class: 'spacer' }),
       S.api.isCustomer() ? null : liveClock(), lang, theme, u && !S.isDemo() ? S.notifBell() : null, who, menuBtn));
+  }
+
+  // K-02: the name in the top bar opens a menu — «Профиль и настройки» (the settings that exist: the buyer's cabinet tab,
+  // the owner's CRM settings, the platform's security), «Устройства» (sign-ins of this account) and «Выйти».
+  function userMenu(u) {
+    const settingsHref = S.api.isCustomer() ? '/cabinet' : S.api.isPlatform() ? '/platform#security' : S.api.isOwner() ? '/crm#settings' : null;
+    const openSettings = () => {
+      if (S.api.isCustomer()) S.store.set('sitora.cab.tab', 'settings');
+      const target = new URL(settingsHref, location.href);
+      if (target.pathname === location.pathname) { location.hash = target.hash; location.reload(); } else location.href = settingsHref;
+    };
+    const item = (label, onclick) => h('button', { class: 'user-menu-item', type: 'button', role: 'menuitem', onclick: () => { close(); onclick(); } }, label);
+    const list = h('div', { class: 'user-menu', role: 'menu', hidden: true },
+      settingsHref ? item(t('nav.profile'), openSettings) : null,
+      S.isDemo() ? null : item(t('dev.title'), devicesDialog),
+      item(t('nav.logout'), async () => { S.leaving = true; await S.api.logout(); location.href = '/'; }));
+    const chip = h('button', { class: 'userchip', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false',
+      title: [u.email || u.phone, t('role.' + u.role, null, u.role), u.organizationName].filter(Boolean).join(' · '),
+      onclick: () => (list.hidden ? open() : close()) },
+      h('span', { class: 'avatar' }, S.fmt.initials(u.name)), h('span', { class: 'nm' }, u.name, u.organizationName ? h('small', { class: 'org' }, u.organizationName) : null));
+    const box = h('div', { class: 'user-menu-box' }, chip, list);
+    const outside = (e) => { if (!box.contains(e.target)) close(); };
+    const esc = (e) => { if (e.key === 'Escape') { close(); chip.focus(); } };
+    function open() { list.hidden = false; chip.setAttribute('aria-expanded', 'true'); document.addEventListener('click', outside, true); document.addEventListener('keydown', esc); const first = list.querySelector('button'); if (first) first.focus(); }
+    function close() { list.hidden = true; chip.setAttribute('aria-expanded', 'false'); document.removeEventListener('click', outside, true); document.removeEventListener('keydown', esc); }
+    return box;
+  }
+
+  // Sign-ins of this account in a dialog (staff have no cabinet tab for them): close one, or all on every device.
+  async function devicesDialog() {
+    const body = h('div', { class: 'stack' }, S.skeleton(3, 40));
+    const md = S.modal({ title: t('dev.title'), body });
+    const draw = async () => {
+      let list;
+      try { list = await S.api.sessions(); } catch (e) { body.replaceChildren(h('div', { class: 'form-err' }, e.message)); return; }
+      const row = (s) => h('li', { class: 'dev-row' + (s.current ? ' current' : '') },
+        h('span', { class: 'dev-ico', 'aria-hidden': 'true' }, /iPhone|Android|iPad/.test(s.device) ? '📱' : '💻'),
+        h('div', { class: 'dev-info' }, h('b', null, s.device || t('dev.unknown')), s.current ? h('span', { class: 'dev-this' }, t('dev.this')) : null,
+          h('div', { class: 'muted' }, t('dev.since', { d: S.fmt.date(s.startedAt) }) + ' · ' + t('dev.last', { d: S.fmt.date(s.lastActiveAt) }))),
+        s.current ? null : h('button', { class: 'btn ghost sm', type: 'button', onclick: (e) => S.busy(e.currentTarget, async () => {
+          try { await S.api.revokeSession(s.id); S.toast(t('dev.closed'), 'ok'); draw(); } catch (er) { S.err(er); }
+        }) }, t('dev.close')));
+      const all = h('button', { class: 'btn ghost', type: 'button', onclick: async () => {
+        if (!(await S.confirm(t('dev.allConfirm'), t('dev.allOut'), true))) return;
+        await S.busy(all, async () => { try { await S.api.revokeAllSessions(); } catch (er) { /* signed out anyway */ } location.href = '/login'; });
+      } }, t('dev.allOut'));
+      body.replaceChildren(h('p', { class: 'muted' }, t('dev.sub')), h('ul', { class: 'dev-list' }, list.map(row)), all);
+    };
+    draw();
+    return md;
   }
 
   // Buyer-facing pages: the complex, its apartments and contacts; on a phone the menu opens over the whole screen.

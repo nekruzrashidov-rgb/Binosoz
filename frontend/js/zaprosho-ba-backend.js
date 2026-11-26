@@ -126,7 +126,8 @@
     invitation(i) { return { id: i.id, email: pick(i, ['email'], ''), name: pick(i, ['fullName', 'name'], ''), role: pick(i, ['role'], ''), buildingIds: arr(pick(i, ['buildingIds'], [])), expiresAt: pick(i, ['expiresAt'], ''), createdAt: pick(i, ['createdAt'], '') }; },
     organization(o) { return { id: o.id, name: pick(o, ['name'], ''), slug: pick(o, ['slug'], ''), active: pick(o, ['isActive'], true) !== false, buildings: num(pick(o, ['buildingsCount'], 0)), users: num(pick(o, ['usersCount'], 0)), createdAt: pick(o, ['createdAt'], ''), logoUrl: pick(o, ['logoUrl'], null), domain: pick(o, ['customDomain'], null), owners: arr(o.ownerEmails), buildingNames: arr(o.buildingNames), deals: num(pick(o, ['dealsCount'], 0)), customers: num(pick(o, ['customersCount'], 0)), lastActivityAt: pick(o, ['lastActivityAt'], null), tariff: o.tariff || null, ownerInfos: arr(o.owners) }; },
     booking(b) { return { id: b.id, apartmentId: b.apartmentId, apartmentNumber: pick(b, ['apartmentNumber'], ''), name: pick(b, ['name', 'customerName', 'fullName'], ''), phone: pick(b, ['phone', 'customerPhone'], ''), status: String(pick(b, ['status'], 'Active')), createdAt: pick(b, ['createdAt'], ''), expiresAt: pick(b, ['expiresAt'], '') }; },
-    audit(a) { return { id: a.id, at: pick(a, ['at', 'createdAt', 'timestamp'], ''), user: pick(a, ['userEmail', 'user', 'userName', 'actor'], '') || (S.t ? S.t('audit.system', null, 'система') : 'система'), action: pick(a, ['action'], ''), entity: pick(a, ['entity', 'entityType'], ''), entityId: pick(a, ['entityId'], ''), before: parseJson(pick(a, ['before', 'oldValues'], null)), after: parseJson(pick(a, ['after', 'newValues'], null)), viaPlatform: !!a.impersonatedById }; }, // TODO: i18n
+    // Author and object come readable from the server (C-06): userName/userEmail of the author, bySystem for the seeder and jobs.
+    audit(a) { return { id: a.id, at: pick(a, ['at', 'createdAt', 'timestamp'], ''), userEmail: a.userEmail || null, userName: a.userName || null, bySystem: !!a.bySystem || (!a.userEmail && !a.userName), action: pick(a, ['action'], ''), entity: pick(a, ['entity', 'entityType'], ''), entityId: pick(a, ['entityId'], ''), entityName: a.entityName || null, apartmentNumber: a.apartmentNumber == null ? null : a.apartmentNumber, before: parseJson(pick(a, ['before', 'oldValues'], null)), after: parseJson(pick(a, ['after', 'newValues'], null)), viaPlatform: !!a.impersonatedById }; },
   });
 
   // ---------- transport ----------
@@ -263,9 +264,22 @@
     return refreshing;
   }
 
+  // R-06: the access token's own expiry (JWT exp, 15 min). An expired token is refreshed before the request, so a page
+  // load does not first get 401 from /auth/me in the console. A token that cannot be read counts as valid (the server decides).
+  function accessExpired(token) {
+    try {
+      const p = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      return typeof p.exp === 'number' && p.exp * 1000 < Date.now() + 15000;
+    } catch (e) { return false; }
+  }
+
   async function request(method, path, o) {
     o = o || {};
     let tried = false;
+    if (!S.isDemo() && o.auth !== false && auth && auth.accessToken && !auth.platform && accessExpired(auth.accessToken)) {
+      tried = true;
+      if (!(await refresh())) throw new ApiError(401, S.t ? S.t('err.401') : 'Требуется вход');
+    }
     for (;;) {
       if (S.isDemo()) {
         try { return await demoCall(method, path, o); } catch (e) { if (e.status === 401 && o.auth !== false && !tried && auth && (await refresh())) { tried = true; continue; } throw e; }
@@ -499,6 +513,7 @@
 
     // the owner's brand: name, short name, contacts, colour and logo of the developer's site
     ownerBrand() { return request('GET', '/owner/brand'); },
+    ownTariff() { return request('GET', '/owner/tariff'); },
     saveOwnerBrand(b) { return withFields(request('PUT', '/owner/brand', { body: b })); },
     uploadLogo(file) { const f = new FormData(); f.append('file', file); return request('POST', '/owner/brand/logo', { form: f, file }); },
     deleteLogo() { return request('DELETE', '/owner/brand/logo'); },
@@ -612,7 +627,9 @@
     addCash(buildingId, b) { return withFields(request('POST', '/buildings/' + buildingId + '/cash', { body: b })); },
     reverseCash(buildingId, id, reason) { return request('POST', '/buildings/' + buildingId + '/cash/' + id + '/reverse', { body: { reason } }); },
     // Each developer has its own manual rate: staff get theirs from the token, the public site names its organization.
-    async rate() { const r = await request('GET', '/rates/current', { auth: api.isStaff(), query: real() ? { currency: 'USD', organization: api.isStaff() ? undefined : cfgSlug() || undefined } : undefined }); return { rate: num(pick(r, ['rateToTjs', 'rate', 'value', 'usdRate'], 0)), date: day(pick(r, ['date', 'rateDate'], '')), source: pick(r, ['source'], '') }; },
+    // No rate yet: the server answers 204 (allowEmpty) instead of 404, so the console stays clean; callers still get an error.
+    async rate() { const r = await request('GET', '/rates/current', { auth: api.isStaff(), query: real() ? { currency: 'USD', organization: api.isStaff() ? undefined : cfgSlug() || undefined, allowEmpty: true } : undefined }); if (!r || r.rateToTjs === undefined && r.rate === undefined) throw new ApiError(404, S.t ? S.t('rate.none') : 'Курс ещё не задан'); return { rate: num(pick(r, ['rateToTjs', 'rate', 'value', 'usdRate'], 0)), date: day(pick(r, ['date', 'rateDate'], '')), source: pick(r, ['source'], '') }; },
+    rateStatus() { return request('GET', '/rates/status'); },
     setRate(rate, date) { return withFields(request('PUT', '/rates', { body: { date, currency: 'USD', rateToTjs: rate, rate } })); },
     async reportPayments(from, to) {
       const r = await request('GET', '/reports/payments', { query: { from, to } });

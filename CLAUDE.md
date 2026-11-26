@@ -102,7 +102,7 @@ Binosoz/
     ├── css/styles.css             ← токены (:root и [data-theme='dark']), все компоненты; новый дизайн — классы nr-*
     └── js/
         ├── tanzimot-api-url.js        ← config: API_BASE ('/api/v1'; Vercel → Render), ORG_SLUG, CONTACT, INSTALLMENT
-        ├── i18n/ru.js, tg.js, en.js   ← тексты (по 1960 ключей); ru — на каждой странице и запасной
+        ├── i18n/ru.js, tg.js, en.js   ← тексты (по 2044 ключа); ru — на каждой странице и запасной
         ├── tarjumaho-ru-tg-en.js      ← S.t(), S.initLang()/S.setLang() (грузит tg/en по требованию), S.bus
         ├── komponentho-modal-toast-tabs.js ← h() DOM-builder, иконки, модалки, тосты
         ├── zaprosho-ba-backend.js     ← все вызовы API, токены (localStorage sitora.auth)
@@ -180,8 +180,8 @@ Binosoz/
 ## API
 - Префикс: `/api/v1`
 - Формат ошибок: Problem Details (RFC 9457) с `code` (snake_case) и `traceId`; тексты и коды — `Sitora.WebApi/Errors/ErrorCatalog.cs`.
-  Новая ошибка домена — строка в каталоге (ru, code, tg).
-- Язык ответов и ошибок: по заголовку `Accept-Language` (ru, tg)
+  Новая ошибка домена — строка в каталоге (ru, code, tg, en).
+- Язык ответов и ошибок: по заголовку `Accept-Language` (ru, tg, en); en — только тексты (UI-культура), числа и даты — ru/tg
 - Пагинация: `page` (от 1), `pageSize` (по умолчанию 20, макс 100); вне границ — тихо исправляется
 - Публичный каталог кэшируется (Output Cache, 15–30 с); изменения каталога сбрасывают тег `catalog`
 - AI-помощник гостя: `/public/{orgSlug}/ai/chat` и `/ai/status` — контекст ЖК только из базы (`EstateContext`, кэш 60 с,

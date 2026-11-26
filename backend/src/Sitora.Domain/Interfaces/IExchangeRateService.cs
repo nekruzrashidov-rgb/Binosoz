@@ -18,4 +18,9 @@ public interface IExchangeRateService
     Task<decimal?> GetRateOnAsync(Currency currency, DateOnly date, Guid? organizationId, CancellationToken ct = default);
 
     Task UpdateFromProviderAsync(CancellationToken ct = default);
+
+    Task<RateUpdateStatus> GetUpdateStatusAsync(CancellationToken ct = default);
+
+    // При старте: последний курс НБТ старше суток (сервер спал в 09:00 и 11:00 по Душанбе) — нужна разовая загрузка.
+    Task<bool> NeedsCatchUpAsync(CancellationToken ct = default);
 }

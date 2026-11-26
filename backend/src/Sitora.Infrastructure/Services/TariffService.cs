@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Sitora.Domain.DTOs.Platform;
@@ -87,7 +88,22 @@ public class TariffService(AppDbContext db, IAuditService audit, TimeProvider ti
             .Where(t => organizationIds.Contains(t.OrganizationId) && t.StartsAt <= now && (t.EndsAt == null || t.EndsAt > now))
             .ToListAsync(ct);
         return rows.GroupBy(t => t.OrganizationId)
-            .ToDictionary(g => g.Key, g => ToResponse(g.OrderByDescending(t => t.StartsAt).First(), g.First().TariffPlan));
+            .ToDictionary(g => g.Key, g => { var t = g.OrderByDescending(x => x.StartsAt).First(); return ToResponse(t, t.TariffPlan); });
+    }
+
+    public async Task<OwnTariffResponse> OwnAsync(Guid organizationId, CancellationToken ct = default)
+    {
+        var now = Now;
+        var current = await db.OrganizationTariffs.IgnoreQueryFilters().AsNoTracking().Include(t => t.TariffPlan)
+            .Where(t => t.OrganizationId == organizationId && t.StartsAt <= now && (t.EndsAt == null || t.EndsAt > now))
+            .OrderByDescending(t => t.StartsAt)
+            .FirstOrDefaultAsync(ct);
+        var buildings = await db.Buildings.IgnoreQueryFilters().CountAsync(b => b.OrganizationId == organizationId, ct);
+        var users = await db.Users.CountAsync(u => u.OrganizationId == organizationId && u.IsActive, ct);
+        if (current is null)
+            return new OwnTariffResponse(null, [], null, null, buildings, users, null);
+        var p = current.TariffPlan;
+        return new OwnTariffResponse(LocalName(p), LocalFeatures(p), p.MaxBuildings, p.MaxUsers, buildings, users, current.EndsAt);
     }
 
     public async Task EnsureCanAddBuildingAsync(Guid organizationId, CancellationToken ct = default)
@@ -132,6 +148,14 @@ public class TariffService(AppDbContext db, IAuditService audit, TimeProvider ti
         var features = (request.Features ?? []).Select(f => f?.Trim() ?? "").Where(f => f.Length > 0).ToList();
         if (features.Count > MaxFeatures || features.Any(f => f.Length > 200))
             throw new BusinessRuleException($"Возможностей тарифа — не больше {MaxFeatures}, каждая до 200 символов");
+        var featuresTg = Clean(request.FeaturesTg);
+        var featuresEn = Clean(request.FeaturesEn);
+        if (featuresTg.Count > MaxFeatures || featuresEn.Count > MaxFeatures || featuresTg.Concat(featuresEn).Any(f => f.Length > 200))
+            throw new BusinessRuleException($"Возможностей тарифа — не больше {MaxFeatures}, каждая до 200 символов");
+        var nameTg = string.IsNullOrWhiteSpace(request.NameTg) ? null : request.NameTg.Trim();
+        var nameEn = string.IsNullOrWhiteSpace(request.NameEn) ? null : request.NameEn.Trim();
+        if (nameTg?.Length > 50 || nameEn?.Length > 50)
+            throw new BusinessRuleException("Название тарифа — от 1 до 50 символов");
         if (await db.TariffPlans.AnyAsync(t => t.Name == name && t.Id != plan.Id, ct))
             throw new ConflictException("Тариф с таким названием уже есть");
 
@@ -141,10 +165,36 @@ public class TariffService(AppDbContext db, IAuditService audit, TimeProvider ti
         plan.MaxBuildings = request.MaxBuildings;
         plan.MaxUsers = request.MaxUsers;
         plan.Features = JsonSerializer.Serialize(features);
+        plan.NameTg = nameTg;
+        plan.NameEn = nameEn;
+        plan.FeaturesTg = JsonSerializer.Serialize(featuresTg);
+        plan.FeaturesEn = JsonSerializer.Serialize(featuresEn);
         plan.IsActive = request.IsActive;
     }
 
-    private static object Snapshot(TariffPlan p) => new { p.Name, p.Price, p.Currency, p.MaxBuildings, p.MaxUsers, p.Features, p.IsActive };
+    private static List<string> Clean(IReadOnlyList<string>? items) =>
+        (items ?? []).Select(f => f?.Trim() ?? "").Where(f => f.Length > 0).ToList();
+
+    private static object Snapshot(TariffPlan p) => new
+    {
+        p.Name, p.NameTg, p.NameEn, p.Price, p.Currency, p.MaxBuildings, p.MaxUsers, p.Features, p.FeaturesTg, p.FeaturesEn, p.IsActive
+    };
+
+    // Язык запроса (Accept-Language): tg, en или ru; перевода нет — русский текст.
+    private static string Language => CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+
+    public static string LocalName(TariffPlan p) => Language switch
+    {
+        "tg" when !string.IsNullOrWhiteSpace(p.NameTg) => p.NameTg!,
+        "en" when !string.IsNullOrWhiteSpace(p.NameEn) => p.NameEn!,
+        _ => p.Name
+    };
+
+    public static IReadOnlyList<string> LocalFeatures(TariffPlan p)
+    {
+        var local = Language switch { "tg" => ParseFeatures(p.FeaturesTg), "en" => ParseFeatures(p.FeaturesEn), _ => [] };
+        return local.Count > 0 ? local : ParseFeatures(p.Features);
+    }
 
     public static IReadOnlyList<string> ParseFeatures(string json)
     {
@@ -159,10 +209,11 @@ public class TariffService(AppDbContext db, IAuditService audit, TimeProvider ti
     }
 
     private static TariffPlanResponse ToResponse(TariffPlan p, int organizations) =>
-        new(p.Id, p.Name, p.Price, p.Currency, p.MaxBuildings, p.MaxUsers, ParseFeatures(p.Features), p.IsActive, organizations);
+        new(p.Id, p.Name, p.Price, p.Currency, p.MaxBuildings, p.MaxUsers, ParseFeatures(p.Features), p.IsActive, organizations,
+            p.NameTg, p.NameEn, ParseFeatures(p.FeaturesTg), ParseFeatures(p.FeaturesEn), LocalName(p), LocalFeatures(p));
 
-    private static OrganizationTariffResponse ToResponse(OrganizationTariff t, TariffPlan p) =>
-        new(t.Id, t.OrganizationId, p.Id, p.Name, p.Price, p.Currency, t.StartsAt, t.EndsAt, t.IsPaid);
+    public static OrganizationTariffResponse ToResponse(OrganizationTariff t, TariffPlan p) =>
+        new(t.Id, t.OrganizationId, p.Id, LocalName(p), p.Price, p.Currency, t.StartsAt, t.EndsAt, t.IsPaid);
 
     private static string Plural(int n, string one, string few, string many) =>
         (n % 10, n % 100) switch

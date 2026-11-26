@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Sitora.Infrastructure;
 using Sitora.Infrastructure.Health;
 
 namespace Sitora.WebApi.Extensions;

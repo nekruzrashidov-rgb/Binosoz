@@ -34,6 +34,8 @@ public class ExchangeRateTests(SitoraApiFactory factory) : IClassFixture<SitoraA
             $"/api/v1/rates/current?organizationId={Organization.DefaultId}", TestJson.Options);
         Assert.Equal((Today, 11m, RateSource.Manual), (current!.Date, current.RateToTjs, current.Source));
         Assert.Equal(HttpStatusCode.NotFound, (await factory.CreateClient().GetAsync("/api/v1/rates/current")).StatusCode);
+        // Сайт и CRM спрашивают с allowEmpty: курса нет — 204 без ошибки в консоли.
+        Assert.Equal(HttpStatusCode.NoContent, (await factory.CreateClient().GetAsync("/api/v1/rates/current?allowEmpty=true")).StatusCode);
         var bySlug = await factory.CreateClient().GetFromJsonAsync<RateResponse>(
             $"/api/v1/rates/current?organization={Organization.DefaultSlug}", TestJson.Options);
         Assert.Equal(11m, bySlug!.RateToTjs);

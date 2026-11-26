@@ -297,5 +297,53 @@
       h('tbody', null, rows.length ? rows.map((r) => { const tr = h('tr', { class: (o.onRow ? 'click ' : '') + (o.rowClass ? o.rowClass(r) : ''), onclick: o.onRow ? () => o.onRow(r) : null }, cols.map((c) => { const v = c.render ? c.render(r) : r[c.key]; return h('td', { class: (c.r ? 'r ' : '') + (c.num ? 'num' : '') }, v === undefined || v === null || v === '' ? '—' : v); })); return tr; }) : [h('tr', null, h('td', { colspan: cols.length }, S.empty(o.empty || t('common.nothing'), o.emptyIcon)))])));
   };
   S.copy = (text) => { try { navigator.clipboard.writeText(text).then(() => S.toast(t('common.copied'), 'ok'), () => S.toast(text)); } catch (e) { S.toast(text); } };
+  // Journal (CRM «Журнал» and platform «Активность»), C-06 / R-04: readable action, object, author and a short summary;
+  // the raw JSON only inside «Подробнее». Unknown codes are shown as they are.
+  const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const REQ = /^(POST|PUT|PATCH|DELETE) (\/\S*)$/;
+  const reqPath = (path) => path.replace(/^\/api\/v1/, '').split('/').map((p) => (GUID.test(p) || /^\d+$/.test(p) ? '{id}' : p)).join('/') || '/';
+  const json = (v) => { if (v === null || v === undefined || v === '') return null; if (typeof v === 'object') return v; try { return JSON.parse(v); } catch (e) { return v; } };
+  const scalar = (v) => (v === null || v === undefined ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v));
+  S.audit = {
+    action(code) {
+      const m = REQ.exec(code || '');
+      if (m) { const path = reqPath(m[2]); return t('audit.req.' + m[1] + ' ' + path, null, t('audit.req.' + m[1], { path }, code)); }
+      return t('audit.act.' + code, null, code);
+    },
+    entity(x) {
+      const kind = t('audit.ent.' + x.entity, null, x.entity);
+      const parts = [x.apartmentNumber != null ? t('audit.apt', { n: x.apartmentNumber }) : null, x.entityName || null].filter(Boolean);
+      if (parts.length) return kind + ' · ' + parts.join(' · ');
+      const id = typeof x.entityId === 'string' && x.entityId.length > 12 ? x.entityId.replace(/-/g, '').slice(-8).toUpperCase() : '';
+      return id && !/^0+$/.test(id) ? kind + ' #' + id : kind;
+    },
+    who(x) {
+      if (x.bySystem && !x.userEmail) return h('span', { class: 'muted' }, t('audit.system', null, 'система'));
+      const name = x.userName && x.userName !== x.userEmail ? x.userName : null;
+      return name ? h('span', { title: x.userEmail || '' }, name, x.userEmail ? h('small', { class: 'muted' }, ' · ' + x.userEmail) : null) : (x.userEmail || '—');
+    },
+    // A short text instead of {"Method":"Password"}: a known phrase for the action (and its method), the server status
+    // for platform actions, or «field: before → after» for the fields that changed.
+    summary(x) {
+      const before = json(x.before), after = json(x.after);
+      const a = after && typeof after === 'object' ? after : {}, b = before && typeof before === 'object' ? before : {};
+      if (a.Method) { const s = t('audit.sum.' + x.action + '.' + a.Method, null, ''); if (s) return s; }
+      if (x.action === 'DemoBookingsRenewed') return t('audit.sum.DemoBookingsRenewed', { n: a.bookings, h: a.hours });
+      if (x.action === 'NameSetFromSeedSecret') return t('audit.sum.NameSetFromSeedSecret', { before: b.FullName || '—', after: a.FullName || '—' });
+      const fixed = t('audit.sum.' + x.action, null, '');
+      if (fixed) return fixed;
+      if (REQ.test(x.action || '') && a.Status) return t(a.Status >= 400 ? 'audit.sum.statusFail' : 'audit.sum.status', { s: a.Status });
+      const keys = Object.keys(a).filter((k) => typeof a[k] !== 'object' || a[k] === null);
+      const changed = keys.filter((k) => JSON.stringify(a[k]) !== JSON.stringify(b[k])).slice(0, 3);
+      return changed.map((k) => (k in b ? k + ': ' + scalar(b[k]) + ' → ' + scalar(a[k]) : k + ': ' + scalar(a[k]))).join('; ');
+    },
+    change(x) {
+      const text = S.audit.summary(x);
+      const raw = [x.before ? scalar(json(x.before)) : '', x.before && x.after ? ' → ' : '', x.after ? scalar(json(x.after)) : ''].join('');
+      if (!raw) return text || '';
+      return h('div', null, text ? h('div', null, text) : null,
+        h('details', { class: 'audit-raw' }, h('summary', null, t('audit.details')), h('code', null, raw)));
+    },
+  };
   S.cd = (iso) => { const ms = new Date(iso).getTime() - Date.now(); return h('span', { class: 'cd-pill' + (ms < 6 * 3600000 ? ' red' : '') }, S.fmt.left(iso)); };
 })();
