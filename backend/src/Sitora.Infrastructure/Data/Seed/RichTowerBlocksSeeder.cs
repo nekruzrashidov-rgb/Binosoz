@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Sitora.Domain.Common;
 using Sitora.Domain.Entities;
+using Sitora.Domain.Enums;
 using Sitora.Domain.Interfaces;
 
 namespace Sitora.Infrastructure.Data.Seed;
@@ -64,6 +65,11 @@ public static class RichTowerBlocksSeeder
 
     private const int RandomSeed = 20261126;
 
+    // Подземный паркинг −1/−2 под каждым блоком, по 28 мест на уровень; 1–2 этажи — 6 магазинов на этаж; 3 лифта в блоке.
+    public const int ParkingLevels = 2, ParkingSpotsPerLevel = 28, CommercialFloors = 2, Elevators = 3;
+    public const decimal ParkingSpotArea = 13.25m;
+    private static readonly double[] ShopWeights = [1.2, 0.8, 1.0, 1.2, 0.8, 1.0];
+
     [SuppressMessage("Security", "CA5394", Justification = "Генератор с фиксированным зерном нужен для одинаковых статусов квартир при каждом запуске; к безопасности отношения не имеет.")]
     public static async Task SeedAsync(AppDbContext db, IAuditService audit, ILogger logger)
     {
@@ -94,11 +100,43 @@ public static class RichTowerBlocksSeeder
                 // Цена за м² по этажам в USD (PriceDefaults): 3–6 — 1 200, 7–19 — до 900, выше — 900, пентхаусы — 1 400.
                 PriceCurrency = PriceDefaults.Currency,
                 PriceSteps = PriceDefaults.Steps(spec.Floors),
-                PenthousePricePerM2 = PriceDefaults.PenthousePricePerM2
+                PenthousePricePerM2 = PriceDefaults.PenthousePricePerM2,
+                CommercialPricePerM2 = PriceDefaults.CommercialPricePerM2,
+                ParkingSpotPrice = PriceDefaults.ParkingSpotPrice,
+                ElevatorsCount = Elevators
             };
+            // −2 и −1 — подземный паркинг под блоком: машино-места 2,5 × 5,3 м по своей цене.
+            for (var level = -ParkingLevels; level <= -1; level++)
+            {
+                var floor = new Floor { Number = level };
+                for (var slot = 0; slot < ParkingSpotsPerLevel; slot++)
+                {
+                    var spot = new Apartment { Number = -level * 100 + slot + 1, Rooms = 0, PlanSlot = slot, Kind = ApartmentKind.Parking };
+                    spot.SetFixedPrice(ParkingSpotArea, PriceDefaults.ParkingSpotPrice, building.PriceCurrency);
+                    if (random.NextDouble() < 0.25)
+                        spot.Sell();
+                    floor.Apartments.Add(spot);
+                }
+                building.Floors.Add(floor);
+            }
+            // 1–2 — коммерция: помещения с витринами на улицу вдоль фасада, квартир на них нет.
+            var shops = FloorPlanMath.UnitAreas(spec.Footprint, FloorPlanMath.Depth, ShopWeights);
+            for (var level = 1; level <= CommercialFloors; level++)
+            {
+                var floor = new Floor { Number = level };
+                for (var slot = 0; slot < shops.Length; slot++)
+                {
+                    var shop = new Apartment { Number = level * 100 + slot + 1, Rooms = 0, PlanSlot = slot, Kind = ApartmentKind.Commercial };
+                    shop.SetPricing(shops[slot], PriceDefaults.CommercialPricePerM2, building.PriceCurrency);
+                    if (random.NextDouble() < 0.2)
+                        shop.Sell();
+                    floor.Apartments.Add(shop);
+                }
+                building.Floors.Add(floor);
+            }
             // Площади квартир — доли полосы этажа (FloorPlanMath): сумма с коридором и лифтовым узлом = площадь этажа.
             var areas = FloorPlanMath.UnitAreas(spec.Footprint, FloorPlanMath.Depth, spec.UnitWeights);
-            for (var floorNumber = 1; floorNumber <= spec.Floors; floorNumber++)
+            for (var floorNumber = CommercialFloors + 1; floorNumber <= spec.Floors; floorNumber++)
             {
                 var floor = new Floor { Number = floorNumber };
                 var soldProbability = Math.Max(0, 0.6 - (floorNumber - 1) * 0.04);
@@ -116,7 +154,7 @@ public static class RichTowerBlocksSeeder
                 }
                 building.Floors.Add(floor);
             }
-            building.PlannedApartments = building.Floors.Sum(f => f.Apartments.Count);
+            building.PlannedApartments = building.Floors.Sum(f => f.Apartments.Count(a => a.Kind is ApartmentKind.Residential or ApartmentKind.Penthouse));
             db.Buildings.Add(building);
             audit.Record(nameof(Building), building.Id, "Seeded", null, new { building.NameRu, building.BlockCode, building.FloorsCount, Concept = true }, organization.Id);
         }

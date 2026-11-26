@@ -202,9 +202,9 @@ public class CatalogTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
         Assert.Equal(HttpStatusCode.Conflict, occupiedSlot.StatusCode);
         Assert.Contains("Позиция 0 на плане этого этажа уже занята", await occupiedSlot.Content.ReadAsStringAsync());
 
-        var badSlot = await client.PostAsJsonAsync("/api/v1/apartments", new CreateApartmentRequest(floor.Id, 203, 1, 40m, 10000m, 8));
+        var badSlot = await client.PostAsJsonAsync("/api/v1/apartments", new CreateApartmentRequest(floor.Id, 203, 1, 40m, 10000m, 100));
         Assert.Equal(HttpStatusCode.BadRequest, badSlot.StatusCode);
-        Assert.Contains("от 0 до 7", await badSlot.Content.ReadAsStringAsync());
+        Assert.Contains("от 0 до 99", await badSlot.Content.ReadAsStringAsync());
 
         var withModel = await ReadAsync<ApartmentResponse>(await client.PostAsJsonAsync("/api/v1/apartments",
             new CreateApartmentRequest(floor.Id, 204, 1, 40m, 10000m, 3, "SR-F2-A204")));

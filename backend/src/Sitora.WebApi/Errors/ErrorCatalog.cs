@@ -230,6 +230,8 @@ public static class ErrorCatalog
         E("Этаж «по» не может быть ниже этажа «с»", "price_step_reversed", "Ошёнаи «то» аз ошёнаи «аз» паст буда наметавонад", "The «to» floor cannot be below the «from» floor");
         E("Цена за м² — больше нуля и не больше 1 000 000", "invalid_price_per_m2", "Нархи 1 м² — аз сифр зиёд ва на бештар аз 1 000 000", "The price per m² is above zero and at most 1,000,000");
         E("Ступени цены не должны пересекаться по этажам", "price_steps_overlap", "Зинаҳои нарх набояд аз рӯи ошёна ҳамдигарро буранд", "Price steps must not overlap by floors");
+        E("Цена машино-места — больше нуля и не больше 10 000 000", "invalid_parking_price", "Нархи ҷойи мошин — аз сифр зиёд ва на бештар аз 10 000 000", "The parking space price is above zero and at most 10,000,000");
+        E("Цена должна быть больше нуля", "invalid_price", "Нарх бояд аз сифр зиёд бошад", "The price must be greater than zero");
         E("Сначала задайте цены по этажам", "price_rule_missing", "Аввал нархҳоро аз рӯи ошёна муайян кунед", "Set the prices by floor first");
         E("Правило цены изменено другим пользователем", "price_rule_conflict", "Қоидаи нархро корбари дигар тағйир дод", "The price rule was changed by another user");
         E("Этаж не найден", "floor_not_found", "Ошёна ёфт нашуд", "Floor not found");
@@ -384,7 +386,7 @@ public static class ErrorCatalog
         E("Описание на русском не длиннее 4000 символов", "description_too_long", "Тавсиф бо забони русӣ на дарозтар аз 4000 аломат", "Description in Russian — up to 4000 characters");
         E("Описание на таджикском не длиннее 4000 символов", "description_too_long", "Тавсиф бо забони тоҷикӣ на дарозтар аз 4000 аломат", "Description in Tajik — up to 4000 characters");
         E("Этажность должна быть от 1 до 100", "invalid_floors_count", "Шумораи ошёнаҳо бояд аз 1 то 100 бошад", "The number of floors must be from 1 to 100");
-        E("Номер этажа должен быть от 0 до 100", "invalid_floor_number", "Рақами ошёна бояд аз 0 то 100 бошад", "The floor number must be from 0 to 100");
+        E("Номер этажа должен быть от -5 до 100", "invalid_floor_number", "Рақами ошёна бояд аз -5 то 100 бошад", "The floor number must be from -5 to 100");
         E("Номер квартиры должен быть от 1 до 99999", "invalid_apartment_number", "Рақами манзил бояд аз 1 то 99999 бошад", "The apartment number must be from 1 to 99999");
         E("Комнат должно быть от 0 (студия) до 10", "invalid_rooms", "Шумораи ҳуҷраҳо бояд аз 0 (студия) то 10 бошад", "Rooms must be from 0 (studio) to 10");
         E("Год сдачи — от 2000 до 2100", "invalid_year", "Соли супоридан — аз 2000 то 2100", "Completion year — from 2000 to 2100");

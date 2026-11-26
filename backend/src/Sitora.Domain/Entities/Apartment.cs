@@ -8,7 +8,8 @@ public class Apartment : BaseEntity
     public Guid FloorId { get; set; }
     public Floor Floor { get; set; } = null!;
 
-    public const int MaxPlanSlot = 7;
+    // Позиция на плане этажа: квартиры 0–7, магазины, машино-места паркинга — больше.
+    public const int MaxPlanSlot = 99;
     public const int Model3dIdMaxLength = 100;
 
     public int Number { get; set; }
@@ -18,6 +19,8 @@ public class Apartment : BaseEntity
     public string? Model3dId { get; set; }
 
     public int Rooms { get; set; }
+
+    public ApartmentKind Kind { get; set; } = ApartmentKind.Residential;
     public decimal Area { get; private set; }
     public decimal PricePerM2 { get; private set; }
     public decimal Price { get; private set; }
@@ -41,6 +44,19 @@ public class Apartment : BaseEntity
         Price = CalculatePrice(area, pricePerM2);
         if (currency is { } c)
             Currency = c;
+    }
+
+    // Своя цена, не от площади (машино-место): цена за м² — для справки, цена / площадь до копейки.
+    public void SetFixedPrice(decimal area, decimal price, Currency currency)
+    {
+        if (area <= 0)
+            throw new BusinessRuleException("Площадь должна быть больше нуля");
+        if (price <= 0)
+            throw new BusinessRuleException("Цена должна быть больше нуля");
+        Area = area;
+        Price = price;
+        PricePerM2 = Math.Round(price / area, 2, MidpointRounding.AwayFromZero);
+        Currency = currency;
     }
 
     public void SetOnRequest(bool onRequest)

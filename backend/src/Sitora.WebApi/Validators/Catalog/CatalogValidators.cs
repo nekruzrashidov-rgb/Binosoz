@@ -103,6 +103,10 @@ public class SavePriceRuleRequestValidator : AbstractValidator<SavePriceRuleRequ
         RuleFor(x => x.Steps).Must(NotOverlap).WithMessage("Ступени цены не должны пересекаться по этажам");
         RuleFor(x => x.PenthousePricePerM2).GreaterThan(0).LessThanOrEqualTo(1_000_000).When(x => x.PenthousePricePerM2 is not null)
             .WithMessage("Цена за м² — больше нуля и не больше 1 000 000");
+        RuleFor(x => x.CommercialPricePerM2).GreaterThan(0).LessThanOrEqualTo(1_000_000).When(x => x.CommercialPricePerM2 is not null)
+            .WithMessage("Цена за м² — больше нуля и не больше 1 000 000");
+        RuleFor(x => x.ParkingSpotPrice).GreaterThan(0).LessThanOrEqualTo(10_000_000).When(x => x.ParkingSpotPrice is not null)
+            .WithMessage("Цена машино-места — больше нуля и не больше 10 000 000");
     }
 
     private static bool NotOverlap(List<Sitora.Domain.Entities.PriceStep>? steps)
@@ -173,7 +177,7 @@ public class CreateFloorRequestValidator : AbstractValidator<CreateFloorRequest>
     public CreateFloorRequestValidator()
     {
         RuleFor(x => x.BuildingId).NotEmpty().WithMessage("Укажите дом");
-        RuleFor(x => x.Number).InclusiveBetween(0, 100).WithMessage("Номер этажа должен быть от 0 до 100");
+        RuleFor(x => x.Number).InclusiveBetween(-5, 100).WithMessage("Номер этажа должен быть от -5 до 100");
         RuleFor(x => x.PlanImageUrl).MaximumLength(500);
     }
 }
@@ -182,7 +186,7 @@ public class UpdateFloorRequestValidator : AbstractValidator<UpdateFloorRequest>
 {
     public UpdateFloorRequestValidator()
     {
-        RuleFor(x => x.Number).InclusiveBetween(0, 100).WithMessage("Номер этажа должен быть от 0 до 100");
+        RuleFor(x => x.Number).InclusiveBetween(-5, 100).WithMessage("Номер этажа должен быть от -5 до 100");
         RuleFor(x => x.PlanImageUrl).MaximumLength(500);
     }
 }

@@ -44,10 +44,17 @@ public record BuildingResponse(
     // Правило цены блока: ступени по этажам, цена м² пентхаусов, валюта каталога; не задано — полей нет.
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<PriceStep>? PriceSteps = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? PenthousePricePerM2 = null,
-    Currency PriceCurrency = Currency.TJS);
+    Currency PriceCurrency = Currency.TJS,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? CommercialPricePerM2 = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? ParkingSpotPrice = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? ElevatorsCount = null,
+    // Коммерческих помещений и машино-мест (TotalApartments — только квартиры и пентхаусы).
+    int CommercialUnits = 0,
+    int ParkingSpots = 0);
 
 // PUT /buildings/{id}/price-rule: правило целиком (валюта, ступени, цена м² пентхаусов); квартиры не меняет.
-public record SavePriceRuleRequest(Currency Currency = Currency.TJS, List<PriceStep>? Steps = null, decimal? PenthousePricePerM2 = null);
+public record SavePriceRuleRequest(Currency Currency = Currency.TJS, List<PriceStep>? Steps = null, decimal? PenthousePricePerM2 = null,
+    decimal? CommercialPricePerM2 = null, decimal? ParkingSpotPrice = null);
 
 // POST /buildings/{id}/price-rule/apply: сколько свободных квартир получили новую цену и сколько не тронуто
 // (бронь, продажа, «под запрос» или цена не изменилась).
@@ -123,7 +130,9 @@ public record FloorResponse(
     bool IsCommercial,
     string? PlanImageUrl,
     int TotalApartments,
-    int FreeApartments);
+    int FreeApartments,
+    // Подземный этаж паркинга (−1, −2).
+    bool IsParking = false);
 
 public record ApartmentResponse(
     Guid Id,
@@ -138,7 +147,8 @@ public record ApartmentResponse(
     Currency Currency,
     ApartmentStatus Status,
     int PlanSlot,
-    string? Model3dId);
+    string? Model3dId,
+    ApartmentKind Kind = ApartmentKind.Residential);
 
 public record SaveBuildingRequest(
     string NameRu,

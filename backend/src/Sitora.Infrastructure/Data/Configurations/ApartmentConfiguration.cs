@@ -13,6 +13,8 @@ public class ApartmentConfiguration : IEntityTypeConfiguration<Apartment>
         builder.ToTable("Apartments", t => t.HasCheckConstraint(
             "CK_Apartments_PlanSlot", $"\"PlanSlot\" BETWEEN 0 AND {Apartment.MaxPlanSlot}"));
         builder.Property(a => a.Model3dId).HasMaxLength(Apartment.Model3dIdMaxLength);
+        // Вид помещения строкой, по умолчанию — квартира (у всех прежних строк).
+        builder.Property(a => a.Kind).HasConversion<string>().HasMaxLength(16).HasDefaultValue(Sitora.Domain.Enums.ApartmentKind.Residential);
         builder.HasIndex(a => new { a.FloorId, a.Number }).IsUnique();
         // Одна позиция на плане этажа — одна квартира.
         builder.HasIndex(a => new { a.FloorId, a.PlanSlot }).HasDatabaseName(PlanSlotIndex).IsUnique();

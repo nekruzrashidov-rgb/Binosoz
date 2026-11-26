@@ -174,6 +174,13 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Property<Guid>("FloorId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Residential");
+
                     b.Property<string>("Model3dId")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -216,7 +223,7 @@ namespace Sitora.Infrastructure.Data.Migrations
 
                     b.ToTable("Apartments", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Apartments_PlanSlot", "\"PlanSlot\" BETWEEN 0 AND 7");
+                            t.HasCheckConstraint("CK_Apartments_PlanSlot", "\"PlanSlot\" BETWEEN 0 AND 99");
                         });
                 });
 
@@ -467,6 +474,10 @@ namespace Sitora.Infrastructure.Data.Migrations
                         .HasMaxLength(4)
                         .HasColumnType("character varying(4)");
 
+                    b.Property<decimal?>("CommercialPricePerM2")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<int?>("CompletionYear")
                         .HasColumnType("integer");
 
@@ -484,6 +495,9 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Property<string>("DescriptionTg")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
+
+                    b.Property<int?>("ElevatorsCount")
+                        .HasColumnType("integer");
 
                     b.Property<decimal?>("FloorHeight")
                         .HasPrecision(4, 2)
@@ -523,6 +537,10 @@ namespace Sitora.Infrastructure.Data.Migrations
 
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
+
+                    b.Property<decimal?>("ParkingSpotPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<decimal?>("PenthousePricePerM2")
                         .HasPrecision(18, 2)

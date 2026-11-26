@@ -51,6 +51,12 @@ public class Building : BaseEntity
     public List<PriceStep>? PriceSteps { get; set; }
     public decimal? PenthousePricePerM2 { get; set; }
     public Sitora.Domain.Enums.Currency PriceCurrency { get; set; } = Sitora.Domain.Enums.Currency.TJS;
+    // Коммерция 1–2 этажа — своя цена м²; машино-место паркинга — своя цена за место (не от площади).
+    public decimal? CommercialPricePerM2 { get; set; }
+    public decimal? ParkingSpotPrice { get; set; }
+
+    // Лифтов в блоке (на сайте — «Лифтов: 3», в 3D — шахты в ядре); не задано — не показывается.
+    public int? ElevatorsCount { get; set; }
 
     public List<Floor> Floors { get; set; } = [];
 }

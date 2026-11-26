@@ -197,7 +197,7 @@
      passport and the whole list with filters. Every number comes from the API. ---------- */
   S.views.apartments = function (root) {
     const cfg = window.SITORA_CONFIG || {};
-    const st = { building: null, floors: [], apts: [], rate: null, sel: null, floor: null, floorRooms: 'all', rooms: 'all', maxPrice: 0, priceCap: 0, sort: 'price', onlyFree: true, shown: 12, time: 'dusk', calcApt: null };
+    const st = { building: null, floors: [], apts: [], units: [], kind: '', rate: null, sel: null, floor: null, floorRooms: 'all', rooms: 'all', maxPrice: 0, priceCap: 0, sort: 'price', onlyFree: true, shown: 12, time: 'dusk', calcApt: null };
     // The catalogue's currency: the apartments' own (the blocks of Rich Tower — USD), TJS without data.
     const cur = () => (st.apts[0] && st.apts[0].currency) || 'TJS';
     let house = null, alive = true, full = null, wantFull = location.hash === '#3d', pushedFull = false;
@@ -271,7 +271,10 @@
         const [apts, rate] = await Promise.all([S.api.allApartments(st.floors), S.api.rate().catch(() => null)]);
         if (!alive) return;
         if (!apts.length) { showEmpty('empty'); return; }
-        st.apts = apts; st.rate = rate && rate.rate ? rate : null;
+        // st.apts — homes (apartments, penthouses): the model, the stats, the layouts, the calculator; st.units — everything,
+        // with the shops of floors 1–2 and the parking spaces of −1/−2 (the floor panel and the list's «Коммерция»/«Паркинг»).
+        st.units = apts; st.apts = apts.filter(S.isHome); st.rate = rate && rate.rate ? rate : null;
+        if (!st.apts.length && !apts.length) { showEmpty('empty'); return; }
         // The slider's ends are multiples of its step: max rounded up, min down — the right end keeps the dearest apartments.
         st.maxPrice = Math.ceil(Math.max(...apts.map((a) => a.price), 0) / PRICE_STEP) * PRICE_STEP;
         st.priceCap = st.maxPrice;
@@ -282,7 +285,7 @@
       if (!alive) return;
       loading.remove();
       // The floor with free apartments, the highest first (the best views); without free ones — the top floor.
-      const residential = st.floors.filter((f) => !f.commercial).map((f) => f.number).sort((a, b) => b - a);
+      const residential = st.floors.filter((f) => !f.commercial && !f.parking).map((f) => f.number).sort((a, b) => b - a);
       st.floor = residential.find((n) => st.apts.some((a) => a.floor === n && a.status === 'free')) || residential[0] || null;
       st.sel = firstFree(st.floor);
       const askedRooms = new URLSearchParams(location.search).get('rooms');
@@ -293,7 +296,7 @@
       // /apartments#calc from the landing: the calculator exists only now, after the data.
       if (location.hash === '#calc') setTimeout(() => scrollTo('calc'), 100);
     }
-    const firstFree = (n) => st.apts.filter((a) => a.floor === n).sort((a, b) => a.number - b.number).find((a) => a.status === 'free') || null;
+    const firstFree = (n) => (st.units || st.apts).filter((a) => a.floor === n).sort((a, b) => a.number - b.number).find((a) => a.status === 'free') || null;
 
     function initHouse() {
       // The 3D engine is loaded now (once): when the stage comes near the screen.
@@ -405,12 +408,12 @@
 
     // Floors on the right of the model, the top floor first; the number of free apartments under each.
     function renderRail() {
-      const free = (n) => st.apts.filter((a) => a.floor === n && a.status === 'free').length;
+      const free = (n) => st.units.filter((a) => a.floor === n && a.status === 'free').length;
       rail.replaceChildren(...st.floors.slice().sort((a, b) => b.number - a.number).map((f) => {
         const c = free(f.number);
         return h('button', { type: 'button', class: 'nr-rail-btn' + (c ? '' : ' zero'), 'aria-pressed': String(st.floor === f.number),
-          'aria-label': f.commercial ? t('floor.commercial') : t('floor.n', { n: f.number }) + ', ' + t('floor.free', { n: c }), onclick: () => selectFloor(f.number) },
-        h('span', null, f.commercial ? t('nr.cat.comShort') : f.number));
+          'aria-label': (f.commercial ? t('floor.commercialN', { n: f.number }) : S.floorName(f)) + ', ' + t('floor.free', { n: c }), onclick: () => selectFloor(f.number) },
+        h('span', null, f.number === 0 ? t('nr.cat.comShort') : f.parking ? S.floorNo(f.number) : f.commercial ? f.number + t('nr.cat.comShort') : f.number));
       }));
       const on = S.$('[aria-pressed="true"]', rail);
       if (on && on.scrollIntoView && rail.scrollHeight > rail.clientHeight) on.scrollIntoView({ block: 'nearest' });
@@ -438,42 +441,45 @@
     function renderPanel() {
       const f = st.floor, fl = st.floors.find((x) => x.number === f);
       if (f === null || !fl) { panel.replaceChildren(h('p', { class: 'nr-panel-hint' }, t('nr.cat.pickHint'))); return; }
-      if (fl.commercial) {
+      // The old commercial floor 0 without premises in the catalogue: a request to the manager.
+      if (fl.commercial && !st.units.some((a) => a.floor === f)) {
         panel.replaceChildren(h('div', { class: 'nr-panel-head' }, h('div', null, h('div', { class: 'nr-kicker' }, t('nr.cat.selFloor')), h('h2', { class: 'nr-panel-floor' }, t('floor.commercial')))),
           h('p', { class: 'nr-lead' }, t('floor.commercialText')),
           h('button', { class: 'btn nr-btn nr-btn--primary', type: 'button', onclick: () => leadModal(t('lead.commercial')) }, t('lead.send')));
         return;
       }
-      const onFloor = st.apts.filter((a) => a.floor === f).sort((a, b) => a.number - b.number);
+      const onFloor = st.units.filter((a) => a.floor === f).sort((a, b) => a.number - b.number);
       const free = onFloor.filter((a) => a.status === 'free').length;
       const match = (a) => S.roomsKind.match(a, st.floorRooms);
       const units = onFloor.filter(match);
-      const pills = h('div', { class: 'nr-pills', role: 'group', 'aria-label': t('filter.rooms') }, roomOptions(onFloor).map(([v, l]) =>
+      const homes = onFloor.every(S.isHome);
+      const pills = !homes ? null : h('div', { class: 'nr-pills', role: 'group', 'aria-label': t('filter.rooms') }, roomOptions(onFloor).map(([v, l]) =>
         h('button', { type: 'button', class: 'nr-pill', 'aria-pressed': String(st.floorRooms === v), onclick: () => { st.floorRooms = v; renderPanel(); } }, l)));
       const list = h('div', { class: 'nr-units' }, units.map((a) => h('button', { type: 'button', class: 'nr-unit st-' + a.status, 'aria-pressed': String(!!st.sel && st.sel.id === a.id), onclick: () => pickApt(a) },
-        h('span', { class: 'nr-unit-top' }, h('b', null, t('nr.cat.aptN', { n: a.number })), h('span', { class: 'nr-unit-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status))),
-        h('span', { class: 'nr-unit-type' }, S.roomsKind.label(a.rooms)),
+        h('span', { class: 'nr-unit-top' }, h('b', null, S.unitName(a)), h('span', { class: 'nr-unit-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status))),
+        h('span', { class: 'nr-unit-type' }, S.unitType(a)),
         h('span', { class: 'nr-unit-meta' }, S.fmt.area(a.area)),
         h('span', { class: 'nr-unit-price' }, S.fmt.money(a.price, cur())))));
       panel.replaceChildren(
         h('div', { class: 'nr-panel-head' },
-          h('div', null, h('div', { class: 'nr-kicker' }, t('nr.cat.selFloor')), h('h2', { class: 'nr-panel-floor' }, t('floor.n', { n: f }))),
-          h('div', { class: 'nr-panel-free' }, t('nr.cat.freeOf', { n: S.fmt.n(free), m: S.fmt.n(onFloor.length) }))),
+          h('div', null, h('div', { class: 'nr-kicker' }, fl.parking ? t('floor.parking') : fl.commercial ? t('floor.commercial') : t('nr.cat.selFloor')), h('h2', { class: 'nr-panel-floor' }, S.floorName(fl))),
+          h('div', { class: 'nr-panel-free' }, t('nr.cat.freeOf', { n: S.fmt.n(free), m: S.fmt.n(onFloor.length) }),
+            st.building.elevators ? h('small', { class: 'nr-panel-lifts' }, t('nr.cat.lifts', { n: st.building.elevators })) : null)),
         pills, units.length ? list : h('p', { class: 'nr-panel-hint' }, t('nr.cat.noUnits')),
         st.sel && st.sel.floor === f ? detail(st.sel) : h('p', { class: 'nr-panel-hint' }, t('nr.cat.pickHint')));
     }
     // The chosen apartment: its plan, the facts, the price, «от … в месяц» by the developer's terms, booking.
     function detail(a) {
-      const plan = h('canvas', { class: 'nr-detail-plan', width: 300, height: 200, role: 'img', 'aria-label': S.roomsKind.label(a.rooms) });
-      drawFloorPlan(plan, S.roomsKind.group(a.rooms));
+      const plan = S.isHome(a) ? h('canvas', { class: 'nr-detail-plan', width: 300, height: 200, role: 'img', 'aria-label': S.roomsKind.label(a.rooms) }) : null;
+      if (plan) drawFloorPlan(plan, S.roomsKind.group(a.rooms));
       const eq = S.priceEq(a.price, a.currency, st.rate);
       const m = cheapestMonthly(a.price);
       const badge = S.eco && S.eco.badge(st.building.eco);
-      return h('div', { class: 'nr-detail' }, h('div', { class: 'nr-detail-pic' }, plan),
+      return h('div', { class: 'nr-detail' + (plan ? '' : ' nr-detail--unit') }, plan ? h('div', { class: 'nr-detail-pic' }, plan) : null,
         h('div', { class: 'nr-detail-body' },
-          h('div', { class: 'nr-detail-kicker' }, t('nr.cat.aptN', { n: a.number }) + ' · ' + t('floor.n', { n: a.floor })),
-          h('h3', { class: 'nr-detail-type' }, S.roomsKind.label(a.rooms)),
-          h('dl', { class: 'nr-detail-facts' }, h('div', null, h('dt', null, t('nr.cat.area')), h('dd', null, S.fmt.area(a.area))), h('div', null, h('dt', null, t('nr.cat.sqm')), h('dd', null, S.fmt.money(sqmPrice(a), cur())))),
+          h('div', { class: 'nr-detail-kicker' }, S.unitName(a) + ' · ' + S.floorName({ number: a.floor, parking: a.floor < 0 })),
+          h('h3', { class: 'nr-detail-type' }, S.unitType(a)),
+          h('dl', { class: 'nr-detail-facts' }, h('div', null, h('dt', null, t('nr.cat.area')), h('dd', null, S.fmt.area(a.area))), a.kind === 'parking' ? null : h('div', null, h('dt', null, t('nr.cat.sqm')), h('dd', null, S.fmt.money(sqmPrice(a), cur())))),
           h('div', { class: 'nr-detail-label' }, t('nr.cat.price')),
           h('div', { class: 'nr-detail-price' }, S.fmt.money(a.price, cur())),
           eq ? h('div', { class: 'nr-detail-note' }, eq + ' · ' + t('price.estimate')) : null,
@@ -507,7 +513,7 @@
         });
       });
     }
-    async function refreshApts() { try { st.apts = await S.api.allApartments(st.floors); pushToHouse(); renderPanel(); renderRail(); renderApartments(); renderTopStats(); if (full) full.refresh(); } catch (e) { /* ignore */ } }
+    async function refreshApts() { try { st.units = await S.api.allApartments(st.floors); st.apts = st.units.filter(S.isHome); pushToHouse(); renderPanel(); renderRail(); renderApartments(); renderTopStats(); if (full) full.refresh(); } catch (e) { /* ignore */ } }
 
     function leadModal(preset, aptId) {
       const name = S.input('name', { placeholder: t('f.namePh'), autocomplete: 'name' });
@@ -593,10 +599,10 @@
       return [['all', t('filter.all')]].concat(S.roomsKind.types.filter((g) => list.some((a) => S.roomsKind.group(a.rooms) === g)).map((g) => [String(g), S.roomsKind.pill(g)]));
     }
     function filtered() {
-      let l = st.apts.slice();
+      let l = (st.kind === 'commercial' ? st.units.filter((a) => a.kind === 'commercial') : st.kind === 'parking' ? st.units.filter((a) => a.kind === 'parking') : st.apts).slice();
       if (st.onlyFree) l = l.filter((a) => a.status === 'free');
-      if (st.rooms !== 'all') l = l.filter((a) => S.roomsKind.match(a, st.rooms));
-      if (st.priceCap) l = l.filter((a) => a.price <= st.priceCap);
+      if (st.rooms !== 'all' && !st.kind) l = l.filter((a) => S.roomsKind.match(a, st.rooms));
+      if (st.priceCap && !st.kind) l = l.filter((a) => a.price <= st.priceCap);
       const cls = st.building && st.building.eco && st.building.eco.energyClass;
       if (cls && st.minClass && st.minClass !== 'any' && S.eco.rank(cls) > S.eco.rank(st.minClass)) l = [];
       const s = { price: (a, b) => a.price - b.price, priceDesc: (a, b) => b.price - a.price, area: (a, b) => b.area - a.area, floor: (a, b) => b.floor - a.floor }[st.sort];
@@ -618,7 +624,8 @@
       }
       aptSection.replaceChildren(h('div', { class: 'nr-wrap' },
         h('div', { class: 'nr-head-row' }, h('div', null, kicker(t('nr.cat.allKicker')), h('h2', { class: 'nr-h2' }, t('apts.title'))), count),
-        h('div', { class: 'nr-filters' },
+        kindPills(),
+        h('div', { class: 'nr-filters', hidden: !!st.kind },
           h('div', { class: 'nr-filter' }, h('span', { class: 'nr-filter-label', id: 'f-rooms' }, t('filter.rooms')), h('div', { class: 'nr-pills', role: 'group', 'aria-labelledby': 'f-rooms' }, rooms.map(([v, l]) => h('button', { type: 'button', class: 'nr-pill', 'aria-pressed': String(st.rooms === v), onclick: (e) => { st.rooms = v; st.shown = 12; S.$$('.nr-pill', e.currentTarget.parentNode).forEach((p) => p.setAttribute('aria-pressed', String(p === e.currentTarget))); drawList(); } }, l)))),
           h('div', { class: 'nr-filter nr-range' }, h('div', { class: 'nr-range-top' }, h('label', { for: 'f-price' }, t('filter.priceTo')), priceVal), price),
           h('div', { class: 'nr-filter' }, S.field(t('filter.sort'), sort)),
@@ -626,6 +633,14 @@
           h('label', { class: 'check nr-filter nr-check' }, h('input', { type: 'checkbox', checked: st.onlyFree, onchange: (e) => { st.onlyFree = e.target.checked; st.shown = 12; drawList(); } }), t('filter.onlyFree'))),
         grid, more));
       drawList();
+    }
+    // Kinds of premises in the list: shown only when the API has shops or parking spaces.
+    function kindPills() {
+      const has = (k) => st.units.some((a) => a.kind === k);
+      if (!has('commercial') && !has('parking')) return null;
+      const opts = [['', t('kind.homes')]].concat(has('commercial') ? [['commercial', t('kind.commercial')]] : []).concat(has('parking') ? [['parking', t('kind.parking')]] : []);
+      return h('div', { class: 'nr-pills nr-kinds', role: 'group', 'aria-label': t('kind.label') }, opts.map(([v, l]) =>
+        h('button', { type: 'button', class: 'nr-pill', 'aria-pressed': String((st.kind || '') === v), 'data-kind': v || 'homes', onclick: () => { st.kind = v; st.shown = 12; renderApartments(); } }, l)));
     }
     function ecoFilter() {
       const cls = st.building && st.building.eco && st.building.eco.energyClass;
@@ -637,13 +652,13 @@
     // A card of the list: the plan of its type, status and floor, number, type, area, price; it opens the apartment on the model.
     function renderCard(a) {
       const plan = h('canvas', { class: 'nr-unit-plan', width: 320, height: 180, 'aria-hidden': 'true' });
-      drawFloorPlan(plan, S.roomsKind.group(a.rooms));
+      if (S.isHome(a)) drawFloorPlan(plan, S.roomsKind.group(a.rooms));
       return h('button', { class: 'nr-unit-card', type: 'button', onclick: () => { pickApt(a); scrollTo('home'); } },
         h('span', { class: 'nr-unit-card-pic' }, plan),
         h('span', { class: 'nr-unit-card-body' },
-          h('span', { class: 'nr-unit-top' }, h('b', null, t('nr.cat.aptN', { n: a.number })), h('span', { class: 'nr-unit-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status))),
-          h('span', { class: 'nr-unit-type' }, S.roomsKind.label(a.rooms)),
-          h('span', { class: 'nr-unit-meta' }, t('floor.n', { n: a.floor }) + ' · ' + S.fmt.area(a.area) + ' · ' + S.fmt.money(sqmPrice(a), a.currency) + ' / ' + t('u.m2')),
+          h('span', { class: 'nr-unit-top' }, h('b', null, S.unitName(a)), h('span', { class: 'nr-unit-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status))),
+          h('span', { class: 'nr-unit-type' }, S.unitType(a)),
+          h('span', { class: 'nr-unit-meta' }, S.floorName({ number: a.floor, parking: a.floor < 0 }) + ' · ' + S.fmt.area(a.area) + (a.kind === 'parking' ? '' : ' · ' + S.fmt.money(sqmPrice(a), a.currency) + ' / ' + t('u.m2'))),
           h('span', { class: 'nr-unit-price' }, S.fmt.money(a.price, cur()))));
     }
 

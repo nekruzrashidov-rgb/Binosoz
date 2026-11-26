@@ -336,11 +336,14 @@ public class CatalogService(
     {
         var building = await db.Buildings.FirstOrDefaultAsync(b => b.Id == id, ct)
             ?? throw new NotFoundException(BuildingNotFound);
-        var before = new { building.PriceCurrency, building.PriceSteps, building.PenthousePricePerM2 };
+        var before = new { building.PriceCurrency, building.PriceSteps, building.PenthousePricePerM2, building.CommercialPricePerM2, building.ParkingSpotPrice };
         building.PriceCurrency = request.Currency;
         building.PriceSteps = request.Steps is { Count: > 0 } ? request.Steps.OrderBy(s => s.FromFloor).ToList() : null;
         building.PenthousePricePerM2 = request.PenthousePricePerM2;
-        audit.Record(nameof(Building), building.Id, "PriceRuleUpdated", before, new { building.PriceCurrency, building.PriceSteps, building.PenthousePricePerM2 });
+        building.CommercialPricePerM2 = request.CommercialPricePerM2;
+        building.ParkingSpotPrice = request.ParkingSpotPrice;
+        audit.Record(nameof(Building), building.Id, "PriceRuleUpdated", before, new { building.PriceCurrency, building.PriceSteps, building.PenthousePricePerM2,
+            building.CommercialPricePerM2, building.ParkingSpotPrice });
         await SaveAsync("Правило цены изменено другим пользователем", ct);
         return await GetBuildingAsync(id, ct);
     }
@@ -358,19 +361,22 @@ public class CatalogService(
         int updated = 0, unchanged = 0, skipped = 0;
         foreach (var a in apartments)
         {
-            var ppm = PriceRules.PricePerM2(building, a.Floor.Number, a.Floor.Number == building.FloorsCount);
-            if (a.Status != ApartmentStatus.Free || ppm is null)
+            var (ppm, fixedPrice) = PriceRules.PriceOf(building, a, a.Floor.Number);
+            if (a.Status != ApartmentStatus.Free || (ppm is null && fixedPrice is null))
             {
                 skipped++;
                 continue;
             }
-            if (a.PricePerM2 == ppm && a.Currency == building.PriceCurrency)
+            if (a.Currency == building.PriceCurrency && (fixedPrice is { } fp ? a.Price == fp : a.PricePerM2 == ppm))
             {
                 unchanged++;
                 continue;
             }
             var before = new { a.PricePerM2, a.Price, a.Currency };
-            a.SetPricing(a.Area, ppm.Value, building.PriceCurrency);
+            if (fixedPrice is { } spot)
+                a.SetFixedPrice(a.Area, spot, building.PriceCurrency);
+            else
+                a.SetPricing(a.Area, ppm!.Value, building.PriceCurrency);
             audit.Record(nameof(Apartment), a.Id, "PriceChanged", before, new { a.PricePerM2, a.Price, a.Currency, Source = "PriceRule" });
             updated++;
         }
@@ -525,10 +531,13 @@ public class CatalogService(
         await cache.InvalidateAsync(ct);
     }
 
+    // Подземные этажи паркинга — отрицательные (−1, −2…), 0 — прежний коммерческий этаж.
+    public const int MinFloorNumber = -5;
+
     private static void EnsureFloorNumber(Building building, int number)
     {
-        if (number < Floor.CommercialFloorNumber || number > building.FloorsCount)
-            throw new BusinessRuleException($"Номер этажа должен быть от 0 до {building.FloorsCount}");
+        if (number < MinFloorNumber || number > building.FloorsCount)
+            throw new BusinessRuleException($"Номер этажа должен быть от {MinFloorNumber} до {building.FloorsCount}");
     }
 
     private static void Apply(Building building, SaveBuildingRequest request)
@@ -565,8 +574,8 @@ public class CatalogService(
         b.DescriptionRu,
         b.DescriptionTg,
         b.ModelUrl,
-        b.Floors.SelectMany(f => f.Apartments).Count(),
-        b.Floors.SelectMany(f => f.Apartments).Count(a => a.Status == ApartmentStatus.Free),
+        b.Floors.SelectMany(f => f.Apartments).Count(a => a.Kind == ApartmentKind.Residential || a.Kind == ApartmentKind.Penthouse),
+        b.Floors.SelectMany(f => f.Apartments).Count(a => (a.Kind == ApartmentKind.Residential || a.Kind == ApartmentKind.Penthouse) && a.Status == ApartmentStatus.Free),
         b.CompletionYear,
         b.PlannedApartments,
         b.Eco == null ? null : new BuildingEcoResponse(
@@ -606,16 +615,22 @@ public class CatalogService(
         b.Setbacks,
         b.PriceSteps,
         b.PenthousePricePerM2,
-        b.PriceCurrency);
+        b.PriceCurrency,
+        b.CommercialPricePerM2,
+        b.ParkingSpotPrice,
+        b.ElevatorsCount,
+        b.Floors.SelectMany(f => f.Apartments).Count(a => a.Kind == ApartmentKind.Commercial),
+        b.Floors.SelectMany(f => f.Apartments).Count(a => a.Kind == ApartmentKind.Parking));
 
     private static readonly Expression<Func<Floor, FloorResponse>> ToFloorResponse = f => new FloorResponse(
         f.Id,
         f.BuildingId,
         f.Number,
-        f.Number == Floor.CommercialFloorNumber,
+        f.Number == Floor.CommercialFloorNumber || (f.Apartments.Any() && f.Apartments.All(a => a.Kind == ApartmentKind.Commercial)),
         f.PlanImageUrl,
         f.Apartments.Count(),
-        f.Apartments.Count(a => a.Status == ApartmentStatus.Free));
+        f.Apartments.Count(a => a.Status == ApartmentStatus.Free),
+        f.Number < 0);
 
     private static readonly Expression<Func<Apartment, ApartmentResponse>> ToApartmentResponse = a => new ApartmentResponse(
         a.Id,
@@ -630,5 +645,6 @@ public class CatalogService(
         a.Currency,
         a.Status,
         a.PlanSlot,
-        a.Model3dId);
+        a.Model3dId,
+        a.Kind);
 }

@@ -35,6 +35,16 @@ public static class PriceRules
 
     public static decimal? PricePerM2(Building b, int floor, bool penthouse) =>
         penthouse && b.PenthousePricePerM2 is { } p ? p : PricePerM2(b.PriceSteps, floor);
+
+    // Цена помещения по правилу блока: машино-место — своя цена за место (Fixed), магазин — цена м² коммерции, пентхаус —
+    // цена м² пентхаусов, квартира — ступень этажа. Не задано — null (цена не меняется).
+    public static (decimal? PricePerM2, decimal? Fixed) PriceOf(Building b, Apartment a, int floor) => a.Kind switch
+    {
+        Enums.ApartmentKind.Parking => (null, b.ParkingSpotPrice),
+        Enums.ApartmentKind.Commercial => (b.CommercialPricePerM2, null),
+        Enums.ApartmentKind.Penthouse => (b.PenthousePricePerM2 ?? PricePerM2(b.PriceSteps, floor), null),
+        _ => (PricePerM2(b, floor, floor == b.FloorsCount), null),
+    };
 }
 
 public static class PriceDefaults
@@ -44,6 +54,8 @@ public static class PriceDefaults
     // последний этаж — пентхаусы, 1 400 $/м².
     public const Currency Currency = Enums.Currency.USD;
     public const decimal PenthousePricePerM2 = 1400m;
+    // Магазины 1–2 этажа — 1 500 $/м², машино-место — 20 000 $ (не от площади).
+    public const decimal CommercialPricePerM2 = 1500m, ParkingSpotPrice = 20000m;
 
     public static List<PriceStep> Steps(int floors) =>
     [

@@ -124,6 +124,14 @@
   };
   // Apartment types by rooms — one rule for the catalog, the layouts, the gallery and the 3D card, so the labels agree:
   // groups 0 (studio), 1, 2, 3, 4 (four rooms and more); the label names the real number of rooms.
+  // Kinds of premises: an apartment (and a penthouse) is a home; a shop and a parking space have their own names.
+  S.isHome = (a) => !a || !a.kind || a.kind === 'residential' || a.kind === 'penthouse';
+  S.unitName = (a) => (a && a.kind === 'commercial' ? S.t('unit.shop', { n: a.number }) : a && a.kind === 'parking' ? S.t('unit.spot', { n: a.number }) : S.t('nr.cat.aptN', { n: a.number }));
+  S.unitType = (a) => (a && a.kind === 'commercial' ? S.t('unit.shopType') : a && a.kind === 'parking' ? S.t('unit.spotType') : S.roomsKind.label(a.rooms));
+  // Floor numbers as the plan writes them: −2, −1, 1, 2… (a real minus sign).
+  S.floorNo = (n) => (+n < 0 ? '−' + Math.abs(+n) : String(n));
+  S.floorName = (f) => (f.parking ? S.t('floor.parkingN', { n: S.floorNo(f.number) }) : S.t('floor.n', { n: f.number }));
+
   S.roomsKind = {
     types: [0, 1, 2, 3, 4],
     group: (n) => Math.max(0, Math.min(4, Math.floor(+n || 0))),

@@ -78,11 +78,11 @@ public class PriceRuleTests(SitoraApiFactory factory) : IClassFixture<SitoraApiF
         var after = await factory.WithDbAsync(db => db.Apartments.AsNoTracking().Include(a => a.Floor).Where(a => a.Floor.BuildingId == b.Id).ToListAsync());
         Assert.Equal(before[bookedId], after.Single(a => a.Id == bookedId).Price);
         Assert.Equal(before[soldId], after.Single(a => a.Id == soldId).Price);
-        Assert.All(after.Where(a => a.Status == ApartmentStatus.Free && a.Floor.Number < b.FloorsCount),
+        Assert.All(after.Where(a => a.Kind == ApartmentKind.Residential && a.Status == ApartmentStatus.Free && a.Floor.Number < b.FloorsCount),
             a => Assert.Equal(Apartment.CalculatePrice(a.Area, 1000m), a.Price));
-        Assert.All(after.Where(a => a.Status == ApartmentStatus.Free && a.Floor.Number == b.FloorsCount),
+        Assert.All(after.Where(a => a.Kind != ApartmentKind.Parking && a.Status == ApartmentStatus.Free && a.Floor.Number == b.FloorsCount),
             a => Assert.Equal(Apartment.CalculatePrice(a.Area, 1500m), a.Price));
-        var changed = after.First(a => a.Status == ApartmentStatus.Free && a.Floor.Number == 5);
+        var changed = after.First(a => a.Kind == ApartmentKind.Residential && a.Status == ApartmentStatus.Free && a.Floor.Number == 5);
         Assert.True(await factory.WithDbAsync(db => db.AuditLogs.AnyAsync(l => l.EntityId == changed.Id && l.Action == "PriceChanged")));
         Assert.True(await factory.WithDbAsync(db => db.AuditLogs.AnyAsync(l => l.EntityId == b.Id && l.Action == "PriceRuleUpdated")));
         // Кэш каталога сброшен: гость видит новую цену.
