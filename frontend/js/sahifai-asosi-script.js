@@ -788,6 +788,10 @@
     heroTitle.setAttribute('data-brand', '');
     const heroSub = fromShell('heroSub') || h('p', { class: 'nr-hero-sub' });
     heroSub.textContent = t('nr.hero.sub');
+    // «Rich Tower — 3 блока» from the API (the brand's published blocks); hidden for one building.
+    const heroBlocks = h('p', { class: 'nr-hero-blocks', hidden: true });
+    const drawBlocksLine = () => { const l = S.blocksLine(); heroBlocks.hidden = !l; heroBlocks.textContent = l || ''; };
+    drawBlocksLine(); if (S.bus) S.bus.on('brand', drawBlocksLine);
     const heroStats = h('dl', { class: 'nr-hero-stats', hidden: true });
     // A demo building (isDemo): its numbers are marked as demo data right under the buttons (A-04).
     const heroDemo = h('p', { class: 'nr-hero-demo', hidden: true }, h('span', { class: 'demo-badge' }, t('demo.badge')), ' ', t('nr.hero.demoNote'));
@@ -796,7 +800,7 @@
         h('figcaption', { class: 'nr-render-note' }, t('nr.render'))),
       h('div', { class: 'nr-hero-shade', 'aria-hidden': 'true' }),
       h('div', { class: 'nr-wrap nr-hero-in' },
-        h('div', { class: 'nr-hero-text' }, heroKicker, heroTitle, heroSub,
+        h('div', { class: 'nr-hero-text' }, heroKicker, heroTitle, heroSub, heroBlocks,
           h('div', { class: 'nr-actions' },
             h('a', { class: 'btn nr-btn nr-btn--primary', href: '/apartments' }, t('wow.hero.pick'), arrow()),
             h('a', { class: 'btn nr-btn nr-btn--light', href: '/apartments#3d' }, t('wow.hero.3d'))), heroDemo),

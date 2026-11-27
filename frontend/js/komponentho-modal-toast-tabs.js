@@ -92,6 +92,11 @@
   const RU_ADDRESS = 'г. Душанбе, пр. Борбад, 15';
   // «Отправляя, вы соглашаетесь с политикой конфиденциальности» — под формами заявки и регистрации.
   S.privacyNote = () => S.h('p', { class: 'consent-note' }, S.t('privacy.consent') + ' ', S.h('a', { href: '/privacy' }, S.t('privacy.consentLink')), '.');
+  // «Rich Tower — 3 блока»: the published blocks of the complex from the same answer; one building — null.
+  S.blocksLine = () => {
+    const n = ((S.brandInfo && S.brandInfo.buildings) || []).filter((b) => b.blockCode).length;
+    return n > 1 ? S.t('nr.blocksLine', { b: S.brandName(), n, w: S.plural(n, 'nr.blocksN') }) : null;
+  };
   S.brandName = () => { const v = String((S.brandInfo && S.brandInfo.name) || '').trim(); return v || S.t('brand.name'); };
   S.brandAddress = (address) => { const v = String(address || '').trim().replace(/\s+/g, ' '); return v === RU_ADDRESS ? S.t('contact.address') : v; };
 

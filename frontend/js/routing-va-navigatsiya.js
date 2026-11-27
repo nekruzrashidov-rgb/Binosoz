@@ -385,10 +385,12 @@
     if (isPublic || page === 'cabinet' || page === 'login') S.api.publicBrand().then((b) => {
       if (!b || !b.name) return;
       const before = S.brandName(); S.brandInfo = b;
-      if (S.brandName() === before) return;
-      drawHeader(); setTitle();
-      // Texts already drawn with the name (the landing's title, the footer, the 3D title) are marked data-brand.
-      S.$$('[data-brand]').forEach((el) => { el.textContent = S.brandName(); });
+      // The pages listen (the blocks of the complex come with the brand), even when the name is the same.
+      if (S.brandName() !== before) {
+        drawHeader(); setTitle();
+        // Texts already drawn with the name (the landing's title, the footer, the 3D title) are marked data-brand.
+        S.$$('[data-brand]').forEach((el) => { el.textContent = S.brandName(); });
+      }
       S.bus.emit('brand', b);
     }).catch(() => { /* no API: «Rich Tower» stays */ });
     await S.api.restore();

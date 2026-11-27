@@ -44,7 +44,7 @@ test('home without data: no invented numbers, an honest "sales open soon" block'
   await expect(page.locator('#layouts')).toBeHidden();
   await expect(page.locator('#installment')).toBeHidden();
   await expect(page.locator('#about')).toBeHidden();
-  await expect(page.locator('.nr-hero .nr-render-note')).toHaveText('Визуализация 3D-модели');
+  await expect(page.locator('.nr-hero .nr-render-note')).toHaveText('Визуализация 3D-модели, концепт');
   await expect(page.locator('h1')).toHaveText('Rich Tower');
 });
 

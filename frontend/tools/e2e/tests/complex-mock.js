@@ -58,4 +58,4 @@ async function mockComplex(page) {
   });
 }
 
-module.exports = { mockComplex, BLOCKS };
+module.exports = { mockComplex, BLOCKS, SITE, units, floorsOf, building };
