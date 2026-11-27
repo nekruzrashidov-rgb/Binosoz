@@ -164,7 +164,7 @@
           h('div', { class: 'foot-qr' }, h('img', { src: '/img/qr-binosoz.svg', alt: t('qr.alt'), width: 88, height: 88, loading: 'lazy' }), h('span', null, t('qr.open')))),
         col(t('foot.apts'), h('a', { href: '/apartments' }, t('foot.catalog')), h('a', { href: '/apartments#calc' }, t('foot.calc')), h('a', { href: '/apartments' }, t('foot.3d'))),
         col(t('foot.info'), h('a', { href: '/#why' }, t('foot.why')), h('a', { href: '/#steps' }, t('foot.steps')), h('a', { href: '/login' }, t('foot.cabinet'))),
-        col(t('foot.contacts'), h('span', null, c.address || ''), c.phone ? h('a', { href: 'tel:+' + phoneDigits(c.phone) }, c.phone) : null, c.telegram ? h('a', { href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, c.telegram) : null, h('a', { href: '/contact' }, t('foot.write')))),
+        col(t('foot.contacts'), h('span', null, c.address || ''), S.map ? S.map.footerLink() : null, c.phone ? h('a', { href: 'tel:+' + phoneDigits(c.phone) }, c.phone) : null, c.telegram ? h('a', { href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, c.telegram) : null, h('a', { href: '/contact' }, t('foot.write')))),
       h('div', { class: 'foot-bottom' }, h('span', null, '© ' + new Date().getFullYear() + ' ' + S.brandName() + '. ' + t('footer.rights') + ' · ' + t('footer.platform')),
         h('a', { class: 'foot-privacy', href: '/privacy' }, t('privacy.link')),
         h('span', { class: 'foot-dev' }, t('foot.dev') + ' ', h('a', { href: '/register' }, t('foot.devLink')))),
@@ -860,7 +860,9 @@
     const soonHost = h('div', { class: 'nr-wrap nr-soon', hidden: true });
     // «Зелёный эффект Binosoz» — real counters from the API; hidden when there is nothing to show.
     const green = S.eco ? S.eco.impactSection() : null;
-    page.append(hero, soonHost, about, why, layouts, visuals, green, plan, steps, contactBand, siteFooter());
+    // «Как добраться» — before «Остались вопросы?»; hidden without an address and a point.
+    const mapSec = S.map ? h('section', { class: 'nr-sec nr-map-sec', id: 'map' }, h('div', { class: 'nr-wrap' }, kicker(t('map.kicker')), h('h2', { class: 'nr-h2' }, t('map.title')), S.map.block({ size: 'band' }))) : null;
+    page.append(hero, soonHost, about, why, layouts, visuals, green, plan, steps, mapSec, contactBand, siteFooter());
     renderData(); renderCall();
     const stopReveal = revealIn(page);
 
@@ -1046,11 +1048,7 @@
           ? h('div', { class: 'ct-card ct-hours' }, h('span', { class: 'ct-ic' }, landIcon('clock')), h('div', null, h('small', null, t('ct.hours')),
             h('dl', null, schedule.map(([day, time]) => [h('dt', null, t('day.' + day)), h('dd', { class: time ? '' : 'off' }, time || t('day.off'))]))))
           : null),
-      // A map card: the office address on a stylised city plan.
-      // Not role="img": the card holds a link (axe nested-interactive, A-18); the address is read as text, the pin is decoration.
-      h('div', { class: 'ct-map' },
-        h('div', { class: 'ct-map-pin', 'aria-hidden': 'true' }, landIcon('pin')), h('b', null, t('ct.city') + ', ' + (c.address || '').replace(/^(г\.\s*|ш\.\s*)?Душанбе,\s*/, '').replace(/,\s*Dushanbe$/, '')),
-        h('a', { class: 'btn nr-btn nr-btn--primary', href: 'https://www.openstreetmap.org/search?query=' + encodeURIComponent(c.address || ''), target: '_blank', rel: 'noopener' }, t('ct.route'), arrow())));
+      null);
 
     // Above the form — straight to the messengers; under it — why it is safe to write.
     const formHost = h('div');
@@ -1087,7 +1085,9 @@
     const faq = h('section', { class: 'nr-sec nr-band', id: 'faq' }, h('div', { class: 'nr-wrap nr-faq-wrap' },
       kicker(t('nr.faq.kicker')), h('h2', { class: 'nr-h2' }, t('faq.title')), faqList,
       h('p', { class: 'nr-note' }, t('faq.sub'))));
-    page.append(head, h('section', { class: 'nr-sec nr-ct' }, h('div', { class: 'nr-wrap ct-split' }, left, right)), faq, siteFooter());
+    // The map of the complex: the address and the point from the API (S.map), loaded from Google only after a click.
+    const mapSec = S.map ? h('section', { class: 'nr-sec nr-map-sec', id: 'map' }, h('div', { class: 'nr-wrap' }, S.map.block({ size: 'large' }))) : null;
+    page.append(head, h('section', { class: 'nr-sec nr-ct' }, h('div', { class: 'nr-wrap ct-split' }, left, right)), mapSec, faq, siteFooter());
 
     // Floating labels: the label sits in the field and moves up when the field has focus or a value.
     const fl = (field, label, req) => h('label', { class: 'fl' }, field, h('span', null, label + (req ? ' *' : '')), h('em', { class: 'fl-err' }));

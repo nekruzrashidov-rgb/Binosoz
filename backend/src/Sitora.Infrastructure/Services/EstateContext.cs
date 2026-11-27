@@ -68,7 +68,8 @@ public class EstateContext(AppDbContext db, IExchangeRateService rates, TimeProv
         if (!string.IsNullOrWhiteSpace(org.Phone)) contacts.Add("phone " + org.Phone.Trim());
         if (!string.IsNullOrWhiteSpace(org.Telegram)) contacts.Add("Telegram " + org.Telegram.Trim());
         if (!string.IsNullOrWhiteSpace(org.Email)) contacts.Add("e-mail " + org.Email.Trim());
-        if (!string.IsNullOrWhiteSpace(org.Address)) contacts.Add("sales office " + org.Address.Trim());
+        // Адрес ЖК из CRM («Компания на сайте») — его же показывает карта сайта; он же адрес офиса продаж.
+        if (!string.IsNullOrWhiteSpace(org.Address)) contacts.Add("address of the complex and the sales office " + org.Address.Trim());
         lines.Add(contacts.Count > 0
             ? "Contacts: " + string.Join("; ", contacts) + ". Office hours are not in the database."
             : "Contacts: not in the database — point to the contact page /contact.");

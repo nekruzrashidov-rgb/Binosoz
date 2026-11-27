@@ -60,6 +60,8 @@ public static class DependencyInjection
             .BindConfiguration(ClaudeOptions.SectionName);
         services.AddOptions<BrandOptions>()
             .BindConfiguration(BrandOptions.SectionName);
+        services.AddOptions<MapsOptions>()
+            .BindConfiguration(MapsOptions.SectionName);
         services.AddOptions<BookingOptions>()
             .BindConfiguration(BookingOptions.SectionName);
         services.AddOptions<EmailOptions>()

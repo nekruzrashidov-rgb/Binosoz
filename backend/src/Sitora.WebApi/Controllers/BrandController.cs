@@ -38,6 +38,20 @@ public class PublicController(IBrandService brands) : ControllerBase
     }
 }
 
+// Точка ЖК на карте (CRM → «Настройки → Компания на сайте»): владелец, руководитель дома и контент-менеджер.
+[ApiController]
+[Route("api/v1/owner/brand/location")]
+[Authorize(Roles = Roles.CatalogEditors)]
+[Produces("application/json")]
+public class OwnerLocationController(IBrandService brands) : ControllerBase
+{
+    /// <summary>Широта −90…90 и долгота −180…180 (6 знаков) — парой; пусто — убрать точку. Ошибка — 400; AuditLog.</summary>
+    [HttpPut]
+    [ProducesResponseType<BrandResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    public Task<BrandResponse> Update(SaveOrganizationLocationRequest request, CancellationToken ct) => brands.SetLocationAsync(request, ct);
+}
+
 // Тариф своей организации (CRM → «Настройки», C-07): тот же действующий тариф, что на платформе → «Застройщики».
 [ApiController]
 [Route("api/v1/owner/tariff")]

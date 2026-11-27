@@ -566,3 +566,14 @@
   frontend/tools/renders/render.mjs пишет complex.json и снимает сцену сайта), все квартиры свободны: кадр показывает
   концепт, не продажи. Подпись под кадром — «Визуализация 3D-модели, концепт». На главной и «О проекте» под названием —
   «Rich Tower — 3 блока»: число опубликованных блоков из того же ответа /public/brand; у одного дома строки нет.
+- **Карта Google (feat(map)).** Адрес и точка — только из API: адрес — Organization.Address (CRM «Компания на сайте»),
+  точка — Organization.Latitude/Longitude (миграция OrganizationLocation, decimal(9,6)), без неё — центр опубликованных
+  блоков с координатами; нет ни адреса, ни точки — карты нет. В сид адрес и точку не кладём: это данные владельца.
+- **Приватность карты.** До клика «Показать карту» у Google ничего не запрашивается — тёмная карточка сайта с адресом и
+  ссылками `maps/search` и `maps/dir` (официальный формат). Выбор хранится в localStorage (`sitora.mapOk`). Встраивание —
+  Maps Embed API (язык ru для ru и tg — таджикского у Google нет, en для en); ключ `Maps__EmbedKey` отдаёт `/public/brand`
+  (`mapsEmbedKey`) — он публичный по природе и ограничивается в Google Cloud; без ключа — только ссылки. CSP открывает
+  только `frame-src https://www.google.com`. Политика конфиденциальности — раздел «Карта Google».
+- **Точку задаёт** Owner, ObjectAdmin или Content (PUT /owner/brand/location, AuditLog LocationUpdated); форма — в
+  «Настройки → Компания на сайте» (раздел владельца) и у блока в «Каталоге». AI-помощник получает адрес ЖК из базы
+  («address of the complex and the sales office»).

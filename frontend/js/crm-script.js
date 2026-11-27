@@ -708,7 +708,7 @@
             tariff && tariff.endsAt ? [h('dt', null, t('set.tariffEnds')), h('dd', null, S.fmt.date(tariff.endsAt))] : null),
           maxB != null ? S.bar((count * 100) / maxB, count >= maxB ? 'warn' : '') : null,
           h('p', { class: 'hint' }, t(tariff && tariff.name ? 'set.planHint' : 'set.noTariffHint')));
-        body.replaceChildren(h('div', { class: 'set-grid' }, form, h('div', { class: 'stack' },
+        body.replaceChildren(h('div', { class: 'set-grid' }, h('div', { class: 'stack' }, form, orgLocationForm(br, () => addr.value.trim())), h('div', { class: 'stack' },
           h('div', { class: 'card stack' }, h('h3', null, t('set.logo')), logoBox, h('p', { class: 'hint' }, t('set.logoHint')), h('div', { class: 'row' }, file, upload, del)),
           planCard)));
         // Tariffs and coefficients of the green features (owner): the utility calculator and the CO₂ figure use only these.
@@ -1320,14 +1320,52 @@
   const CITIES = ['dushanbe', 'khujand', 'bokhtar', 'other'];
   // The point of the building on the map and its floor height (Content and leaders): the 3D model of the site shows the
   // real surroundings and the distances only with the coordinates; without the floor height it counts 3,0 m as an estimate.
+  // «Найти на карте» opens Google Maps by the address (the owner copies the point from there); the preview — the same map as
+  // the site (the iframe only when the API has the key), or the links.
+  function mapTools(address, lat, lon) {
+    const preview = h('div', { class: 'map-preview' });
+    let key = null;
+    const draw = () => {
+      const v = (el) => (el.value.trim() === '' ? null : Number(el.value.replace(',', '.')));
+      const la = v(lat), lo = v(lon);
+      const ok = la != null && lo != null && la >= -90 && la <= 90 && lo >= -180 && lo <= 180;
+      if (!S.map || !ok) { preview.replaceChildren(h('p', { class: 'hint' }, t('locf.noPoint'))); return; }
+      const p = { address: address(), lat: la, lon: lo, key };
+      preview.replaceChildren(key ? S.map.iframe(p) : h('p', { class: 'hint' }, t('locf.noKey')), S.map.links(p));
+    };
+    const find = h('button', { class: 'btn soft', type: 'button', onclick: () => { const a = address(); if (!a) { S.toast(t('locf.noAddress'), 'warn'); return; } window.open('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(a), '_blank', 'noopener'); } }, t('locf.find'));
+    [lat, lon].forEach((el) => el.addEventListener('change', draw));
+    if (S.api.publicBrand) S.api.publicBrand().then((b) => { key = (b && b.mapsEmbedKey) || null; draw(); }).catch(() => draw()); else draw();
+    return { find, preview, draw };
+  }
+  // The point of the complex (owner, CRM → «Настройки → Компания на сайте»): the site's map uses it; without it — the centre of
+  // the blocks that have coordinates.
+  function orgLocationForm(br, address) {
+    const num = (name, v, attrs) => S.input(name, Object.assign({ type: 'number', inputmode: 'decimal', value: v == null ? '' : v }, attrs));
+    const lat = num('latitude', br.latitude, { step: 'any', min: -90, max: 90, placeholder: '38.5598' });
+    const lon = num('longitude', br.longitude, { step: 'any', min: -180, max: 180, placeholder: '68.7870' });
+    const tools = mapTools(address, lat, lon);
+    const btn = h('button', { class: 'btn', type: 'submit' }, t('common.save'));
+    const f = h('form', { class: 'card stack loc-form', novalidate: true }, h('h3', null, t('locf.orgTitle')), h('p', { class: 'muted' }, t('locf.orgHint')),
+      h('div', { class: 'grid g2' }, S.field(t('locf.lat'), lat), S.field(t('locf.lon'), lon)), h('div', { class: 'row' }, btn, tools.find), tools.preview);
+    const val = (el) => (el.value.trim() === '' ? null : Number(el.value.replace(',', '.')));
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault(); S.showErrors(f, null);
+      await S.busy(btn, async () => {
+        try { const r = await S.api.saveOwnerLocation({ latitude: val(lat), longitude: val(lon) }); Object.assign(br, { latitude: r.latitude, longitude: r.longitude }); tools.draw(); S.toast(t('common.saved'), 'ok'); } catch (er) { S.showErrors(f, er); }
+      });
+    });
+    return f;
+  }
   function locationForm(b) {
     const num = (name, v, attrs) => S.input(name, Object.assign({ type: 'number', inputmode: 'decimal', value: v == null ? '' : v }, attrs));
     const lat = num('latitude', b.latitude, { step: 'any', min: -90, max: 90, placeholder: '38.5598' });
     const lon = num('longitude', b.longitude, { step: 'any', min: -180, max: 180, placeholder: '68.7870' });
     const fh = num('floorHeight', b.floorHeight, { step: '0.05', min: 2.4, max: 6, placeholder: '3.0' });
     const btn = h('button', { class: 'btn', type: 'submit' }, t('common.save'));
+    const tools = mapTools(() => b.address || '', lat, lon);
     const f = h('form', { class: 'card stack loc-form', novalidate: true }, h('h3', null, t('locf.title')), h('p', { class: 'muted' }, t('locf.hint')),
-      h('div', { class: 'grid g3' }, S.field(t('locf.lat'), lat), S.field(t('locf.lon'), lon), S.field(t('locf.floorH'), fh, t('locf.floorHint'))), h('div', null, btn));
+      h('div', { class: 'grid g3' }, S.field(t('locf.lat'), lat), S.field(t('locf.lon'), lon), S.field(t('locf.floorH'), fh, t('locf.floorHint'))), h('div', { class: 'row' }, btn, tools.find), tools.preview);
     const val = (el) => (el.value.trim() === '' ? null : Number(el.value.replace(',', '.')));
     f.addEventListener('submit', async (e) => {
       e.preventDefault(); S.showErrors(f, null);

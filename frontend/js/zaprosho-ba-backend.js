@@ -544,6 +544,8 @@
     saveOwnerBrand(b) { return withFields(request('PUT', '/owner/brand', { body: b })); },
     uploadLogo(file) { const f = new FormData(); f.append('file', file); return request('POST', '/owner/brand/logo', { form: f, file }); },
     deleteLogo() { return request('DELETE', '/owner/brand/logo'); },
+    // The point of the complex on the map (latitude and longitude together; empty — remove).
+    saveOwnerLocation(body) { return request('PUT', '/owner/brand/location', { body }); },
     createApartment(b) { return withFields(request('POST', '/apartments', { body: Object.assign({}, b, { pricePerM2: pick(b, ['pricePerM2', 'pricePerSqm'], 0) }) })).then((a) => M.apt(a)); },
     updateApartment(id, b) { return withFields(request('PUT', '/apartments/' + id, { body: Object.assign({}, b, { pricePerM2: pick(b, ['pricePerM2', 'pricePerSqm'], 0) }) })).then((a) => M.apt(a)); },
     onRequest(id, on) { return request('PATCH', '/apartments/' + id + '/on-request', { body: { onRequest: on } }); },

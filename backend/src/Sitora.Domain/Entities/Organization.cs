@@ -23,6 +23,9 @@ public class Organization : BaseEntity
     public string? Phone { get; set; }
     public string? Telegram { get; set; }
     public string? Address { get; set; }
+    // Точка ЖК на карте (общая для блоков): задаёт владелец в CRM; нет — сайт берёт центр блоков с координатами.
+    public decimal? Latitude { get; set; }
+    public decimal? Longitude { get; set; }
     // Почта для связи на сайте застройщика (не для входа).
     public string? Email { get; set; }
 

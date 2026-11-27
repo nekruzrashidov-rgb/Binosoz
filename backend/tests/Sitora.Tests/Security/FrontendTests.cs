@@ -31,6 +31,8 @@ public class FrontendTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFa
         var policy = response.Headers.GetValues("Content-Security-Policy").Single();
         Assert.Contains("script-src 'self' https://cdnjs.cloudflare.com;", policy);
         Assert.Contains("connect-src 'self' https://fonts.googleapis.com;", policy);
+        // Карта Google: открыт только iframe www.google.com (тот же список в frontend/vercel.json).
+        Assert.Contains("frame-src https://www.google.com;", policy);
     }
 
     [Fact]

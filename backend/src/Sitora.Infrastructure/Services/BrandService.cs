@@ -19,6 +19,14 @@ public class BrandOptions
     public string[] BaseDomains { get; set; } = ["sitora.tj", "localhost"];
 }
 
+// Карта Google на сайте (раздел Maps; переменная Maps__EmbedKey). Без ключа сайт даёт только ссылки на Google Карты.
+public class MapsOptions
+{
+    public const string SectionName = "Maps";
+
+    public string? EmbedKey { get; set; }
+}
+
 // Бренд застройщика (white-label): публичная вывеска для сайта, правка владельцем, домен — создателем платформы.
 public class BrandService(
     AppDbContext db,
@@ -27,7 +35,8 @@ public class BrandService(
     IAuditService audit,
     CatalogCache catalogCache,
     TimeProvider timeProvider,
-    IOptions<BrandOptions> options) : IBrandService
+    IOptions<BrandOptions> options,
+    IOptions<MapsOptions> maps) : IBrandService
 {
     public const string PlatformName = "Sitora";
     private const long MaxLogoSize = 2 * 1024 * 1024;
@@ -47,9 +56,17 @@ public class BrandService(
             .ToListAsync(ct);
         buildings = await CatalogService.WithExpiredReleasedAsync(db, timeProvider, buildings, ct);
 
+        // Точка ЖК: своя у организации, иначе центр опубликованных домов, у которых координаты есть.
+        var located = buildings.Where(b => b.Latitude is not null && b.Longitude is not null).ToList();
+        decimal? lat = organization.Latitude, lon = organization.Longitude;
+        if ((lat is null || lon is null) && located.Count > 0)
+            (lat, lon) = (Math.Round(located.Average(b => b.Latitude!.Value), 6), Math.Round(located.Average(b => b.Longitude!.Value), 6));
+        else if (lat is null || lon is null)
+            (lat, lon) = (null, null);
+        var key = string.IsNullOrWhiteSpace(maps.Value.EmbedKey) ? null : maps.Value.EmbedKey.Trim();
         return new PublicBrandResponse(organization.Id, organization.Name, organization.Slug, organization.LogoUrl,
             organization.PrimaryColor, organization.Phone, organization.Telegram, organization.Address, buildings, organization.Email,
-            organization.SitePlan is { Boundary.Count: >= 3 } plan ? plan : null);
+            organization.SitePlan is { Boundary.Count: >= 3 } plan ? plan : null, lat, lon, key);
     }
 
     // Свой домен проверяется первым; иначе нужен ровно один уровень под доменом платформы: slug.sitora.tj.
@@ -118,6 +135,18 @@ public class BrandService(
             : EmailAddress.Normalize(request.Email) ?? throw new BusinessRuleException("Неверный адрес почты для связи");
 
         audit.Record(nameof(Organization), organization.Id, "BrandUpdated", before, ToResponse(organization), organization.Id);
+        await SaveAsync(ct);
+        return ToResponse(organization);
+    }
+
+    // Точка ЖК на карте: широта и долгота парой (проверяет валидатор), пусто — убрать; AuditLog LocationUpdated.
+    public async Task<BrandResponse> SetLocationAsync(SaveOrganizationLocationRequest request, CancellationToken ct = default)
+    {
+        var organization = await OwnAsync(ct);
+        var before = new { organization.Latitude, organization.Longitude };
+        organization.Latitude = request.Latitude is null ? null : Math.Round(request.Latitude.Value, 6);
+        organization.Longitude = request.Longitude is null ? null : Math.Round(request.Longitude.Value, 6);
+        audit.Record(nameof(Organization), organization.Id, "LocationUpdated", before, new { organization.Latitude, organization.Longitude }, organization.Id);
         await SaveAsync(ct);
         return ToResponse(organization);
     }
@@ -249,5 +278,5 @@ public class BrandService(
     }
 
     private static BrandResponse ToResponse(Organization o) =>
-        new(o.Id, o.Name, o.Slug, o.LogoUrl, o.PrimaryColor, o.Phone, o.Telegram, o.Address, o.CustomDomain, o.Email);
+        new(o.Id, o.Name, o.Slug, o.LogoUrl, o.PrimaryColor, o.Phone, o.Telegram, o.Address, o.CustomDomain, o.Email, o.Latitude, o.Longitude);
 }

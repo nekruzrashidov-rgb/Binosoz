@@ -152,6 +152,20 @@ public class SaveBuildingLocationRequestValidator : AbstractValidator<SaveBuildi
     }
 }
 
+// Точка ЖК: те же правила, что у дома.
+public class SaveOrganizationLocationRequestValidator : AbstractValidator<Sitora.Domain.DTOs.Brand.SaveOrganizationLocationRequest>
+{
+    public SaveOrganizationLocationRequestValidator()
+    {
+        RuleFor(x => x).Must(x => (x.Latitude is null) == (x.Longitude is null))
+            .WithName("latitude").WithMessage("Укажите широту и долготу вместе");
+        RuleFor(x => x.Latitude).InclusiveBetween(-90m, 90m).When(x => x.Latitude is not null)
+            .WithMessage("Широта — от -90 до 90");
+        RuleFor(x => x.Longitude).InclusiveBetween(-180m, 180m).When(x => x.Longitude is not null)
+            .WithMessage("Долгота — от -180 до 180");
+    }
+}
+
 public class SaveBuildingEcoRequestValidator : AbstractValidator<SaveBuildingEcoRequest>
 {
     public SaveBuildingEcoRequestValidator()

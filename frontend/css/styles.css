@@ -3328,6 +3328,26 @@ button.userchip:hover, button.userchip[aria-expanded='true'] { border-color: var
 .nr-block-floor { display: block; width: 100%; max-width: 360px; height: auto; aspect-ratio: 360 / 220; cursor: pointer; }
 .nr-hero-blocks { margin: 6px 0 0; font-family: var(--display); font-size: clamp(20px, 2.4vw, 28px); font-weight: 500; color: var(--ink); }
 .nr-hero-blocks[hidden] { display: none; }
+/* The Google map (karta-google-script.js): a dark card until the click, then the iframe. */
+.nr-map-sec:has(.nr-map[hidden]) { display: none; }
+.nr-map { margin-top: 18px; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; }
+.nr-map[hidden] { display: none; }
+.nr-map-card { display: grid; align-content: center; gap: 14px; padding: clamp(24px, 4vw, 48px); min-height: 260px; }
+.nr-map--large .nr-map-card, .nr-map--large .nr-map-media { aspect-ratio: 16 / 9; max-height: 520px; }
+.nr-map--band .nr-map-card, .nr-map--band .nr-map-media { height: 360px; }
+.nr-map-addr { margin: 0; font-family: var(--display); font-size: clamp(24px, 3vw, 36px); font-weight: 500; line-height: 1.15; }
+.nr-map-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+.nr-map-links { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.nr-map-links .nr-link { display: inline-flex; align-items: center; min-height: 44px; }
+.nr-map-note { margin: 0; color: var(--muted); font-size: 13px; }
+.nr-map-media { width: 100%; }
+.nr-map-frame { display: block; width: 100%; height: 100%; border: 0; border-radius: 2px; }
+.nr-map-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 10px 16px; border-top: 1px solid var(--line); }
+.nr-map-addr-sm { font-weight: 700; }
+.foot-map[hidden] { display: none; }
+.map-preview { display: grid; gap: 8px; }
+.map-preview .nr-map-frame { height: 260px; border: 1px solid var(--field-line); }
+@media (max-width: 700px) { .nr-map--large .nr-map-card, .nr-map--large .nr-map-media { aspect-ratio: auto; height: 360px; } .nr-map-show { width: 100%; } }
 .nr-concept-note { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
 .nr-blocks button[aria-pressed="true"] { font-weight: 800; }
 .nr-panel-lifts { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
