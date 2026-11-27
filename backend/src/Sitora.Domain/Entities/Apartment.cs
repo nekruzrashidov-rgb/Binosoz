@@ -24,6 +24,10 @@ public class Apartment : BaseEntity
 
     public ApartmentKind Kind { get; set; } = ApartmentKind.Residential;
 
+    // Планировка квартиры (Layout.Code застройщика или угловая/эркерная типовая сайта: corner-l, corner-round, bay-2, ph-4);
+    // не задана — типовая по числу комнат.
+    public string? LayoutCode { get; set; }
+
     // Своя терраса пентхауса на крыше уступа, м² — отдельно от площади, в цену м² не входит.
     public decimal? TerraceArea { get; set; }
     public decimal Area { get; private set; }

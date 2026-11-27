@@ -1,10 +1,13 @@
 /* The apartment inside, for the 3D model (modeli-3d-bino-script.js → enterInside): walls with their thickness, door and
    window openings, wooden floors, tiles in the bathroom, the balcony with its railing and an example of furniture made of
    simple boxes and cylinders (no outside models). The geometry comes from S.plans (planirovki-data.js) — the same layout
-   the 2D plan is drawn from. Loaded by the page only when someone opens «Посмотреть внутри». */
+   the 2D plan is drawn from: rooms are polygons, walls are segments of any direction with their thickness (outer, between
+   apartments, between rooms). Loaded by the page only when someone opens «Посмотреть внутри». */
 (function () {
   const S = (window.S = window.S || {});
-  const WALL_H = 2.7, SILL = 0.9, HEAD = 2.2, OUTER = 0.25, INNER = 0.12, E = 1e-4;
+  const WALL_H = 2.7, SILL = 0.9, HEAD = 2.2, E = 1e-4;
+  // Wall thickness by kind (S.plans.THICK: outer 0.4, party 0.2, inner 0.12), a little thinner in the model for the walk.
+  const TH = (kind) => (S.plans.THICK[kind] || 0.12) * (kind === 'outer' ? 0.7 : 1);
 
   function canvasTex(T, w, h, draw) {
     const c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -70,77 +73,84 @@
       (parent || inner).add(b); return b;
     };
 
+    // A polygon of the plan as a horizontal surface at height y (plan y → world z).
+    const flat = (poly, y) => { const g = new T.ShapeGeometry(new T.Shape(poly.map((p) => new T.Vector2(p.x, -p.y)))); g.rotateX(-Math.PI / 2); g.translate(0, y, 0); return g; };
     // Floor slab and the floors of the rooms (click targets: userData.room).
-    box(lay.w + 0.5, 0.24, lay.d + 0.5, M.slab, lay.w / 2, -0.13, lay.d / 2, inner, false).receiveShadow = true;
+    { const slab = new T.Mesh(flat(lay.outline, -0.02), M.slab); slab.receiveShadow = true; inner.add(slab); }
     const floors = [];
-    const floorOf = (r, tex, k) => {
-      const t = tex.clone(); t.needsUpdate = true; t.repeat.set(r.w / 1.4, r.h / 1.4); textures.push(t);
-      const m = new T.Mesh(new T.PlaneGeometry(r.w, r.h), new T.MeshStandardMaterial({ map: t, roughness: tex === wood ? 0.55 : 0.3 }));
-      m.rotation.x = -Math.PI / 2; m.position.set(r.x + r.w / 2, 0.01, r.y + r.h / 2); m.receiveShadow = true; m.userData.room = k;
+    const floorOf = (poly, tex, k) => {
+      const bb = poly.reduce((a, p) => ({ x0: Math.min(a.x0, p.x), y0: Math.min(a.y0, p.y), x1: Math.max(a.x1, p.x), y1: Math.max(a.y1, p.y) }), { x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9 });
+      const t = tex.clone(); t.needsUpdate = true; t.repeat.set(1 / 1.4, 1 / 1.4); textures.push(t);
+      const m = new T.Mesh(flat(poly, 0.01), new T.MeshStandardMaterial({ map: t, roughness: tex === wood ? 0.55 : 0.3 }));
+      m.receiveShadow = true; m.userData.room = k; void bb;
       inner.add(m); floors.push(m);
     };
-    lay.rooms.forEach((r) => floorOf(r, r.wet ? tiles : wood, r.part ? lay.rooms.findIndex((x) => x.key === r.key && !x.part) : r.i));
+    lay.rooms.forEach((r) => floorOf(r.poly, r.wet ? tiles : wood, r.i));
     const b = lay.balcony;
-    floorOf({ x: b.x, y: b.y, w: b.w, h: b.h }, balconyTiles, lay.rooms.length);
-    box(b.w + 0.2, 0.2, b.h + 0.1, M.slab, b.x + b.w / 2, -0.11, b.y + b.h / 2 - 0.05, inner, false);
+    if (b) { floorOf(b.poly, balconyTiles, lay.rooms.length); const bs = new T.Mesh(flat(b.poly, -0.03), M.slab); inner.add(bs); }
 
-    // Walls. On the facade (y = 0) the windows leave a sill and a lintel; the balcony door — only a lintel.
+    // Walls: segments of any direction (S.plans.walls) with the thickness of their kind; a wall on the facade is split by
+    // its windows — a sill and a lintel (the balcony door — only a lintel), glass and a frame in the opening.
     const segs = S.plans.walls(lay);
     const collision = [];
-    const facadeOpen = lay.windows.map((w) => [w.from, w.to, w.door]);
-    function wallPiece(x1, y1, x2, y2, outer, y0, y1h) {
+    function wallPiece(x1, y1, x2, y2, kind, y0, y1h) {
       const L = Math.hypot(x2 - x1, y2 - y1); if (L < 0.02) return;
-      const th = outer ? OUTER : INNER;
-      const horiz = Math.abs(y1 - y2) < E;
-      box(horiz ? L + th : th, y1h - y0, horiz ? th : L + th, outer ? M.outer : M.wall, (x1 + x2) / 2, (y0 + y1h) / 2, (y1 + y2) / 2);
+      const th = TH(kind);
+      const m = new T.Mesh(new T.BoxGeometry(L + th, y1h - y0, th), kind === 'outer' ? M.outer : M.wall);
+      m.position.set((x1 + x2) / 2, (y0 + y1h) / 2, (y1 + y2) / 2); m.rotation.y = -Math.atan2(y2 - y1, x2 - x1);
+      m.castShadow = true; m.receiveShadow = true; inner.add(m);
     }
-    segs.forEach(([x1, y1, x2, y2, outer]) => {
-      const facade = Math.abs(y1) < E && Math.abs(y2) < E;
-      if (!facade) { wallPiece(x1, y1, x2, y2, outer, 0, WALL_H); collision.push([x1, y1, x2, y2]); return; }
-      // Split the facade segment by the openings.
-      const a = Math.min(x1, x2), c = Math.max(x1, x2);
-      let cur = a;
-      facadeOpen.filter(([f, t]) => t > a + E && f < c - E).sort((p, q) => p[0] - q[0]).forEach(([f, t, door]) => {
-        const f2 = Math.max(a, f), t2 = Math.min(c, t);
-        if (f2 > cur + E) { wallPiece(cur, 0, f2, 0, true, 0, WALL_H); collision.push([cur, 0, f2, 0]); }
-        if (!door) { wallPiece(f2, 0, t2, 0, true, 0, SILL); collision.push([f2, 0, t2, 0]); }
-        wallPiece(f2, 0, t2, 0, true, HEAD, WALL_H);
-        // Glass and its frame.
-        const gw = t2 - f2, gy0 = door ? 0.02 : SILL, gh = HEAD - gy0;
-        const g = new T.Mesh(new T.BoxGeometry(gw, gh, 0.03), M.glass); g.position.set(f2 + gw / 2, gy0 + gh / 2, 0); g.renderOrder = 2; inner.add(g);
-        box(gw, 0.06, 0.12, M.frame, f2 + gw / 2, gy0 + 0.03, 0); box(gw, 0.06, 0.12, M.frame, f2 + gw / 2, HEAD - 0.03, 0);
-        box(0.06, gh, 0.12, M.frame, f2 + gw / 2, gy0 + gh / 2, 0, inner, false);
-        if (door) collision.push(null); // the balcony door: passable
-        cur = t2;
+    const along = (x1, y1, x2, y2, p) => { const L = Math.hypot(x2 - x1, y2 - y1); return ((p.x - x1) * (x2 - x1) + (p.y - y1) * (y2 - y1)) / L; };
+    const off = (x1, y1, x2, y2, p) => { const L = Math.hypot(x2 - x1, y2 - y1); return Math.abs((p.x - x1) * (y2 - y1) - (p.y - y1) * (x2 - x1)) / L; };
+    segs.forEach(([x1, y1, x2, y2, , kind]) => {
+      const L = Math.hypot(x2 - x1, y2 - y1), ux = (x2 - x1) / L, uy = (y2 - y1) / L;
+      const P2 = (t) => [x1 + ux * t, y1 + uy * t];
+      // The windows on this wall: their span along it.
+      const opens = kind !== 'outer' ? [] : lay.windows.filter((w) => off(x1, y1, x2, y2, w.a) < 0.02 && off(x1, y1, x2, y2, w.b) < 0.02)
+        .map((w) => { const a = along(x1, y1, x2, y2, w.a), c = along(x1, y1, x2, y2, w.b); return [Math.max(0, Math.min(a, c)), Math.min(L, Math.max(a, c)), w.door]; })
+        .filter(([f, t]) => t - f > 0.1).sort((p, q) => p[0] - q[0]);
+      if (!opens.length) { wallPiece(x1, y1, x2, y2, kind, 0, WALL_H); collision.push([x1, y1, x2, y2]); return; }
+      let cur = 0;
+      opens.forEach(([f, t, door]) => {
+        if (f > cur + E) { const [a1, b1] = P2(cur), [a2, b2] = P2(f); wallPiece(a1, b1, a2, b2, kind, 0, WALL_H); collision.push([a1, b1, a2, b2]); }
+        const [p1, q1] = P2(f), [p2, q2] = P2(t);
+        if (!door) { wallPiece(p1, q1, p2, q2, kind, 0, SILL); collision.push([p1, q1, p2, q2]); }
+        wallPiece(p1, q1, p2, q2, kind, HEAD, WALL_H);
+        const gw = t - f, gy0 = door ? 0.02 : SILL, gh = HEAD - gy0, ry = -Math.atan2(uy, ux), mx = (p1 + p2) / 2, mz = (q1 + q2) / 2;
+        const gl = new T.Mesh(new T.BoxGeometry(gw, gh, 0.03), M.glass); gl.position.set(mx, gy0 + gh / 2, mz); gl.rotation.y = ry; gl.renderOrder = 2; inner.add(gl);
+        [[gy0 + 0.03], [HEAD - 0.03]].forEach(([y]) => { const fr = new T.Mesh(new T.BoxGeometry(gw, 0.06, 0.12), M.frame); fr.position.set(mx, y, mz); fr.rotation.y = ry; inner.add(fr); });
+        cur = t;
       });
-      if (c > cur + E) { wallPiece(cur, 0, c, 0, true, 0, WALL_H); collision.push([cur, 0, c, 0]); }
+      if (L > cur + E) { const [a1, b1] = P2(cur); wallPiece(a1, b1, x2, y2, kind, 0, WALL_H); collision.push([a1, b1, x2, y2]); }
     });
     // Lintels over the doors (an open passage has none).
     lay.doors.forEach((d) => {
       if (d.open) return;
-      const outer = !!d.entrance;
-      const th = outer ? OUTER : INNER;
-      if (d.axis === 'x') box(d.to - d.from, WALL_H - 2.1, th, outer ? M.outer : M.wall, (d.from + d.to) / 2, (2.1 + WALL_H) / 2, d.at);
-      else box(th, WALL_H - 2.1, d.to - d.from, M.wall, d.at, (2.1 + WALL_H) / 2, (d.from + d.to) / 2);
+      const L = Math.hypot(d.b.x - d.a.x, d.b.y - d.a.y);
+      const m = new T.Mesh(new T.BoxGeometry(L, WALL_H - 2.1, TH(d.entrance ? 'party' : 'inner')), d.entrance ? M.outer : M.wall);
+      m.position.set((d.a.x + d.b.x) / 2, (2.1 + WALL_H) / 2, (d.a.y + d.b.y) / 2); m.rotation.y = -Math.atan2(d.b.y - d.a.y, d.b.x - d.a.x); inner.add(m);
     });
-    // The entrance door leaf, open to the hall.
+    // The entrance door leaf, open into the hall.
     const ent = lay.doors.find((d) => d.entrance);
     if (ent) {
       const leaf = box(0.9, 2.05, 0.05, M.wood, 0, 1.03, 0);
       leaf.geometry.translate(0.45, 0, 0);
-      leaf.position.set(ent.from, 1.03, ent.at - 0.05); leaf.rotation.y = -Math.PI * 0.42;
+      leaf.position.set(ent.a.x, 1.03, ent.a.y); leaf.rotation.y = -Math.atan2(ent.b.y - ent.a.y, ent.b.x - ent.a.x) - Math.PI * 0.42;
     }
-    // Balcony railing: glass on three sides with a handrail; it is a wall for the walk.
-    [[b.x, b.y, b.x + b.w, b.y], [b.x, b.y, b.x, 0], [b.x + b.w, b.y, b.x + b.w, 0]].forEach(([x1, y1, x2, y2]) => {
-      const horiz = Math.abs(y1 - y2) < E, L = Math.hypot(x2 - x1, y2 - y1);
-      const r = new T.Mesh(new T.BoxGeometry(horiz ? L : 0.04, 1.0, horiz ? 0.04 : L), M.rail); r.position.set((x1 + x2) / 2, 0.55, (y1 + y2) / 2); r.renderOrder = 2; inner.add(r);
-      box(horiz ? L + 0.06 : 0.06, 0.05, horiz ? 0.06 : L + 0.06, M.frame, (x1 + x2) / 2, 1.07, (y1 + y2) / 2);
-      collision.push([x1, y1, x2, y2]);
-    });
+    // Balcony, loggia or terrace railing: glass on its free edges (not on the facade) with a handrail; a wall for the walk.
+    if (b) {
+      const onOutline = (p, q) => lay.outline.some((u, i) => { const v = lay.outline[(i + 1) % lay.outline.length]; return off(u.x, u.y, v.x, v.y, p) < 0.02 && off(u.x, u.y, v.x, v.y, q) < 0.02; });
+      b.poly.forEach((p, i) => {
+        const q = b.poly[(i + 1) % b.poly.length]; if (onOutline(p, q)) return;
+        const L = Math.hypot(q.x - p.x, q.y - p.y), ry = -Math.atan2(q.y - p.y, q.x - p.x);
+        const r = new T.Mesh(new T.BoxGeometry(L, 1.0, 0.04), M.rail); r.position.set((p.x + q.x) / 2, 0.55, (p.y + q.y) / 2); r.rotation.y = ry; r.renderOrder = 2; inner.add(r);
+        const hr = new T.Mesh(new T.BoxGeometry(L + 0.06, 0.05, 0.06), M.frame); hr.position.set((p.x + q.x) / 2, 1.07, (p.y + q.y) / 2); hr.rotation.y = ry; inner.add(hr);
+        collision.push([p.x, p.y, q.x, q.y]);
+      });
+    }
 
     // Ceiling — only for the walk (seen from above the apartment is cut open).
-    const ceiling = new T.Mesh(new T.PlaneGeometry(lay.w + 0.4, lay.d + 0.4), M.ceiling);
-    ceiling.rotation.x = Math.PI / 2; ceiling.position.set(lay.w / 2, WALL_H, lay.d / 2); ceiling.visible = false; inner.add(ceiling);
+    const ceiling = new T.Mesh(flat(lay.outline, WALL_H), M.ceiling); ceiling.visible = false; inner.add(ceiling);
 
     // ---------- furniture: an example arrangement ----------
     const furn = new T.Group(); inner.add(furn);
@@ -163,8 +173,10 @@
     };
     // Openings of every wall of a room, in its own coordinates.
     function roomWalls(r, rIndex) {
+      // r — the room's inner rectangle { x, y, w, h }; only the axis-aligned doors and windows block its walls.
       const W = { front: { len: r.w, blocked: [] }, back: { len: r.w, blocked: [] }, left: { len: r.h, blocked: [] }, right: { len: r.h, blocked: [] } };
       lay.doors.forEach((d) => {
+        if (!d.axis) return;
         if (d.axis === 'x') {
           if (d.to <= r.x || d.from >= r.x + r.w) return;
           if (Math.abs(d.at - r.y) < E) W.front.blocked.push([d.from - r.x, d.to - r.x]);
@@ -175,7 +187,16 @@
           if (Math.abs(d.at - (r.x + r.w)) < E) W.right.blocked.push([d.from - r.y, d.to - r.y]);
         }
       });
-      if (r.y < E) lay.windows.forEach((w) => { if (w.room === rIndex || (w.to > r.x && w.from < r.x + r.w)) W.front.blocked.push([w.from - r.x, w.to - r.x]); });
+      lay.windows.forEach((w) => {
+        if (w.axis === 'x' && w.to > r.x && w.from < r.x + r.w) {
+          if (Math.abs(w.at - r.y) < 0.3) W.front.blocked.push([w.from - r.x, w.to - r.x]);
+          if (Math.abs(w.at - (r.y + r.h)) < 0.3) W.back.blocked.push([w.from - r.x, w.to - r.x]);
+        } else if (w.axis === 'y' && w.to > r.y && w.from < r.y + r.h) {
+          if (Math.abs(w.at - r.x) < 0.3) W.left.blocked.push([w.from - r.y, w.to - r.y]);
+          if (Math.abs(w.at - (r.x + r.w)) < 0.3) W.right.blocked.push([w.from - r.y, w.to - r.y]);
+        }
+      });
+      void rIndex;
       return W;
     }
     // Put an item along the first wall with room for it.
@@ -198,8 +219,9 @@
       return null;
     }
     const centre = (r, item, arg, dx, dz) => { const g = ITEMS[item](arg); g.position.set(r.x + r.w / 2 + (dx || 0), 0, r.y + r.h / 2 + (dz || 0)); furn.add(g); return g; };
-    lay.rooms.forEach((r) => {
-      if (r.part) return;
+    lay.rooms.forEach((room) => {
+      // The furniture stands in the largest rectangle inside the room (a polygon room keeps its corners free).
+      const r = Object.assign({ key: room.key, i: room.i }, S.plans.innerRect ? S.plans.innerRect(room.poly) : room);
       const W = roomWalls(r, r.i);
       const fitLen = (max, wall) => Math.min(max, Math.max(r.w, r.h) - 0.6);
       if (r.key === 'living') {
@@ -223,11 +245,11 @@
         place(r, W, 'shoe', Math.min(1.4, fitLen(1.4)), 0.4, ['left', 'right', 'back', 'front']);
       }
     });
-    { const g = ITEMS.chairs(); g.position.set(b.x + b.w / 2, 0, b.y + b.h / 2); furn.add(g); }
+    if (b && b.kind !== 'terrace') { const g = ITEMS.chairs(); g.position.set(b.x + b.w / 2, 0, b.y + b.h / 2); furn.add(g); }
 
     // Labels: one per room (parts of one space together) and the balcony, with the area of the scaled layout.
-    const rooms = lay.rooms.filter((r) => !r.part).map((r) => ({ i: r.i, key: r.key, area: r.area, cx: r.x + r.w / 2, cy: r.y + r.h / 2 }));
-    rooms.push({ i: lay.rooms.length, key: 'balcony', area: b.area, cx: b.x + b.w / 2, cy: b.y + b.h / 2 });
+    const rooms = lay.rooms.map((r) => ({ i: r.i, key: r.key, area: r.area, cx: r.label.x, cy: r.label.y }));
+    if (b) rooms.push({ i: lay.rooms.length, key: b.kind === 'terrace' ? 'terrace' : b.kind === 'loggia' ? 'loggia' : 'balcony', area: b.area, cx: b.x + b.w / 2, cy: b.y + b.h / 2 });
     // A floor tells which label (index in «rooms») it belongs to.
     floors.forEach((f) => { f.userData.room = rooms.findIndex((r) => r.i === f.userData.room); });
     return {

@@ -298,7 +298,7 @@
       if (!sel) return;
       const a = sel;
       ctx.loadInterior().then(() => {
-        if (!S.plans || !house.enterInside(a.id, S.plans.layout(S.roomsKind.group(a.rooms), a.area), { furniture: furnBtn.getAttribute('aria-pressed') === 'true' })) S.toast(t('h3d.insideFail'), 'err');
+        if (!S.plans || !house.enterInside(a.id, S.plans.layout(S.roomsKind.group(a.rooms), a.area, a.layoutCode), { furniture: furnBtn.getAttribute('aria-pressed') === 'true' })) S.toast(t('h3d.insideFail'), 'err');
       }).catch(() => S.toast(t('h3d.insideFail'), 'err'));
     }
     house.on('mode', (m) => {

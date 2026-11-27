@@ -274,7 +274,8 @@
           const units = (await S.api.allApartments(floors)).map((a) => Object.assign(a, { block: b.blockCode || null, blockName: b.blockCode ? full.name : null }));
           return { b: full, floors, units };
         }));
-        const [rate, brand] = await Promise.all([S.api.rate().catch(() => null), blocks.length ? S.api.publicBrand().catch(() => null) : null]);
+        const [rate, brand, real] = await Promise.all([S.api.rate().catch(() => null), blocks.length ? S.api.publicBrand().catch(() => null) : null, S.api.publicLayouts().catch(() => [])]);
+        if (S.plans && S.plans.setReal) S.plans.setReal((real || []).map((x) => ({ code: x.code, layout: x.layout })));
         if (!alive) return;
         st.blocks = loaded.map((x) => x.b);
         st.building = st.blocks[0];
@@ -494,6 +495,17 @@
       const match = (a) => S.roomsKind.match(a, st.floorRooms);
       const units = onFloor.filter(match);
       const homes = onFloor.every(S.isHome);
+      const blk = (st.blocks || []).find((b) => b.blockCode === st.blockSel);
+      let floorPlan = null;
+      if (blk && blk.footprint && f > 0 && onFloor.length) {
+        const cv = h('canvas', { class: 'nr-block-floor', width: 360, height: 220, role: 'img', 'aria-label': t('plans.blockFloor', { b: blk.name, n: f }) });
+        floorPlan = h('div', { class: 'nr-block-floor-box' }, cv, h('p', { class: 'nr-plan-note' }, t('plans.blockFloorNote')));
+        const byslot = onFloor.slice().sort((x, y) => (x.planSlot || 0) - (y.planSlot || 0));
+        requestAnimationFrame(() => {
+          const hit = drawBlockFloor(cv, blk, f, byslot, st.sel && st.sel.id);
+          if (hit) cv.addEventListener('click', (e) => { const r = cv.getBoundingClientRect(); const a = hit((e.clientX - r.left) * (360 / r.width), (e.clientY - r.top) * (220 / r.height)); if (a) pickApt(a); });
+        });
+      }
       const pills = !homes ? null : h('div', { class: 'nr-pills', role: 'group', 'aria-label': t('filter.rooms') }, roomOptions(onFloor).map(([v, l]) =>
         h('button', { type: 'button', class: 'nr-pill', 'aria-pressed': String(st.floorRooms === v), onclick: () => { st.floorRooms = v; renderPanel(); } }, l)));
       const list = h('div', { class: 'nr-units' }, units.map((a) => h('button', { type: 'button', class: 'nr-unit st-' + a.status, 'aria-pressed': String(!!st.sel && st.sel.id === a.id), onclick: () => pickApt(a) },
@@ -506,17 +518,18 @@
           h('div', null, h('div', { class: 'nr-kicker' }, (st.blockSel ? blockName(st.blockSel) + ' · ' : '') + (fl.parking ? t('floor.parking') : fl.commercial ? t('floor.commercial') : t('nr.cat.selFloor'))), h('h2', { class: 'nr-panel-floor' }, S.floorName(fl))),
           h('div', { class: 'nr-panel-free' }, t('nr.cat.freeOf', { n: S.fmt.n(free), m: S.fmt.n(onFloor.length) }),
             st.building.elevators ? h('small', { class: 'nr-panel-lifts' }, t('nr.cat.lifts', { n: st.building.elevators })) : null)),
-        pills, units.length ? list : h('p', { class: 'nr-panel-hint' }, t('nr.cat.noUnits')),
+        floorPlan, pills, units.length ? list : h('p', { class: 'nr-panel-hint' }, t('nr.cat.noUnits')),
         st.sel && st.sel.floor === f ? detail(st.sel) : h('p', { class: 'nr-panel-hint' }, t('nr.cat.pickHint')));
     }
     // The chosen apartment: its plan, the facts, the price, «от … в месяц» by the developer's terms, booking.
     function detail(a) {
       const plan = S.isHome(a) ? h('canvas', { class: 'nr-detail-plan', width: 300, height: 200, role: 'img', 'aria-label': S.roomsKind.label(a.rooms) }) : null;
-      if (plan) drawFloorPlan(plan, S.roomsKind.group(a.rooms));
+      const lay = plan ? drawFloorPlan(plan, S.roomsKind.group(a.rooms), a.area, a.layoutCode, { areas: true }) : null;
+      const planNote = lay ? h('p', { class: 'nr-plan-note' }, (lay.exact ? '' : t('plans.inexact') + ' · ') + (lay.real ? t('plans.real') : t('viz.concept'))) : null;
       const eq = S.priceEq(a.price, a.currency, st.rate);
       const m = cheapestMonthly(a.price);
       const badge = S.eco && S.eco.badge(st.building.eco);
-      return h('div', { class: 'nr-detail' + (plan ? '' : ' nr-detail--unit') }, plan ? h('div', { class: 'nr-detail-pic' }, plan) : null,
+      return h('div', { class: 'nr-detail' + (plan ? '' : ' nr-detail--unit') }, plan ? h('div', { class: 'nr-detail-pic' }, plan, planNote) : null,
         h('div', { class: 'nr-detail-body' },
           h('div', { class: 'nr-detail-kicker' }, S.unitName(a) + ' · ' + S.floorName({ number: a.floor, parking: a.floor < 0 })),
           h('h3', { class: 'nr-detail-type' }, S.unitType(a), a.kind === 'penthouse' ? h('span', { class: 'chip warn nr-badge-ph' }, t('kind.penthouseOne')) : null),
@@ -1266,52 +1279,111 @@
   // The price of a square metre the buyer actually pays: price / area, rounded to a somoni (A-27). The stored price per m²
   // can differ from it when the total price was rounded; without an area or a price — the stored one.
   const sqmPrice = (a) => (a.area > 0 && a.price > 0 ? Math.round(a.price / a.area) : a.pricePerSqm);
-  // An architect's plan as in the design: walls in the ink colour on the paper of the card, windows and the balcony in copper,
-  // doors as gaps with a thin swing, room names in the middle. The rooms, doors and windows come from S.plans
-  // (planirovki-data.js) — the same layout the 3D model builds inside; with the area the plan is scaled to it.
+  // An architect's plan as in the design: walls in the ink colour on the paper of the card (outer thicker than the ones
+  // between rooms), windows and the balcony in copper, doors as gaps with a thin swing, room names (and m²) in the middle.
+  // The rooms are polygons from S.plans (planirovki-data.js) — the same layout the 3D model builds inside; a concept layout is
+  // scaled to the area; a real one with rooms off the API's area by more than 3 % shows no m² («уточняйте у менеджера»).
   // Colours come from the page tokens, so the plan follows the light and the dark theme; sharp on high-density screens.
-  function drawFloorPlan(canvas, type, area) {
-    const W = +canvas.getAttribute('width'), H = +canvas.getAttribute('height'), dpr = Math.min(window.devicePixelRatio || 1, 2);
+  function drawFloorPlan(canvas, type, area, code, o) {
+    o = o || {};
+    // The size in CSS px is kept in data-w/h: canvas.width grows with the pixel ratio, a redraw must not grow it again.
+    if (!canvas.dataset.w) { canvas.dataset.w = canvas.getAttribute('width'); canvas.dataset.h = canvas.getAttribute('height'); }
+    const W = +canvas.dataset.w, H = +canvas.dataset.h, dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = W * dpr; canvas.height = H * dpr;
-    const g = canvas.getContext('2d'); if (!g || !S.plans) return;
+    const g = canvas.getContext('2d'); if (!g || !S.plans) return null;
     g.scale(dpr, dpr);
     const css = getComputedStyle(canvas.isConnected ? canvas : document.documentElement);
     const tok = (n, f) => (css.getPropertyValue(n) || '').trim() || f;
-    const paper = tok('--surface', '#fbf8f2'), room = tok('--bg', '#f4efe7'), ink = tok('--ink', '#1b1815'), copper = tok('--accent-text', '#8a4e2a');
+    const paper = tok('--surface', '#fbf8f2'), room = tok('--bg', '#f4efe7'), ink = tok('--ink', '#1b1815'), copper = tok('--accent-text', '#8a4e2a'), muted = tok('--muted', '#6b6258');
     g.fillStyle = paper; g.fillRect(0, 0, W, H);
-    const lay = S.plans.layout(type, area);
-    const top = lay.balcony.y, spanY = lay.d - top, pad = 12;
-    const s = Math.min((W - pad * 2) / lay.w, (H - pad * 2) / spanY);
-    const ox = (W - lay.w * s) / 2, oy = (H - spanY * s) / 2 - top * s;
+    const lay = S.plans.layout(type, area, code);
+    const all = lay.outline.concat(lay.balcony ? lay.balcony.poly : []);
+    const xs = all.map((p) => p.x), ys = all.map((p) => p.y), x0 = Math.min(...xs), y0 = Math.min(...ys), spanX = Math.max(...xs) - x0, spanY = Math.max(...ys) - y0, pad = 12;
+    const s = Math.min((W - pad * 2) / spanX, (H - pad * 2) / spanY);
+    const ox = (W - spanX * s) / 2 - x0 * s, oy = (H - spanY * s) / 2 - y0 * s;
     const X = (x) => ox + x * s, Y = (y) => oy + y * s;
-    g.font = '600 10.5px Manrope, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    lay.rooms.forEach((r) => { g.fillStyle = room; g.fillRect(X(r.x), Y(r.y), r.w * s, r.h * s); });
-    // The balcony: a dashed copper outline, as in the design.
-    const b = lay.balcony;
-    g.setLineDash([5, 4]); g.strokeStyle = copper; g.lineWidth = 1.5; g.strokeRect(X(b.x) + 1, Y(b.y) + 1, b.w * s - 2, b.h * s - 1); g.setLineDash([]);
-    g.strokeStyle = ink; g.lineWidth = 2.5; g.lineCap = 'square';
-    S.plans.walls(lay).forEach(([x1, y1, x2, y2]) => { g.beginPath(); g.moveTo(X(x1), Y(y1)); g.lineTo(X(x2), Y(y2)); g.stroke(); });
+    const path = (poly) => { g.beginPath(); poly.forEach((p, i) => (i ? g.lineTo(X(p.x), Y(p.y)) : g.moveTo(X(p.x), Y(p.y)))); g.closePath(); };
+    lay.rooms.forEach((r) => { path(r.poly); g.fillStyle = room; g.fill(); });
+    // The balcony / loggia / terrace: a dashed copper outline.
+    if (lay.balcony) { path(lay.balcony.poly); g.setLineDash([5, 4]); g.strokeStyle = copper; g.lineWidth = 1.5; g.stroke(); g.setLineDash([]); }
+    // Walls with their thickness: outer 0.4 m, between apartments 0.2 m, between rooms 0.12 m (not thinner than a hairline).
+    g.strokeStyle = ink; g.lineCap = 'square';
+    S.plans.walls(lay).forEach(([x1, y1, x2, y2, , kind]) => {
+      g.lineWidth = Math.max(kind === 'inner' ? 1.2 : 2, S.plans.THICK[kind] * s);
+      g.beginPath(); g.moveTo(X(x1), Y(y1)); g.lineTo(X(x2), Y(y2)); g.stroke();
+    });
     // Door swings: a quarter circle from one side of the opening.
     g.lineWidth = 0.8; g.lineCap = 'butt';
     lay.doors.forEach((d) => {
       if (d.open) return;
-      const r = (d.to - d.from) * s;
-      g.beginPath();
-      if (d.axis === 'x') { g.moveTo(X(d.from), Y(d.at)); g.arc(X(d.from), Y(d.at), r, 0, d.entrance ? -Math.PI / 2 : Math.PI / 2, d.entrance); }
-      else { g.moveTo(X(d.at), Y(d.from)); g.arc(X(d.at), Y(d.from), r, Math.PI / 2, 0, true); }
-      g.stroke();
+      const r = Math.hypot(d.b.x - d.a.x, d.b.y - d.a.y) * s, a0 = Math.atan2(d.b.y - d.a.y, d.b.x - d.a.x);
+      g.beginPath(); g.moveTo(X(d.a.x), Y(d.a.y)); g.arc(X(d.a.x), Y(d.a.y), r, a0, a0 + (d.entrance ? -Math.PI / 2 : Math.PI / 2), !!d.entrance); g.stroke();
     });
     // Windows: thick copper strokes on the facade.
     g.strokeStyle = copper; g.lineWidth = 4;
-    lay.windows.forEach((w) => { g.beginPath(); g.moveTo(X(w.from), Y(0)); g.lineTo(X(w.to), Y(0)); g.stroke(); });
+    lay.windows.forEach((w) => { g.beginPath(); g.moveTo(X(w.a.x), Y(w.a.y)); g.lineTo(X(w.b.x), Y(w.b.y)); g.stroke(); });
     const fit = (label, ww) => (label.length * 6 > ww - 6 ? label.slice(0, Math.max(3, Math.floor((ww - 6) / 6) - 1)) + '.' : label);
+    g.font = '600 10.5px Manrope, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     lay.rooms.forEach((r) => {
-      if (r.part) return;
       const ww = r.w * s, hh = r.h * s;
-      g.fillStyle = ink;
-      if (ww > 30 && hh > 18) g.fillText(fit(t('plans.room.' + r.key), ww), X(r.x) + ww / 2, Y(r.y) + hh / 2);
+      if (ww < 30 || hh < 18) return;
+      g.fillStyle = ink; g.fillText(fit(t('plans.room.' + r.key), ww), X(r.label.x), Y(r.label.y) - (o.areas && lay.exact ? 6 : 0));
+      if (o.areas && lay.exact && hh > 30) { g.fillStyle = muted; g.fillText(S.fmt.n(Math.round(r.area * 10) / 10) + ' ' + t('u.m2'), X(r.label.x), Y(r.label.y) + 7); }
     });
-    if (b.w * s > 36 && b.h * s > 12) { g.fillStyle = copper; g.fillText(fit(t('plans.room.balcony'), b.w * s), X(b.x) + b.w * s / 2, Y(b.y) + b.h * s / 2); }
+    if (lay.balcony && lay.balcony.w * s > 36 && lay.balcony.h * s > 12) {
+      const b = lay.balcony; g.fillStyle = copper; g.fillText(fit(t('plans.room.' + (b.kind === 'terrace' ? 'terrace' : b.kind === 'loggia' ? 'loggia' : 'balcony')), b.w * s), X(b.x + b.w / 2), Y(b.y + b.h / 2));
+    }
+    canvas.dataset.vertices = String(Math.max(...lay.rooms.map((r) => r.poly.length)));
+    canvas.dataset.exact = String(lay.exact);
+    return lay;
+  }
+
+  // The floor of a block: the outline, the apartments (or shops) laid along the facade — each a polygon coloured by its
+  // status, the chosen one outlined —, the corridor and the lift core with its lifts. The same split as the 3D windows
+  // (S.geom.floor). Returns the hit test (x, y in CSS px → the unit) for clicks.
+  function drawBlockFloor(canvas, block, n, units, selId) {
+    if (!S.geom || !block || !block.footprint) return null;
+    // The size in CSS px is kept in data-w/h: canvas.width grows with the pixel ratio, a redraw must not grow it again.
+    if (!canvas.dataset.w) { canvas.dataset.w = canvas.getAttribute('width'); canvas.dataset.h = canvas.getAttribute('height'); }
+    const W = +canvas.dataset.w, H = +canvas.dataset.h, dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    const g = canvas.getContext('2d'); if (!g) return null;
+    g.scale(dpr, dpr);
+    const css = getComputedStyle(canvas.isConnected ? canvas : document.documentElement);
+    const tok = (k, f) => (css.getPropertyValue(k) || '').trim() || f;
+    const col = { free: tok('--good', '#2e7d5b'), booked: tok('--warn', '#b7791f'), sold: tok('--muted', '#6b6258'), onrequest: tok('--info', '#3b6ea8') };
+    g.fillStyle = tok('--surface', '#fbf8f2'); g.fillRect(0, 0, W, H);
+    const fp = S.geom.footprintOf(block, n);
+    let depth = 7; (block.setbacks || []).forEach((s) => { if (n >= s.fromFloor && s.planDepth) depth = s.planDepth; });
+    const plan = S.geom.floor(fp, units.map((u) => u.area || 1), { depth, lifts: block.elevators || 0 });
+    const outline = S.geom.expand(fp), b = S.geom.bounds(outline), pad = 10;
+    const s = Math.min((W - pad * 2) / (b.x1 - b.x0), (H - pad * 2) / (b.y1 - b.y0));
+    const ox = (W - (b.x1 - b.x0) * s) / 2 - b.x0 * s, oy = (H - (b.y1 - b.y0) * s) / 2 - b.y0 * s;
+    const X = (x) => ox + x * s, Y = (y) => oy + y * s;
+    const path = (poly) => { g.beginPath(); poly.forEach((p, i) => (i ? g.lineTo(X(p.x), Y(p.y)) : g.moveTo(X(p.x), Y(p.y)))); g.closePath(); };
+    path(plan.corridor); g.fillStyle = tok('--surface-2', '#efe8dc'); g.fill();
+    plan.units.forEach((u, k) => {
+      const a = units[k]; path(u.poly);
+      g.globalAlpha = 0.32; g.fillStyle = col[a && a.status] || col.free; g.fill(); g.globalAlpha = 1;
+      g.lineWidth = a && a.id === selId ? 3 : 1.2; g.strokeStyle = a && a.id === selId ? tok('--accent-text', '#8a4e2a') : tok('--ink', '#1b1815'); g.stroke();
+      if (a) {
+        const c = u.poly.reduce((acc, p) => ({ x: acc.x + p.x / u.poly.length, y: acc.y + p.y / u.poly.length }), { x: 0, y: 0 });
+        g.fillStyle = tok('--ink', '#1b1815'); g.font = '700 11px Manrope, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText(String(a.number), X(c.x), Y(c.y));
+      }
+    });
+    path(outline); g.lineWidth = 2.4; g.strokeStyle = tok('--ink', '#1b1815'); g.stroke();
+    // The lift core: the shafts and the stairs.
+    path(plan.core.poly); g.fillStyle = tok('--muted', '#6b6258'); g.fill();
+    plan.core.lifts.forEach((r) => { path(r); g.fillStyle = tok('--surface', '#fbf8f2'); g.fill(); });
+    canvas.dataset.units = String(plan.units.length);
+    canvas.dataset.vertices = String(Math.max(...plan.units.map((u) => u.poly.length)));
+    canvas.dataset.lifts = String(plan.core.lifts.length);
+    return (px, py) => {
+      const p = { x: (px - ox) / s, y: (py - oy) / s };
+      const k = plan.units.findIndex((u) => S.geom.contains(u.poly, p));
+      return k >= 0 ? units[k] : null;
+    };
   }
 
   // For the other public pages (about.js, gallery.js): the same footer, reveal on scroll, icons and headings.
@@ -1330,5 +1402,5 @@
     const el = document.createElement('script'); el.type = 'application/ld+json'; el.textContent = JSON.stringify(data);
     document.head.appendChild(el);
   })();
-  S.site = { footer: siteFooter, reveal: revealIn, icon: landIcon, accentFirst, contacts, drawFloorPlan, building: siteBuilding, galleryPhotos: GALLERY_PHOTOS, galleryImg, galleryCredit, renderImg, kicker: (x) => kicker(x), arrow: () => arrow(), amenIcon: (k) => AMEN_ICON[k] || 'check' };
+  S.site = { footer: siteFooter, reveal: revealIn, icon: landIcon, accentFirst, contacts, drawFloorPlan, drawBlockFloor, building: siteBuilding, galleryPhotos: GALLERY_PHOTOS, galleryImg, galleryCredit, renderImg, kicker: (x) => kicker(x), arrow: () => arrow(), amenIcon: (k) => AMEN_ICON[k] || 'check' };
 })();

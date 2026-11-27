@@ -156,7 +156,14 @@ public record ApartmentResponse(
     ApartmentKind Kind = ApartmentKind.Residential,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? TerraceArea = null,
     // Блок ЖК («A»): номер для людей — «Блок A, кв. 45», кратко «A-45» (UnitNames); у дома без блока — null.
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? BlockCode = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? BlockCode = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? LayoutCode = null);
+
+// Планировка застройщика: код, название, JSON в формате сайта (frontend/js/planirovki-data.js), когда изменена.
+public record LayoutResponse(string Code, string Name, System.Text.Json.JsonElement Layout, DateTime UpdatedAt);
+
+// PUT /layouts/{code}: название и JSON планировки (контур, комнаты-многоугольники, двери, вход, балкон).
+public record SaveLayoutRequest(string? Name, System.Text.Json.JsonElement Layout);
 
 public record SaveBuildingRequest(
     string NameRu,
@@ -176,9 +183,9 @@ public record CreateFloorRequest(Guid BuildingId, int Number, string? PlanImageU
 public record UpdateFloorRequest(int Number, string? PlanImageUrl);
 
 // PlanSlot — позиция на плане этажа (0–7), Model3dId — объект квартиры в 3D-модели (необязательно).
-public record CreateApartmentRequest(Guid FloorId, int Number, int Rooms, decimal Area, decimal PricePerM2, int PlanSlot, string? Model3dId = null);
+public record CreateApartmentRequest(Guid FloorId, int Number, int Rooms, decimal Area, decimal PricePerM2, int PlanSlot, string? Model3dId = null, string? LayoutCode = null);
 
-public record UpdateApartmentRequest(int Number, int Rooms, decimal Area, decimal PricePerM2, int PlanSlot, string? Model3dId = null);
+public record UpdateApartmentRequest(int Number, int Rooms, decimal Area, decimal PricePerM2, int PlanSlot, string? Model3dId = null, string? LayoutCode = null);
 
 public record SetOnRequestRequest(bool OnRequest);
 

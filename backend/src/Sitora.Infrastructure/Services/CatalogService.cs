@@ -472,7 +472,8 @@ public class CatalogService(
             Number = request.Number,
             Rooms = request.Rooms,
             PlanSlot = request.PlanSlot,
-            Model3dId = EmptyToNull(request.Model3dId)
+            Model3dId = EmptyToNull(request.Model3dId),
+            LayoutCode = EmptyToNull(request.LayoutCode)?.ToLowerInvariant()
         };
         apartment.SetPricing(request.Area, request.PricePerM2);
         db.Apartments.Add(apartment);
@@ -491,6 +492,7 @@ public class CatalogService(
         apartment.Rooms = request.Rooms;
         apartment.PlanSlot = request.PlanSlot;
         apartment.Model3dId = EmptyToNull(request.Model3dId);
+        apartment.LayoutCode = EmptyToNull(request.LayoutCode)?.ToLowerInvariant();
         apartment.SetPricing(request.Area, request.PricePerM2);
         audit.Record(nameof(Apartment), apartment.Id, "Updated", before, Snapshot(apartment));
         await SaveApartmentAsync(request.Number, request.PlanSlot, ct);
@@ -602,7 +604,7 @@ public class CatalogService(
         new { b.NameRu, b.NameTg, b.NameEn, b.Address, b.FloorsCount, b.DescriptionRu, b.DescriptionTg, b.DescriptionEn, b.ModelUrl, b.CompletionYear, b.PlannedApartments };
 
     private static object Snapshot(Apartment a) =>
-        new { a.Number, a.Rooms, a.Area, a.PricePerM2, a.Price, a.Currency, a.Status, a.PlanSlot, a.Model3dId };
+        new { a.Number, a.Rooms, a.Area, a.PricePerM2, a.Price, a.Currency, a.Status, a.PlanSlot, a.Model3dId, a.LayoutCode };
 
     internal static Expression<Func<Building, BuildingResponse>> ToBuildingResponse(bool tg) => b => new BuildingResponse(
         b.Id,
@@ -690,5 +692,6 @@ public class CatalogService(
         a.Model3dId,
         a.Kind,
         a.TerraceArea,
-        a.Floor.Building.BlockCode);
+        a.Floor.Building.BlockCode,
+        a.LayoutCode);
 }

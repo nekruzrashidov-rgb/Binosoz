@@ -89,7 +89,7 @@
       const area = num(pick(a, ['area', 'totalArea', 'squareMeters'], 0)), pps = num(pick(a, ['pricePerM2', 'pricePerSqm', 'pricePerSquareMeter'], 0));
       return { id: a.id, floorId: pick(a, ['floorId'], null), buildingId: pick(a, ['buildingId'], null), floor: floorNo !== undefined ? floorNo : num(pick(a, ['floorNumber', 'floor'], 0)), number: pick(a, ['number', 'apartmentNumber'], ''), rooms: num(pick(a, ['rooms', 'roomsCount'], 0)), area, pricePerSqm: pps, price: num(pick(a, ['price', 'totalPrice'], area * pps)), currency: String(pick(a, ['currency'], 'TJS')).toUpperCase(),
         // residential | penthouse | commercial (a shop of floors 1–2) | parking (a space of −1/−2).
-        kind: String(pick(a, ['kind'], 'Residential')).toLowerCase(), block: pick(a, ['blockCode', 'block'], null), terraceArea: a.terraceArea == null ? null : num(a.terraceArea), status: normStatus(pick(a, ['status'], 'free')), planSlot: pick(a, ['planSlot'], null) === null ? null : num(a.planSlot), model3dId: pick(a, ['model3dId'], null) };
+        kind: String(pick(a, ['kind'], 'Residential')).toLowerCase(), block: pick(a, ['blockCode', 'block'], null), layoutCode: a.layoutCode || null, terraceArea: a.terraceArea == null ? null : num(a.terraceArea), status: normStatus(pick(a, ['status'], 'free')), planSlot: pick(a, ['planSlot'], null) === null ? null : num(a.planSlot), model3dId: pick(a, ['model3dId'], null) };
     },
     lead(l) { return { id: l.id, name: pick(l, ['name', 'fullName', 'customerName'], ''), phone: pick(l, ['phone', 'phoneNumber'], ''), comment: pick(l, ['comment', 'message'], ''), status: leadStatus(pick(l, ['status'], 'New')), apiStatus: String(pick(l, ['status'], 'New')), managerId: pick(l, ['managerId'], null), assignee: pick(l, ['assignee', 'assignedTo', 'managerName', 'responsibleName'], ''), createdAt: pick(l, ['createdAt', 'created'], ''), apartmentId: pick(l, ['apartmentId'], null), source: String(pick(l, ['source'], 'Website')) }; },
     customer(c) { return { id: c.id, fullName: pick(c, ['fullName', 'name'], ''), phone: pick(c, ['phone'], ''), email: pick(c, ['email'], ''), passport: pick(c, ['passportData', 'passport', 'passportNumber'], ''), createdAt: pick(c, ['createdAt'], ''), dealsCount: pick(c, ['dealsCount'], null), deals: arr(c.deals).map(M.deal) }; },
@@ -518,6 +518,11 @@
     saveInstallmentSettings(b) { return request('PUT', '/owner/installment-settings', { body: b }); },
     saveBuildingLocation(id, body) { return request('PUT', '/buildings/' + id + '/location', { body }).then(M.building); },
     // A block of the complex: the letter, the order, the outline, the place on the site and the setbacks — as a whole.
+    // The developer's layouts (JSON, the format of planirovki-data.js): the public list of the site, the CRM's own ones.
+    publicLayouts() { return cfgSlug() ? request('GET', '/public/' + encodeURIComponent(cfgSlug()) + '/layouts', { auth: false }) : Promise.resolve([]); },
+    layouts() { return request('GET', '/layouts'); },
+    saveLayout(code, body) { return request('PUT', '/layouts/' + encodeURIComponent(code), { body }); },
+    deleteLayout(code) { return request('DELETE', '/layouts/' + encodeURIComponent(code)); },
     setPublished(id, isPublished) { return request('PUT', '/buildings/' + id + '/published', { body: { isPublished: !!isPublished } }).then(M.building); },
     savePriceRule(id, body) { return request('PUT', '/buildings/' + id + '/price-rule', { body }).then(M.building); },
     // «Пересчитать цены»: { updated, unchanged, skipped } — only free apartments get the new price.

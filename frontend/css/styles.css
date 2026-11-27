@@ -3324,6 +3324,8 @@ button.userchip:hover, button.userchip[aria-expanded='true'] { border-color: var
 .user-menu-item:hover, .user-menu-item:focus-visible { background: var(--surface-2); }
 
 /* Rich Tower: the complex of blocks — the concept caption, the block switch, the 3D labels of blocks, the yard and the distances. */
+.nr-block-floor-box { margin: 12px 0; }
+.nr-block-floor { display: block; width: 100%; max-width: 360px; height: auto; aspect-ratio: 360 / 220; cursor: pointer; }
 .nr-concept-note { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
 .nr-blocks button[aria-pressed="true"] { font-weight: 800; }
 .nr-panel-lifts { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }

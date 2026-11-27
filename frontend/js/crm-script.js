@@ -481,7 +481,9 @@
         });
         const pubCard = h('div', { class: 'card stack' }, h('label', { class: 'check' }, pubBox, t('cat.onSite')),
           b.isPublished === false ? S.chip('warn', t('cat.hidden')) : null, h('p', { class: 'hint' }, t('cat.onSiteHint')));
-        body.replaceChildren(buildingBar(bs, bid, 'catalog'), pubCard, bform, locationForm(b), shapeForm, priceForm, amenForm, ecoForm, h('h3', { style: { marginTop: '10px' } }, t('cat.apts')), tools, holder);
+        // The developer's layouts (JSON with a preview): apartments with their code are drawn by them on the site.
+        const layoutsForm = S.blockForms ? S.blockForms.layouts() : null;
+        body.replaceChildren(buildingBar(bs, bid, 'catalog'), pubCard, bform, locationForm(b), shapeForm, priceForm, layoutsForm, amenForm, ecoForm, h('h3', { style: { marginTop: '10px' } }, t('cat.apts')), tools, holder);
         async function drawApts() {
           const fl = floors.find((f) => String(f.id) === String(floorId)); holder.replaceChildren(S.skeleton(4, 38));
           const list = (await S.api.floorApartments(fl)).sort((a, c) => (a.planSlot || 0) - (c.planSlot || 0));

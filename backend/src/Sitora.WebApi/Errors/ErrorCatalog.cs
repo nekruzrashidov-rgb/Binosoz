@@ -222,6 +222,16 @@ public static class ErrorCatalog
         P("Расстояние между блоками меньше допустимого: ", "blocks_too_close", "Масофаи байни блокҳо аз иҷозатдодашуда камтар аст: ",
             "The distance between the blocks is less than allowed: ");
         E("Дом изменён другим пользователем", "building_conflict", "Биноро корбари дигар тағйир дод", "The building was changed by another user");
+        // ---------- планировки застройщика ----------
+        E("Код планировки — от 1 до 32 латинских букв, цифр, дефисов", "invalid_layout_code", "Рамзи нақша — аз 1 то 32 ҳарфи лотинӣ, рақам, дефис", "The layout code is 1 to 32 Latin letters, digits, hyphens");
+        E("Планировка — объект JSON с контуром и комнатами", "invalid_layout", "Нақша — объекти JSON бо контур ва ҳуҷраҳо", "A layout is a JSON object with an outline and rooms");
+        E("Контур планировки — от 3 до 64 вершин, без самопересечений", "invalid_layout_outline", "Контури нақша — аз 3 то 64 қулла, бе бурриши худ", "The layout outline has 3 to 64 vertices and does not cross itself");
+        E("В планировке — от 1 до 30 комнат", "invalid_layout_rooms", "Дар нақша — аз 1 то 30 ҳуҷра", "A layout has 1 to 30 rooms");
+        E("Комната планировки — [название, многоугольник] без самопересечений, не меньше 0,5 м²", "invalid_layout_room", "Ҳуҷраи нақша — [ном, бисёркунҷа] бе бурриши худ, на камтар аз 0,5 м²", "A layout room is [name, polygon], not crossing itself, at least 0.5 m²");
+        E("Комната планировки выходит за её контур", "layout_room_outside", "Ҳуҷраи нақша аз контури он берун мебарояд", "A layout room goes beyond its outline");
+        E("Площадь комнат планировки — от 10 до 1 000 м²", "invalid_layout_area", "Масоҳати ҳуҷраҳои нақша — аз 10 то 1 000 м²", "The rooms of a layout total 10 to 1,000 m²");
+        E("Балкон планировки — многоугольник без самопересечений", "invalid_layout_balcony", "Балкони нақша — бисёркунҷа бе бурриши худ", "The layout balcony is a polygon that does not cross itself");
+        E("Планировка не найдена", "layout_not_found", "Нақша ёфт нашуд", "Layout not found");
         E("Блок с такой буквой уже есть", "block_code_taken", "Блок бо чунин ҳарф аллакай ҳаст", "A block with this code already exists");
         E("План участка изменён другим пользователем", "site_plan_conflict", "Нақшаи қитъаро корбари дигар тағйир дод", "The site plan was changed by another user");
         E("Зон участка — не больше 40", "too_many_site_zones", "Минтақаҳои қитъа — на зиёда аз 40", "No more than 40 site zones");

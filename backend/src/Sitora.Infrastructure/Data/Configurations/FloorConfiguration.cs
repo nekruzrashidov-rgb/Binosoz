@@ -18,6 +18,20 @@ public class FloorConfiguration : IEntityTypeConfiguration<Floor>
     }
 }
 
+public class LayoutConfiguration : IEntityTypeConfiguration<Layout>
+{
+    public void Configure(EntityTypeBuilder<Layout> builder)
+    {
+        builder.ToTable("Layouts");
+        builder.Property(l => l.Code).HasMaxLength(Layout.CodeMaxLength).IsRequired();
+        builder.Property(l => l.Name).HasMaxLength(200).IsRequired();
+        builder.Property(l => l.Json).HasColumnType("jsonb").IsRequired();
+        // Один код — одна планировка организации.
+        builder.HasIndex(l => new { l.OrganizationId, l.Code }).IsUnique();
+        builder.HasOne(l => l.Organization).WithMany().HasForeignKey(l => l.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
 public class FloorPlanConfiguration : IEntityTypeConfiguration<FloorPlan>
 {
     public void Configure(EntityTypeBuilder<FloorPlan> builder)

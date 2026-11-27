@@ -183,5 +183,48 @@
     return form;
   }
 
-  S.blockForms = { shape, draw, prices, ppmOf };
+  // ---------- the developer's layouts (JSON) ----------
+  function layouts() {
+    const list = h('div', { class: 'stack' });
+    const code = S.input('code', { maxlength: 32, placeholder: 'a-corner-4' });
+    const name = S.input('name', { maxlength: 200 });
+    const json = h('textarea', { class: 'inp mono', name: 'layout', id: 'lay-json', rows: 8, spellcheck: 'false' });
+    const canvas = h('canvas', { class: 'lay-preview', role: 'img', 'aria-label': t('lay.preview'), width: 360, height: 240 });
+    const facts = h('p', { class: 'hint', 'aria-live': 'polite' });
+    const btn = h('button', { class: 'btn', type: 'submit' }, t('common.save'));
+    const form = h('form', { class: 'card stack lay-form', novalidate: true }, h('h3', null, t('lay.title')), h('p', { class: 'muted' }, t('lay.hint')),
+      h('div', { class: 'grid g2' }, S.field(t('lay.code'), code, t('lay.codeHint')), S.field(t('lay.name'), name)), S.field(t('lay.json'), json, t('lay.jsonHint')),
+      canvas, facts, h('div', null, btn), list);
+    function parsed() { try { return JSON.parse(json.value); } catch (e) { return null; } }
+    function preview() {
+      const v = parsed();
+      const errs = v ? S.plans.validate(v) : ['json'];
+      if (errs.length) { facts.textContent = t('lay.bad'); const g = canvas.getContext('2d'); if (g) g.clearRect(0, 0, canvas.width, canvas.height); return false; }
+      const tmp = 'preview-' + Date.now();
+      S.plans.setReal([{ code: tmp, layout: v }]);
+      const lay = S.site && S.site.drawFloorPlan ? S.site.drawFloorPlan(canvas, 0, 0, tmp, { areas: true }) : null;
+      S.plans.setReal(lastList.map((x) => ({ code: x.code, layout: x.layout })));
+      facts.textContent = lay ? t('lay.facts', { a: S.fmt.n(Math.round(lay.roomsArea * 10) / 10), n: lay.rooms.length }) : '';
+      return true;
+    }
+    json.addEventListener('input', preview);
+    let lastList = [];
+    async function load() {
+      try { lastList = await S.api.layouts(); } catch (e) { lastList = []; }
+      S.plans.setReal(lastList.map((x) => ({ code: x.code, layout: x.layout })));
+      list.replaceChildren(...(lastList.length ? lastList.map((x) => h('div', { class: 'row between lay-item' }, h('span', null, h('b', null, x.code), ' · ', x.name),
+        h('span', { class: 'row' }, h('button', { class: 'btn ghost sm', type: 'button', onclick: () => { code.value = x.code; name.value = x.name; json.value = JSON.stringify(x.layout, null, 1); preview(); } }, t('common.edit')),
+          h('button', { class: 'btn ghost sm', type: 'button', onclick: (e) => S.busy(e.currentTarget, async () => { try { await S.api.deleteLayout(x.code); S.toast(t('lay.deleted'), 'ok'); load(); } catch (er) { S.err(er); } }) }, t('lay.delete'))))) : [h('p', { class: 'hint' }, t('lay.none'))]));
+    }
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault(); S.showErrors(form, null);
+      const v = parsed();
+      if (!v || !preview()) { S.showErrors(form, { message: t('lay.bad'), errors: { layout: [t('lay.bad')] } }); return; }
+      await S.busy(btn, async () => { try { await S.api.saveLayout(code.value.trim(), { name: name.value.trim() || null, layout: v }); S.toast(t('common.saved'), 'ok'); load(); } catch (er) { S.showErrors(form, er); } });
+    });
+    load();
+    return form;
+  }
+
+  S.blockForms = { shape, draw, prices, ppmOf, layouts };
 })();

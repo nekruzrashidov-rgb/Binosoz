@@ -46,6 +46,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider t
     public DbSet<CashTransaction> CashTransactions => Set<CashTransaction>();
     public DbSet<WeeklyReport> WeeklyReports => Set<WeeklyReport>();
     public DbSet<FloorPlan> FloorPlans => Set<FloorPlan>();
+    public DbSet<Layout> Layouts => Set<Layout>();
     public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
     public DbSet<Document> Documents => Set<Document>();
     public DbSet<IssuedPdf> IssuedPdfs => Set<IssuedPdf>();

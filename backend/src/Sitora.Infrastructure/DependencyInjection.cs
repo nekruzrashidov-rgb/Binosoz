@@ -105,6 +105,7 @@ public static class DependencyInjection
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<ApartmentImporter>();
         services.AddScoped<ICatalogService, CatalogService>();
+        services.AddScoped<LayoutService>();
         services.AddScoped<IGreenService, GreenService>();
         services.AddScoped<IInstallmentService, InstallmentService>();
         services.AddScoped<PdfIssueRecorder>();

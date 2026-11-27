@@ -70,14 +70,14 @@ public static class RichTowerBlocksSql
             L("  INSERT INTO \"Floors\" (\"Id\", \"BuildingId\", \"Number\", \"PlanImageUrl\", \"CreatedAt\", \"UpdatedAt\")");
             L("  SELECT gen_random_uuid(), b, n, NULL, ts, ts FROM unnest(ARRAY[" + string.Join(", ", x.Floors.Select(f => f.Number).OrderBy(n => n)) + "]) AS n;");
             L("  INSERT INTO \"Apartments\" (\"Id\", \"FloorId\", \"BuildingId\", \"Number\", \"PlanSlot\", \"Model3dId\", \"Rooms\", \"Area\", \"PricePerM2\", \"Price\", \"Currency\",");
-            L("    \"Status\", \"Kind\", \"TerraceArea\", \"CreatedAt\", \"UpdatedAt\")");
-            L("  SELECT gen_random_uuid(), f.\"Id\", b, v.num, v.slot, NULL, v.rooms, v.area, v.ppm, v.price, " + Q(x.PriceCurrency.ToString()) + ", 'Free', v.kind, v.terrace, ts, ts");
+            L("    \"Status\", \"Kind\", \"TerraceArea\", \"LayoutCode\", \"CreatedAt\", \"UpdatedAt\")");
+            L("  SELECT gen_random_uuid(), f.\"Id\", b, v.num, v.slot, NULL, v.rooms, v.area, v.ppm, v.price, " + Q(x.PriceCurrency.ToString()) + ", 'Free', v.kind, v.terrace, v.layout, ts, ts");
             L("  FROM (VALUES");
             var rows = x.Floors.OrderBy(f => f.Number).SelectMany(f => f.Apartments.OrderBy(a => a.PlanSlot).Select(a =>
-                string.Create(Inv, $"    ({f.Number}, {a.Number}, {a.PlanSlot}, {a.Rooms}, '{a.Kind}', {a.Area}, {a.PricePerM2}, {a.Price}, {D(a.TerraceArea)}::numeric)"))).ToList();
+                string.Create(Inv, $"    ({f.Number}, {a.Number}, {a.PlanSlot}, {a.Rooms}, '{a.Kind}', {a.Area}, {a.PricePerM2}, {a.Price}, {D(a.TerraceArea)}::numeric, {Q(a.LayoutCode)}::text)"))).ToList();
             for (var i = 0; i < rows.Count; i++)
                 L(rows[i] + (i < rows.Count - 1 ? "," : ""));
-            L("  ) AS v(floor, num, slot, rooms, kind, area, ppm, price, terrace)");
+            L("  ) AS v(floor, num, slot, rooms, kind, area, ppm, price, terrace, layout)");
             L("  JOIN \"Floors\" f ON f.\"BuildingId\" = b AND f.\"Number\" = v.floor;");
             L("  INSERT INTO \"AuditLog\" (\"Id\", \"UserId\", \"OrganizationId\", \"ImpersonatedById\", \"Entity\", \"EntityId\", \"Action\", \"Before\", \"After\",");
             L("                          \"At\", \"Ip\", \"CreatedAt\", \"UpdatedAt\")");

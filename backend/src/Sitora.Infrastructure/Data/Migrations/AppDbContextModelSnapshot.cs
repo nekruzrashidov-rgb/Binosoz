@@ -184,6 +184,10 @@ namespace Sitora.Infrastructure.Data.Migrations
                         .HasColumnType("character varying(16)")
                         .HasDefaultValue("Residential");
 
+                    b.Property<string>("LayoutCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<string>("Model3dId")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -1295,6 +1299,43 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.HasIndex("OrganizationId", "CreatedAt");
 
                     b.ToTable("IssuedPdfs", (string)null);
+                });
+
+            modelBuilder.Entity("Sitora.Domain.Entities.Layout", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Json")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId", "Code")
+                        .IsUnique();
+
+                    b.ToTable("Layouts", (string)null);
                 });
 
             modelBuilder.Entity("Sitora.Domain.Entities.Lead", b =>
@@ -2584,6 +2625,17 @@ namespace Sitora.Infrastructure.Data.Migrations
                         .HasForeignKey("DealId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Sitora.Domain.Entities.Layout", b =>
+                {
+                    b.HasOne("Sitora.Domain.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Organization");
                 });
 
             modelBuilder.Entity("Sitora.Domain.Entities.Lead", b =>

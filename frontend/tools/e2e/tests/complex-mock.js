@@ -3,11 +3,11 @@
 // Not a test file itself (no .spec).
 const BLOCKS = [
   { code: 'A', floors: 22, sort: 1, footprint: [[10, 0], [38, 0], [38, 18], [19, 18], [19, 34], [0, 34], [0, 0, 6]], pos: { x: -89, y: -50, rotationDeg: 0 },
-    top: [[10, 2.5], [38, 2.5], [38, 18], [19, 18], [19, 34], [2.5, 34], [2.5, 2.5, 5]], depth: 6.5, areas: [54, 158, 72, 90, 158, 54, 72, 149], rooms: [0, 4, 1, 2, 4, 0, 1, 3], start: 4, topStart: 1 },
+    top: [[10, 2.5], [38, 2.5], [38, 18], [19, 18], [19, 34], [2.5, 34], [2.5, 2.5, 5]], depth: 6.5, areas: [54, 158, 72, 90, 158, 54, 72, 149], rooms: [0, 4, 1, 2, 4, 0, 1, 4], start: 4, topStart: 1, layouts: [null, null, null, null, null, null, null, 'corner-l'] },
   { code: 'B', floors: 20, sort: 2, footprint: [[24, 0], [31, 0], [32.5, -1.5], [37.5, -1.5], [39, 0], [46, 0], [50, 4], [50, 16], [46, 20], [39, 20], [37.5, 21.5], [32.5, 21.5], [31, 20], [19, 20], [17.5, 21.5], [12.5, 21.5], [11, 20], [4, 20], [0, 16], [0, 4], [4, 0], [11, 0], [12.5, -1.5], [17.5, -1.5], [19, 0]],
-    pos: { x: -25, y: -60, rotationDeg: 0 }, top: [[24, 0], [43, 0], [47, 4], [47, 16], [43, 20], [7, 20], [3, 16], [3, 4], [7, 0]], depth: 8, areas: [52, 81, 170, 90, 52, 81, 170, 90], rooms: [0, 1, 4, 2, 0, 1, 4, 2], start: 5, topStart: 2 },
+    pos: { x: -25, y: -60, rotationDeg: 0 }, top: [[24, 0], [43, 0], [47, 4], [47, 16], [43, 20], [7, 20], [3, 16], [3, 4], [7, 0]], depth: 8, areas: [52, 81, 170, 90, 52, 81, 170, 90], rooms: [0, 1, 4, 2, 0, 1, 4, 2], start: 5, topStart: 2, layouts: [null, null, null, 'bay-2', null, null, null, 'bay-2'] },
   { code: 'C', floors: 20, sort: 3, footprint: [[21, 0], [42, 0, 8], [42, 28], [27, 28], [27, 15], [15, 15], [15, 28], [0, 28], [0, 0, 8]], pos: { x: 81, y: -55, rotationDeg: 90 },
-    top: [[21, 1.5], [40.5, 1.5, 7], [40.5, 28], [27, 28], [27, 15], [15, 15], [15, 28], [1.5, 28], [1.5, 1.5, 7]], depth: 6.5, areas: [67, 181, 98, 122, 122, 98, 181, 67], rooms: [0, 4, 1, 2, 2, 1, 4, 0], start: 6, topStart: 2 },
+    top: [[21, 1.5], [40.5, 1.5, 7], [40.5, 28], [27, 28], [27, 15], [15, 15], [15, 28], [1.5, 28], [1.5, 1.5, 7]], depth: 6.5, areas: [67, 181, 98, 122, 122, 98, 181, 67], rooms: [0, 4, 1, 2, 2, 1, 4, 0], start: 6, topStart: 2, layouts: [null, 'corner-round', null, null, null, null, 'corner-round', null] },
 ];
 // Numbering as in the seed (RichTowerBlocksSeeder): homes 1…N from the 3rd floor up, on a floor clockwise from the unit at the
 // lift hall (start — its plan slot; topStart — on the penthouse floor), penthouses go on; shops Н-1…, parking spaces М-1….
@@ -31,8 +31,8 @@ function units(b, f) {
   const u = (k, kind, rooms, area, price) => ({ id: id(b.code, f, k), number: numberOf(b, f, k), blockCode: b.code, rooms, area, pricePerM2: Math.round(price / area), price, currency: 'USD', status: st(k), planSlot: k, kind });
   if (f < 0) return Array.from({ length: 6 }, (_, k) => u(k, 'Parking', 0, 13.25, 20000));
   if (f <= 2) return Array.from({ length: 6 }, (_, k) => u(k, 'Commercial', 0, 120, 180000));
-  if (f === b.floors) return Array.from({ length: 4 }, (_, k) => Object.assign(u(k, 'Penthouse', 4, 180, 252000), { terraceArea: 40 }));
-  return b.areas.map((a, k) => u(k, 'Residential', b.rooms[k], a, Math.round(a * 1000 / 100) * 100));
+  if (f === b.floors) return Array.from({ length: 4 }, (_, k) => Object.assign(u(k, 'Penthouse', 4, 180, 252000), { terraceArea: 40, layoutCode: 'ph-4' }));
+  return b.areas.map((a, k) => Object.assign(u(k, 'Residential', b.rooms[k], a, Math.round(a * 1000 / 100) * 100), b.layouts[k] ? { layoutCode: b.layouts[k] } : {}));
 }
 const floorsOf = (b) => [-2, -1].concat(Array.from({ length: b.floors }, (_, i) => i + 1));
 const building = (b) => ({ id: bid(b.code), name: 'Блок ' + b.code, nameRu: 'Блок ' + b.code, nameTg: 'Блоки ' + b.code, address: 'Душанбе', floorsCount: b.floors,
