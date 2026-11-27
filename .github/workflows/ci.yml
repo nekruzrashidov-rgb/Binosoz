@@ -76,7 +76,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Тесты
-        run: npx playwright test --grep-invert "3D on the whole screen"
+        run: npx playwright test --grep-invert "3D on the whole screen|3D of the whole complex"
 
       # 3D-сцена в CI рисуется на SwiftShader (без видеокарты): параллельно с другими тестами кадр идёт секунды и
       # тесты падают по времени. Поэтому 3D — отдельным шагом, в один поток.
@@ -84,7 +84,7 @@ jobs:
         if: success() || failure()
         env:
           PLAYWRIGHT_HTML_REPORT: playwright-report-3d
-        run: npx playwright test tests/house3d.spec.js --workers=1
+        run: npx playwright test tests/house3d.spec.js tests/complex3d.spec.js tests/ui3d.spec.js --workers=1
 
       - name: Отчёт при ошибке
         if: failure()
