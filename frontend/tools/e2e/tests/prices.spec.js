@@ -27,7 +27,14 @@ async function mock(page) {
 
 test('price per m² by floor in USD: $1 200 on floor 6, $900 on floor 19, ≈ TJS by the NBT rate', async ({ page }) => {
   await mock(page);
+  // The data first: both floors' apartments and the NBT rate (on a busy CI runner they come seconds after the page).
+  const loaded = Promise.all([
+    page.waitForResponse((r) => r.url().endsWith('/floors/f6/apartments') || r.url().includes('/floors/f6/apartments?')),
+    page.waitForResponse((r) => r.url().endsWith('/floors/f19/apartments') || r.url().includes('/floors/f19/apartments?')),
+    page.waitForResponse((r) => r.url().includes('/rates/current')),
+  ]);
   await page.goto('/apartments');
+  await loaded;
   const card = (n) => page.locator('.nr-unit-card', { hasText: 'Кв. ' + n });
   await expect(page.locator('.nr-unit-card').first()).toBeVisible();
   await expect(card(601)).toContainText('$1 200 / м²');

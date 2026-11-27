@@ -3090,6 +3090,10 @@ body:is([data-page='crm'], [data-page='cabinet'], [data-page='platform']) h1, bo
 .h3d-full { position: fixed; inset: 0; z-index: var(--z-panel); background: var(--espresso); color: var(--ink); font-family: var(--font);
   --h3d-panel: color-mix(in srgb, var(--espresso) 88%, transparent); --h3d-glass: color-mix(in srgb, var(--espresso) 72%, transparent);
   --h3d-shadow: 0 12px 32px color-mix(in srgb, #000 35%, transparent); --h3d-ease: 0.2s ease; }
+/* The glass (72 % + blur 16 px) only when the 3D is fast: on a weak GPU and on software WebGL a blur over the canvas is redone
+   every frame and the scene stops for seconds. The page turns it on (class h3d-glass) after the engine has seen ≥ 30 fps at
+   full quality; otherwise the panels are the denser dark base without a blur. */
+.h3d-full.h3d-glass :is(.h3d-seg, .h3d-pop, .h3d-list, .h3d-list-tab, .h3d-card) { background: var(--h3d-glass); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
 .h3d-scene, .h3d-scene .nr-house { position: absolute; inset: 0; }
 .h3d-labels { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
 .h3d-label { position: absolute; left: 0; top: 0; will-change: transform; }
@@ -3120,7 +3124,7 @@ body:is([data-page='crm'], [data-page='cabinet'], [data-page='platform']) h1, bo
 .h3d-full :is(button, input, [tabindex]):focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
 
 /* Segments: the main one (blocks, 40 px), the views (32 px), the small one in the time card */
-.h3d-seg { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--field-line); border-radius: 999px; background: var(--h3d-glass); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+.h3d-seg { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--field-line); border-radius: 999px; background: var(--h3d-panel); }
 .h3d-seg button { flex: none; min-height: 34px; min-width: 40px; padding: 0 14px; border: 1px solid transparent; border-radius: 999px; background: transparent; color: var(--ink); font: inherit; font-size: 13.5px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; cursor: pointer; transition: background var(--h3d-ease), color var(--h3d-ease); }
 .h3d-seg button:hover { border-color: var(--field-line); }
 .h3d-seg button[aria-pressed='true'] { background: var(--accent); color: var(--accent-ink); }
@@ -3146,7 +3150,7 @@ body:is([data-page='crm'], [data-page='cabinet'], [data-page='platform']) h1, bo
 .h3d-top-gap { width: 1px; }
 
 /* The time card under the sun icon */
-.h3d-pop { position: absolute; top: 64px; right: 16px; z-index: 4; display: grid; gap: 10px; width: 340px; padding: 14px; border: 1px solid var(--line); border-radius: 2px; background: var(--h3d-glass); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); box-shadow: var(--h3d-shadow); }
+.h3d-pop { position: absolute; top: 64px; right: 16px; z-index: 4; display: grid; gap: 10px; width: 340px; padding: 14px; border: 1px solid var(--line); border-radius: 2px; background: var(--h3d-panel); box-shadow: var(--h3d-shadow); }
 .h3d-pop[hidden] { display: none; }
 .h3d-pop-row { display: flex; align-items: center; gap: 8px; }
 .h3d-pop-row .h3d-range { flex: 1; width: auto; }
@@ -3165,9 +3169,9 @@ body:is([data-page='crm'], [data-page='cabinet'], [data-page='platform']) h1, bo
 .h3d-floor-dot { position: absolute; right: 4px; top: 50%; width: 5px; height: 5px; margin-top: -2.5px; border-radius: 50%; background: var(--good); }
 
 /* The list: a folding panel on the left */
-.h3d-list { position: absolute; left: 16px; top: 72px; bottom: 64px; z-index: 3; width: 340px; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 2px; background: var(--h3d-glass); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); box-shadow: var(--h3d-shadow); transform: translateX(calc(-100% - 24px)); visibility: hidden; transition: transform var(--h3d-ease), visibility 0s linear 0.2s; }
+.h3d-list { position: absolute; left: 16px; top: 72px; bottom: 64px; z-index: 3; width: 340px; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 2px; background: var(--h3d-panel); box-shadow: var(--h3d-shadow); transform: translateX(calc(-100% - 24px)); visibility: hidden; transition: transform var(--h3d-ease), visibility 0s linear 0.2s; }
 .h3d-full.list-open .h3d-list { transform: none; visibility: visible; transition: transform var(--h3d-ease), visibility 0s; }
-.h3d-list-tab { position: absolute; left: 16px; top: 72px; z-index: 3; display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 14px; border: 1px solid var(--field-line); border-radius: 2px; background: var(--h3d-glass); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); color: var(--ink); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.h3d-list-tab { position: absolute; left: 16px; top: 72px; z-index: 3; display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 14px; border: 1px solid var(--field-line); border-radius: 2px; background: var(--h3d-panel); color: var(--ink); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .h3d-list-tab:hover { border-color: var(--ink); }
 .h3d-full.list-open .h3d-list-tab { display: none; }
 .h3d-sheet-grip, .h3d-sheet-sum { display: none; }
@@ -3200,7 +3204,7 @@ body:is([data-page='crm'], [data-page='cabinet'], [data-page='platform']) h1, bo
 .h3d-empty { padding: 16px; color: var(--muted); }
 
 /* The price card (right, bottom; left of the floor scale) */
-.h3d-card { position: absolute; right: 16px; bottom: 64px; z-index: 3; width: 340px; display: grid; gap: 4px; padding: 18px; border: 1px solid var(--line); border-radius: 2px; background: var(--h3d-glass); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); box-shadow: var(--h3d-shadow); }
+.h3d-card { position: absolute; right: 16px; bottom: 64px; z-index: 3; width: 340px; display: grid; gap: 4px; padding: 18px; border: 1px solid var(--line); border-radius: 2px; background: var(--h3d-panel); box-shadow: var(--h3d-shadow); }
 .h3d-full:has(.h3d-floors:not([hidden])) .h3d-card { right: 72px; }
 .h3d-card[hidden] { display: none; }
 .h3d-card-x { position: absolute; top: 6px; right: 6px; border: 0; }

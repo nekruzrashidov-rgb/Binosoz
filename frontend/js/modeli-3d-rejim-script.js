@@ -370,6 +370,10 @@
 
     let alive = true;
     house.setFocusMode(true); house.setAutoRotate(false);
+    // The glass panels (a blur over the canvas) only on a fast GPU: two seconds at ≥ 30 fps on full quality; a step down of
+    // the quality takes it away again (styles.css, .h3d-glass).
+    let fast = 0;
+    house.on('fps', (f, q) => { fast = q >= 2 && f >= 30 ? fast + 1 : 0; if (fast >= 2) root.classList.add('h3d-glass'); if (q < 2) root.classList.remove('h3d-glass'); });
     // Labels stay out of the controls: the engine skips (or moves) a label over any of these boxes.
     const avoid = [top, pop, viewSeg, floorsBox, list, listTab, card, conceptNote, poiBar, attribution, insideBar];
     house.setLabelAvoid(() => {
@@ -405,7 +409,7 @@
         if (house.parking) house.setParking(false);
         if (house.state().xray) house.setXray(false);
         house.setFilter(null); house.setFocusMode(false);
-        house.on('select', ctx.onModelSelect || (() => {})); house.on('view', () => {}); house.on('mode', () => {});
+        house.on('select', ctx.onModelSelect || (() => {})); house.on('view', () => {}); house.on('mode', () => {}); house.on('fps', () => {});
         if (next && next.parentNode === home) home.insertBefore(ctx.box, next); else home.appendChild(ctx.box);
         root.remove(); document.documentElement.classList.remove('h3d-lock');
         delete window.__house3dMode;

@@ -6,7 +6,7 @@
   const q = new URLSearchParams(location.search);
   const num = (k) => (q.has(k) ? Number(q.get(k)) : undefined);
   const house = window.S.House3D.create(document.getElementById('stage'), {
-    floors: num('floors') || 20, time: q.get('time') || 'dusk', autoRotate: false, overlay: false,
+    floors: num('floors') || 20, time: q.get('time') || 'dusk', autoRotate: false, overlay: false, reflections: 'always',
     view: { az: num('az'), pol: num('pol'), distK: num('distK'), tyK: num('tyK'), tx: num('tx') },
   });
   window.__house = house;

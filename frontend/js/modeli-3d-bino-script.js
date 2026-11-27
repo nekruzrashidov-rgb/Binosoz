@@ -210,7 +210,7 @@
 
   function create(container, opts) {
     opts = opts || {};
-    const handlers = { select: opts.onSelectApartment || (() => {}), floor: opts.onSelectFloor || (() => {}), hover: opts.onHover || (() => {}), mode: () => {}, room: () => {}, view: () => {} };
+    const handlers = { select: opts.onSelectApartment || (() => {}), floor: opts.onSelectFloor || (() => {}), hover: opts.onHover || (() => {}), mode: () => {}, room: () => {}, view: () => {}, fps: () => {} };
     const rand = rnd(7);
 
     const renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -920,8 +920,24 @@
       presetName = s.n.stars > 0.6 ? 'night' : s.n.glow > 0.5 ? 'dusk' : 'day';
       tgt = s;
       if (!smooth || !cur) { cur = clonePreset(s); applyCur(); }
-      clearTimeout(pmremTimer); pmremTimer = setTimeout(rebuildEnv, smooth ? 1200 : 500);
+      envLater(smooth ? 1200 : 500);
     }
+    // The reflections (PMREM of the sky) are rebuilt a moment after the light changes. Building them takes seconds of a still
+    // scene on a weak GPU and on software WebGL, and with them every frame there is many times heavier — so they are only for a
+    // GPU that keeps ≥ 20 fps at full quality (measured; opts.reflections === 'always' — the still renders). The rebuild waits
+    // for a calm moment: not during a camera flight and not right after a touch — the camera the person asked for comes first.
+    function envLater(delay) {
+      clearTimeout(pmremTimer);
+      const attempt = () => {
+        const always = opts.reflections === 'always';
+        if (!always && stats.quality < 2) return;
+        if (fly || performance.now() - lastInput < QUALITY_CALM_MS || (!always && !stats.fps)) { pmremTimer = setTimeout(attempt, 700); return; }
+        if (!always && stats.fps < 20) return;
+        rebuildEnv();
+      };
+      pmremTimer = setTimeout(attempt, delay);
+    }
+    function dropEnv() { clearTimeout(pmremTimer); scene.environment = null; if (envTex) { envTex.dispose(); envTex = null; } }
     // The hour (local) when the sun is at «deg» above the horizon: in the afternoon (sunset side) or the morning.
     function hourAtElevation(deg, afternoon) {
       let lo = afternoon ? 12.5 : 3, hi = afternoon ? 22 : 12.5;
@@ -962,8 +978,8 @@
     function setTime(name, instant) {
       if (!PRESETS[name]) return;
       presetName = name; clockH = null; tgt = snapshot(PRESETS[name]);
-      if (instant || !cur) { cur = clonePreset(tgt); applyCur(); rebuildEnv(); }
-      else { clearTimeout(pmremTimer); pmremTimer = setTimeout(() => { rebuildEnv(); }, 1400); }
+      if (instant || !cur) { cur = clonePreset(tgt); applyCur(); envLater(opts.reflections === 'always' ? 0 : 300); }
+      else envLater(1400);
     }
     function stepPreset(dt) {
       if (!cur || !tgt) return;
@@ -1046,7 +1062,7 @@
     function setView(name, dur) {
       if (mode !== 'house') return;
       currentView = VIEWS.includes(name) ? name : 'overview';
-      autoRotate = false;
+      autoRotate = false; lastInput = performance.now();
       // The distances between the blocks are drawn on «Сверху» only.
       dims.forEach((d) => { d.line.visible = currentView === 'top'; if (d.label) d.label.on = currentView === 'top'; });
       labels.forEach((l) => { if (l.group === 'yard') l.on = !parkingOn && yardView(); });
@@ -1071,6 +1087,7 @@
       autoRotate = false;
       const bi = blocks.findIndex((b) => b.code === code);
       focusCode = bi < 0 ? null : code;
+      lastInput = performance.now();
       if (bi < 0) { flyTo(viewGoal('overview'), 1); handlers.view(currentView = 'overview'); labels.forEach((l) => { if (l.group === 'yard') l.on = !parkingOn && yardView(); }); return; }
       const b = blocks[bi];
       flyTo({ tx: b.center.x, tz: b.center.z, ty: b.H * 0.5, dist: Math.max(70, b.H * 2.2) * (portrait() ? 1.4 : 1), pol: 1.3 }, 1.1);
@@ -1521,22 +1538,27 @@
       if (selectedIdx >= 0 && (apartmentInst[selectedIdx].floor !== n || apartmentInst[selectedIdx].block !== selBlock)) selectedIdx = -1;
       if (!silent) handlers.floor(n, b.code);
     }
+    // flyThere: true — fly to its windows; false — only mark it (fresh data, the camera stays where the person put it);
+    // not given — fly in the full-screen mode (focusApt), stay in the catalog frame.
     function selectApartment(id, flyThere) {
       const i = aptMap[id];
       if (i == null) { selectedIdx = -1; return; }
       selectedIdx = i; selectFloor(apartmentInst[i].floor, true, false, apartmentInst[i].block);
-      if (flyThere || focusApt) { autoRotate = false; flyToApartment(i); }
+      if (flyThere === true || (focusApt && flyThere !== false)) { autoRotate = false; flyToApartment(i); }
     }
     function clearSelection() { selectedIdx = -1; selBand.visible = false; if (!focusApt) defaultGoal(); }
 
     // ---------- speed: FPS and the automatic quality ----------
     // Below 30 frames a second for three seconds in a row the quality steps down (never back up in this visit):
     // 2 — everything; 1 — no shadows, at most 1.25 device pixels; 0 — 1 device pixel, no clouds, no outlines of the
-    // neighbour buildings.
+    // neighbour buildings. A step rebuilds the shaders of every material — on a weak phone (and on software WebGL) the
+    // scene stands still for seconds. So a step never comes during a camera flight or right after a touch (it waits for a
+    // calm moment), and below 12 frames a second it goes straight to 0 — one rebuild, not two.
     const stats = { fps: 0, quality: 2, frames: 0, t0: performance.now(), slow: 0, since: performance.now() };
+    const QUALITY_CALM_MS = 2500;
     function setQuality(q) {
       stats.quality = q;
-      if (q <= 1) { sun.castShadow = false; renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25)); }
+      if (q <= 1) { sun.castShadow = false; renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25)); dropEnv(); }
       if (q <= 0) { renderer.setPixelRatio(1); clouds.forEach((c) => { c.visible = false; }); contextGroup.children.forEach((c) => { if (c.userData.edges) c.visible = false; }); }
       resize();
     }
@@ -1544,10 +1566,11 @@
       stats.frames++;
       if (now - stats.t0 < 1000) return;
       stats.fps = Math.round(stats.frames * 1000 / (now - stats.t0)); stats.frames = 0; stats.t0 = now;
+      handlers.fps(stats.fps, stats.quality);
       // Not in the first 4 s after the loop (re)starts: the shaders compile and the shadows build then.
       if (opts.autoQuality === false || now - stats.since < 6000) return;
       stats.slow = stats.fps < 30 ? stats.slow + 1 : 0;
-      if (stats.slow >= 3 && stats.quality > 0) { stats.slow = 0; setQuality(stats.quality - 1); }
+      if (stats.slow >= 3 && stats.quality > 0 && !fly && now - lastInput > QUALITY_CALM_MS) { stats.slow = 0; setQuality(stats.fps < 12 ? 0 : stats.quality - 1); }
     }
 
     // ---------- loop ----------

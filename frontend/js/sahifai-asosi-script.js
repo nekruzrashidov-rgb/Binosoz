@@ -404,6 +404,9 @@
     function pushToHouse() {
       if (!house) return;
       house.setData(st.units.map((a) => ({ id: a.id, block: a.block, floor: a.floor, planSlot: a.planSlot, number: a.number, status: a.status, rooms: a.rooms, area: a.area, price: a.price, kind: a.kind })), complexModel());
+      // In the full-screen 3D fresh data (late floors, a booking) only repaints: the camera stays on the block or the view the
+      // person chose (on a slow phone the apartments arrive seconds after the scene).
+      if (full) { if (st.sel) house.selectApartment(st.sel.id, false); return; }
       if (st.sel) house.selectApartment(st.sel.id); else if (st.floor !== null) house.selectFloor(st.floor, st.blockSel);
     }
 
