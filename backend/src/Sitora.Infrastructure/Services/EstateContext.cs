@@ -22,14 +22,20 @@ public class EstateContext(AppDbContext db, IExchangeRateService rates, TimeProv
 
     public static string CacheKey(Guid organizationId) => "estate-context:" + organizationId;
 
-    public Task<string> BuildAsync(Guid organizationId, CancellationToken ct = default) =>
-        cache.GetOrCreateAsync(CacheKey(organizationId), entry =>
+    // Дома на сайте (IsPublished) — для гостя; покупателю в кабинете добавляются дома его сделок, даже скрытые с сайта.
+    public Task<string> BuildAsync(Guid organizationId, CancellationToken ct = default) => BuildAsync(organizationId, [], ct);
+
+    public Task<string> BuildAsync(Guid organizationId, IReadOnlyCollection<Guid> alsoBuildings, CancellationToken ct = default)
+    {
+        var also = alsoBuildings.Distinct().OrderBy(id => id).ToList();
+        return cache.GetOrCreateAsync(CacheKey(organizationId) + (also.Count == 0 ? "" : ":" + string.Join(',', also)), entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = CacheDuration;
-            return CreateAsync(organizationId, ct);
+            return CreateAsync(organizationId, also, ct);
         })!;
+    }
 
-    private async Task<string> CreateAsync(Guid organizationId, CancellationToken ct)
+    private async Task<string> CreateAsync(Guid organizationId, List<Guid> also, CancellationToken ct)
     {
         var org = await db.Organizations.IgnoreQueryFilters().AsNoTracking()
             .Where(o => o.Id == organizationId)
@@ -37,8 +43,8 @@ public class EstateContext(AppDbContext db, IExchangeRateService rates, TimeProv
             .SingleAsync(ct);
 
         var buildings = await db.Buildings.IgnoreQueryFilters().AsNoTracking()
-            .Where(b => b.OrganizationId == organizationId)
-            .OrderBy(b => b.NameRu).ThenBy(b => b.Id)
+            .Where(b => b.OrganizationId == organizationId && (b.IsPublished || also.Contains(b.Id)))
+            .OrderBy(b => b.SortOrder).ThenBy(b => b.NameRu).ThenBy(b => b.Id)
             .Select(CatalogService.ToBuildingResponse(false))
             .ToListAsync(ct);
         // Квартиры с истёкшей бронью сайт уже показывает свободными — так же и здесь.
@@ -62,7 +68,8 @@ public class EstateContext(AppDbContext db, IExchangeRateService rates, TimeProv
         if (!string.IsNullOrWhiteSpace(org.Phone)) contacts.Add("phone " + org.Phone.Trim());
         if (!string.IsNullOrWhiteSpace(org.Telegram)) contacts.Add("Telegram " + org.Telegram.Trim());
         if (!string.IsNullOrWhiteSpace(org.Email)) contacts.Add("e-mail " + org.Email.Trim());
-        if (!string.IsNullOrWhiteSpace(org.Address)) contacts.Add("sales office " + org.Address.Trim());
+        // Адрес ЖК из CRM («Компания на сайте») — его же показывает карта сайта; он же адрес офиса продаж.
+        if (!string.IsNullOrWhiteSpace(org.Address)) contacts.Add("address of the complex and the sales office " + org.Address.Trim());
         lines.Add(contacts.Count > 0
             ? "Contacts: " + string.Join("; ", contacts) + ". Office hours are not in the database."
             : "Contacts: not in the database — point to the contact page /contact.");

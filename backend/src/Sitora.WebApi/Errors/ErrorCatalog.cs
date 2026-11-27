@@ -165,6 +165,7 @@ public static class ErrorCatalog
         E("Введите код входа", "pin_required", "Рамзи воридшавиро ворид кунед", "Enter the sign-in code");
         E("Введите код из письма", "code_required", "Рамзи мактубро ворид кунед", "Enter the code from the e-mail");
         P("Не удалось создать учётную запись покупателя: ", "customer_account_failed", "Сохтани ҳисоби харидор муяссар нашуд: ", "Could not create the buyer account: ");
+        P(Sitora.Infrastructure.Services.CatalogService.NumberTakenInBuilding, "apartment_number_taken", "Ин рақам дар ин бино (блок) аллакай банд аст: ", "This number is already taken in this building (block): ");
         P("Неизвестная роль: ", "unknown_role", "Нақши номаълум: ", "Unknown role: ");
         P("Роль должна быть одной из: ", "invalid_role", "Нақш бояд яке аз инҳо бошад: ", "The role must be one of: ");
 
@@ -201,6 +202,51 @@ public static class ErrorCatalog
 
         // ---------- каталог ----------
         E("Дом не найден", "building_not_found", "Бино ёфт нашуд", "Building not found");
+        // ---------- блоки ЖК на участке (контур, место, уступы, план участка) ----------
+        E("Буква блока — от 1 до 4 латинских букв или цифр", "invalid_block_code", "Ҳарфи блок — аз 1 то 4 ҳарфи лотинӣ ё рақам", "The block code is 1 to 4 Latin letters or digits");
+        E("Порядок блока — от 0 до 1000", "invalid_block_order", "Тартиби блок — аз 0 то 1000", "The block order is from 0 to 1000");
+        E("Контур — от 3 до 64 вершин", "polygon_vertex_count", "Контур — аз 3 то 64 қулла", "An outline has 3 to 64 vertices");
+        E("Точка контура — числа x и y (м, не дальше 1000 м) и необязательный радиус скругления 0–50 м", "polygon_invalid_point",
+            "Нуқтаи контур — рақамҳои x ва y (м, на дуртар аз 1000 м) ва радиуси ихтиёрии гирдкунӣ 0–50 м",
+            "An outline point is the numbers x and y (m, within 1000 m) and an optional corner radius of 0–50 m");
+        E("Контур не должен пересекать сам себя", "polygon_self_intersection", "Контур набояд худашро бурад", "The outline must not cross itself");
+        E("Площадь контура должна быть больше нуля", "polygon_zero_area", "Масоҳати контур бояд аз сифр зиёд бошад", "The outline's area must be greater than zero");
+        E("Место блока на участке — не дальше 2000 м", "invalid_site_position", "Ҷои блок дар қитъа — на дуртар аз 2000 м", "The block's place on the site is within 2000 m");
+        E("Поворот блока — от -360 до 360°", "invalid_block_rotation", "Гардиши блок — аз -360 то 360°", "The block's rotation is from -360 to 360°");
+        E("Уступов — не больше 10", "too_many_setbacks", "Пиллаҳо — на зиёда аз 10", "No more than 10 setbacks");
+        E("Уступ начинается со 2-го этажа или выше", "invalid_setback_floor", "Пилла аз ошёнаи 2-юм ё болотар сар мешавад", "A setback starts on floor 2 or higher");
+        E("Глубина квартир уступа — от 4 до 14 м", "invalid_setback_depth", "Чуқурии манзилҳои пилла — аз 4 то 14 м", "The setback's apartment depth is 4 to 14 m");
+        E("Уступ начинается выше последнего этажа", "setback_above_roof", "Пилла аз ошёнаи охирин болотар сар мешавад", "The setback starts above the top floor");
+        E("Контур уступа выходит за контур блока", "setback_outside_block", "Контури пилла аз контури блок берун мебарояд", "The setback's outline goes beyond the block's outline");
+        E("Блоки на участке пересекаются", "blocks_overlap", "Блокҳо дар қитъа ҳамдигарро мебуранд", "The blocks overlap on the site");
+        P("Расстояние между блоками меньше допустимого: ", "blocks_too_close", "Масофаи байни блокҳо аз иҷозатдодашуда камтар аст: ",
+            "The distance between the blocks is less than allowed: ");
+        E("Дом изменён другим пользователем", "building_conflict", "Биноро корбари дигар тағйир дод", "The building was changed by another user");
+        // ---------- планировки застройщика ----------
+        E("Код планировки — от 1 до 32 латинских букв, цифр, дефисов", "invalid_layout_code", "Рамзи нақша — аз 1 то 32 ҳарфи лотинӣ, рақам, дефис", "The layout code is 1 to 32 Latin letters, digits, hyphens");
+        E("Планировка — объект JSON с контуром и комнатами", "invalid_layout", "Нақша — объекти JSON бо контур ва ҳуҷраҳо", "A layout is a JSON object with an outline and rooms");
+        E("Контур планировки — от 3 до 64 вершин, без самопересечений", "invalid_layout_outline", "Контури нақша — аз 3 то 64 қулла, бе бурриши худ", "The layout outline has 3 to 64 vertices and does not cross itself");
+        E("В планировке — от 1 до 30 комнат", "invalid_layout_rooms", "Дар нақша — аз 1 то 30 ҳуҷра", "A layout has 1 to 30 rooms");
+        E("Комната планировки — [название, многоугольник] без самопересечений, не меньше 0,5 м²", "invalid_layout_room", "Ҳуҷраи нақша — [ном, бисёркунҷа] бе бурриши худ, на камтар аз 0,5 м²", "A layout room is [name, polygon], not crossing itself, at least 0.5 m²");
+        E("Комната планировки выходит за её контур", "layout_room_outside", "Ҳуҷраи нақша аз контури он берун мебарояд", "A layout room goes beyond its outline");
+        E("Площадь комнат планировки — от 10 до 1 000 м²", "invalid_layout_area", "Масоҳати ҳуҷраҳои нақша — аз 10 то 1 000 м²", "The rooms of a layout total 10 to 1,000 m²");
+        E("Балкон планировки — многоугольник без самопересечений", "invalid_layout_balcony", "Балкони нақша — бисёркунҷа бе бурриши худ", "The layout balcony is a polygon that does not cross itself");
+        E("Планировка не найдена", "layout_not_found", "Нақша ёфт нашуд", "Layout not found");
+        E("Блок с такой буквой уже есть", "block_code_taken", "Блок бо чунин ҳарф аллакай ҳаст", "A block with this code already exists");
+        E("План участка изменён другим пользователем", "site_plan_conflict", "Нақшаи қитъаро корбари дигар тағйир дод", "The site plan was changed by another user");
+        E("Зон участка — не больше 40", "too_many_site_zones", "Минтақаҳои қитъа — на зиёда аз 40", "No more than 40 site zones");
+        E("Неизвестная зона участка", "unknown_site_zone", "Минтақаи номаълуми қитъа", "Unknown site zone");
+        // ---------- цена за м² по этажам ----------
+        E("Валюта — TJS или USD", "invalid_currency", "Асъор — TJS ё USD", "The currency is TJS or USD");
+        E("Ступеней цены — не больше 20", "too_many_price_steps", "Зинаҳои нарх — на зиёда аз 20", "No more than 20 price steps");
+        E("Этажи ступени — от 1 до 100", "invalid_price_step_floor", "Ошёнаҳои зина — аз 1 то 100", "The step's floors are from 1 to 100");
+        E("Этаж «по» не может быть ниже этажа «с»", "price_step_reversed", "Ошёнаи «то» аз ошёнаи «аз» паст буда наметавонад", "The «to» floor cannot be below the «from» floor");
+        E("Цена за м² — больше нуля и не больше 1 000 000", "invalid_price_per_m2", "Нархи 1 м² — аз сифр зиёд ва на бештар аз 1 000 000", "The price per m² is above zero and at most 1,000,000");
+        E("Ступени цены не должны пересекаться по этажам", "price_steps_overlap", "Зинаҳои нарх набояд аз рӯи ошёна ҳамдигарро буранд", "Price steps must not overlap by floors");
+        E("Цена машино-места — больше нуля и не больше 10 000 000", "invalid_parking_price", "Нархи ҷойи мошин — аз сифр зиёд ва на бештар аз 10 000 000", "The parking space price is above zero and at most 10,000,000");
+        E("Цена должна быть больше нуля", "invalid_price", "Нарх бояд аз сифр зиёд бошад", "The price must be greater than zero");
+        E("Сначала задайте цены по этажам", "price_rule_missing", "Аввал нархҳоро аз рӯи ошёна муайян кунед", "Set the prices by floor first");
+        E("Правило цены изменено другим пользователем", "price_rule_conflict", "Қоидаи нархро корбари дигар тағйир дод", "The price rule was changed by another user");
         E("Этаж не найден", "floor_not_found", "Ошёна ёфт нашуд", "Floor not found");
         E("Квартира не найдена", "apartment_not_found", "Манзил ёфт нашуд", "Apartment not found");
         E("План этажа не задан", "floor_plan_not_found", "Нақшаи ошёна муайян нашудааст", "The floor plan is not set");
@@ -353,7 +399,7 @@ public static class ErrorCatalog
         E("Описание на русском не длиннее 4000 символов", "description_too_long", "Тавсиф бо забони русӣ на дарозтар аз 4000 аломат", "Description in Russian — up to 4000 characters");
         E("Описание на таджикском не длиннее 4000 символов", "description_too_long", "Тавсиф бо забони тоҷикӣ на дарозтар аз 4000 аломат", "Description in Tajik — up to 4000 characters");
         E("Этажность должна быть от 1 до 100", "invalid_floors_count", "Шумораи ошёнаҳо бояд аз 1 то 100 бошад", "The number of floors must be from 1 to 100");
-        E("Номер этажа должен быть от 0 до 100", "invalid_floor_number", "Рақами ошёна бояд аз 0 то 100 бошад", "The floor number must be from 0 to 100");
+        E("Номер этажа должен быть от -5 до 100", "invalid_floor_number", "Рақами ошёна бояд аз -5 то 100 бошад", "The floor number must be from -5 to 100");
         E("Номер квартиры должен быть от 1 до 99999", "invalid_apartment_number", "Рақами манзил бояд аз 1 то 99999 бошад", "The apartment number must be from 1 to 99999");
         E("Комнат должно быть от 0 (студия) до 10", "invalid_rooms", "Шумораи ҳуҷраҳо бояд аз 0 (студия) то 10 бошад", "Rooms must be from 0 (studio) to 10");
         E("Год сдачи — от 2000 до 2100", "invalid_year", "Соли супоридан — аз 2000 то 2100", "Completion year — from 2000 to 2100");

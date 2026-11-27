@@ -16,7 +16,10 @@ public record PaymentReportRow(
     decimal AmountTjs,
     PaymentMethod Method,
     bool IsReversal,
-    string? Comment);
+    string? Comment,
+    // Блок ЖК и вид помещения — номер для людей «Блок A, кв. 45» (UnitNames); у дома без блока BlockCode = null.
+    string? BlockCode = null,
+    ApartmentKind ApartmentKind = ApartmentKind.Residential);
 
 // Поступления за период: платежи и сторно (с минусом), итоги по валюте платежа и общий итог в сомони.
 public record PaymentsReportResponse(
@@ -36,7 +39,10 @@ public record DebtReportRow(
     decimal Overdue,
     DateOnly OldestOverdueDate,
     int DaysOverdue,
-    decimal Remaining);
+    decimal Remaining,
+    // Блок ЖК и вид помещения — номер для людей «Блок A, кв. 45» (UnitNames); у дома без блока BlockCode = null.
+    string? BlockCode = null,
+    ApartmentKind ApartmentKind = ApartmentKind.Residential);
 
 // Задолженность на дату: сделки, где по графику на эту дату оплачено меньше, чем начислено.
 public record DebtsReportResponse(

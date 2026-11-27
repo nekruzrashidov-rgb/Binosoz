@@ -12,12 +12,21 @@ const BASE = process.argv[2] || 'http://localhost:5500';
 const OUT = fileURLToPath(new URL('../../img/renders/', import.meta.url));
 const SIZES = [800, 1600, 2400];
 
-// name, time of day, camera, aspect (width / height)
+// The whole complex «Rich Tower» from the blocks of the seed (the same data as the e2e mock: outlines, places, setbacks,
+// the yard) — written next to render.html; every apartment free (a render shows the concept, not sales).
+const { BLOCKS, SITE, units, floorsOf, building } = require('../e2e/tests/complex-mock.js');
+const complex = {
+  complex: { site: SITE, blocks: BLOCKS.map((b) => { const x = building(b); return { id: x.id, code: b.code, name: x.name, footprint: b.footprint, position: b.pos, setbacks: x.setbacks, floors: b.floors, elevators: 3, amenities: x.amenities }; }) },
+  units: BLOCKS.flatMap((b) => floorsOf(b).flatMap((n) => units(b, n).map((a) => ({ id: a.id, block: b.code, floor: n, planSlot: a.planSlot, number: a.number, status: 'free', rooms: a.rooms, area: a.area, price: a.price, kind: a.kind.toLowerCase() })))),
+};
+await writeFile(fileURLToPath(new URL('./complex.json', import.meta.url)), JSON.stringify(complex));
+
+// name, time of day, camera view of the complex, aspect (width / height)
 const SHOTS = [
-  ['tower-dusk-wide', { time: 'dusk', az: 0.8, pol: 1.5, distK: 0.66, tyK: 0.8, tx: -13 }, 16 / 9],
-  ['tower-dusk-tall', { time: 'dusk', az: 0.85, pol: 1.55, distK: 0.55, tyK: 0.75 }, 4 / 5],
-  ['tower-day-tall', { time: 'day', az: -0.6, pol: 1.55, distK: 0.55, tyK: 0.75 }, 4 / 5],
-  ['tower-night-tall', { time: 'night', az: 2.4, pol: 1.55, distK: 0.55, tyK: 0.75 }, 4 / 5],
+  ['tower-dusk-wide', { time: 'dusk', complex: 1, distK: 1.35, tyK: 0.8 }, 16 / 9],
+  ['tower-dusk-tall', { time: 'dusk', complex: 1, view: 'yard' }, 4 / 5],
+  ['tower-day-tall', { time: 'day', complex: 1, view: 'street' }, 4 / 5],
+  ['tower-night-tall', { time: 'night', complex: 1, view: 'overview' }, 4 / 5],
 ];
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
 

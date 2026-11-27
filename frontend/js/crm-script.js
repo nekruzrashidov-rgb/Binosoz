@@ -139,12 +139,12 @@
         S.$$('.btn svg', bar).forEach((s) => { s.style.cssText = 'width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2'; });
         body.replaceChildren(bar, holder);
         const draw = () => holder.replaceChildren(S.tbl([
-          { label: '#', render: (d) => shortId(d.id) }, { label: t('deal.apt'), render: (d) => h('b', null, '№ ' + d.apartmentNumber) }, { label: t('deal.customer'), render: (d) => d.customerName }, { label: t('deal.stage'), render: (d) => S.stageChip(d.stage) },
+          { label: '#', render: (d) => shortId(d.id) }, { label: t('deal.apt'), render: (d) => h('b', null, S.aptShort(d)) }, { label: t('deal.customer'), render: (d) => d.customerName }, { label: t('deal.stage'), render: (d) => S.stageChip(d.stage) },
           { label: t('deal.price'), r: true, num: true, render: (d) => S.fmt.money(d.price - d.discount, d.currency) },
           // The real API's list has no paid sum (it is in each deal's schedule): the column shows only when it is known.
           list.some((d) => d.paid !== null) ? { label: t('sch.paid'), r: true, num: true, render: (d) => S.fmt.money(d.paid, d.currency) } : null,
           { label: t('deal.manager'), render: (d) => d.managerName || managers[d.managerId] || '' }].filter(Boolean),
-          list.filter((d) => (stage === 'all' || d.stage === stage) && (!q || (d.customerName + ' ' + d.apartmentNumber + ' ' + d.id).toLowerCase().includes(q))), { onRow: (d) => dealDrawer(d.id, load), empty: t('deal.none') }));
+          list.filter((d) => (stage === 'all' || d.stage === stage) && (!q || (d.customerName + ' ' + d.apartmentNumber + ' ' + S.aptNum(d) + ' ' + d.id).toLowerCase().includes(q))), { onRow: (d) => dealDrawer(d.id, load), empty: t('deal.none') }));
         // The list carries the manager's id only: names come from the staff list (leaders may read it) and from the signed-in user.
         let managers = {};
         const loadManagers = async () => {
@@ -241,7 +241,7 @@
             const r = await S.api.reportPayments(from.value, to.value);
             const totals = Object.keys(r.totals || {}).map((c) => h('div', { class: 'card kpi' }, h('span', null, t('rep.total') + ' ' + c), h('b', { style: { fontSize: '22px' } }, S.fmt.money(r.totals[c], c)), h('i')));
             holder.replaceChildren(h('div', { class: 'grid g4', style: { marginBottom: '14px' } }, totals, r.totalTjs !== null && r.totalTjs !== undefined ? h('div', { class: 'card kpi', style: { '--k': 'var(--good)' } }, h('span', null, t('rep.totalTjs')), h('b', { style: { fontSize: '22px' } }, S.fmt.money(r.totalTjs, 'TJS')), h('i')) : null),
-              S.tbl([{ label: t('doc.date'), render: (p) => S.fmt.date(p.date) }, { label: t('deal.apt'), render: (p) => (p.apartmentNumber ? '№ ' + p.apartmentNumber : '#' + p.dealId) }, { label: t('deal.customer'), render: (p) => p.customerName }, { label: t('pay.amount'), r: true, num: true, render: (p) => (p.reversal ? '− ' : '') + S.fmt.money(p.amount, p.currency) }, { label: t('pay.tjs'), r: true, num: true, render: (p) => (p.reversal ? '− ' : '') + S.fmt.money(p.amountTjs, 'TJS') }, { label: t('pay.rate'), r: true, num: true, render: (p) => p.rate || '—' }, { label: t('pay.comment'), render: (p) => p.comment }], r.rows, { rowClass: (p) => (p.reversal ? 'rev' : ''), onRow: (p) => dealDrawer(p.dealId, null, p), empty: t('rep.none') }));
+              S.tbl([{ label: t('doc.date'), render: (p) => S.fmt.date(p.date) }, { label: t('deal.apt'), render: (p) => (p.apartmentNumber ? S.aptShort(p) : '#' + p.dealId) }, { label: t('deal.customer'), render: (p) => p.customerName }, { label: t('pay.amount'), r: true, num: true, render: (p) => (p.reversal ? '− ' : '') + S.fmt.money(p.amount, p.currency) }, { label: t('pay.tjs'), r: true, num: true, render: (p) => (p.reversal ? '− ' : '') + S.fmt.money(p.amountTjs, 'TJS') }, { label: t('pay.rate'), r: true, num: true, render: (p) => p.rate || '—' }, { label: t('pay.comment'), render: (p) => p.comment }], r.rows, { rowClass: (p) => (p.reversal ? 'rev' : ''), onRow: (p) => dealDrawer(p.dealId, null, p), empty: t('rep.none') }));
           } catch (e) { holder.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
         }
         load();
@@ -254,7 +254,7 @@
         body.replaceChildren(h('div', { class: 'toolbar' }, S.field(t('rep.asOf'), asOf), h('div', { style: { alignSelf: 'flex-end', display: 'flex', gap: '8px' } }, go, xl)), holder);
         async function load() {
           holder.replaceChildren(S.skeleton(4, 38));
-          try { const r = await S.api.reportDebts(asOf.value); holder.replaceChildren(S.tbl([{ label: t('deal.customer'), render: (d) => h('b', null, d.customerName) }, { label: t('f.phone'), render: (d) => d.phone }, { label: t('deal.apt'), render: (d) => '№ ' + d.apartmentNumber }, { label: t('debt.amount'), r: true, num: true, render: (d) => S.chip('Overdue', S.fmt.money(d.overdue, d.currency)) }, { label: t('debt.since'), render: (d) => S.fmt.date(d.since) }, { label: t('debt.days'), r: true, num: true, render: (d) => d.days }, { label: t('sch.left'), r: true, num: true, render: (d) => S.fmt.money(d.remaining, d.currency) }], r.rows, { onRow: (d) => dealDrawer(d.dealId, null, d), empty: t('debt.none') })); } catch (e) { holder.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
+          try { const r = await S.api.reportDebts(asOf.value); holder.replaceChildren(S.tbl([{ label: t('deal.customer'), render: (d) => h('b', null, d.customerName) }, { label: t('f.phone'), render: (d) => d.phone }, { label: t('deal.apt'), render: (d) => S.aptShort(d) }, { label: t('debt.amount'), r: true, num: true, render: (d) => S.chip('Overdue', S.fmt.money(d.overdue, d.currency)) }, { label: t('debt.since'), render: (d) => S.fmt.date(d.since) }, { label: t('debt.days'), r: true, num: true, render: (d) => d.days }, { label: t('sch.left'), r: true, num: true, render: (d) => S.fmt.money(d.remaining, d.currency) }], r.rows, { onRow: (d) => dealDrawer(d.dealId, null, d), empty: t('debt.none') })); } catch (e) { holder.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
         }
         load();
       },
@@ -469,11 +469,25 @@
         const ecoForm = S.eco ? S.eco.form(b, (r) => { b.eco = r && r.eco; }) : null;
         // Amenities of the building: the site lists only these (Content and leaders).
         const amenForm = S.eco ? S.eco.amenitiesForm(b, (r) => { b.amenities = (r && r.amenities) || []; }) : null;
-        body.replaceChildren(buildingBar(bs, bid, 'catalog'), bform, locationForm(b), amenForm, ecoForm, h('h3', { style: { marginTop: '10px' } }, t('cat.apts')), tools, holder);
+        // A block of the complex: the outline and the place on the site (blok-shakl-crm-script.js), Content and leaders.
+        const shapeForm = S.blockForms ? S.blockForms.shape(b, bs) : null;
+        // Prices by floor (the owner and the object's head): the rule and «Пересчитать цены» for the free apartments.
+        const priceForm = S.blockForms && S.api.isLeader() ? S.blockForms.prices(b, () => drawApts()) : null;
+        // On the public site or hidden from it (leaders): deals, schedules and payments of a hidden building do not change.
+        const pubBox = h('input', { type: 'checkbox', checked: b.isPublished !== false, disabled: !S.api.isLeader() });
+        pubBox.addEventListener('change', async () => {
+          try { const r = await S.api.setPublished(b.id, pubBox.checked); b.isPublished = r.isPublished; S.toast(t(r.isPublished ? 'cat.published' : 'cat.hidden'), 'ok'); }
+          catch (er) { pubBox.checked = !pubBox.checked; S.err(er); }
+        });
+        const pubCard = h('div', { class: 'card stack' }, h('label', { class: 'check' }, pubBox, t('cat.onSite')),
+          b.isPublished === false ? S.chip('warn', t('cat.hidden')) : null, h('p', { class: 'hint' }, t('cat.onSiteHint')));
+        // The developer's layouts (JSON with a preview): apartments with their code are drawn by them on the site.
+        const layoutsForm = S.blockForms ? S.blockForms.layouts() : null;
+        body.replaceChildren(buildingBar(bs, bid, 'catalog'), pubCard, bform, locationForm(b), shapeForm, priceForm, layoutsForm, amenForm, ecoForm, h('h3', { style: { marginTop: '10px' } }, t('cat.apts')), tools, holder);
         async function drawApts() {
           const fl = floors.find((f) => String(f.id) === String(floorId)); holder.replaceChildren(S.skeleton(4, 38));
           const list = (await S.api.floorApartments(fl)).sort((a, c) => (a.planSlot || 0) - (c.planSlot || 0));
-          holder.replaceChildren(S.tbl([{ label: '№', render: (a) => h('b', null, a.number) }, { label: t('cat.slot'), render: (a) => a.planSlot }, { label: t('f.rooms'), render: (a) => S.fmt.rooms(a.rooms) }, { label: t('f.area'), r: true, num: true, render: (a) => S.fmt.area(a.area) }, { label: t('cat.pps'), r: true, num: true, render: (a) => S.fmt.n(a.pricePerSqm) }, { label: t('deal.price'), r: true, num: true, render: (a) => S.fmt.money(a.price, 'TJS') }, { label: t('deal.stage'), render: (a) => S.statusChip(a.status) }, { label: '', r: true, render: (a) => h('span', { class: 'row', style: { justifyContent: 'flex-end', gap: '6px', flexWrap: 'nowrap' } }, h('button', { class: 'btn ghost sm', onclick: () => aptForm(a, fl, drawApts) }, t('common.edit')), a.status === 'free' || a.status === 'onrequest' ? h('button', { class: 'btn soft sm', onclick: async (e) => { await S.busy(e.currentTarget, async () => { try { await S.api.onRequest(a.id, a.status === 'free'); drawApts(); } catch (er) { S.err(er); } }); } }, a.status === 'free' ? t('cat.toRequest') : t('cat.toFree')) : null) }], list, { empty: t('cat.noApts'), rowClass: (a) => 'apt-st st-' + a.status }));
+          holder.replaceChildren(S.tbl([{ label: '№', render: (a) => h('b', null, a.number) }, { label: t('cat.slot'), render: (a) => a.planSlot }, { label: t('f.rooms'), render: (a) => S.fmt.rooms(a.rooms) }, { label: t('f.area'), r: true, num: true, render: (a) => S.fmt.area(a.area) }, { label: t('cat.pps'), r: true, num: true, render: (a) => S.fmt.n(a.pricePerSqm) }, { label: t('deal.price'), r: true, num: true, render: (a) => S.fmt.money(a.price, a.currency) }, { label: t('deal.stage'), render: (a) => S.statusChip(a.status) }, { label: '', r: true, render: (a) => h('span', { class: 'row', style: { justifyContent: 'flex-end', gap: '6px', flexWrap: 'nowrap' } }, h('button', { class: 'btn ghost sm', onclick: () => aptForm(a, fl, drawApts) }, t('common.edit')), a.status === 'free' || a.status === 'onrequest' ? h('button', { class: 'btn soft sm', onclick: async (e) => { await S.busy(e.currentTarget, async () => { try { await S.api.onRequest(a.id, a.status === 'free'); drawApts(); } catch (er) { S.err(er); } }); } }, a.status === 'free' ? t('cat.toRequest') : t('cat.toFree')) : null) }], list, { empty: t('cat.noApts'), rowClass: (a) => 'apt-st st-' + a.status }));
         }
         drawApts();
       },
@@ -523,7 +537,7 @@
               h('span', { class: 'avatar' }, S.fmt.initials(c.customerName)),
               h('span', { class: 'chat-row-main' },
                 h('span', { class: 'row between', style: { flexWrap: 'nowrap', gap: '8px' } }, h('b', null, c.customerName), h('small', { class: 'muted' }, S.fmt.dt(c.lastMessageAt))),
-                h('small', { class: 'muted' }, [c.customerPhone, c.buildingName, t('apt.title', { n: c.apartmentNumber })].filter(Boolean).join(' · ')),
+                h('small', { class: 'muted' }, [c.customerPhone, c.buildingName, (c.blockCode ? S.unitName(c) : t('apt.title', { n: c.apartmentNumber }))].filter(Boolean).join(' · ')),
                 h('span', { class: 'chat-last' }, (c.lastFromCustomer ? '' : t('chats.you') + ' ') + c.lastMessage)),
               c.unread ? h('span', { class: 'badge', 'aria-label': t('chats.unread', { n: c.unread }) }, c.unread) : null)))
               : S.empty(t(search.value.trim() ? 'chats.noMatch' : 'chats.none'), 'send'));
@@ -575,7 +589,7 @@
                 { label: '№', render: (a) => h('b', null, a.number) },
                 { label: t('f.rooms'), render: (a) => S.fmt.rooms(a.rooms) },
                 { label: t('f.area'), r: true, num: true, render: (a) => S.fmt.area(a.area) },
-                { label: t('deal.price'), r: true, num: true, render: (a) => S.fmt.money(a.price, 'TJS') },
+                { label: t('deal.price'), r: true, num: true, render: (a) => S.fmt.money(a.price, a.currency) },
                 { label: t('deal.stage'), render: (a) => S.statusChip(a.status) },
                 edit ? { label: '', r: true, render: (a) => h('button', { class: 'btn ghost sm', onclick: (e) => { e.stopPropagation(); aptForm(a, floors.find((f) => f.number === a.floor), again); } }, t('common.edit')) } : null,
               ].filter(Boolean), l, { empty: t(apts.length ? 'obj.noMatch' : 'cat.noApts'), onRow: (a) => aptPanel(a, again), rowClass: (a) => 'apt-st st-' + a.status }));
@@ -694,7 +708,7 @@
             tariff && tariff.endsAt ? [h('dt', null, t('set.tariffEnds')), h('dd', null, S.fmt.date(tariff.endsAt))] : null),
           maxB != null ? S.bar((count * 100) / maxB, count >= maxB ? 'warn' : '') : null,
           h('p', { class: 'hint' }, t(tariff && tariff.name ? 'set.planHint' : 'set.noTariffHint')));
-        body.replaceChildren(h('div', { class: 'set-grid' }, form, h('div', { class: 'stack' },
+        body.replaceChildren(h('div', { class: 'set-grid' }, h('div', { class: 'stack' }, form, orgLocationForm(br, () => addr.value.trim())), h('div', { class: 'stack' },
           h('div', { class: 'card stack' }, h('h3', null, t('set.logo')), logoBox, h('p', { class: 'hint' }, t('set.logoHint')), h('div', { class: 'row' }, file, upload, del)),
           planCard)));
         // Tariffs and coefficients of the green features (owner): the utility calculator and the CO₂ figure use only these.
@@ -776,7 +790,7 @@
       try {
         const c = await S.api.customer(id);
         holder.replaceChildren(h('dl', { class: 'kv' }, h('dt', null, t('f.fullName')), h('dd', null, c.fullName), h('dt', null, t('f.phone')), h('dd', null, c.phone), h('dt', null, t('f.email')), h('dd', null, c.email || '—'), h('dt', null, t('f.passport')), h('dd', null, c.passport || '—')),
-          h('h3', { style: { margin: '16px 0 8px' } }, t('crm.deals')), S.tbl([{ label: t('deal.apt'), render: (d) => '№ ' + d.apartmentNumber }, { label: t('deal.stage'), render: (d) => S.stageChip(d.stage) }, { label: t('deal.price'), r: true, num: true, render: (d) => S.fmt.money(d.price - d.discount, d.currency) }], c.deals, { onRow: (d) => dealDrawer(d.id, null), empty: t('deal.none') }));
+          h('h3', { style: { margin: '16px 0 8px' } }, t('crm.deals')), S.tbl([{ label: t('deal.apt'), render: (d) => S.aptShort(d) }, { label: t('deal.stage'), render: (d) => S.stageChip(d.stage) }, { label: t('deal.price'), r: true, num: true, render: (d) => S.fmt.money(d.price - d.discount, d.currency) }], c.deals, { onRow: (d) => dealDrawer(d.id, null), empty: t('deal.none') }));
       } catch (e) { holder.replaceChildren(h('div', { class: 'form-err' }, e.message)); }
     }
 
@@ -1166,7 +1180,7 @@
     }
     function buildingBar(bs, bid, tab) {
       if (bs.length < 2 && !S.api.isOwner()) return null;
-      const sel = S.select('building', bs.map((b) => [b.id, b.name]), bid, { 'aria-label': t('cust.building') });
+      const sel = S.select('building', bs.map((b) => [b.id, b.name + (b.isPublished === false ? ' · ' + t('cat.hiddenShort') : '')]), bid, { 'aria-label': t('cust.building') });
       sel.addEventListener('change', () => { S.store.set('sitora.crmBuilding', sel.value); S.crmGo(tab); });
       return h('div', { class: 'toolbar' }, bs.length > 1 ? h('div', { style: { minWidth: '240px' } }, S.field(t('cust.building'), sel)) : null, h('span', { class: 'spacer' }),
         S.api.isOwner() ? h('button', { class: 'btn ghost', onclick: () => buildingForm(() => S.crmGo(tab)) }, t('cat.newBuilding')) : null);
@@ -1189,7 +1203,7 @@
       const tabsDef = () => [['overview', t('deal.tab.overview')], ['schedule', t('deal.tab.schedule')], ['payments', t('deal.tab.payments')], ['docs', t('deal.tab.docs')], ['chat', t('deal.tab.chat')], ['ai', t('deal.tab.ai')]];
       function draw() {
         const content = h('div', { class: 'stack' });
-        body.replaceChildren(h('div', { class: 'row between', style: { paddingRight: '40px', marginBottom: '14px' } }, h('div', null, h('h2', { style: { margin: 0, padding: 0 } }, t('deal.title', { n: d.apartmentNumber })), h('div', { class: 'muted', style: { fontWeight: 600 } }, (d.customerName || '—') + ' · #' + shortId(d.id))), d.readOnly ? null : S.stageChip(d.stage)),
+        body.replaceChildren(h('div', { class: 'row between', style: { paddingRight: '40px', marginBottom: '14px' } }, h('div', null, h('h2', { style: { margin: 0, padding: 0 } }, (d.blockCode ? S.unitName(d) : t('deal.title', { n: d.apartmentNumber }))), h('div', { class: 'muted', style: { fontWeight: 600 } }, (d.customerName || '—') + ' · #' + shortId(d.id))), d.readOnly ? null : S.stageChip(d.stage)),
           h('div', { class: 'tabs' }, tabsDef().map(([k, l]) => h('button', { class: tab === k ? 'on' : '', onclick: () => { tab = k; draw(); } }, l))), content);
         panes[tab](content);
       }
@@ -1204,7 +1218,7 @@
             if (idx && !reason.value.trim()) { S.showErrors(sf, { message: t('val.reason'), errors: { reason: [t('val.reason')] } }); return; }
             if (stageSel.value === 'Cancelled' && !(await S.confirm(t('deal.cancelConfirm'), t('deal.cancelDo'), true))) return;
             await S.busy(btn, async () => { try { await S.api.setStage(d.id, stageSel.value, reason.value.trim()); S.toast(t('common.saved'), 'ok'); await reload(); } catch (er) { S.showErrors(sf, er); } }); });
-          c.append(h('div', { class: 'card flat' }, h('dl', { class: 'kv' }, kv(t('deal.customer'), d.customerName), kv(t('f.phone'), d.customerPhone), kv(t('deal.apt'), '№ ' + d.apartmentNumber + ' · ' + t('floor.n', { n: d.floor })), kv(t('f.rooms'), S.fmt.rooms(d.rooms)), kv(t('f.area'), S.fmt.area(d.area)), kv(t('deal.price'), S.fmt.money(d.price, d.currency)), d.discount ? kv(t('deal.discount'), '− ' + S.fmt.money(d.discount, d.currency) + (d.discountReason ? ' (' + d.discountReason + ')' : '')) : null, kv(t('deal.manager'), d.managerName), kv(t('sch.paid'), S.fmt.money(d.paid, d.currency)), kv(t('sch.left'), S.fmt.money(d.remaining, d.currency)), kv(t('deal.since'), S.fmt.date(d.createdAt)))), canMove ? sf : null);
+          c.append(h('div', { class: 'card flat' }, h('dl', { class: 'kv' }, kv(t('deal.customer'), d.customerName), kv(t('f.phone'), d.customerPhone), kv(t('deal.apt'), S.aptShort(d) + ' · ' + t('floor.n', { n: d.floor })), kv(t('f.rooms'), S.fmt.rooms(d.rooms)), kv(t('f.area'), S.fmt.area(d.area)), kv(t('deal.price'), S.fmt.money(d.price, d.currency)), d.discount ? kv(t('deal.discount'), '− ' + S.fmt.money(d.discount, d.currency) + (d.discountReason ? ' (' + d.discountReason + ')' : '')) : null, kv(t('deal.manager'), d.managerName), kv(t('sch.paid'), S.fmt.money(d.paid, d.currency)), kv(t('sch.left'), S.fmt.money(d.remaining, d.currency)), kv(t('deal.since'), S.fmt.date(d.createdAt)))), canMove ? sf : null);
         },
         async schedule(c) {
           c.replaceChildren(S.skeleton(3, 50)); const s = await getSched();
@@ -1306,14 +1320,52 @@
   const CITIES = ['dushanbe', 'khujand', 'bokhtar', 'other'];
   // The point of the building on the map and its floor height (Content and leaders): the 3D model of the site shows the
   // real surroundings and the distances only with the coordinates; without the floor height it counts 3,0 m as an estimate.
+  // «Найти на карте» opens Google Maps by the address (the owner copies the point from there); the preview — the same map as
+  // the site (the iframe only when the API has the key), or the links.
+  function mapTools(address, lat, lon) {
+    const preview = h('div', { class: 'map-preview' });
+    let key = null;
+    const draw = () => {
+      const v = (el) => (el.value.trim() === '' ? null : Number(el.value.replace(',', '.')));
+      const la = v(lat), lo = v(lon);
+      const ok = la != null && lo != null && la >= -90 && la <= 90 && lo >= -180 && lo <= 180;
+      if (!S.map || !ok) { preview.replaceChildren(h('p', { class: 'hint' }, t('locf.noPoint'))); return; }
+      const p = { address: address(), lat: la, lon: lo, key };
+      preview.replaceChildren(key ? S.map.iframe(p) : h('p', { class: 'hint' }, t('locf.noKey')), S.map.links(p));
+    };
+    const find = h('button', { class: 'btn soft', type: 'button', onclick: () => { const a = address(); if (!a) { S.toast(t('locf.noAddress'), 'warn'); return; } window.open('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(a), '_blank', 'noopener'); } }, t('locf.find'));
+    [lat, lon].forEach((el) => el.addEventListener('change', draw));
+    if (S.api.publicBrand) S.api.publicBrand().then((b) => { key = (b && b.mapsEmbedKey) || null; draw(); }).catch(() => draw()); else draw();
+    return { find, preview, draw };
+  }
+  // The point of the complex (owner, CRM → «Настройки → Компания на сайте»): the site's map uses it; without it — the centre of
+  // the blocks that have coordinates.
+  function orgLocationForm(br, address) {
+    const num = (name, v, attrs) => S.input(name, Object.assign({ type: 'number', inputmode: 'decimal', value: v == null ? '' : v }, attrs));
+    const lat = num('latitude', br.latitude, { step: 'any', min: -90, max: 90, placeholder: '38.5598' });
+    const lon = num('longitude', br.longitude, { step: 'any', min: -180, max: 180, placeholder: '68.7870' });
+    const tools = mapTools(address, lat, lon);
+    const btn = h('button', { class: 'btn', type: 'submit' }, t('common.save'));
+    const f = h('form', { class: 'card stack loc-form', novalidate: true }, h('h3', null, t('locf.orgTitle')), h('p', { class: 'muted' }, t('locf.orgHint')),
+      h('div', { class: 'grid g2' }, S.field(t('locf.lat'), lat), S.field(t('locf.lon'), lon)), h('div', { class: 'row' }, btn, tools.find), tools.preview);
+    const val = (el) => (el.value.trim() === '' ? null : Number(el.value.replace(',', '.')));
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault(); S.showErrors(f, null);
+      await S.busy(btn, async () => {
+        try { const r = await S.api.saveOwnerLocation({ latitude: val(lat), longitude: val(lon) }); Object.assign(br, { latitude: r.latitude, longitude: r.longitude }); tools.draw(); S.toast(t('common.saved'), 'ok'); } catch (er) { S.showErrors(f, er); }
+      });
+    });
+    return f;
+  }
   function locationForm(b) {
     const num = (name, v, attrs) => S.input(name, Object.assign({ type: 'number', inputmode: 'decimal', value: v == null ? '' : v }, attrs));
     const lat = num('latitude', b.latitude, { step: 'any', min: -90, max: 90, placeholder: '38.5598' });
     const lon = num('longitude', b.longitude, { step: 'any', min: -180, max: 180, placeholder: '68.7870' });
     const fh = num('floorHeight', b.floorHeight, { step: '0.05', min: 2.4, max: 6, placeholder: '3.0' });
     const btn = h('button', { class: 'btn', type: 'submit' }, t('common.save'));
+    const tools = mapTools(() => b.address || '', lat, lon);
     const f = h('form', { class: 'card stack loc-form', novalidate: true }, h('h3', null, t('locf.title')), h('p', { class: 'muted' }, t('locf.hint')),
-      h('div', { class: 'grid g3' }, S.field(t('locf.lat'), lat), S.field(t('locf.lon'), lon), S.field(t('locf.floorH'), fh, t('locf.floorHint'))), h('div', null, btn));
+      h('div', { class: 'grid g3' }, S.field(t('locf.lat'), lat), S.field(t('locf.lon'), lon), S.field(t('locf.floorH'), fh, t('locf.floorHint'))), h('div', { class: 'row' }, btn, tools.find), tools.preview);
     const val = (el) => (el.value.trim() === '' ? null : Number(el.value.replace(',', '.')));
     f.addEventListener('submit', async (e) => {
       e.preventDefault(); S.showErrors(f, null);
@@ -1337,7 +1389,7 @@
     }
 
     function buildingStep() {
-      const nameRu = S.input('nameRu', { placeholder: 'Некруз Резиденс' }), nameTg = S.input('nameTg', { placeholder: 'Некруз Резиденс' });
+      const nameRu = S.input('nameRu', { placeholder: 'Блок A' }), nameTg = S.input('nameTg', { placeholder: 'Блоки A' });
       const city = S.select('city', CITIES.map((c) => [c, t('wiz.city.' + c)]), 'dushanbe');
       const cityOther = S.input('cityOther');
       const other = h('div', { hidden: true }, S.field(t('wiz.cityName') + ' *', cityOther));

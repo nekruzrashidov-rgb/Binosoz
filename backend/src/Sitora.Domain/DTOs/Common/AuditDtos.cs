@@ -20,4 +20,6 @@ public record AuditLogResponse(
     string? UserName = null,
     bool BySystem = false,
     string? EntityName = null,
-    int? ApartmentNumber = null);
+    int? ApartmentNumber = null,
+    // «A-45» у помещений блока ЖК (UnitNames.Short); у дома без блока — null.
+    string? ApartmentCode = null);

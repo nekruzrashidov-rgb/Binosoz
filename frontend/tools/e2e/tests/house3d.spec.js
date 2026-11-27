@@ -44,12 +44,12 @@ async function openFull(page, o) {
 }
 const state = (page) => page.evaluate(() => window.__house3d.state());
 // On a phone the list is a sheet from below: open it first.
-async function showList(page, isMobile) { if (isMobile) { await page.locator('.h3d-list-toggle').click(); await expect(page.locator('.h3d-list')).toBeVisible(); } }
+async function showList(page, isMobile) { if (isMobile) { await page.locator('.h3d-list-tab').click(); await expect(page.locator('.h3d-list')).toBeVisible(); } }
 
 test.describe('3D on the whole screen', () => {
   test.setTimeout(120000);
 
-  test('opens from the catalog button, the views move the camera, Escape and history close it', async ({ page }) => {
+  test('opens from the catalog button, the views move the camera, Escape and history close it', async ({ page, isMobile }) => {
     const errors = await openFull(page);
     await expect(page.locator('.h3d-full')).toBeVisible();
     await expect(page.locator('.h3d-tag--height')).toContainText('6 этажей');
@@ -58,12 +58,16 @@ test.describe('3D on the whole screen', () => {
     await expect(page.locator('[data-view="area"]')).toHaveCount(0);
     await expect(page.locator('.h3d-attr')).toBeHidden();
     const before = await state(page);
+    // On a phone the views are in the bottom sheet.
+    if (isMobile) await page.locator('.h3d-list-tab').click();
     await page.locator('[data-view="top"]').click();
     await expect.poll(async () => (await state(page)).currentView).toBe('top');
     await expect.poll(async () => (await state(page)).view.pol, { timeout: 20000 }).toBeLessThan(0.4);
     expect((await state(page)).view.pol).not.toBeCloseTo(before.view.pol, 1);
     await page.locator('[data-view="street"]').click();
     await expect.poll(async () => (await state(page)).view.pol, { timeout: 20000 }).toBeGreaterThan(1.3);
+    // Escape folds the sheet first on a phone, then closes the 3D.
+    if (isMobile) { await page.keyboard.press('Escape'); await expect(page.locator('.h3d-full')).not.toHaveClass(/list-open/); }
     await page.keyboard.press('Escape');
     await expect(page.locator('.h3d-full')).toHaveCount(0);
     expect(page.url()).not.toContain('#3d');
@@ -78,12 +82,13 @@ test.describe('3D on the whole screen', () => {
 
   test('the time slider changes the light by the real sun; the presets are points of it', async ({ page }) => {
     await openFull(page);
-    const slider = page.locator('.h3d-time input[type=range]');
+    await page.locator('.h3d-tool[aria-haspopup]').click();
+    const slider = page.locator('.h3d-pop input[type=range]');
     await slider.fill('13');
     const day = await state(page);
     expect(day.sun.el).toBeGreaterThan(15);
     await expect(page.locator('.h3d-clock')).toHaveText('13:00');
-    await expect(page.locator('.h3d-time [aria-pressed="true"]')).toHaveCount(0);
+    await expect(page.locator('.h3d-pop [aria-pressed="true"]')).toHaveCount(0);
     await slider.fill('21.5');
     const night = await state(page);
     expect(night.sun.el).toBeLessThan(-10);
@@ -91,8 +96,8 @@ test.describe('3D on the whole screen', () => {
     await page.locator('.h3d-seg button[data-k="dusk"]').click();
     const dusk = await state(page);
     expect(dusk.sun.el).toBeGreaterThan(1); expect(dusk.sun.el).toBeLessThan(6);
-    await page.locator('.h3d-chip', { hasText: 'Сейчас' }).click();
-    await expect(page.locator('.h3d-chip', { hasText: 'Сейчас' })).toHaveAttribute('aria-pressed', 'true');
+    await page.locator('.h3d-pop-btn', { hasText: 'Сейчас' }).click();
+    await expect(page.locator('.h3d-pop-btn', { hasText: 'Сейчас' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('a chosen apartment opens the card with TJS and ≈ $; inside and the walk switch on and off', async ({ page, isMobile }) => {
@@ -158,7 +163,7 @@ test.describe('3D on the whole screen', () => {
     await openFull(page);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(0);
-    await page.locator('.h3d-list-toggle').click();
+    await page.locator('.h3d-list-tab').click();
     await expect(page.locator('.h3d-list')).toBeVisible();
     // Text contrast of the panels over the scene: text colour against the panel colour blended over the darkest scene.
     const worst = await page.evaluate(() => {

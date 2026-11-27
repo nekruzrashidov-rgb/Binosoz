@@ -141,7 +141,7 @@ Binosoz/
   Полупрозрачность — `color-mix(in srgb, var(--accent) 20%, transparent)`. Хардкод цвета текста ломает тёмную тему.
 - **Тёмные секции** на светлом сайте (класс `.nr-dark`: hero главной и «О проекте», «Всё, что важно при покупке»,
   калькулятор каталога, «История строительства», «Остались вопросы?», левая колонка входа и регистрации, 3D на весь экран
-  `.h3d-full`; ещё футер)
+  `.h3d-full`, карточка карты `.nr-map` (до клика «Показать карту»); ещё футер)
   переопределяют `--ink/--ink-2/--muted` локально — компоненты внутри сами светлые. Новую тёмную секцию добавлять в этот список.
 - **Тёмная тема**: `[data-theme='dark']` меняет токены; рамки полей и кнопок-контуров — `--field-line` (контраст ≥ 3:1, WCAG 1.4.11); проверка — `frontend/tools/check-contrast.js` (0 текстов ниже AA в обеих темах).
 - **Честные данные**: цифры, цены, свободные квартиры, удобства, условия рассрочки, ход стройки — только из API (в config
@@ -236,6 +236,7 @@ Storage__Provider=Local          # или S3 (MinIO, R2, B2, AWS): Storage__S3__
 Storage__RootPath=/app/storage
 Sentry__Dsn=                     # пусто — ошибки никуда не отправляются
 Health__Key=                     # ключ X-Health-Key для /health/ready снаружи
+Maps__EmbedKey=                  # ключ Google Maps Embed API (публичный, ограничить в Google Cloud — docs/DEPLOY.md); пусто — на сайте только ссылки на карту
 Auth__RefreshCookie__Mode=Dual
 Auth__DemoPasswordLogin=false    # true — вход демо-покупателя (demo-buyer@binosoz.tj) паролем для жюри
 SEED_DEMO_ACCOUNTS=false         # true + SEED_DEMO_BUYER_PASSWORD / SEED_DEMO_MANAGER_PASSWORD — демо-доступ (--migrate)

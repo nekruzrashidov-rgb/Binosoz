@@ -15,15 +15,19 @@
     root.appendChild(page);
 
     // 1. Hero: the render of the 3D model, the name and the numbers of the building (each only when the API has it).
-    const title = h('h1', { class: 'nr-page-title nr-about-title' }, S.brandName());
+    const title = h('h1', { class: 'nr-page-title nr-about-title', 'data-brand': '' }, S.brandName());
     const chips = h('ul', { class: 'nr-chips' });
+    // «Rich Tower — 3 блока» from the API; hidden for one building.
+    const aboutBlocks = h('p', { class: 'nr-hero-blocks', hidden: true });
+    const drawBlocksLine = () => { const l = S.blocksLine(); aboutBlocks.hidden = !l; aboutBlocks.textContent = l || ''; };
+    drawBlocksLine(); if (S.bus) S.bus.on('brand', drawBlocksLine);
     const hero = h('section', { class: 'nr-about-hero nr-dark' },
       h('figure', { class: 'nr-hero-media' }, site.renderImg('tower-dusk-wide', '100vw', t('nr.render.alt'), true),
         h('figcaption', { class: 'nr-render-note' }, t('nr.render'))),
       h('div', { class: 'nr-hero-shade', 'aria-hidden': 'true' }),
       h('div', { class: 'nr-wrap nr-about-hero-in' },
         h('nav', { class: 'nr-crumbs', 'aria-label': t('cat.crumbs') }, h('a', { href: '/' }, t('nav.home')), h('span', { 'aria-hidden': 'true' }, '/'), h('span', { 'aria-current': 'page' }, t('nav.project'))),
-        title, h('p', { class: 'nr-hero-sub' }, t('aboutpg.hero.sub')), chips));
+        title, aboutBlocks, h('p', { class: 'nr-hero-sub' }, t('aboutpg.hero.sub')), chips));
 
     // 2. The complex: the developer's description and the address.
     const text = h('div', { class: 'nr-about-text' });
@@ -65,7 +69,7 @@
         if (!id || !alive) { settle(); return; }
         const b = await S.api.building(id);
         if (!alive) return;
-        title.textContent = S.brandName(b.name);
+        title.textContent = S.brandName();
         const apts = b.plannedApartments || b.total || 0;
         const desc = S.localText(b, 'description');
         const address = S.brandAddress(b.address) || site.contacts().address;

@@ -5,7 +5,7 @@ using Sitora.Domain.Entities;
 
 namespace Sitora.Infrastructure.Data.Seed;
 
-// Простой план 1-го этажа «Некруз Резиденс» для разработки: четыре квартиры в ряд, прямоугольники 120×80 с номерами.
+// Простой план 1-го этажа «Rich Tower» для разработки: четыре квартиры в ряд, прямоугольники 120×80 с номерами.
 public static class FloorPlanSeeder
 {
     public const int Floor = 1;
@@ -13,7 +13,7 @@ public static class FloorPlanSeeder
 
     public static async Task SeedAsync(AppDbContext db)
     {
-        var buildingId = await db.Buildings.Where(b => b.NameRu == CatalogSeeder.BuildingName).Select(b => (Guid?)b.Id).FirstOrDefaultAsync();
+        var buildingId = await db.Buildings.Where(b => CatalogSeeder.BuildingNames.Contains(b.NameRu)).Select(b => (Guid?)b.Id).FirstOrDefaultAsync();
         if (buildingId is null || await db.FloorPlans.AnyAsync(p => p.BuildingId == buildingId && p.Floor == Floor))
             return;
         var apartments = await db.Apartments

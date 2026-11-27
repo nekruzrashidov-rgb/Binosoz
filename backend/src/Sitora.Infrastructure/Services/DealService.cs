@@ -57,12 +57,14 @@ public class DealService(
 
     public async Task<DealResponse> CreateAsync(CreateDealRequest request, CancellationToken ct = default)
     {
-        var currency = request.Currency ?? Currency.TJS;
         var organizationId = await db.OrganizationOfApartmentAsync(request.ApartmentId, ct);
-        // Цена в каталоге в сомони; для договора в USD она пересчитывается по курсу на сегодня
-        // и округляется до целого доллара.
+        // Валюта договора — из запроса, иначе валюта каталога квартиры. Если они разные, цена пересчитывается по курсу
+        // на сегодня: TJS → USD — до целого доллара, USD → TJS — до целого сомони.
+        var catalogCurrency = await db.Apartments.Where(a => a.Id == request.ApartmentId).Select(a => (Currency?)a.Currency).FirstOrDefaultAsync(ct)
+            ?? Currency.TJS;
+        var currency = request.Currency ?? catalogCurrency;
         decimal? usdRate = null;
-        if (currency == Currency.USD)
+        if (currency != catalogCurrency)
         {
             usdRate = await rates.GetRateOnAsync(Currency.USD, DushanbeTime.Today(timeProvider.GetUtcNow().UtcDateTime), organizationId, ct)
                 ?? throw new BusinessRuleException("Нет курса USD. Бухгалтер должен ввести курс, прежде чем оформлять сделку в долларах");
@@ -93,9 +95,10 @@ public class DealService(
                 throw new ConflictException(OpenDealExists);
 
             deal = new Deal { ApartmentId = apartment.Id, CustomerId = customer.Id, ManagerId = managerId };
-            var price = usdRate is { } rate
-                ? Math.Round(apartment.Price / rate, 0, MidpointRounding.AwayFromZero)
-                : apartment.Price;
+            var price = usdRate is not { } rate ? apartment.Price
+                : apartment.Currency == Currency.USD
+                    ? Math.Round(apartment.Price * rate, 0, MidpointRounding.AwayFromZero)
+                    : Math.Round(apartment.Price / rate, 0, MidpointRounding.AwayFromZero);
             deal.SetPrice(price, currency, request.Discount ?? 0, request.DiscountReason);
             db.Deals.Add(deal);
 
@@ -217,5 +220,7 @@ public class DealService(
         d.Currency,
         d.BookingId,
         d.CreatedAt,
-        d.UpdatedAt);
+        d.UpdatedAt,
+        d.Apartment.Floor.Building.BlockCode,
+        d.Apartment.Kind);
 }

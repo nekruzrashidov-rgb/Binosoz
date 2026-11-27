@@ -79,7 +79,7 @@ public partial class GreenService(
         var org = await db.Organizations.AsNoTracking().Where(o => o.Slug == slug && o.IsActive)
                       .Select(o => new { o.Id, o.Green }).FirstOrDefaultAsync(ct)
                   ?? throw new NotFoundException("Организация не найдена");
-        return (await CountAsync(org.Id, org.Green, ct)).Totals;
+        return (await CountAsync(org.Id, org.Green, ct, publishedOnly: true)).Totals;
     }
 
     public async Task<GreenStatsResponse> GetStatsAsync(CancellationToken ct = default)
@@ -108,26 +108,30 @@ public partial class GreenService(
     }
 
     // Документы сделок организации (без фильтров текущего пользователя: публичный агрегат считается и для гостя).
-    private IQueryable<Sitora.Domain.Entities.Document> Documents(Guid organizationId) =>
-        db.Documents.IgnoreQueryFilters().AsNoTracking().Where(d => d.Deal.Apartment.Floor.Building.OrganizationId == organizationId);
+    private IQueryable<Sitora.Domain.Entities.Document> Documents(Guid organizationId, bool publishedOnly = false) =>
+        db.Documents.IgnoreQueryFilters().AsNoTracking().Where(d => d.Deal.Apartment.Floor.Building.OrganizationId == organizationId
+            && (!publishedOnly || d.Deal.Apartment.Floor.Building.IsPublished));
 
     // Только реальные счётчики. Страницы — из файлов (PDF без определённого числа страниц не считается).
     // Действия без визита в офис: брони с сайта, оплаченные онлайн платежи, сообщения в чате сделки.
     private async Task<(GreenImpactResponse Totals, int Bookings, int Payments, int Chat)> CountAsync(
-        Guid organizationId, Sitora.Domain.Entities.OrganizationGreenSettings green, CancellationToken ct)
+        Guid organizationId, Sitora.Domain.Entities.OrganizationGreenSettings green, CancellationToken ct, bool publishedOnly = false)
     {
-        var documents = await Documents(organizationId).CountAsync(ct);
-        var documentPages = await Documents(organizationId).SumAsync(d => d.PageCount ?? 0, ct);
-        var issued = db.IssuedPdfs.AsNoTracking().Where(x => x.OrganizationId == organizationId);
+        // На публичном сайте дома, скрытые с сайта (IsPublished = false), не считаются; в CRM — все дома организации.
+        var documents = await Documents(organizationId, publishedOnly).CountAsync(ct);
+        var documentPages = await Documents(organizationId, publishedOnly).SumAsync(d => d.PageCount ?? 0, ct);
+        var issued = db.IssuedPdfs.AsNoTracking().Where(x => x.OrganizationId == organizationId
+            && (!publishedOnly || db.Deals.IgnoreQueryFilters().Any(d => d.Id == x.DealId && d.Apartment.Floor.Building.IsPublished)));
         var issuedCount = await issued.CountAsync(ct);
         var issuedPages = await issued.SumAsync(x => x.PageCount ?? 0, ct);
 
         var bookings = await db.Bookings.IgnoreQueryFilters().CountAsync(b =>
-            b.Apartment.Floor.Building.OrganizationId == organizationId && b.Lead != null && b.Lead.Source == Sitora.Domain.Enums.LeadSource.Website, ct);
+            b.Apartment.Floor.Building.OrganizationId == organizationId && (!publishedOnly || b.Apartment.Floor.Building.IsPublished) && b.Lead != null && b.Lead.Source == Sitora.Domain.Enums.LeadSource.Website, ct);
         var payments = await db.OnlinePayments.IgnoreQueryFilters().CountAsync(p =>
-            p.Deal.Apartment.Floor.Building.OrganizationId == organizationId && p.Status == PaymentGatewayStatus.Paid, ct);
+            p.Deal.Apartment.Floor.Building.OrganizationId == organizationId && (!publishedOnly || p.Deal.Apartment.Floor.Building.IsPublished)
+            && p.Status == PaymentGatewayStatus.Paid, ct);
         var chat = await db.ChatMessages.IgnoreQueryFilters().CountAsync(m =>
-            m.Deal.Apartment.Floor.Building.OrganizationId == organizationId, ct);
+            m.Deal.Apartment.Floor.Building.OrganizationId == organizationId && (!publishedOnly || m.Deal.Apartment.Floor.Building.IsPublished), ct);
 
         var pages = documentPages + issuedPages;
         var paperKg = Math.Round(pages * PaperKgPerPage, 2, MidpointRounding.AwayFromZero);

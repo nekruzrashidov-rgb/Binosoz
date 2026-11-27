@@ -44,8 +44,34 @@ test('home without data: no invented numbers, an honest "sales open soon" block'
   await expect(page.locator('#layouts')).toBeHidden();
   await expect(page.locator('#installment')).toBeHidden();
   await expect(page.locator('#about')).toBeHidden();
-  await expect(page.locator('.nr-hero .nr-render-note')).toHaveText('Визуализация 3D-модели');
-  await expect(page.locator('h1')).toHaveText('Некруз Резиденс');
+  await expect(page.locator('.nr-hero .nr-render-note')).toHaveText('Визуализация 3D-модели, концепт');
+  await expect(page.locator('h1')).toHaveText('Rich Tower');
+});
+
+// The complex is «Rich Tower» (docs/DECISIONS.md): the old name is nowhere — texts, titles, descriptions, in every language.
+// (The manager's own name on the contact page is a person, not the brand, and stays as config.js has it.)
+const OLD_BRAND = /Некр[уӯ]з\s+Резиденс|Nekruz\s+Residence|НЕКРУЗ/;
+test('no old brand name on the public pages, in every language', async ({ page }) => {
+  for (const lang of ['ru', 'tg', 'en']) {
+    await page.addInitScript((l) => { try { localStorage.setItem('sitora.lang', l); } catch (e) { /* private mode */ } }, lang);
+    for (const url of PUBLIC) {
+      await open(page, url);
+      const text = await page.evaluate(() => document.body.innerText + ' ' + document.title + ' ' + ((document.querySelector('meta[name=description]') || {}).content || '')
+        + ' ' + [...document.querySelectorAll('meta[property^="og:"]')].map((m) => m.content).join(' '));
+      expect(text, lang + ' ' + url).not.toMatch(OLD_BRAND);
+    }
+  }
+});
+
+// The name comes from the API (the organization, GET /public/brand): another name there — the page shows it.
+test('the complex name comes from the API', async ({ page }) => {
+  await page.route('**/api/v1/public/brand**', (route) => route.fulfill({ status: 200, contentType: 'application/json',
+    body: JSON.stringify({ organizationId: '01a20000-0000-7000-8000-000000000001', name: 'Тест Тауэр', slug: 'nekruz', buildings: [] }) }));
+  await open(page, '/');
+  await expect(page.locator('h1')).toHaveText('Тест Тауэр');
+  await expect(page.locator('header .brand-word')).toContainText('Тест');
+  await expect(page).toHaveTitle(/Тест Тауэр/);
+  await expect(page.locator('.foot-brand b')).toHaveText('Тест Тауэр');
 });
 
 // Claims that are not in the data must not come back on any public page (the redesign removed them).

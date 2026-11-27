@@ -30,7 +30,10 @@ public record PipelineCard(
     decimal? Amount,
     Currency? Currency,
     DateTime CreatedAt,
-    DateTime? ExpiresAt);
+    DateTime? ExpiresAt,
+    // Блок ЖК и вид помещения — номер для людей «Блок A, кв. 45» (UnitNames); у дома без блока BlockCode = null.
+    string? BlockCode = null,
+    ApartmentKind ApartmentKind = ApartmentKind.Residential);
 
 public record PipelineColumn(DealStage Stage, int Count, IReadOnlyList<PipelineCard> Cards);
 

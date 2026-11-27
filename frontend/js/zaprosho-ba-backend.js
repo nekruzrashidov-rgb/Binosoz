@@ -73,12 +73,23 @@
         // Amenities (keys of BuildingAmenities) and the developer's installment terms: only what the API has.
         amenities: Array.isArray(b.amenities) ? b.amenities : [], installment: b.installment || null,
         // The point on the map and the floor height (3D model): null — not set (no surroundings; the height is an estimate).
-        latitude: b.latitude == null ? null : num(b.latitude), longitude: b.longitude == null ? null : num(b.longitude), floorHeight: b.floorHeight == null ? null : num(b.floorHeight) };
+        latitude: b.latitude == null ? null : num(b.latitude), longitude: b.longitude == null ? null : num(b.longitude), floorHeight: b.floorHeight == null ? null : num(b.floorHeight),
+        // A block of the complex (letter, order, outline in metres, place on the site, setbacks): null — a plain building.
+        blockCode: b.blockCode || null, sortOrder: num(b.sortOrder || 0), footprint: Array.isArray(b.footprint) && b.footprint.length >= 3 ? b.footprint : null,
+        sitePosition: b.sitePosition || null, setbacks: Array.isArray(b.setbacks) ? b.setbacks : [],
+        // The price rule of a block: steps «floors from–to → price per m²», the penthouses' price, the catalogue currency.
+        priceSteps: Array.isArray(b.priceSteps) ? b.priceSteps : [], penthousePricePerM2: b.penthousePricePerM2 == null ? null : num(b.penthousePricePerM2),
+        priceCurrency: String(b.priceCurrency || 'TJS').toUpperCase(),
+        // false — the building is hidden from the public site (the CRM still shows it, marked).
+        isPublished: b.isPublished !== false,
+        elevators: b.elevatorsCount == null ? null : num(b.elevatorsCount), commercialUnits: num(b.commercialUnits || 0), parkingSpots: num(b.parkingSpots || 0) };
     },
-    floor(f) { return { id: f.id, number: num(pick(f, ['number', 'floorNumber', 'level'], 0)), commercial: !!pick(f, ['isCommercial', 'commercial'], false), total: num(pick(f, ['totalApartments', 'apartmentsCount', 'total'], 0)), free: num(pick(f, ['freeApartments', 'freeCount', 'free'], 0)) }; },
+    floor(f) { return { id: f.id, number: num(pick(f, ['number', 'floorNumber', 'level'], 0)), commercial: !!pick(f, ['isCommercial', 'commercial'], false), parking: !!pick(f, ['isParking', 'parking'], false) || num(pick(f, ['number'], 0)) < 0, total: num(pick(f, ['totalApartments', 'apartmentsCount', 'total'], 0)), free: num(pick(f, ['freeApartments', 'freeCount', 'free'], 0)) }; },
     apt(a, floorNo) {
       const area = num(pick(a, ['area', 'totalArea', 'squareMeters'], 0)), pps = num(pick(a, ['pricePerM2', 'pricePerSqm', 'pricePerSquareMeter'], 0));
-      return { id: a.id, floorId: pick(a, ['floorId'], null), buildingId: pick(a, ['buildingId'], null), floor: floorNo !== undefined ? floorNo : num(pick(a, ['floorNumber', 'floor'], 0)), number: pick(a, ['number', 'apartmentNumber'], ''), rooms: num(pick(a, ['rooms', 'roomsCount'], 0)), area, pricePerSqm: pps, price: num(pick(a, ['price', 'totalPrice'], area * pps)), status: normStatus(pick(a, ['status'], 'free')), planSlot: pick(a, ['planSlot'], null) === null ? null : num(a.planSlot), model3dId: pick(a, ['model3dId'], null) };
+      return { id: a.id, floorId: pick(a, ['floorId'], null), buildingId: pick(a, ['buildingId'], null), floor: floorNo !== undefined ? floorNo : num(pick(a, ['floorNumber', 'floor'], 0)), number: pick(a, ['number', 'apartmentNumber'], ''), rooms: num(pick(a, ['rooms', 'roomsCount'], 0)), area, pricePerSqm: pps, price: num(pick(a, ['price', 'totalPrice'], area * pps)), currency: String(pick(a, ['currency'], 'TJS')).toUpperCase(),
+        // residential | penthouse | commercial (a shop of floors 1–2) | parking (a space of −1/−2).
+        kind: String(pick(a, ['kind'], 'Residential')).toLowerCase(), block: pick(a, ['blockCode', 'block'], null), layoutCode: a.layoutCode || null, terraceArea: a.terraceArea == null ? null : num(a.terraceArea), status: normStatus(pick(a, ['status'], 'free')), planSlot: pick(a, ['planSlot'], null) === null ? null : num(a.planSlot), model3dId: pick(a, ['model3dId'], null) };
     },
     lead(l) { return { id: l.id, name: pick(l, ['name', 'fullName', 'customerName'], ''), phone: pick(l, ['phone', 'phoneNumber'], ''), comment: pick(l, ['comment', 'message'], ''), status: leadStatus(pick(l, ['status'], 'New')), apiStatus: String(pick(l, ['status'], 'New')), managerId: pick(l, ['managerId'], null), assignee: pick(l, ['assignee', 'assignedTo', 'managerName', 'responsibleName'], ''), createdAt: pick(l, ['createdAt', 'created'], ''), apartmentId: pick(l, ['apartmentId'], null), source: String(pick(l, ['source'], 'Website')) }; },
     customer(c) { return { id: c.id, fullName: pick(c, ['fullName', 'name'], ''), phone: pick(c, ['phone'], ''), email: pick(c, ['email'], ''), passport: pick(c, ['passportData', 'passport', 'passportNumber'], ''), createdAt: pick(c, ['createdAt'], ''), dealsCount: pick(c, ['dealsCount'], null), deals: arr(c.deals).map(M.deal) }; },
@@ -88,7 +99,7 @@
       // The deal itself has no paid/remaining in the real API; they come from the schedule (see api.deal).
       const paid = pick(d, ['paid', 'paidAmount', 'totalPaid'], null);
       const remaining = pick(d, ['remaining', 'remainingAmount', 'balance'], null);
-      return { id: d.id, stage: normStage(pick(d, ['stage', 'status'], 'Lead')), stageReason: pick(d, ['stageReason', 'cancelReason'], ''), price, discount: disc, discountReason: pick(d, ['discountReason'], ''), currency: String(pick(d, ['currency', 'contractCurrency'], 'TJS')).toUpperCase(), apartmentId: pick(d, ['apartmentId'], apt.id), apartmentNumber: pick(d, ['apartmentNumber'], apt.number), floor: pick(d, ['floor', 'floorNumber'], apt.floorNumber !== undefined ? apt.floorNumber : apt.floor), rooms: pick(d, ['rooms'], apt.rooms), area: pick(d, ['area'], apt.area), buildingId: pick(d, ['buildingId'], apt.buildingId || null), buildingName: pick(d, ['buildingName'], ''), customerId: pick(d, ['customerId'], cu.id), customerName: pick(d, ['customerName'], cu.fullName || cu.name || ''), customerPhone: pick(d, ['customerPhone'], cu.phone || ''), managerName: pick(d, ['managerName', 'manager'], ''), managerId: pick(d, ['managerId'], null), createdAt: pick(d, ['createdAt'], ''), paid: paid === null ? null : num(paid), remaining: remaining === null ? (paid === null ? null : price - disc - num(paid)) : num(remaining), hasPlan: pick(d, ['hasPlan'], true) };
+      return { id: d.id, stage: normStage(pick(d, ['stage', 'status'], 'Lead')), stageReason: pick(d, ['stageReason', 'cancelReason'], ''), price, discount: disc, discountReason: pick(d, ['discountReason'], ''), currency: String(pick(d, ['currency', 'contractCurrency'], 'TJS')).toUpperCase(), apartmentId: pick(d, ['apartmentId'], apt.id), apartmentNumber: pick(d, ['apartmentNumber'], apt.number), blockCode: pick(d, ['blockCode'], null), apartmentKind: pick(d, ['apartmentKind'], null), floor: pick(d, ['floor', 'floorNumber'], apt.floorNumber !== undefined ? apt.floorNumber : apt.floor), rooms: pick(d, ['rooms'], apt.rooms), area: pick(d, ['area'], apt.area), buildingId: pick(d, ['buildingId'], apt.buildingId || null), buildingName: pick(d, ['buildingName'], ''), customerId: pick(d, ['customerId'], cu.id), customerName: pick(d, ['customerName'], cu.fullName || cu.name || ''), customerPhone: pick(d, ['customerPhone'], cu.phone || ''), managerName: pick(d, ['managerName', 'manager'], ''), managerId: pick(d, ['managerId'], null), createdAt: pick(d, ['createdAt'], ''), paid: paid === null ? null : num(paid), remaining: remaining === null ? (paid === null ? null : price - disc - num(paid)) : num(remaining), hasPlan: pick(d, ['hasPlan'], true) };
     },
     schedule(s) {
       let monthly = 0;
@@ -125,7 +136,7 @@
     },
     invitation(i) { return { id: i.id, email: pick(i, ['email'], ''), name: pick(i, ['fullName', 'name'], ''), role: pick(i, ['role'], ''), buildingIds: arr(pick(i, ['buildingIds'], [])), expiresAt: pick(i, ['expiresAt'], ''), createdAt: pick(i, ['createdAt'], '') }; },
     organization(o) { return { id: o.id, name: pick(o, ['name'], ''), slug: pick(o, ['slug'], ''), active: pick(o, ['isActive'], true) !== false, buildings: num(pick(o, ['buildingsCount'], 0)), users: num(pick(o, ['usersCount'], 0)), createdAt: pick(o, ['createdAt'], ''), logoUrl: pick(o, ['logoUrl'], null), domain: pick(o, ['customDomain'], null), owners: arr(o.ownerEmails), buildingNames: arr(o.buildingNames), deals: num(pick(o, ['dealsCount'], 0)), customers: num(pick(o, ['customersCount'], 0)), lastActivityAt: pick(o, ['lastActivityAt'], null), tariff: o.tariff || null, ownerInfos: arr(o.owners) }; },
-    booking(b) { return { id: b.id, apartmentId: b.apartmentId, apartmentNumber: pick(b, ['apartmentNumber'], ''), name: pick(b, ['name', 'customerName', 'fullName'], ''), phone: pick(b, ['phone', 'customerPhone'], ''), status: String(pick(b, ['status'], 'Active')), createdAt: pick(b, ['createdAt'], ''), expiresAt: pick(b, ['expiresAt'], '') }; },
+    booking(b) { return { id: b.id, apartmentId: b.apartmentId, apartmentNumber: pick(b, ['apartmentNumber'], ''), blockCode: pick(b, ['blockCode'], null), apartmentKind: pick(b, ['apartmentKind'], null), name: pick(b, ['name', 'customerName', 'fullName'], ''), phone: pick(b, ['phone', 'customerPhone'], ''), status: String(pick(b, ['status'], 'Active')), createdAt: pick(b, ['createdAt'], ''), expiresAt: pick(b, ['expiresAt'], '') }; },
     // Author and object come readable from the server (C-06): userName/userEmail of the author, bySystem for the seeder and jobs.
     audit(a) { return { id: a.id, at: pick(a, ['at', 'createdAt', 'timestamp'], ''), userEmail: a.userEmail || null, userName: a.userName || null, bySystem: !!a.bySystem || (!a.userEmail && !a.userName), action: pick(a, ['action'], ''), entity: pick(a, ['entity', 'entityType'], ''), entityId: pick(a, ['entityId'], ''), entityName: a.entityName || null, apartmentNumber: a.apartmentNumber == null ? null : a.apartmentNumber, before: parseJson(pick(a, ['before', 'oldValues'], null)), after: parseJson(pick(a, ['after', 'newValues'], null)), viaPlatform: !!a.impersonatedById }; },
   });
@@ -496,6 +507,8 @@
     async utility(apartmentId) { const r = await request('GET', '/apartments/' + apartmentId + '/utility', { auth: false }); return r && r.costPerYearTjs !== undefined ? r : null; },
     greenSettings() { return request('GET', '/owner/green-settings'); },
     // «Зелёный эффект»: the public aggregate of the developer's site (ORG_SLUG) and the CRM statistics with months.
+    // The developer's sign (name, contacts, buildings) by ORG_SLUG: the complex's name on the site comes from here.
+    publicBrand() { return cfgSlug() ? request('GET', '/public/brand', { auth: false, query: { slug: cfgSlug() } }) : Promise.resolve(null); },
     greenImpact() { return request('GET', '/public/green-impact', { auth: false, query: { organization: cfgSlug() } }); },
     greenStats() { return request('GET', '/stats/green'); },
     saveGreenSettings(b) { return request('PUT', '/owner/green-settings', { body: b }); },
@@ -504,6 +517,20 @@
     installmentSettings() { return request('GET', '/owner/installment-settings'); },
     saveInstallmentSettings(b) { return request('PUT', '/owner/installment-settings', { body: b }); },
     saveBuildingLocation(id, body) { return request('PUT', '/buildings/' + id + '/location', { body }).then(M.building); },
+    // A block of the complex: the letter, the order, the outline, the place on the site and the setbacks — as a whole.
+    // The developer's layouts (JSON, the format of planirovki-data.js): the public list of the site, the CRM's own ones.
+    publicLayouts() { return cfgSlug() ? request('GET', '/public/' + encodeURIComponent(cfgSlug()) + '/layouts', { auth: false }) : Promise.resolve([]); },
+    layouts() { return request('GET', '/layouts'); },
+    saveLayout(code, body) { return request('PUT', '/layouts/' + encodeURIComponent(code), { body }); },
+    deleteLayout(code) { return request('DELETE', '/layouts/' + encodeURIComponent(code)); },
+    setPublished(id, isPublished) { return request('PUT', '/buildings/' + id + '/published', { body: { isPublished: !!isPublished } }).then(M.building); },
+    savePriceRule(id, body) { return request('PUT', '/buildings/' + id + '/price-rule', { body }).then(M.building); },
+    // «Пересчитать цены»: { updated, unchanged, skipped } — only free apartments get the new price.
+    applyPriceRule(id) { return request('POST', '/buildings/' + id + '/price-rule/apply'); },
+    saveBuildingShape(id, body) { return request('PUT', '/buildings/' + id + '/shape', { body }).then(M.building); },
+    // The plan of the complex's site (the outline, the yard's zones) of the own organization; null — not set.
+    sitePlan() { return request('GET', '/owner/site-plan').then((r) => r || null); },
+    saveSitePlan(body) { return request('PUT', '/owner/site-plan', { body }).then((r) => r || null); },
     saveBuildingAmenities(id, keys) { return request('PUT', '/buildings/' + id + '/amenities', { body: { amenities: keys } }).then(M.building); },
     // Eco passport of a building (Content and leaders): the whole passport, empty fields — «not filled».
     saveBuildingEco(id, eco) { return request('PUT', '/buildings/' + id + '/eco', { body: eco }).then(M.building); },
@@ -517,6 +544,8 @@
     saveOwnerBrand(b) { return withFields(request('PUT', '/owner/brand', { body: b })); },
     uploadLogo(file) { const f = new FormData(); f.append('file', file); return request('POST', '/owner/brand/logo', { form: f, file }); },
     deleteLogo() { return request('DELETE', '/owner/brand/logo'); },
+    // The point of the complex on the map (latitude and longitude together; empty — remove).
+    saveOwnerLocation(body) { return request('PUT', '/owner/brand/location', { body }); },
     createApartment(b) { return withFields(request('POST', '/apartments', { body: Object.assign({}, b, { pricePerM2: pick(b, ['pricePerM2', 'pricePerSqm'], 0) }) })).then((a) => M.apt(a)); },
     updateApartment(id, b) { return withFields(request('PUT', '/apartments/' + id, { body: Object.assign({}, b, { pricePerM2: pick(b, ['pricePerM2', 'pricePerSqm'], 0) }) })).then((a) => M.apt(a)); },
     onRequest(id, on) { return request('PATCH', '/apartments/' + id + '/on-request', { body: { onRequest: on } }); },
@@ -599,7 +628,7 @@
           const aptNo = pick(it, ['apartmentNumber'], null);
           return Object.assign({}, it, {
             kind: kind || undefined,
-            title: it.title || (aptNo && kind !== 'lead' ? '№ ' + aptNo + ' · ' + client : client),
+            title: it.title || (aptNo && kind !== 'lead' ? (S.aptShort ? S.aptShort(it) : '№ ' + aptNo) + ' · ' + client : client),
             subtitle: it.subtitle || it.phone || '',
             price: pick(it, ['price', 'amount'], null),
             dealId: kind === 'deal' ? it.id : it.dealId,
@@ -637,7 +666,7 @@
       const totals = Array.isArray(t) ? t.reduce((o, m) => { o[m.currency] = num(m.amount); return o; }, {}) : t;
       return { from: r.from, to: r.to, rows: arr(r.rows || r.payments || r.items).map(M.payment), totalTjs: pick(r, ['totalTjs', 'total'], null), totals };
     },
-    async reportDebts(asOf) { const r = await request('GET', '/reports/debts', { query: { asOf } }); return { asOf: r.asOf, rows: arr(r.rows || r.items || r.debts).map((x) => ({ dealId: x.dealId, customerName: pick(x, ['customerName'], ''), phone: pick(x, ['phone', 'customerPhone'], ''), apartmentNumber: pick(x, ['apartmentNumber'], ''), currency: pick(x, ['currency'], 'TJS'), overdue: num(pick(x, ['overdue', 'overdueAmount', 'amount'], 0)), since: day(pick(x, ['oldestOverdueDate', 'since', 'overdueSince'], '')), days: num(pick(x, ['daysOverdue', 'days', 'overdueDays'], 0)), remaining: num(pick(x, ['remaining'], 0)) })) }; },
+    async reportDebts(asOf) { const r = await request('GET', '/reports/debts', { query: { asOf } }); return { asOf: r.asOf, rows: arr(r.rows || r.items || r.debts).map((x) => ({ dealId: x.dealId, customerName: pick(x, ['customerName'], ''), phone: pick(x, ['phone', 'customerPhone'], ''), apartmentNumber: pick(x, ['apartmentNumber'], ''), blockCode: pick(x, ['blockCode'], null), apartmentKind: pick(x, ['apartmentKind'], null), currency: pick(x, ['currency'], 'TJS'), overdue: num(pick(x, ['overdue', 'overdueAmount', 'amount'], 0)), since: day(pick(x, ['oldestOverdueDate', 'since', 'overdueSince'], '')), days: num(pick(x, ['daysOverdue', 'days', 'overdueDays'], 0)), remaining: num(pick(x, ['remaining'], 0)) })) }; },
 
     // documents, files, chat, construction
     async documents(id) { return arr(await request('GET', '/deals/' + id + '/documents')).map(M.doc); },

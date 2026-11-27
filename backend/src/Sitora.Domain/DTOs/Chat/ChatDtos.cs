@@ -1,3 +1,4 @@
+using Sitora.Domain.Enums;
 namespace Sitora.Domain.DTOs.Chat;
 
 public record SendMessageRequest(string Text);
@@ -22,7 +23,10 @@ public record ChatConversationResponse(
     string LastMessage,
     DateTime LastMessageAt,
     bool LastFromCustomer,
-    int Unread);
+    int Unread,
+    // Блок ЖК и вид помещения — номер для людей «Блок A, кв. 45» (UnitNames); у дома без блока BlockCode = null.
+    string? BlockCode = null,
+    ApartmentKind ApartmentKind = ApartmentKind.Residential);
 
 // Непрочитанное для читающей стороны (без отметки о прочтении) и менеджер сделки: в сети, если заходил за последние 5 минут.
 public record ChatUnreadResponse(int Unread, string? ManagerName, bool ManagerOnline, DateTime? ManagerLastSeenAt);

@@ -7,12 +7,13 @@ public class SecurityHeadersMiddleware(RequestDelegate next)
 {
     // Сайт: свои скрипты и стили, библиотеки с cdnjs (Three.js, SignalR), шрифты Google, запросы только к своему API
     // (и к fonts.googleapis.com: таблицу шрифтов браузер загружает заранее, rel=preload, — A-21).
+    // Карта Google (Maps Embed API) — только iframe с www.google.com и только после клика посетителя.
     // Встроенных скриптов на страницах нет; встроенные стили нужны SVG-иконкам.
     private const string SitePolicy =
         "default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; " +
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; " +
         "img-src 'self' data: blob: https:; connect-src 'self' https://fonts.googleapis.com; object-src 'none'; base-uri 'none'; " +
-        "form-action 'self'; frame-ancestors 'none'";
+        "form-action 'self'; frame-src https://www.google.com; frame-ancestors 'none'";
 
     public Task InvokeAsync(HttpContext context)
     {

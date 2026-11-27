@@ -191,38 +191,38 @@ public class RegistrationAndPlatformTests(SitoraApiFactory factory) : IClassFixt
             .ExecuteUpdateAsync(s => s.SetProperty(c => c.CreatedAt, c => c.CreatedAt.AddMinutes(-2))));
 }
 
-// Сидер разработки со вторым застройщиком: Rich Tower, его владелец и дом.
-public class RichTowerFactory : SitoraApiFactory
+// Сидер разработки со вторым застройщиком: организация, её владелец и дом.
+public class SecondBuilderFactory : SitoraApiFactory
 {
-    public string RichTowerPassword { get; } = "Rich-" + Guid.NewGuid().ToString("N")[..10] + "A1";
+    public string OwnerPassword { get; } = "Second-" + Guid.NewGuid().ToString("N")[..10] + "A1";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
-        builder.UseSetting("Seed:RichTower", "true");
-        builder.UseSetting(RichTowerSeeder.OwnerPasswordVariable, RichTowerPassword);
+        builder.UseSetting("Seed:SecondBuilder", "true");
+        builder.UseSetting(SecondBuilderSeeder.OwnerPasswordVariable, OwnerPassword);
     }
 }
 
-public class RichTowerSeedTests(RichTowerFactory factory) : IClassFixture<RichTowerFactory>
+public class SecondBuilderSeedTests(SecondBuilderFactory factory) : IClassFixture<SecondBuilderFactory>
 {
     [Fact]
-    public async Task RichTowerOwner_SeesOnlyOwnBuilding_AndDefaultOwnerDoesNotSeeIt()
+    public async Task SecondBuilderOwner_SeesOnlyOwnBuilding_AndDefaultOwnerDoesNotSeeIt()
     {
-        var owner = await factory.CreateClientForAsync(RichTowerSeeder.OwnerEmail, factory.RichTowerPassword);
+        var owner = await factory.CreateClientForAsync(SecondBuilderSeeder.OwnerEmail, factory.OwnerPassword);
         var me = await owner.GetFromJsonAsync<CurrentUserResponse>("/api/v1/auth/me", TestJson.Options);
-        Assert.Equal(("Owner", "Rich Tower"), (me!.Role, me.OrganizationName));
+        Assert.Equal(("Owner", SecondBuilderSeeder.Name), (me!.Role, me.OrganizationName));
 
         var own = await owner.GetFromJsonAsync<PagedResult<BuildingResponse>>("/api/v1/buildings", TestJson.Options);
         var building = Assert.Single(own!.Items);
-        Assert.Equal("Rich Tower", building.NameRu);
+        Assert.Equal(SecondBuilderSeeder.BuildingName, building.NameRu);
 
         var admin = await factory.CreateAdminClientAsync();
         var adminBuildings = await admin.GetFromJsonAsync<PagedResult<BuildingResponse>>("/api/v1/buildings?pageSize=100", TestJson.Options);
         Assert.DoesNotContain(adminBuildings!.Items, b => b.Id == building.Id);
 
         var publicSite = await factory.CreateClient().GetFromJsonAsync<PagedResult<BuildingResponse>>(
-            $"/api/v1/buildings?organization={RichTowerSeeder.Slug}", TestJson.Options);
+            $"/api/v1/buildings?organization={SecondBuilderSeeder.Slug}", TestJson.Options);
         Assert.Equal([building.Id], publicSite!.Items.Select(b => b.Id));
     }
 }

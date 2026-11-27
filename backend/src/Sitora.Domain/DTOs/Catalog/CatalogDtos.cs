@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Sitora.Domain.DTOs.Settings;
+using Sitora.Domain.Entities;
 using Sitora.Domain.Enums;
 
 namespace Sitora.Domain.DTOs.Catalog;
@@ -33,7 +34,47 @@ public record BuildingResponse(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? FloorHeight = null,
     // Английские название и описание (A-10): не заданы — полей нет, сайт на EN показывает русский текст с пометкой.
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? NameEn = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? DescriptionEn = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? DescriptionEn = null,
+    // Блок ЖК: буква, порядок, контур в плане (м; точка [x, y] или [x, y, r]), место на участке, уступы. Не заданы — полей нет.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? BlockCode = null,
+    int SortOrder = 0,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<double[]>? Footprint = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] SitePlacement? SitePosition = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<BuildingSetback>? Setbacks = null,
+    // Правило цены блока: ступени по этажам, цена м² пентхаусов, валюта каталога; не задано — полей нет.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<PriceStep>? PriceSteps = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? PenthousePricePerM2 = null,
+    Currency PriceCurrency = Currency.TJS,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? CommercialPricePerM2 = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? ParkingSpotPrice = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? ElevatorsCount = null,
+    // Коммерческих помещений и машино-мест (TotalApartments — только квартиры и пентхаусы).
+    int CommercialUnits = 0,
+    int ParkingSpots = 0,
+    // Дом на публичном сайте; false — скрыт (сотрудники видят его в CRM с пометкой).
+    bool IsPublished = true);
+
+// PUT /buildings/{id}/published: показать дом на сайте или скрыть (сделки, графики и платежи не меняются).
+public record SetPublishedRequest(bool IsPublished);
+
+// PUT /buildings/{id}/price-rule: правило целиком (валюта, ступени, цена м² пентхаусов); квартиры не меняет.
+public record SavePriceRuleRequest(Currency Currency = Currency.TJS, List<PriceStep>? Steps = null, decimal? PenthousePricePerM2 = null,
+    decimal? CommercialPricePerM2 = null, decimal? ParkingSpotPrice = null);
+
+// POST /buildings/{id}/price-rule/apply: сколько свободных квартир получили новую цену и сколько не тронуто
+// (бронь, продажа, «под запрос» или цена не изменилась).
+public record ApplyPriceRuleResponse(int Updated, int Unchanged, int Skipped);
+
+// PUT /buildings/{id}/shape: блок ЖК целиком. Пустой контур — «не блок» (сайт рисует обычный дом), места и уступов тогда нет.
+public record SaveBuildingShapeRequest(
+    string? BlockCode = null,
+    int SortOrder = 0,
+    List<double[]>? Footprint = null,
+    SitePlacement? SitePosition = null,
+    List<BuildingSetback>? Setbacks = null);
+
+// PUT /owner/site-plan: план участка ЖК целиком; пустой контур — плана нет.
+public record SaveSitePlanRequest(List<double[]>? Boundary = null, List<SiteZone>? Zones = null);
 
 // PUT /buildings/{id}/location: координаты задаются парой (обе или ни одной), пустое значение — «не задано».
 public record SaveBuildingLocationRequest(decimal? Latitude = null, decimal? Longitude = null, decimal? FloorHeight = null);
@@ -94,7 +135,9 @@ public record FloorResponse(
     bool IsCommercial,
     string? PlanImageUrl,
     int TotalApartments,
-    int FreeApartments);
+    int FreeApartments,
+    // Подземный этаж паркинга (−1, −2).
+    bool IsParking = false);
 
 public record ApartmentResponse(
     Guid Id,
@@ -109,7 +152,18 @@ public record ApartmentResponse(
     Currency Currency,
     ApartmentStatus Status,
     int PlanSlot,
-    string? Model3dId);
+    string? Model3dId,
+    ApartmentKind Kind = ApartmentKind.Residential,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? TerraceArea = null,
+    // Блок ЖК («A»): номер для людей — «Блок A, кв. 45», кратко «A-45» (UnitNames); у дома без блока — null.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? BlockCode = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? LayoutCode = null);
+
+// Планировка застройщика: код, название, JSON в формате сайта (frontend/js/planirovki-data.js), когда изменена.
+public record LayoutResponse(string Code, string Name, System.Text.Json.JsonElement Layout, DateTime UpdatedAt);
+
+// PUT /layouts/{code}: название и JSON планировки (контур, комнаты-многоугольники, двери, вход, балкон).
+public record SaveLayoutRequest(string? Name, System.Text.Json.JsonElement Layout);
 
 public record SaveBuildingRequest(
     string NameRu,
@@ -129,9 +183,9 @@ public record CreateFloorRequest(Guid BuildingId, int Number, string? PlanImageU
 public record UpdateFloorRequest(int Number, string? PlanImageUrl);
 
 // PlanSlot — позиция на плане этажа (0–7), Model3dId — объект квартиры в 3D-модели (необязательно).
-public record CreateApartmentRequest(Guid FloorId, int Number, int Rooms, decimal Area, decimal PricePerM2, int PlanSlot, string? Model3dId = null);
+public record CreateApartmentRequest(Guid FloorId, int Number, int Rooms, decimal Area, decimal PricePerM2, int PlanSlot, string? Model3dId = null, string? LayoutCode = null);
 
-public record UpdateApartmentRequest(int Number, int Rooms, decimal Area, decimal PricePerM2, int PlanSlot, string? Model3dId = null);
+public record UpdateApartmentRequest(int Number, int Rooms, decimal Area, decimal PricePerM2, int PlanSlot, string? Model3dId = null, string? LayoutCode = null);
 
 public record SetOnRequestRequest(bool OnRequest);
 

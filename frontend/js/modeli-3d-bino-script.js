@@ -1,23 +1,12 @@
-/* Sitora 3D tower: realistic residential building on three.js r128.
-   Instanced windows are the pick targets (one per apartment). */
+/* Sitora 3D: the residential complex on three.js r128 — its blocks built from the data (outline, setbacks, place on the
+   site), the yard, the parking levels and the lift shafts. Instanced windows are the pick targets: every window belongs to
+   its apartment (the same split of the floor as the 2D plan, S.geom.floor in geometriya-blok-script.js). */
 (function () {
   const S = (window.S = window.S || {});
   const T = window.THREE;
 
-  const FLOOR_H = 3.4, GROUND_H = 5.5, W = 38, D = 26;
-  const BAY = { 0: [-W / 4, D / 2, 0], 1: [W / 4, D / 2, 0] }; // placeholder, rebuilt below
-
-  // apartment slot -> face placement: [x, z, rotationY, bayWidth]
-  const SLOTS = [
-    [-W / 4, D / 2, 0, W / 2],
-    [W / 4, D / 2, 0, W / 2],
-    [W / 2, D / 4, Math.PI / 2, D / 2],
-    [W / 2, -D / 4, Math.PI / 2, D / 2],
-    [W / 4, -D / 2, Math.PI, W / 2],
-    [-W / 4, -D / 2, Math.PI, W / 2],
-    [-W / 2, -D / 4, -Math.PI / 2, D / 2],
-    [-W / 2, D / 4, -Math.PI / 2, D / 2],
-  ];
+  // Floor height of the residential floors (the podium and the parking levels have their own, see floorY).
+  const FLOOR_H = 3.3, D = 26;
 
   const STATUS_COLOR = {
     free: 0x2fd6a3,
@@ -221,7 +210,7 @@
 
   function create(container, opts) {
     opts = opts || {};
-    const handlers = { select: opts.onSelectApartment || (() => {}), floor: opts.onSelectFloor || (() => {}), hover: opts.onHover || (() => {}), mode: () => {}, room: () => {}, view: () => {} };
+    const handlers = { select: opts.onSelectApartment || (() => {}), floor: opts.onSelectFloor || (() => {}), hover: opts.onHover || (() => {}), mode: () => {}, room: () => {}, view: () => {}, fps: () => {} };
     const rand = rnd(7);
 
     const renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -346,6 +335,7 @@
       g.computeVertexNormals();
       const mt = new T.Mesh(g, new T.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true }));
       scene.add(mt);
+      terrainMesh = mt;
     }
 
     // neighbour towers (skyline): a generic backdrop, hidden when the real surroundings from OpenStreetMap are loaded
@@ -363,379 +353,432 @@
         b.position.set(x, h / 2 - 3, z); b.castShadow = true; b.receiveShadow = true; fakeNeighbours.add(b);
       });
     }
-    var neighbourMat;
+    var neighbourMat, terrainMesh;
 
-    // ---------- the tower ----------
+    // ---------- the complex: blocks on one site ----------
+    // A model { blocks: [{ id, code, name, footprint, position, setbacks, floors, elevators, amenities }], site } from the API
+    // (Footprint, SitePosition, Setbacks of every block, SitePlan of the organization); without it — one plain block of the
+    // old size (a building without an outline). Plan axes: x to the right, y down the plan → world x and z; the complex is
+    // centred at the origin. Floors: −2, −1 underground (parking), 1–2 the podium (taller), then the residential floors.
     const tower = new T.Group();
     scene.add(tower);
-    let pickGroup = [];
-    let apartmentInst = []; // instance index -> {floor, slot, id}
+    const under = new T.Group(); under.visible = false; scene.add(under); // parking levels, shown in the parking mode
+    let apartmentInst = []; // apartment index -> { block, floor, slot, id, status, data, windows: [instance], kind }
+    let winApt = [];        // window instance -> apartment index (−1 — a window of no apartment)
+    let spotApt = [];       // parking spot instance -> apartment index
     let floorsCount = 16;
-    let glass, glow, frames, mullions, slabsMesh, railFront, railSide;
-    let selBand, selEdges, hoverIdx = -1, selectedIdx = -1;
-    let roofLight, lampBulbs = [], lampMat, signMat;
+    let glass, glow, frames, spots;
+    let selBand, hoverIdx = -1, selectedIdx = -1;
+    let roofLight, lampBulbs = [], lampMat, signMat, terraceLamps = null;
     // opts.overlay === false: windows lit like a lived-in house, without status colours (renders for the site's pictures).
     let overlay = opts.overlay !== false;
-    let aptMap = {}; // id -> inst
-    let keyMap = {}; // "floor:slot" -> inst
-    let apartments = [];
+    let aptMap = {}; // id -> apartment index
+    let keyMap = {}; // "block:floor:slot" -> apartment index
+    let blocks = [], site = null, model = null, complexR = 60, siteCenter = { x: 0, y: 0 };
+    let shafts = [], cabins = [], dims = [], yardZones = [], parkingOn = false, xray = false;
+    const bodyMats = [];
+    let pickMeshes = [], selBlock = -1;
 
     const mats = {
-      plaster: null,
-      // Copper-bronze accent of the site's palette (the pilasters, the canopy, the crown): matte metal, not bright gold.
       stone: new T.MeshStandardMaterial({ color: lin(0x9a6a44), roughness: 0.42, metalness: 0.45 }),
-      // Upper-body concrete/stucco — warm cream/beige Dushanbe apartment style
       concrete: new T.MeshStandardMaterial({ color: lin(0xd8d2c4), roughness: 0.82 }),
-      // Window frames: anthracite aluminum
       frame: new T.MeshStandardMaterial({ color: lin(0x232830), roughness: 0.3, metalness: 0.78 }),
-      // Lobby / entrance glass: dark blue architectural
       glassWall: new T.MeshStandardMaterial({ color: lin(0x1a3558), roughness: 0.03, metalness: 0.98, transparent: true, opacity: 0.72 }),
-      // Balcony railings: tinted blue glass
-      railGlass: new T.MeshStandardMaterial({ color: lin(0x3a6a98), roughness: 0.04, metalness: 0.6, transparent: true, opacity: 0.28 }),
-      // Roof membrane: dark charcoal
+      railGlass: new T.MeshStandardMaterial({ color: lin(0x3a6a98), roughness: 0.04, metalness: 0.6, transparent: true, opacity: 0.28, depthWrite: false }),
       roof: new T.MeshStandardMaterial({ color: lin(0x484440), roughness: 0.96 }),
+      granite: new T.MeshStandardMaterial({ color: lin(0x2e2b28), roughness: 0.75, metalness: 0.05 }),
+      slab: new T.MeshStandardMaterial({ color: lin(0xc8c0b0), roughness: 0.65 }),
+      crown: new T.MeshStandardMaterial({ color: lin(0xb88a5e), roughness: 0.45, metalness: 0.35 }),
+      shaft: new T.MeshStandardMaterial({ color: lin(0x7a8696), roughness: 0.5, metalness: 0.3, transparent: true, opacity: 0.55, depthWrite: false }),
+      cabin: new T.MeshStandardMaterial({ color: lin(0xf2c46a), roughness: 0.4, emissive: lin(0xf2c46a), emissiveIntensity: 0.4 }),
+      parkSlab: new T.MeshStandardMaterial({ color: lin(0x6b6f76), roughness: 0.9, transparent: true, opacity: 0.85 }),
+      planter: new T.MeshStandardMaterial({ color: lin(0x5f8a4a), roughness: 1 }),
     };
+    // Each block its own accent of the cladding, one style for the complex.
+    const ACCENT = [0xece6d8, 0xe9dcc8, 0xe3e3dc, 0xe8e0d0];
 
-    function floorY(n) { return n === 0 ? 0 : GROUND_H + (n - 1) * FLOOR_H; }
-    function floorTop(n) { return n === 0 ? GROUND_H : GROUND_H + n * FLOOR_H; }
+    // Heights: the podium (floors 1–2) is taller; underground levels 3,2 m each.
+    const PODIUM_H = 4.5;
+    function floorY(n) { return n < 0 ? n * 3.2 : n <= 2 ? (n - 1) * PODIUM_H : 2 * PODIUM_H + (n - 3) * FLOOR_H; }
+    function floorTop(n) { return n < 0 ? (n + 1) * 3.2 : floorY(n) + (n <= 2 ? PODIUM_H : FLOOR_H); }
     function floorMid(n) { return (floorY(n) + floorTop(n)) / 2; }
 
     function clearTower() {
-      while (tower.children.length) {
-        const o = tower.children.pop();
-        o.traverse && o.traverse((c) => { if (c.geometry) c.geometry.dispose(); });
-      }
+      [tower, under].forEach((g) => { while (g.children.length) { const o = g.children.pop(); o.traverse && o.traverse((c) => { if (c.geometry) c.geometry.dispose(); }); } });
+      bodyMats.length = 0; shafts = []; cabins = []; dims = []; yardZones = [];
+      removeLabels('blocks'); removeLabels('dim'); removeLabels('yard');
     }
 
-    function build(n) {
-      clearTower();
-      floorsCount = Math.max(1, n);
-      const H = floorTop(floorsCount);
+    // Plan → world.
+    const W2 = (p) => ({ x: p.x - siteCenter.x, z: p.y - siteCenter.y });
+    // A ring on the plan (placed on the site) as a THREE.Shape in world x, −z (extruded up after rotateX(−π/2)).
+    function shapeOf(ring) { return new T.Shape(ring.map((p) => { const w = W2(p); return new T.Vector2(w.x, -w.z); })); }
+    function extrude(ring, y0, h, holeRing) {
+      const sh = shapeOf(ring);
+      if (holeRing) sh.holes.push(new T.Path(holeRing.slice().reverse().map((p) => { const w = W2(p); return new T.Vector2(w.x, -w.z); })));
+      const g = new T.ExtrudeGeometry(sh, { depth: h, bevelEnabled: false, steps: 1, curveSegments: 1 });
+      g.rotateX(-Math.PI / 2); g.translate(0, y0, 0);
+      return g;
+    }
+    // The outline grown outwards by d metres (an inward offset with a negative depth).
+    const grow = (rawPlaced, d) => S.geom.offsetInward(rawPlaced.map((p) => S.geom.pt([p.x, p.y])), -d).inner;
+    const placedRaw = (b, raw) => S.geom.place(raw.map(S.geom.pt), b.position);
+    const placedExp = (b, raw) => S.geom.place(S.geom.expand(raw), b.position);
+
+    // A plain block of the old size, for a building without an outline.
+    function plainModel(n) {
+      return { blocks: [{ id: null, code: null, name: '', footprint: [[0, 0], [38, 0], [38, 26], [0, 26]], position: { x: -19, y: -13, rotationDeg: 0 }, setbacks: [], floors: Math.max(1, n), elevators: null, amenities: [] }], site: null, plain: true };
+    }
+
+    function build(m) {
+      clearTower(); pickMeshes = [];
+      model = m && m.blocks && m.blocks.length ? m : plainModel(+m || 16);
+      site = model.site || null;
+      // The site's centre: the middle of all blocks (and of the site outline when there is one).
+      const all = model.blocks.flatMap((b) => placedExp(b, b.footprint));
+      const bb = S.geom.bounds(all);
+      siteCenter = { x: (bb.x0 + bb.x1) / 2, y: (bb.y0 + bb.y1) / 2 };
+      complexR = Math.max(30, Math.hypot(bb.x1 - bb.x0, bb.y1 - bb.y0) / 2);
+      floorsCount = Math.max(...model.blocks.map((b) => b.floors));
       const plaster = plasterTexture(rnd(3));
-      mats.plaster = new T.MeshStandardMaterial({ map: plaster, roughness: 0.88 });
-      const faceMat = (w) => {
-        const t = plaster.clone(); t.needsUpdate = true; t.repeat.set(w / 4, floorsCount);
-        return new T.MeshStandardMaterial({ map: t, roughness: 0.88 });
+      const placements = []; // windows: { x, y, z, ry, w, h, apt, kind }
+      apartmentInst = []; aptMap = {}; keyMap = {};
+      const aptOf = (bi, f, slot, kind) => {
+        const key = bi + ':' + f + ':' + slot;
+        if (keyMap[key] == null) { keyMap[key] = apartmentInst.length; apartmentInst.push({ block: bi, floor: f, slot, id: null, status: 'free', data: null, windows: [], kind: kind || 'residential', rand: rand() }); }
+        return keyMap[key];
       };
+      blocks = model.blocks.map((b, bi) => {
+        const g = new T.Group(); g.userData.block = bi; tower.add(g);
+        const tex = plaster.clone(); tex.needsUpdate = true; tex.repeat.set(1 / 4, 1 / FLOOR_H);
+        const bodyM = new T.MeshStandardMaterial({ map: tex, color: lin(ACCENT[bi % ACCENT.length]), roughness: 0.88, transparent: true, opacity: 1 });
+        bodyMats.push(bodyM);
+        const fpOf = (n) => S.geom.footprintOf({ footprint: b.footprint, setbacks: b.setbacks }, n);
+        const depthOf = (n) => { let d = 7; (b.setbacks || []).forEach((s) => { if (n >= s.fromFloor && s.planDepth) d = s.planDepth; }); return d; };
+        const H = floorTop(b.floors);
+        // Runs of floors with the same outline: one extruded body each (the podium of floors 1–2 in granite).
+        let runStart = 1;
+        for (let n = 1; n <= b.floors + 1; n++) {
+          const same = n <= b.floors && fpOf(n) === fpOf(runStart) && !(runStart <= 2 && n === 3);
+          if (same) continue;
+          const ring = placedExp(b, fpOf(runStart)), y0 = floorY(runStart), y1 = floorTop(n - 1);
+          const mesh = new T.Mesh(extrude(ring, y0, y1 - y0), runStart <= 2 && b.floors > 3 && !model.plain ? mats.granite : bodyM);
+          mesh.castShadow = mesh.receiveShadow = true; mesh.userData.pick = { block: bi }; g.add(mesh); pickMeshes.push(mesh);
+          runStart = n;
+        }
+        // Slab edges of every floor (merged: one draw call per block); the roof of a setback — a terrace with a glass rail.
+        const slabs = [];
+        for (let n = 2; n <= b.floors; n++) slabs.push(extrude(grow(placedRaw(b, fpOf(n)), 0.12), floorY(n) - 0.09, 0.18));
+        const top = fpOf(b.floors), base = b.footprint, setback = top !== base;
+        // The crown: a cornice over the top floor and a parapet.
+        const topRing = placedRaw(b, top);
+        slabs.push(extrude(grow(topRing, 0.6), H, 0.45));
+        slabs.push(extrude(grow(topRing, 0.15), H + 0.45, 1.0, S.geom.offsetInward(topRing.map((p) => S.geom.pt([p.x, p.y])), 0.25).inner));
+        if (setback) {
+          // The terrace: the roof of the floor below the setback (paving), the glass rail on its edge, planters.
+          const below = b.floors - 1, ty = floorTop(below);
+          slabs.push(extrude(grow(placedRaw(b, base), 0.12), ty - 0.05, 0.12));
+          const rail = new T.Mesh(extrude(grow(placedRaw(b, base), 0.02), ty + 0.07, 1.1, S.geom.offsetInward(placedRaw(b, base).map((p) => S.geom.pt([p.x, p.y])), 0.06).inner), mats.railGlass);
+          rail.renderOrder = 2; g.add(rail);
+        }
+        const slabMesh = new T.Mesh(mergeGeometries(slabs), mats.slab); slabMesh.castShadow = true; g.add(slabMesh);
 
-      // ============================================================
-      // DUSHANBE-STYLE BUILDING (Nekruz Residence look)
-      // ============================================================
-
-      // --- Main body (floors 2+) ---
-      const bodyH = floorsCount * FLOOR_H;
-      const body = new T.Mesh(new T.BoxGeometry(W, bodyH, D), [faceMat(D), faceMat(D), mats.roof, mats.roof, faceMat(W), faceMat(W)]);
-      body.position.y = GROUND_H + bodyH / 2; body.castShadow = true; body.receiveShadow = true;
-      tower.add(body);
-
-      // --- Ground floor: granite-clad base (Dushanbe style: dark stone lower 2 floors) ---
-      const graniteM = new T.MeshStandardMaterial({ color: lin(0x2e2b28), roughness: 0.75, metalness: 0.05 }); // dark granite
-      const gf = new T.Mesh(new T.BoxGeometry(W + 0.4, GROUND_H, D + 0.4), graniteM);
-      gf.position.y = GROUND_H / 2; gf.castShadow = true; gf.receiveShadow = true; tower.add(gf);
-
-      // Lobby glass interior behind granite shell
-      const core = new T.Mesh(new T.BoxGeometry(W - 1.0, GROUND_H - 0.6, D - 1.0), new T.MeshStandardMaterial({ color: lin(0x1e3050), roughness: 0.1, metalness: 0.9, transparent: true, opacity: 0.72, emissive: lin(0xffc27a), emissiveIntensity: 0.0 }));
-      core.position.y = GROUND_H / 2 + 0.2; tower.add(core);
-      window.__coreMat = core.material;
-
-      // Granite horizontal rustication joints (3 rows on base)
-      const rusticM = new T.MeshStandardMaterial({ color: lin(0x1e1c1a), roughness: 0.9 });
-      for (let ri = 1; ri <= 3; ri++) {
-        [[0, D / 2 + 0.22, 0, W + 0.9], [0, -D / 2 - 0.22, 0, W + 0.9], [W / 2 + 0.22, 0, Math.PI / 2, D + 0.9], [-W / 2 - 0.22, 0, Math.PI / 2, D + 0.9]].forEach(([x, z, ry, len]) => {
-          const slot = new T.Mesh(new T.BoxGeometry(len, 0.08, 0.1), rusticM);
-          slot.position.set(x, (GROUND_H / 4) * ri, z); slot.rotation.y = ry; tower.add(slot);
-        });
-      }
-
-      // Vertical granite pilasters on ground floor (Dushanbe decorative piers)
-      const pilasterM = new T.MeshStandardMaterial({ color: lin(0x3a3733), roughness: 0.7 });
-      const pilasterPositions = [];
-      for (let i = -3; i <= 3; i++) pilasterPositions.push([i * (W / 7), D / 2 + 0.22, 0]);
-      for (let i = -1; i <= 1; i++) { pilasterPositions.push([W / 2 + 0.22, i * (D / 3), Math.PI / 2]); pilasterPositions.push([-W / 2 - 0.22, i * (D / 3), Math.PI / 2]); }
-      pilasterPositions.forEach(([x, z, ry]) => {
-        const pil = new T.Mesh(new T.BoxGeometry(0.5, GROUND_H, 0.4), pilasterM);
-        pil.position.set(x, GROUND_H / 2, z); pil.rotation.y = ry; pil.castShadow = true; tower.add(pil);
-      });
-
-      // --- Base plinth (extra-wide stone step) ---
-      const plinth = new T.Mesh(new T.BoxGeometry(W + 4.0, 0.7, D + 4.0), new T.MeshStandardMaterial({ color: lin(0x2a2826), roughness: 0.8 }));
-      plinth.position.y = 0.35; plinth.receiveShadow = true; tower.add(plinth);
-      const plinth2 = new T.Mesh(new T.BoxGeometry(W + 2.2, 0.45, D + 2.2), new T.MeshStandardMaterial({ color: lin(0x322f2c), roughness: 0.75 }));
-      plinth2.position.y = 0.9; tower.add(plinth2);
-
-      // --- Transition cornice at top of ground floor (stone crown molding) ---
-      const corniceM = new T.MeshStandardMaterial({ color: lin(0xd0c8b8), roughness: 0.6 });
-      [[0, D / 2 + 0.12, 0, W + 1.2], [0, -D / 2 - 0.12, 0, W + 1.2], [W / 2 + 0.12, 0, Math.PI / 2, D + 1.2], [-W / 2 - 0.12, 0, Math.PI / 2, D + 1.2]].forEach(([x, z, ry, len]) => {
-        const cr = new T.Mesh(new T.BoxGeometry(len, 0.6, 0.55), corniceM);
-        cr.position.set(x, GROUND_H + 0.3, z); cr.rotation.y = ry; cr.castShadow = true; tower.add(cr);
-        const cr2 = new T.Mesh(new T.BoxGeometry(len + 0.2, 0.22, 0.38), corniceM);
-        cr2.position.set(x, GROUND_H + 0.72, z); cr2.rotation.y = ry; tower.add(cr2);
-      });
-
-      // --- Floor-level cornice bands (every 3 floors — Dushanbe belt courses) ---
-      {
-        const bandM = new T.MeshStandardMaterial({ color: lin(0xc8c0b0), roughness: 0.65 });
-        const beltFloors = [];
-        for (let f = 3; f <= floorsCount; f += 3) beltFloors.push(f);
-        beltFloors.forEach((f) => {
-          const y = floorY(f);
-          [[0, D / 2 + 0.1, 0, W + 0.5], [0, -D / 2 - 0.1, 0, W + 0.5], [W / 2 + 0.1, 0, Math.PI / 2, D + 0.5], [-W / 2 - 0.1, 0, Math.PI / 2, D + 0.5]].forEach(([x, z, ry, len]) => {
-            const b = new T.Mesh(new T.BoxGeometry(len, 0.42, 0.44), bandM);
-            b.position.set(x, y + 0.21, z); b.rotation.y = ry; b.castShadow = true; tower.add(b);
+        // Windows of every floor along the facade of each unit (the same split as the 2D plan, S.geom.floor).
+        for (let n = 1; n <= b.floors; n++) {
+          const kind = n <= 2 && b.floors > 3 && !model.plain ? 'commercial' : n === b.floors && setback ? 'penthouse' : 'residential';
+          const units = (b.unitsOf && b.unitsOf(n)) || null;
+          const shares = units && units.length ? units.map((u) => u.area || 1) : (kind === 'commercial' ? [1, 1, 1, 1, 1, 1] : kind === 'penthouse' ? [1, 1, 1, 1] : [1, 1, 1, 1, 1, 1, 1, 1]);
+          const plan = S.geom.floor(fpOf(n), shares, { depth: depthOf(n), lifts: b.elevators || 0 });
+          plan.units.forEach((u, k) => {
+            const ai = aptOf(bi, n, units && units[k] && units[k].planSlot != null ? units[k].planSlot : k, kind);
+            u.facade.forEach((s) => {
+              const a = S.geom.place([s.a, s.b], b.position), p0 = W2(a[0]), p1 = W2(a[1]);
+              const len = Math.hypot(p1.x - p0.x, p1.z - p0.z);
+              if (len < (s.arc ? 0.9 : 1.6)) return;
+              const step = kind === 'commercial' ? 4.2 : kind === 'penthouse' ? 2.6 : 3.4;
+              const m = Math.max(1, Math.floor(len / step)), ww = Math.min(kind === 'residential' ? 1.8 : 3.4, len / m - 0.5);
+              if (ww < 0.6) return;
+              const dx = (p1.x - p0.x) / len, dz = (p1.z - p0.z) / len, ry = Math.atan2(dz, -dx);
+              for (let i = 0; i < m; i++) {
+                const t0 = (i + 0.5) / m;
+                placements.push({ x: p0.x + (p1.x - p0.x) * t0, z: p0.z + (p1.z - p0.z) * t0, y: floorY(n), ry, w: ww, h: kind === 'residential' ? 2.0 : kind === 'penthouse' ? 2.9 : 3.4, fh: n <= 2 ? PODIUM_H : FLOOR_H, apt: ai, kind });
+              }
+            });
           });
-        });
-      }
-
-      // --- Thin floor slab lines (every floor — standard Dushanbe precast appearance) ---
-      {
-        const slabM = new T.MeshStandardMaterial({ color: lin(0xb8b2a8), roughness: 0.85 });
-        const o2 = new T.Object3D();
-        const slabBands = new T.InstancedMesh(new T.BoxGeometry(1, 0.18, 0.28), slabM, floorsCount * 4);
-        let k = 0;
-        for (let f = 1; f <= floorsCount; f++) {
-          const y = floorY(f) + 0.04;
-          [[0, D / 2 + 0.08, 0, W + 0.1], [0, -D / 2 - 0.08, 0, W + 0.1], [W / 2 + 0.08, 0, Math.PI / 2, D + 0.1], [-W / 2 - 0.08, 0, Math.PI / 2, D + 0.1]].forEach(([x, z, ry, len]) => {
-            o2.position.set(x, y, z); o2.rotation.set(0, ry, 0); o2.scale.set(len, 1, 1); o2.updateMatrix(); slabBands.setMatrixAt(k++, o2.matrix);
+          if (n === 3 || (b.floors <= 3 && n === 1)) b.core = plan.core;
+        }
+        // The lift core: 3 shafts from the parking (−2) to the roof and the stairs; seen in the cut-away and the parking mode.
+        const core = b.core;
+        if (core && (b.elevators || 0) > 0 && !model.plain) {
+          const y0 = floorY(-2), y1 = H + 1.4;
+          core.lifts.slice(0, b.elevators).forEach((r, k) => {
+            const pr = S.geom.place(r, b.position).map(W2);
+            const cx = pr.reduce((s, p) => s + p.x, 0) / pr.length, cz = pr.reduce((s, p) => s + p.z, 0) / pr.length;
+            const sw = Math.hypot(pr[1].x - pr[0].x, pr[1].z - pr[0].z), sd = Math.hypot(pr[2].x - pr[1].x, pr[2].z - pr[1].z), ang = Math.atan2(-(pr[1].z - pr[0].z), pr[1].x - pr[0].x);
+            const shaft = new T.Mesh(new T.BoxGeometry(sw, y1 - y0, sd), mats.shaft); shaft.position.set(cx, (y0 + y1) / 2, cz); shaft.rotation.y = ang;
+            shaft.renderOrder = 3; shaft.visible = false; g.add(shaft); shafts.push({ block: b.code, mesh: shaft });
+            const cab = new T.Mesh(new T.BoxGeometry(sw * 0.8, 2.4, sd * 0.8), mats.cabin); cab.position.set(cx, floorY(1) + 1.2, cz); cab.rotation.y = ang;
+            cab.visible = false; cab.userData = { y0: floorY(-2) + 1.2, y1: H - 1.2, phase: k * 2.1 + bi }; g.add(cab); cabins.push(cab);
           });
         }
-        slabBands.frustumCulled = false; slabBands.castShadow = true; tower.add(slabBands);
-      }
-
-      // --- Vertical fins / pilasters on upper body (classical vertical articulation) ---
-      const finM = new T.MeshStandardMaterial({ color: lin(0xb88a5e), roughness: 0.45, metalness: 0.35 }); // light copper fins
-      [[0, D / 2, 1.1, 0.42], [0, -D / 2, 1.1, 0.42], [W / 2, 0, 0.42, 1.1], [-W / 2, 0, 0.42, 1.1]].forEach(([x, z, fw, fd]) => {
-        const fin = new T.Mesh(new T.BoxGeometry(fw, bodyH, fd), finM);
-        fin.position.set(x + (x ? Math.sign(x) * 0.1 : 0), GROUND_H + bodyH / 2, z + (z ? Math.sign(z) * 0.1 : 0));
-        fin.castShadow = true; tower.add(fin);
+        // Parking levels −1/−2 under the block: plates and spots (pick targets), shown in the parking mode.
+        if (b.parkingLevels && b.parkingLevels.length) {
+          b.parkingLevels.forEach((lv) => under.add(new T.Mesh(extrude(placedExp(b, b.footprint), floorY(lv) - 0.25, 0.25), mats.parkSlab)));
+        }
+        // Entrance: a canopy over the street-facing (largest z) edge's middle, on the podium.
+        if (!model.plain) {
+          const ring = placedRaw(b, base).map(W2);
+          let best = null;
+          ring.forEach((p, i) => { const q = ring[(i + 1) % ring.length], len = Math.hypot(q.x - p.x, q.z - p.z), mz = (p.z + q.z) / 2; if (len > 6 && (!best || mz > best.mz)) best = { p, q, mz, len }; });
+          if (best) {
+            const mx = (best.p.x + best.q.x) / 2, ry = Math.atan2(best.q.z - best.p.z, -(best.q.x - best.p.x));
+            const canopy = new T.Mesh(new T.BoxGeometry(Math.min(10, best.len * 0.5), 0.35, 3.2), mats.stone);
+            canopy.position.set(mx, PODIUM_H - 0.4, best.mz); canopy.rotation.y = ry; canopy.translateZ(1.6); canopy.castShadow = true; g.add(canopy);
+          }
+        }
+        const bbB = S.geom.bounds(placedExp(b, base)), ctr = W2({ x: (bbB.x0 + bbB.x1) / 2, y: (bbB.y0 + bbB.y1) / 2 });
+        return { code: b.code, name: b.name, id: b.id, floors: b.floors, H, group: g, center: ctr, ring: placedExp(b, base), raw: b, setback, windows: 0 };
       });
 
-      // Corner columns (massive, full-height — Dushanbe landmark style)
-      [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([sx, sz]) => {
-        const c = new T.Mesh(new T.BoxGeometry(2.0, H + 1.0, 2.0), mats.stone);
-        c.position.set(sx * (W / 2 + 0.25), (H + 1.0) / 2, sz * (D / 2 + 0.25));
-        c.castShadow = true; c.receiveShadow = true; tower.add(c);
-        // Column capital at top
-        const cap = new T.Mesh(new T.BoxGeometry(2.6, 0.5, 2.6), corniceM);
-        cap.position.set(sx * (W / 2 + 0.25), H + 1.3, sz * (D / 2 + 0.25)); tower.add(cap);
-      });
-
-      // --- ENTRANCE: Dushanbe grand portal with arch ---
-      const entW = 13, entH = GROUND_H + 1.0;
-      // Entrance canopy slab
-      const canopy = new T.Mesh(new T.BoxGeometry(entW + 0.6, 0.55, 5.8), mats.stone);
-      canopy.position.set(0, GROUND_H + 0.2, D / 2 + 2.8); canopy.castShadow = true; tower.add(canopy);
-      // Canopy soffit (underside — warm)
-      const canSoffit = new T.Mesh(new T.BoxGeometry(entW - 0.2, 0.08, 5.6), new T.MeshStandardMaterial({ color: lin(0xd4b87a), roughness: 0.6, emissive: lin(0xffa040), emissiveIntensity: 0.0 }));
-      canSoffit.position.set(0, GROUND_H - 0.04, D / 2 + 2.8); tower.add(canSoffit);
-      window.__canSoffit = canSoffit.material;
-      // Entrance columns (round — classical Tajik architecture)
-      [-5.8, -2.9, 2.9, 5.8].forEach((x) => {
-        const col = new T.Mesh(new T.CylinderGeometry(0.38, 0.44, GROUND_H + 0.3, 16), mats.stone);
-        col.position.set(x, (GROUND_H + 0.3) / 2, D / 2 + 5.0); col.castShadow = true; tower.add(col);
-        // Column base
-        const base = new T.Mesh(new T.BoxGeometry(1.1, 0.4, 1.1), corniceM);
-        base.position.set(x, 0.2, D / 2 + 5.0); tower.add(base);
-        // Column capital
-        const cap = new T.Mesh(new T.BoxGeometry(1.0, 0.45, 1.0), corniceM);
-        cap.position.set(x, GROUND_H + 0.26, D / 2 + 5.0); tower.add(cap);
-      });
-      // Entrance arch frieze above canopy
-      const frieze = new T.Mesh(new T.BoxGeometry(entW + 0.6, 1.4, 0.55), corniceM);
-      frieze.position.set(0, GROUND_H + 1.0, D / 2 + 0.4); frieze.castShadow = true; tower.add(frieze);
-      // Sign plate
-      signMat = new T.MeshBasicMaterial({ map: signTexture('НЕКРУЗ'), toneMapped: false });
-      const sign = new T.Mesh(new T.PlaneGeometry(10.4, 1.1), signMat);
-      sign.position.set(0, GROUND_H + 1.0, D / 2 + 0.72); tower.add(sign);
-      // Entrance steps
-      [[3.2, 0.28], [2.0, 0.18], [1.0, 0.1]].forEach(([ext, h], i) => {
-        const step = new T.Mesh(new T.BoxGeometry(entW + ext, h, ext), new T.MeshStandardMaterial({ color: lin(0x2e2b28), roughness: 0.7 }));
-        step.position.set(0, h / 2 + i * 0.1, D / 2 + 5.3 + (3.2 - ext) / 2 + ext / 2); step.receiveShadow = true; tower.add(step);
-      });
-      // Entrance door glass
-      const door = new T.Mesh(new T.BoxGeometry(5.5, GROUND_H - 0.5, 0.12), mats.glassWall);
-      door.position.set(0, (GROUND_H - 0.5) / 2 + 0.25, D / 2 + 0.1); tower.add(door);
-
-      // --- ATTIC / PENTHOUSE floor (top 2 floors set back — Dushanbe tower crown) ---
-      if (floorsCount >= 6) {
-        const attH = FLOOR_H * 2;
-        const attSetback = 1.5;
-        const att = new T.Mesh(new T.BoxGeometry(W - attSetback * 2, attH, D - attSetback * 2), faceMat(W - attSetback * 2));
-        att.position.y = H - attH / 2; att.castShadow = true; tower.add(att);
-        // Attic base cornice (crown molding)
-        [[0, (D - attSetback * 2) / 2 + 0.1, 0, W - attSetback * 2 + 0.5], [0, -(D - attSetback * 2) / 2 - 0.1, 0, W - attSetback * 2 + 0.5], [(W - attSetback * 2) / 2 + 0.1, 0, Math.PI / 2, D - attSetback * 2 + 0.5], [-(W - attSetback * 2) / 2 - 0.1, 0, Math.PI / 2, D - attSetback * 2 + 0.5]].forEach(([x, z, ry, len]) => {
-          const cr = new T.Mesh(new T.BoxGeometry(len, 0.55, 0.65), corniceM);
-          cr.position.set(x, H - attH - 0.08, z); cr.rotation.y = ry; cr.castShadow = true; tower.add(cr);
-        });
-      }
-
-      // --- ROOF: Parapet with decorative crown ---
-      const roofY = H + 0.5;
-      // Main parapet walls
-      [[0, D / 2 + 0.1, 0, W + 1.0], [0, -D / 2 - 0.1, 0, W + 1.0], [W / 2 + 0.1, 0, Math.PI / 2, D + 1.0], [-W / 2 - 0.1, 0, Math.PI / 2, D + 1.0]].forEach(([x, z, ry, len]) => {
-        const p = new T.Mesh(new T.BoxGeometry(len, 1.4, 0.4), mats.concrete);
-        p.position.set(x, H + 0.7, z); p.rotation.y = ry; p.castShadow = true; tower.add(p);
-        // Parapet cap
-        const cap = new T.Mesh(new T.BoxGeometry(len + 0.1, 0.22, 0.6), corniceM);
-        cap.position.set(x, H + 1.52, z); cap.rotation.y = ry; tower.add(cap);
-      });
-      // Parapet corner posts
-      [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([sx, sz]) => {
-        const post = new T.Mesh(new T.BoxGeometry(0.6, 1.8, 0.6), mats.stone);
-        post.position.set(sx * (W / 2 + 0.1), H + 0.9, sz * (D / 2 + 0.1)); tower.add(post);
-      });
-      // Decorative pediment / triangular feature on front
-      const pedBase = new T.Mesh(new T.BoxGeometry(16, 0.3, 0.5), mats.stone);
-      pedBase.position.set(0, roofY + 0.5, D / 2 + 0.1); tower.add(pedBase);
-      // Penthouse + utilities
-      const pent = new T.Mesh(new T.BoxGeometry(10, 3.2, 7), mats.stone);
-      pent.position.set(-5, roofY + 1.6, -3); pent.castShadow = true; tower.add(pent);
-      const tank = new T.Mesh(new T.CylinderGeometry(1.9, 1.9, 2.2, 16), mats.frame);
-      tank.position.set(7.5, roofY + 1.1, 3); tank.castShadow = true; tower.add(tank);
-      const ant = new T.Mesh(new T.CylinderGeometry(0.08, 0.14, 11, 8), mats.frame);
-      ant.position.set(-5, roofY + 3.2 + 5.5, -3); ant.castShadow = true; tower.add(ant);
-      roofLight = new T.Mesh(new T.SphereGeometry(0.3, 12, 8), new T.MeshBasicMaterial({ color: 0xff3b30, toneMapped: false }));
-      roofLight.position.set(-5, roofY + 3.2 + 11, -3); tower.add(roofLight);
-
-      // apartments: windows, frames, balconies
-      apartmentInst = [];
-      aptMap = {}; keyMap = {};
-      const count = floorsCount * 8;
+      // Windows: one instanced set for the whole complex (glass is the pick target, glow is the light behind it).
+      const count = Math.max(1, placements.length);
       glass = new T.InstancedMesh(new T.BoxGeometry(1, 1, 0.06), new T.MeshStandardMaterial({ color: lin(0x3a6ea8), roughness: 0.03, metalness: 0.95, transparent: true, opacity: 0.55, envMapIntensity: 2.0 }), count);
       glow = new T.InstancedMesh(new T.PlaneGeometry(1, 1), new T.MeshBasicMaterial({ color: 0xffffff, toneMapped: true }), count);
-      frames = new T.InstancedMesh(new T.BoxGeometry(1, 1, 0.3), mats.frame, count);
-      mullions = new T.InstancedMesh(new T.BoxGeometry(0.1, 1, 0.12), mats.frame, count * 2);
-      slabsMesh = new T.InstancedMesh(new T.BoxGeometry(1, 0.22, 1), mats.concrete, count);
-      railFront = new T.InstancedMesh(new T.BoxGeometry(1, 1.05, 0.04), mats.railGlass, count);
-      railSide = new T.InstancedMesh(new T.BoxGeometry(0.04, 1.05, 1), mats.railGlass, count * 2);
-      const handrail = new T.InstancedMesh(new T.BoxGeometry(1, 0.05, 0.07), mats.frame, count);
-      [glass, glow, frames, mullions, slabsMesh, railFront, railSide, handrail].forEach((m) => { m.frustumCulled = false; });
-      frames.castShadow = true; slabsMesh.castShadow = true; slabsMesh.receiveShadow = true;
-      const o = new T.Object3D();
-      const baseCol = new T.Color();
-      let mi = 0, ri = 0, idx = 0;
-      for (let f = 1; f <= floorsCount; f++) {
-        for (let s = 0; s < 8; s++) {
-          const [cx, cz, ry, bw] = SLOTS[s];
-          const nx = Math.sin(ry), nz = Math.cos(ry);
-          const tx = Math.cos(ry), tz = -Math.sin(ry); // tangent along face
-          const y = floorY(f) + FLOOR_H / 2 + 0.05;
-          const ww = bw * 0.7, wh = 2.1;
-          const place = (mesh, i, lx, ly, lz, sx, sy, sz) => {
-            o.position.set(cx + tx * lx + nx * lz, y + ly, cz + tz * lx + nz * lz);
-            o.rotation.set(0, ry, 0); o.scale.set(sx, sy, sz); o.updateMatrix(); mesh.setMatrixAt(i, o.matrix);
-          };
-          place(frames, idx, 0, 0.1, 0.12, ww + 0.34, wh + 0.34, 1);
-          place(glow, idx, 0, 0.1, 0.285, ww, wh, 1);
-          place(glass, idx, 0, 0.1, 0.3, ww, wh, 1);
-          place(mullions, mi++, -ww / 6, 0.1, 0.31, 1, wh, 1);
-          place(mullions, mi++, ww / 6, 0.1, 0.31, 1, wh, 1);
-          // balcony (not on top floor corners variety: every floor)
-          const bwid = ww * 0.82, bdep = 1.55;
-          place(slabsMesh, idx, 0, -FLOOR_H / 2 + 0.1 - 0.05 + 0.0, 0.1 + bdep / 2, bwid, 1, bdep);
-          place(railFront, idx, 0, -FLOOR_H / 2 + 0.1 + 0.11 + 0.52, 0.1 + bdep, bwid, 1, 1);
-          place(railSide, ri++, -bwid / 2, -FLOOR_H / 2 + 0.1 + 0.11 + 0.52, 0.1 + bdep / 2, 1, 1, bdep);
-          place(railSide, ri++, bwid / 2, -FLOOR_H / 2 + 0.1 + 0.11 + 0.52, 0.1 + bdep / 2, 1, 1, bdep);
-          place(handrail, idx, 0, -FLOOR_H / 2 + 0.1 + 0.11 + 1.05, 0.1 + bdep, bwid, 1, 1);
-          baseCol.set(0xffffff); glass.setColorAt(idx, baseCol); glow.setColorAt(idx, baseCol);
-          apartmentInst.push({ floor: f, slot: s, id: null, status: 'free', rand: rand() });
-          keyMap[f + ':' + s] = idx;
-          idx++;
-        }
-      }
-      [glass, glow, frames, mullions, slabsMesh, railFront, railSide, handrail].forEach((m) => { m.instanceMatrix.needsUpdate = true; tower.add(m); });
+      frames = new T.InstancedMesh(new T.BoxGeometry(1, 1, 0.24), mats.frame, count);
+      [glass, glow, frames].forEach((m) => { m.frustumCulled = false; });
+      frames.castShadow = true;
+      const o = new T.Object3D(), white = new T.Color(0xffffff);
+      winApt = [];
+      placements.forEach((p, i) => {
+        const place = (mesh, lz, sx, sy) => { o.position.set(p.x, p.y + p.fh / 2 + 0.1, p.z); o.rotation.set(0, p.ry, 0); o.translateZ(lz); o.scale.set(sx, sy, 1); o.updateMatrix(); mesh.setMatrixAt(i, o.matrix); };
+        place(frames, 0.04, p.w + 0.26, p.h + 0.26);
+        place(glow, 0.17, p.w, p.h);
+        place(glass, 0.19, p.w, p.h);
+        glass.setColorAt(i, white); glow.setColorAt(i, white);
+        winApt.push(p.apt); if (p.apt >= 0) { const a = apartmentInst[p.apt]; a.windows.push(i); if (!a.pos) a.pos = { x: p.x, y: p.y + p.fh / 2, z: p.z, ry: p.ry }; }
+        blocks[apartmentInst[p.apt].block].windows++;
+      });
+      [glass, glow, frames].forEach((m) => { m.instanceMatrix.needsUpdate = true; tower.add(m); });
       glass.instanceColor.needsUpdate = true; glow.instanceColor.needsUpdate = true;
-      tower.userData.handrail = handrail;
 
-      // selection band + glowing ring
-      selBand = new T.Mesh(new T.BoxGeometry(W + 2.2, FLOOR_H, D + 2.2), new T.MeshBasicMaterial({ color: 0xf2c46a, transparent: true, opacity: 0.1, depthWrite: false, toneMapped: false }));
-      selBand.visible = false; tower.add(selBand);
-      selEdges = new T.Group();
-      {
-        const gm2 = new T.MeshBasicMaterial({ color: 0xffd27a, toneMapped: false });
-        [-1, 1].forEach((sy) => {
-          [[0, D / 2 + 1.1, W + 2.4, 0.16], [0, -D / 2 - 1.1, W + 2.4, 0.16], [W / 2 + 1.1, 0, 0.16, D + 2.2], [-W / 2 - 1.1, 0, 0.16, D + 2.2]].forEach(([x, z, w, d]) => {
-            const b = new T.Mesh(new T.BoxGeometry(w, 0.16, d), gm2); b.position.set(x, sy * (FLOOR_H / 2 - 0.08), z); selEdges.add(b);
-          });
+      // Parking spots: one instanced set; each spot an apartment (kind parking) of its block and level.
+      const spotPl = [];
+      model.blocks.forEach((b, bi) => (b.parkingLevels || []).forEach((lv) => {
+        const n = (b.unitsOf && b.unitsOf(lv) || []).length;
+        if (!n) return;
+        const core = blocks[bi].raw.core;
+        S.geom.parking(b.footprint, n, { avoid: core ? core.poly : null }).forEach((s, k) => {
+          const units = b.unitsOf(lv);
+          const ai = aptOf(bi, lv, units[k] && units[k].planSlot != null ? units[k].planSlot : k, 'parking');
+          const c = W2(S.geom.place([S.geom.pt([s.x, s.y])], b.position)[0]);
+          spotPl.push({ x: c.x, z: c.z, y: floorY(lv), w: s.w, d: s.h, rot: (b.position.rotationDeg || 0) * Math.PI / 180, apt: ai });
+          if (!apartmentInst[ai].pos) apartmentInst[ai].pos = { x: c.x, y: floorY(lv) + 1.5, z: c.z, ry: 0, spot: true };
         });
-      }
-      selEdges.visible = false; tower.add(selEdges);
+      }));
+      spotApt = [];
+      if (spotPl.length) {
+        spots = new T.InstancedMesh(new T.BoxGeometry(1, 0.08, 1), new T.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), spotPl.length);
+        spotPl.forEach((s, i) => { o.position.set(s.x, s.y + 0.05, s.z); o.rotation.set(0, -s.rot, 0); o.scale.set(s.w - 0.25, 1, s.d - 0.25); o.updateMatrix(); spots.setMatrixAt(i, o.matrix); spots.setColorAt(i, white); spotApt.push(s.apt); });
+        spots.frustumCulled = false; spots.instanceMatrix.needsUpdate = true; under.add(spots);
+      } else spots = null;
 
-      // pick proxy for floors (invisible body)
-      pickBody = new T.Mesh(new T.BoxGeometry(W, H, D), new T.MeshBasicMaterial({ visible: false }));
-      pickBody.position.y = H / 2; tower.add(pickBody);
-
+      // The selection band of a floor (built for the chosen block and floor when it is picked).
+      selBand = new T.Mesh(new T.BufferGeometry(), new T.MeshBasicMaterial({ color: 0xf2c46a, transparent: true, opacity: 0.16, depthWrite: false, toneMapped: false }));
+      selBand.visible = false; tower.add(selBand);
+      // Pick bodies: the blocks' own meshes carry userData.pick.
+      buildSite();
       applyApartments();
-      buildGroundStuff(H);
+      buildGroundStuff();
+      fitLimits();
     }
-    var pickBody;
 
-    // lamps, trees, cars
+    // Labels over the blocks («Блок A»), the yard's zones and the distance between neighbouring blocks (on «Сверху»).
+    function blockLabels() {
+      removeLabels('blocks'); removeLabels('dim');
+      if (model.plain) return;
+      blocks.forEach((b) => {
+        const el = document.createElement('div'); el.className = 'h3d-tag h3d-tag--block'; el.dataset.block = b.code; el.textContent = b.name || ('Блок ' + b.code);
+        addLabel(el, [b.center.x, b.H + 6, b.center.z], { group: 'blocks', prio: 8 });
+      });
+      dims.forEach((d) => {
+        const el = document.createElement('div'); el.className = 'h3d-tag h3d-tag--dim';
+        el.textContent = '≈ ' + Math.round(d.d) + ' ' + S.t('h3d.m') + ' · ' + S.t('h3d.byConcept');
+        d.label = addLabel(el, [d.mid.x, 2, d.mid.z], { group: 'dim', prio: 7 });
+        d.label.on = currentView === 'top';
+      });
+    }
+
+    // The common site: the yard's zones from SitePlan — the playground and the football pitch only when their amenity is
+    // in the data (honest data); paths and lawn; the parking ramp. The dimension lines between the blocks.
+    function buildSite() {
+      const amen = new Set(model.blocks.flatMap((b) => b.amenities || []));
+      const zones = (site && site.zones) || [];
+      const flat = (ring, y, mat) => { const g = new T.ShapeGeometry(shapeOf(ring)); g.rotateX(-Math.PI / 2); g.translate(0, y, 0); const m = new T.Mesh(g, mat); m.receiveShadow = true; tower.add(m); return m; };
+      if (site && site.boundary && site.boundary.length >= 3) flat(site.boundary.map(S.geom.pt), 0.05, new T.MeshStandardMaterial({ map: (() => { const t = paverTexture(rnd(5)); t.repeat.set(30, 30); return t; })(), roughness: 0.9 }));
+      zones.forEach((z) => {
+        const ring = (z.polygon || []).map(S.geom.pt);
+        if (ring.length < 3) return;
+        if (z.kind === 'lawn') flat(ring, 0.09, new T.MeshStandardMaterial({ color: lin(0x6f9a52), roughness: 1 }));
+        else if (z.kind === 'path') flat(ring, 0.1, new T.MeshStandardMaterial({ color: lin(0xcfc6b6), roughness: 0.9 }));
+        else if (z.kind === 'parking_ramp' && amen.has('underground_parking')) {
+          const m = flat(ring, 0.12, new T.MeshStandardMaterial({ color: lin(0x3c3f46), roughness: 0.9 })); yardZones.push({ kind: z.kind, mesh: m });
+        } else if (z.kind === 'football_field' && amen.has('football_field')) { yardZones.push({ kind: z.kind, mesh: footballField(ring) }); }
+        else if (z.kind === 'playground' && amen.has('playground')) { yardZones.push({ kind: z.kind, mesh: playground(ring) }); }
+      });
+      removeLabels('yard');
+      yardZones.filter((z) => z.kind !== 'parking_ramp').forEach((z) => {
+        const el = document.createElement('div'); el.className = 'h3d-tag h3d-tag--yard'; el.textContent = S.t('amen.' + z.kind);
+        const c = z.mesh.userData.center; const l = addLabel(el, [c.x, 1, c.z], { group: 'yard', prio: 6 }); l.on = yardView() && !parkingOn;
+      });
+      // Distances between neighbouring blocks (by their order), from the data — a line and a label on «Сверху».
+      dims = [];
+      for (let i = 0; i + 1 < blocks.length; i++) {
+        const c = S.geom.closest(blocks[i].ring, blocks[i + 1].ring);
+        const a = W2(c.a), b = W2(c.b);
+        const line = new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(a.x, 0.6, a.z), new T.Vector3(b.x, 0.6, b.z)]), new T.LineBasicMaterial({ color: 0xf2c46a, toneMapped: false }));
+        line.visible = false; tower.add(line);
+        dims.push({ a: blocks[i].code, b: blocks[i + 1].code, d: c.d, mid: { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 }, line });
+      }
+      blockLabels();
+    }
+    function zoneFrame(ring) {
+      const w = ring.map(W2), xs = w.map((p) => p.x), zs = w.map((p) => p.z);
+      const x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs);
+      return { x0, x1, z0, z1, cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, w: x1 - x0, d: z1 - z0 };
+    }
+    // A mini-football pitch: artificial turf with the marking (canvas), goals at both ends, a mesh fence around.
+    function footballField(ring) {
+      const f = zoneFrame(ring), g = new T.Group(); tower.add(g);
+      const long = f.w >= f.d;
+      const tex = canvasTex(512, 256, (c, w, h) => {
+        for (let i = 0; i < 8; i++) { c.fillStyle = i % 2 ? '#3f8a3a' : '#469a40'; c.fillRect(i * w / 8, 0, w / 8, h); }
+        c.strokeStyle = '#f4f4ee'; c.lineWidth = 4; c.strokeRect(8, 8, w - 16, h - 16);
+        c.beginPath(); c.moveTo(w / 2, 8); c.lineTo(w / 2, h - 8); c.stroke();
+        c.beginPath(); c.arc(w / 2, h / 2, h * 0.18, 0, Math.PI * 2); c.stroke();
+        c.strokeRect(8, h * 0.3, w * 0.09, h * 0.4); c.strokeRect(w - 8 - w * 0.09, h * 0.3, w * 0.09, h * 0.4);
+      });
+      const turf = new T.Mesh(new T.PlaneGeometry(long ? f.w : f.d, long ? f.d : f.w), new T.MeshStandardMaterial({ map: tex, roughness: 0.95 }));
+      turf.rotation.x = -Math.PI / 2; if (!long) turf.rotation.z = Math.PI / 2; turf.position.set(f.cx, 0.14, f.cz); turf.receiveShadow = true; g.add(turf);
+      const white = new T.MeshStandardMaterial({ color: lin(0xf4f4ee), roughness: 0.5 });
+      const L = long ? f.w : f.d, Wd = long ? f.d : f.w;
+      [-1, 1].forEach((s) => {
+        const goal = new T.Group();
+        [-1.5, 1.5].forEach((x) => { const post = new T.Mesh(new T.CylinderGeometry(0.06, 0.06, 2, 8), white); post.position.set(x, 1, 0); goal.add(post); });
+        const bar = new T.Mesh(new T.CylinderGeometry(0.06, 0.06, 3, 8), white); bar.rotation.z = Math.PI / 2; bar.position.y = 2; goal.add(bar);
+        const net = new T.Mesh(new T.BoxGeometry(3, 2, 1), mats.railGlass); net.position.set(0, 1, -s * 0.5); goal.add(net);
+        goal.position.set(f.cx + (long ? s * (L / 2 - 0.6) : 0), 0.14, f.cz + (long ? 0 : s * (L / 2 - 0.6))); goal.rotation.y = long ? s * Math.PI / 2 : (s > 0 ? Math.PI : 0); g.add(goal);
+      });
+      const fence = new T.Mesh(new T.BoxGeometry(f.w + 1, 3, f.d + 1), new T.MeshStandardMaterial({ color: lin(0x9aa4ae), roughness: 0.6, transparent: true, opacity: 0.16, depthWrite: false, side: T.DoubleSide }));
+      fence.position.set(f.cx, 1.6, f.cz); fence.renderOrder = 2; g.add(fence);
+      void Wd;
+      g.userData.center = { x: f.cx, z: f.cz };
+      return g;
+    }
+    // A children's playground: a soft surface, a slide, swings and a sandbox (simple shapes).
+    function playground(ring) {
+      const f = zoneFrame(ring), g = new T.Group(); tower.add(g);
+      const soft = new T.Mesh(new T.PlaneGeometry(f.w, f.d), new T.MeshStandardMaterial({ color: lin(0xc8643c), roughness: 1 }));
+      soft.rotation.x = -Math.PI / 2; soft.position.set(f.cx, 0.13, f.cz); soft.receiveShadow = true; g.add(soft);
+      const col = (c) => new T.MeshStandardMaterial({ color: lin(c), roughness: 0.6 });
+      const tower1 = new T.Mesh(new T.BoxGeometry(2, 2.2, 2), col(0x3f7fbf)); tower1.position.set(f.cx - f.w / 4, 1.1, f.cz); tower1.castShadow = true; g.add(tower1);
+      const slide = new T.Mesh(new T.BoxGeometry(0.9, 0.1, 3.6), col(0xf2c03c)); slide.position.set(f.cx - f.w / 4, 1.1, f.cz + 2.2); slide.rotation.x = -0.55; g.add(slide);
+      const swingM = col(0x3c3c44);
+      [[-0.9, 0], [0.9, 0]].forEach(([x]) => { const p = new T.Mesh(new T.CylinderGeometry(0.07, 0.07, 2.4, 8), swingM); p.position.set(f.cx + f.w / 4 + x, 1.2, f.cz - 1.5); g.add(p); });
+      const beam = new T.Mesh(new T.CylinderGeometry(0.06, 0.06, 2, 8), swingM); beam.rotation.z = Math.PI / 2; beam.position.set(f.cx + f.w / 4, 2.4, f.cz - 1.5); g.add(beam);
+      const sand = new T.Mesh(new T.BoxGeometry(3, 0.3, 3), col(0xe2cf9a)); sand.position.set(f.cx + f.w / 4, 0.15, f.cz + 2); g.add(sand);
+      g.userData.center = { x: f.cx, z: f.cz };
+      return g;
+    }
+
+    // Lamps, trees and cars around the complex.
     const extras = new T.Group(); scene.add(extras);
     let cars = [];
     const streetLamps = []; // the drawn street's lamps: hidden with the real roads
     function buildGroundStuff() {
       while (extras.children.length) extras.remove(extras.children[0]);
       cars = []; lampBulbs = []; streetLamps.length = 0;
-      // lamps
+      const zFront = complexR * 0.95 + 18; // the street in front of the complex
+      road.position.z = zFront + 10; sidewalk.position.z = zFront + 2; if (road.userData.dash) road.userData.dash.position.z = zFront + 10 - 40;
+      plaza.visible = !!model.plain;
       lampMat = new T.MeshBasicMaterial({ color: 0xffd9a0, toneMapped: false });
       const poleM = mats.frame;
       for (let i = -9; i <= 9; i++) {
-        const x = i * 22, z = 34.2;
+        const x = i * 22, z = zFront + 4.2;
         const pole = new T.Mesh(new T.CylinderGeometry(0.1, 0.14, 7, 8), poleM); pole.position.set(x, 3.5, z); pole.castShadow = true; extras.add(pole); streetLamps.push(pole);
-        const arm = new T.Mesh(new T.BoxGeometry(0.1, 0.1, 2.4), poleM); arm.position.set(x, 6.9, z + 1.1); extras.add(arm); streetLamps.push(arm);
-        const bulb = new T.Mesh(new T.SphereGeometry(0.34, 10, 8), lampMat.clone()); bulb.position.set(x, 6.78, z + 2.2); extras.add(bulb); lampBulbs.push(bulb); streetLamps.push(bulb);
+        const bulb = new T.Mesh(new T.SphereGeometry(0.34, 10, 8), lampMat.clone()); bulb.position.set(x, 6.78, z + 1.2); extras.add(bulb); lampBulbs.push(bulb); streetLamps.push(bulb);
       }
-      // trees
-      const trunkG = new T.CylinderGeometry(0.2, 0.3, 3.4, 7);
-      const crownG = new T.IcosahedronGeometry(2.1, 1);
-      const spots = [];
-      for (let i = -9; i <= 9; i++) { if (Math.abs(i * 11) > 22) spots.push([i * 11 + 4, 26.2]); }
-      for (let i = 0; i < 22; i++) spots.push([-W / 2 - 8 - rand() * 36, -D / 2 + rand() * (D + 30)]);
-      for (let i = 0; i < 22; i++) spots.push([W / 2 + 8 + rand() * 36, -D / 2 + rand() * (D + 30)]);
-      for (let i = 0; i < 26; i++) spots.push([-70 + rand() * 140, -D / 2 - 6 - rand() * 60]);
-      for (let i = 0; i < 5; i++) { spots.push([-W / 2 - 3.5, D / 2 + 4 + i * 2.3]); spots.push([W / 2 + 3.5, D / 2 + 4 + i * 2.3]); }
-      const trunks = new T.InstancedMesh(trunkG, new T.MeshStandardMaterial({ color: lin(0x5a4333), roughness: 1 }), spots.length);
-      const crowns = new T.InstancedMesh(crownG, new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, flatShading: true }), spots.length * 2);
+      // Trees: on the lawn and along the street, never on a block, the pitch or the playground (instanced).
+      const blocked = blocks.map((b) => grow(b.ring.map((p) => p), 4)).map((r) => r.map(W2));
+      const zonesW = yardZones.map((z) => z.mesh.userData.center ? zoneFrame(((site.zones || []).find((q) => q.kind === z.kind) || { polygon: [] }).polygon.map(S.geom.pt)) : null).filter(Boolean);
+      const free = (x, z) => !blocked.some((r) => S.geom.contains(r.map((p) => ({ x: p.x, y: p.z })), { x, y: z })) && !zonesW.some((f) => x > f.x0 - 2 && x < f.x1 + 2 && z > f.z0 - 2 && z < f.z1 + 2);
+      const spotsT = [];
+      for (let i = -9; i <= 9; i++) { const x = i * 11 + 4; if (Math.abs(x) > 8) spotsT.push([x, zFront - 3.8]); }
+      const lawns = ((site && site.zones) || []).filter((z) => z.kind === 'lawn').map((z) => zoneFrame(z.polygon.map(S.geom.pt)));
+      lawns.forEach((f) => { for (let i = 0; i < 40; i++) { const x = f.x0 + rand() * f.w, z = f.z0 + rand() * f.d; if (free(x, z)) spotsT.push([x, z]); } });
+      for (let i = 0; i < 46; i++) { const a = rand() * Math.PI * 2, r = complexR + 14 + rand() * 40, x = Math.cos(a) * r, z = Math.sin(a) * r; if (z < zFront - 6 && free(x, z)) spotsT.push([x, z]); }
+      const trunkG = new T.CylinderGeometry(0.2, 0.3, 3.4, 7), crownG = new T.IcosahedronGeometry(2.1, 1);
+      const trunks = new T.InstancedMesh(trunkG, new T.MeshStandardMaterial({ color: lin(0x5a4333), roughness: 1 }), spotsT.length);
+      const crowns = new T.InstancedMesh(crownG, new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, flatShading: true }), spotsT.length * 2);
       const m = new T.Matrix4(), col = new T.Color();
-      spots.forEach(([x, z], i) => {
+      spotsT.forEach(([x, z], i) => {
         const s = 0.8 + rand() * 0.7;
         m.makeScale(s, s, s); m.setPosition(x, 1.7 * s, z); trunks.setMatrixAt(i, m);
         for (let k = 0; k < 2; k++) {
           const cs = s * (k ? 0.75 : 1.05);
           m.makeScale(cs, cs * 0.95, cs); m.setPosition(x + (k ? 0.5 : 0), (3.6 + k * 1.5) * s, z + (k ? -0.3 : 0));
           crowns.setMatrixAt(i * 2 + k, m);
-          col.setHSL(0.26 + rand() * 0.07, 0.28 + rand() * 0.14, 0.16 + rand() * 0.09); col.convertSRGBToLinear();
-          crowns.setColorAt(i * 2 + k, col);
+          col.setHSL(0.26 + rand() * 0.07, 0.28 + rand() * 0.14, 0.16 + rand() * 0.09); col.convertSRGBToLinear(); crowns.setColorAt(i * 2 + k, col);
         }
       });
-      trunks.castShadow = crowns.castShadow = true; crowns.receiveShadow = true;
-      trunks.frustumCulled = crowns.frustumCulled = false;
+      trunks.castShadow = crowns.castShadow = true; crowns.receiveShadow = true; trunks.frustumCulled = crowns.frustumCulled = false;
       extras.add(trunks); extras.add(crowns);
-      // cars
+      // Warm lights of the penthouse terraces at night (one instanced set of small lamps along the terrace rails).
+      const tl = [];
+      blocks.forEach((b) => { if (!b.setback) return; const ring = b.ring.map(W2), y = floorTop(b.floors - 1) + 0.5; ring.forEach((p, i) => { const q = ring[(i + 1) % ring.length], len = Math.hypot(q.x - p.x, q.z - p.z); for (let s = 2; s < len; s += 6) tl.push([p.x + (q.x - p.x) * s / len, y, p.z + (q.z - p.z) * s / len]); }); });
+      terraceLamps = null;
+      if (tl.length) {
+        terraceLamps = new T.InstancedMesh(new T.SphereGeometry(0.16, 6, 4), new T.MeshBasicMaterial({ color: 0xffc27a, toneMapped: false }), tl.length);
+        tl.forEach(([x, y, z], i) => { m.makeTranslation(x, y, z); terraceLamps.setMatrixAt(i, m); });
+        terraceLamps.frustumCulled = false; extras.add(terraceLamps);
+      }
       const colors = [0xd8d8d8, 0x23324a, 0xa23a32, 0x2b2f35, 0xe8e2d2, 0x3a5f4c];
       for (let i = 0; i < 7; i++) {
         const car = new T.Group();
-        const c = colors[i % colors.length];
-        const body = new T.Mesh(new T.BoxGeometry(4.3, 0.8, 1.8), new T.MeshStandardMaterial({ color: lin(c), roughness: 0.35, metalness: 0.6 }));
+        const body = new T.Mesh(new T.BoxGeometry(4.3, 0.8, 1.8), new T.MeshStandardMaterial({ color: lin(colors[i % colors.length]), roughness: 0.35, metalness: 0.6 }));
         body.position.y = 0.75; body.castShadow = true; car.add(body);
         const cab = new T.Mesh(new T.BoxGeometry(2.2, 0.7, 1.6), new T.MeshStandardMaterial({ color: lin(0x1a2230), roughness: 0.1, metalness: 0.9 }));
-        cab.position.set(-0.2, 1.4, 0); cab.castShadow = true; car.add(cab);
-        const wm = new T.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
-        [[-1.4, 0.9], [1.4, 0.9], [-1.4, -0.9], [1.4, -0.9]].forEach(([x, z]) => {
-          const w = new T.Mesh(new T.CylinderGeometry(0.38, 0.38, 0.3, 12), wm); w.rotation.x = Math.PI / 2; w.position.set(x, 0.38, z); car.add(w);
-        });
-        const hl = new T.MeshBasicMaterial({ color: 0xfff1c4, toneMapped: false });
-        const tl = new T.MeshBasicMaterial({ color: 0xff2a2a, toneMapped: false });
-        [0.6, -0.6].forEach((z) => {
-          const a = new T.Mesh(new T.BoxGeometry(0.1, 0.18, 0.4), hl); a.position.set(2.16, 0.8, z); car.add(a);
-          const b = new T.Mesh(new T.BoxGeometry(0.1, 0.18, 0.4), tl); b.position.set(-2.16, 0.8, z); car.add(b);
-        });
+        cab.position.set(-0.2, 1.4, 0); car.add(cab);
         const dir = i % 2 ? 1 : -1;
-        car.position.set(-400 + rand() * 800, 0.03, 40 + (dir > 0 ? -2.6 : 2.6));
+        car.position.set(-400 + rand() * 800, 0.03, zFront + 10 + (dir > 0 ? -2.6 : 2.6));
         car.rotation.y = dir > 0 ? 0 : Math.PI;
         car.userData = { dir, v: 7 + rand() * 7 };
         extras.add(car); cars.push(car);
       }
+    }
+
+    // The parking mode: the blocks see-through, the ground hidden, the two parking levels with their spots and statuses.
+    // The cut-away (xray) shows the lift shafts and the moving cabins.
+    function setXray(on) {
+      xray = !!on;
+      bodyMats.forEach((m) => { m.opacity = xray ? 0.22 : 1; m.depthWrite = !xray; });
+      [mats.granite, mats.slab].forEach((m) => { m.transparent = xray; m.opacity = xray ? 0.25 : 1; m.depthWrite = !xray; m.needsUpdate = true; });
+      // See-through: the windows would hide the shafts and the parking — they go with the walls.
+      [glass, glow, frames].forEach((m) => { if (m) m.visible = !xray; });
+      shafts.forEach((s) => { s.mesh.visible = xray; });
+      cabins.forEach((c) => { c.visible = xray; });
+    }
+    function setParking(on) {
+      parkingOn = !!on;
+      under.visible = parkingOn;
+      // The ground over the parking is taken away while it is shown (the levels are under it).
+      lawn.visible = !parkingOn; if (terrainMesh) terrainMesh.visible = !parkingOn; [road, sidewalk].forEach((m) => { m.visible = !parkingOn && !contextOn; });
+      tower.children.forEach((c) => { if (c.isMesh && c.geometry && c.geometry.type === 'ShapeGeometry') c.visible = !parkingOn; });
+      // The yard and the trees stand on the parking's roof: hidden while it is shown.
+      yardZones.forEach((z) => { z.mesh.visible = !parkingOn; });
+      extras.visible = !parkingOn;
+      labels.forEach((l) => { if (l.group === 'yard') l.on = !parkingOn && yardView(); });
+      setXray(parkingOn);
+      if (parkingOn) flyTo({ pol: 0.8, ty: -5, tx: 0, tz: 0, dist: complexR * 2.3 * (portrait() ? 1.4 : 1) }, 1);
     }
 
     // ---------- apartments data ----------
@@ -743,6 +786,7 @@
     // An apartment that does not pass the catalog filters is dimmed (a.dim).
     function colorFor(a) {
       let c;
+      if (!a) return new T.Color(0x1a2030);
       if (!overlay) {
         c = new T.Color();
         if (a.rand < 0.42) c.setHex(0x1a2030);
@@ -751,16 +795,24 @@
       if (a.dim) c.multiplyScalar(0.12);
       return c;
     }
-    function applyApartments() {
+    const tmpW = new T.Color(1, 1, 1);
+    function paintApt(i, col) {
+      const a = apartmentInst[i];
       const c = new T.Color();
-      apartmentInst.forEach((a, i) => {
-        const col = colorFor(a); col.convertSRGBToLinear();
-        glow.setColorAt(i, col);
-        c.copy(overlay && a.status !== 'sold' && !a.dim ? col : new T.Color(0xffffff)).lerp(new T.Color(1, 1, 1), a.dim ? 0.3 : 0.78);
-        if (a.dim) c.multiplyScalar(0.45);
-        glass.setColorAt(i, c);
-      });
+      c.copy(overlay && a.status !== 'sold' && !a.dim ? col : tmpW).lerp(tmpW, a.dim ? 0.3 : 0.78);
+      if (a.dim) c.multiplyScalar(0.45);
+      a.windows.forEach((w) => { glow.setColorAt(w, col); glass.setColorAt(w, c); });
+    }
+    function applyApartments() {
+      apartmentInst.forEach((a, i) => { const col = colorFor(a); col.convertSRGBToLinear(); paintApt(i, col); });
+      // A window of no apartment (no data for that floor) stays dark.
+      winApt.forEach((ai, w) => { if (ai < 0) { const c = new T.Color(0x1a2030); glow.setColorAt(w, c); } });
       glow.instanceColor.needsUpdate = true; glass.instanceColor.needsUpdate = true;
+      if (spots) {
+        const sc = new T.Color();
+        spotApt.forEach((ai, k) => { const a = apartmentInst[ai]; sc.set(STATUS_COLOR[a && a.status] || STATUS_COLOR.free); if (a && a.dim) sc.multiplyScalar(0.2); sc.convertSRGBToLinear(); spots.setColorAt(k, sc); });
+        spots.instanceColor.needsUpdate = true;
+      }
     }
 
     function normStatus(s) {
@@ -769,19 +821,40 @@
       return STATUS_COLOR[s] ? s : 'free';
     }
 
-    function setData(list) {
-      // list: [{id, floor, planSlot, status}]
-      const maxFloor = list.reduce((m, a) => Math.max(m, a.floor || 0), 0) || floorsCount;
-      if (!glass || maxFloor !== floorsCount) build(maxFloor);
+    // list: [{ id, block (letter or building id; empty — the one building), floor, planSlot, number, status, kind, area }].
+    // complex: { blocks: [{ id, code, name, footprint, position, setbacks, floors, elevators, amenities }], site } — the
+    // complex's blocks from the API; without it (a building without an outline) — one plain block.
+    let lastSig = '', lastComplex = null;
+    function setData(list, complex) {
+      if (complex !== undefined) lastComplex = complex;
+      const cx = lastComplex && lastComplex.blocks && lastComplex.blocks.length ? lastComplex : null;
+      const keyOf = (a) => (cx ? String(a.block == null ? '' : a.block) : '');
+      const byBlock = {};
+      list.forEach((a) => { (byBlock[keyOf(a)] = byBlock[keyOf(a)] || []).push(a); });
+      const unitsFn = (arr) => (n) => (arr || []).filter((a) => a.floor === n).sort((x, y) => (x.planSlot != null ? x.planSlot : x.number || 0) - (y.planSlot != null ? y.planSlot : y.number || 0));
+      let m;
+      if (cx) {
+        m = { site: cx.site || null, blocks: cx.blocks.map((b) => {
+          const arr = byBlock[String(b.code)] || byBlock[String(b.id)] || [];
+          return Object.assign({}, b, { unitsOf: unitsFn(arr), parkingLevels: [...new Set(arr.filter((a) => a.floor < 0).map((a) => a.floor))].sort((x, y) => x - y) });
+        }) };
+      } else {
+        const arr = list;
+        const n = arr.reduce((mx, a) => Math.max(mx, a.floor || 0), 0) || floorsCount;
+        m = plainModel(n); m.blocks[0].unitsOf = unitsFn(arr); m.blocks[0].parkingLevels = [];
+      }
+      // Rebuilt only when the shape of the data changes (blocks, floors, units per floor); a new status just repaints.
+      const sig = JSON.stringify(m.blocks.map((b) => [b.code, b.floors, JSON.stringify(b.footprint), JSON.stringify(b.position), JSON.stringify(b.setbacks),
+        b.parkingLevels, Array.from({ length: b.floors + 3 }, (_, k) => k - 2).map((f) => b.unitsOf(f).map((u) => (u.planSlot || 0) + ':' + Math.round((u.area || 0) * 10)).join(','))]));
+      if (!glass || sig !== lastSig) { lastSig = sig; build(m); }
       apartmentInst.forEach((a) => { a.id = null; a.status = 'sold'; a.data = null; });
       aptMap = {};
-      const byFloor = {};
-      list.forEach((a) => { (byFloor[a.floor] = byFloor[a.floor] || []).push(a); });
-      Object.keys(byFloor).forEach((f) => {
-        byFloor[f].sort((x, y) => (x.number || 0) - (y.number || 0));
-        byFloor[f].forEach((a, k) => {
-          const slot = a.planSlot != null && a.planSlot >= 0 ? a.planSlot : k;
-          const i = keyMap[f + ':' + slot];
+      m.blocks.forEach((b, bi) => {
+        const arr = cx ? (byBlock[String(b.code)] || byBlock[String(b.id)] || []) : list;
+        arr.forEach((a) => {
+          const sorted = b.unitsOf(a.floor);
+          const slot = a.planSlot != null && a.planSlot >= 0 ? a.planSlot : sorted.indexOf(a);
+          const i = keyMap[bi + ':' + a.floor + ':' + slot];
           if (i == null) return;
           const inst = apartmentInst[i];
           inst.id = a.id; inst.status = normStatus(a.status); inst.data = a;
@@ -790,7 +863,7 @@
       });
       applyFilter();
     }
-    // Catalog filters in the model: fn(apartment) === false — its window is dimmed. null — every window as usual.
+    // Catalog filters in the model: fn(apartment) === false — its windows are dimmed. null — every window as usual.
     let filterFn = null;
     function applyFilter() {
       apartmentInst.forEach((a) => { a.dim = !!(filterFn && (a.id == null || !filterFn(a.data))); });
@@ -847,8 +920,24 @@
       presetName = s.n.stars > 0.6 ? 'night' : s.n.glow > 0.5 ? 'dusk' : 'day';
       tgt = s;
       if (!smooth || !cur) { cur = clonePreset(s); applyCur(); }
-      clearTimeout(pmremTimer); pmremTimer = setTimeout(rebuildEnv, smooth ? 1200 : 500);
+      envLater(smooth ? 1200 : 500);
     }
+    // The reflections (PMREM of the sky) are rebuilt a moment after the light changes. Building them takes seconds of a still
+    // scene on a weak GPU and on software WebGL, and with them every frame there is many times heavier — so they are only for a
+    // GPU that keeps ≥ 20 fps at full quality (measured; opts.reflections === 'always' — the still renders). The rebuild waits
+    // for a calm moment: not during a camera flight and not right after a touch — the camera the person asked for comes first.
+    function envLater(delay) {
+      clearTimeout(pmremTimer);
+      const attempt = () => {
+        const always = opts.reflections === 'always';
+        if (!always && stats.quality < 2) return;
+        if (fly || performance.now() - lastInput < QUALITY_CALM_MS || (!always && !stats.fps)) { pmremTimer = setTimeout(attempt, 700); return; }
+        if (!always && stats.fps < 20) return;
+        rebuildEnv();
+      };
+      pmremTimer = setTimeout(attempt, delay);
+    }
+    function dropEnv() { clearTimeout(pmremTimer); scene.environment = null; if (envTex) { envTex.dispose(); envTex = null; } }
     // The hour (local) when the sun is at «deg» above the horizon: in the afternoon (sunset side) or the morning.
     function hourAtElevation(deg, afternoon) {
       let lo = afternoon ? 12.5 : 3, hi = afternoon ? 22 : 12.5;
@@ -872,8 +961,8 @@
       if (glow) { const g = cur.n.glow; glow.material.color.setRGB(g, g, g); }
       lampBulbs.forEach((b) => { b.material.color.setRGB(1, 0.85, 0.6).multiplyScalar(Math.max(0.05, cur.n.lamp)); b.visible = cur.n.lamp > 0.05 && !b.userData.off; });
       if (neighbourMat) neighbourMat.forEach((m) => { m.emissiveIntensity = 0.04 + cur.n.lamp * 0.85; });
-      if (window.__coreMat) window.__coreMat.emissiveIntensity = cur.n.lamp * 0.55;
-      if (window.__canSoffit) window.__canSoffit.emissiveIntensity = cur.n.lamp * 0.7;
+      // The penthouses' terraces: warm lights in the evening and at night.
+      if (terraceLamps) { terraceLamps.visible = cur.n.lamp > 0.2; terraceLamps.material.color.setRGB(1, 0.76, 0.48).multiplyScalar(Math.min(1.6, 0.4 + cur.n.lamp)); }
       sky.material.uniforms.sunColor.value.copy(cur.sunColor).multiplyScalar(presetName === 'night' ? 0.55 : 1);
     }
     function rebuildEnv() {
@@ -889,8 +978,8 @@
     function setTime(name, instant) {
       if (!PRESETS[name]) return;
       presetName = name; clockH = null; tgt = snapshot(PRESETS[name]);
-      if (instant || !cur) { cur = clonePreset(tgt); applyCur(); rebuildEnv(); }
-      else { clearTimeout(pmremTimer); pmremTimer = setTimeout(() => { rebuildEnv(); }, 1400); }
+      if (instant || !cur) { cur = clonePreset(tgt); applyCur(); envLater(opts.reflections === 'always' ? 0 : 300); }
+      else envLater(1400);
     }
     function stepPreset(dt) {
       if (!cur || !tgt) return;
@@ -914,11 +1003,12 @@
     let focusApt = !!opts.focusApartment, centered = !!opts.centered;
     // The orbit never goes under the ground; zoom and pan have limits (wider with the surroundings loaded).
     const LIM = { polMin: 0.12, polMax: 1.5, distMin: 20, distMax: 260, pan: 120 };
+    const fitLimits = () => { if (!contextOn) { LIM.distMax = Math.max(260, complexR * 6); LIM.pan = Math.max(120, complexR * 2); } };
     const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
     let fly = null;
     const vel = { az: 0, pol: 0 };
     const portrait = () => container.clientWidth < container.clientHeight;
-    const houseH = () => floorTop(floorsCount);
+    const houseH = () => Math.max(...blocks.map((b) => b.H), floorTop(1));
     function placeCamera() {
       const sp = Math.sin(view.pol), cp = Math.cos(view.pol);
       camera.position.set(view.tx + view.dist * sp * Math.sin(view.az), view.ty + view.dist * cp, view.tz + view.dist * sp * Math.cos(view.az));
@@ -943,7 +1033,7 @@
     function stopFly() { if (fly) { fly = null; Object.assign(goal, view); } }
     function defaultGoalValues() {
       const H = houseH();
-      const g = { az: goal.az, ty: H * 0.5, dist: Math.max(110, H * 2.35) * (portrait() ? 1.45 : 1), pol: 1.36, tx: 0, tz: 0 };
+      const g = { az: goal.az, ty: H * 0.5, dist: Math.max(110, H * 2.35, complexR * 2.7) * (portrait() ? 1.45 : 1), pol: 1.36, tx: 0, tz: 0 };
       // opts.view: a fixed camera { az, pol, distK, tyK, tx } (frontend/tools/renders): distK and tyK scale the default distance and height.
       const v = opts.view;
       if (v) {
@@ -960,33 +1050,52 @@
     function viewGoal(name) {
       const H = houseH(), k = portrait() ? 1.45 : 1;
       switch (name) {
-        case 'yard': return { az: Math.PI + 0.5, pol: 1.2, dist: Math.max(120, H * 2.6) * k, ty: H * 0.5, tx: 0, tz: 0 };
-        case 'street': return { az: 0.14, pol: 1.47, dist: (55 + H * 0.5) * k, ty: Math.min(H * 0.38, 26), tx: 0, tz: 0 };
-        case 'top': return { az: 0.001, pol: LIM.polMin, dist: Math.max(150, H * 2.5) * k, ty: 0, tx: 0, tz: 0 };
+        case 'yard': return model && !model.plain ? { az: 0.15, pol: 0.95, dist: Math.max(90, complexR * 1.9) * k, ty: 8, tx: 0, tz: complexR * 0.15 } : { az: Math.PI + 0.5, pol: 1.2, dist: Math.max(120, H * 2.6) * k, ty: H * 0.5, tx: 0, tz: 0 };
+        case 'street': return { az: 0.14, pol: 1.47, dist: (55 + H * 0.5 + complexR * 0.8) * k, ty: Math.min(H * 0.38, 26), tx: 0, tz: 0 };
+        case 'top': return { az: 0.001, pol: LIM.polMin, dist: Math.max(150, H * 2.5, complexR * 3.9) * k, ty: 0, tx: 0, tz: 0 };
         case 'area': return { az: 0.85, pol: 0.95, dist: (contextOn ? 430 : 300) * (portrait() ? 1.1 : 1), ty: 0, tx: 0, tz: 0 };
         default: { const g = defaultGoalValues(); return Object.assign(g, { az: 0.62, pol: 1.3, ty: H * 0.6, dist: g.dist * 1.22 }); }
       }
     }
     let currentView = 'overview';
+    const yardView = () => currentView === 'yard' || currentView === 'top';
     function setView(name, dur) {
       if (mode !== 'house') return;
       currentView = VIEWS.includes(name) ? name : 'overview';
-      autoRotate = false;
+      autoRotate = false; lastInput = performance.now();
+      // The distances between the blocks are drawn on «Сверху» only.
+      dims.forEach((d) => { d.line.visible = currentView === 'top'; if (d.label) d.label.on = currentView === 'top'; });
+      labels.forEach((l) => { if (l.group === 'yard') l.on = !parkingOn && yardView(); });
       flyTo(viewGoal(currentView), dur == null ? 1.0 : dur);
       handlers.view(currentView);
     }
     function resetView() { defaultGoal(); selectFloor(null, true); }
-    function focusFloor(n) {
-      goal.ty = floorMid(n); goal.dist = 58 * (portrait() ? 1.35 : 1); goal.pol = 1.42;
+    function focusFloor(n, bi) {
+      const b = blocks[bi != null && bi >= 0 ? bi : 0];
+      goal.ty = floorMid(n); goal.dist = 58 * (portrait() ? 1.35 : 1) + (blocks.length > 1 ? 30 : 0); goal.pol = n < 0 ? 1.1 : 1.42;
+      if (b && blocks.length > 1) { goal.tx = b.center.x; goal.tz = b.center.z; }
     }
-    // The world point of an apartment's window and the direction its facade faces.
+    // The world point of an apartment's window (its first window) and the direction its facade faces.
     function aptWorld(i) {
-      const a = apartmentInst[i]; const [cx, cz, ry] = SLOTS[a.slot];
-      return { x: cx, y: floorMid(a.floor), z: cz, ry, nx: Math.sin(ry), nz: Math.cos(ry) };
+      const a = apartmentInst[i], p = a.pos || { x: 0, z: 0, ry: 0 };
+      return { x: p.x, y: floorMid(a.floor), z: p.z, ry: p.ry, nx: Math.sin(p.ry), nz: Math.cos(p.ry) };
+    }
+    // The camera to a block (or the whole complex with null): its centre, a distance for its height.
+    let focusCode = null;
+    function focusBlock(code) {
+      if (mode !== 'house') return;
+      autoRotate = false;
+      const bi = blocks.findIndex((b) => b.code === code);
+      focusCode = bi < 0 ? null : code;
+      lastInput = performance.now();
+      if (bi < 0) { flyTo(viewGoal('overview'), 1); handlers.view(currentView = 'overview'); labels.forEach((l) => { if (l.group === 'yard') l.on = !parkingOn && yardView(); }); return; }
+      const b = blocks[bi];
+      flyTo({ tx: b.center.x, tz: b.center.z, ty: b.H * 0.5, dist: Math.max(70, b.H * 2.2) * (portrait() ? 1.4 : 1), pol: 1.3 }, 1.1);
     }
     function flyToApartment(i) {
       const p = aptWorld(i);
-      flyTo({ tx: p.x * 0.6, tz: p.z * 0.6, ty: p.y, az: p.ry + 0.18, pol: 1.4, dist: 46 * (portrait() ? 1.4 : 1) }, 1.0);
+      const spot = apartmentInst[i].pos && apartmentInst[i].pos.spot;
+      flyTo(spot ? { tx: p.x, tz: p.z, ty: p.y, pol: 0.9, dist: 30 * (portrait() ? 1.4 : 1) } : { tx: p.x - p.nx * 6, tz: p.z - p.nz * 6, ty: p.y, az: p.ry + 0.18, pol: 1.4, dist: 46 * (portrait() ? 1.4 : 1) }, 1.0);
     }
 
     // ---------- labels over the scene (HTML) ----------
@@ -996,6 +1105,7 @@
     labelLayer.className = 'h3d-labels';
     container.appendChild(labelLayer);
     const labels = [], labelInset = { top: 0 };
+    let labelAvoid = null;
     const pv = new T.Vector3();
     function addLabel(el, pos, o) {
       const l = Object.assign({ el, pos: new T.Vector3(pos[0], pos[1], pos[2]), group: 'misc', prio: 0, on: true, w: 0, h: 0, shown: false }, o || {});
@@ -1010,6 +1120,8 @@
       if (!labels.length) return;
       const w = container.clientWidth, h = container.clientHeight, placed = [];
       const topInset = labelInset.top || 0;
+      const avoid = labelAvoid ? labelAvoid() : [];
+      const hit = (r, list) => list.some((p) => r.x0 < p.x1 && r.x1 > p.x0 && r.y0 < p.y1 && r.y1 > p.y0);
       labels.slice().sort((a, b) => b.prio - a.prio).forEach((l) => {
         let show = l.on;
         let x = 0, y = 0;
@@ -1020,8 +1132,16 @@
         }
         if (show) {
           if (!l.w) { l.w = l.el.offsetWidth || 90; l.h = l.el.offsetHeight || 26; }
-          const r = { x0: x - l.w / 2 - 3, y0: y - l.h - 8, x1: x + l.w / 2 + 3, y1: y - 4 };
-          if (r.y0 < topInset || (!l.free && placed.some((p) => r.x0 < p.x1 && r.x1 > p.x0 && r.y0 < p.y1 && r.y1 > p.y0))) show = false;
+          const base = { x0: x - l.w / 2 - 3, y0: y - l.h - 8, x1: x + l.w / 2 + 3, y1: y - 4 };
+          // Over its point first; covering a control or a more important label — up, down, left, right; nowhere — hidden.
+          const tries = l.free ? [[0, 0]] : [[0, 0], [0, -(l.h + 6)], [0, l.h + 12], [-(l.w / 2 + 12), 0], [l.w / 2 + 12, 0]];
+          let r = null;
+          for (const [dx, dy] of tries) {
+            const c = { x0: base.x0 + dx, y0: base.y0 + dy, x1: base.x1 + dx, y1: base.y1 + dy };
+            if (c.x0 < 0 || c.x1 > w || c.y0 < topInset || c.y1 > h || hit(c, avoid) || (!l.free && hit(c, placed))) continue;
+            r = c; break;
+          }
+          if (!r) show = false;
           else { placed.push(r); l.el.style.transform = 'translate3d(' + Math.round(r.x0 + 3) + 'px,' + Math.round(r.y0) + 'px,0)'; }
         }
         if (show !== l.shown) { l.shown = show; l.el.style.visibility = show ? 'visible' : 'hidden'; l.el.setAttribute('aria-hidden', String(!show)); }
@@ -1057,13 +1177,13 @@
       contextOn = false; procedural.forEach((m) => { if (m) m.visible = true; });
       streetLamps.forEach((m) => { m.userData.off = false; m.visible = true; });
       cars.forEach((c) => { c.userData.path = null; });
-      LIM.distMax = 260; LIM.pan = 120;
+      LIM.distMax = Math.max(260, complexR * 6); LIM.pan = Math.max(120, complexR * 2);
       lawn.scale.set(1, 1, 1); lawn.position.set(0, 0, -130); cars.forEach((c) => { c.visible = true; });
     }
     function setContext(data, origin) {
       clearContext();
       if (!data || !origin || origin.lat == null || origin.lon == null) return [];
-      const keepOut = (pts) => pts.some(([x, z]) => Math.abs(x) < W / 2 + 4 && Math.abs(z) < D / 2 + 4);
+      const keepOut = (pts) => pts.some(([x, z]) => Math.hypot(x, z) < complexR + 6);
       const blds = [];
       (data.buildings || []).forEach((b) => {
         const pts = (b.pts || []).map(([la, lo]) => project(la, lo, origin));
@@ -1117,7 +1237,7 @@
       paths.sort((a, b) => b.pts.length - a.pts.length);
       cars.forEach((c, i) => { const p = paths[i % Math.max(1, paths.length)]; c.userData.path = p ? { pts: p.pts, s: rand() * 300, len: p.pts.reduce((s, q, k) => s + (k ? Math.hypot(q[0] - p.pts[k - 1][0], q[1] - p.pts[k - 1][1]) : 0), 0) } : null; c.visible = !!p; });
       lawn.scale.set(2.2, 2.6, 1); lawn.position.set(0, 0, 0);
-      contextOn = true; LIM.distMax = 520; LIM.pan = 420;
+      contextOn = true; LIM.distMax = Math.max(520, complexR * 6); LIM.pan = 420;
       return (data.pois || []).map((p) => {
         const [x, z] = project(p.lat, p.lon, origin);
         return { cat: p.cat, name: p.name, x, z, dist: Math.round(distanceM(origin.lat, origin.lon, p.lat, p.lon)) };
@@ -1151,15 +1271,15 @@
     let inside = null, ghost = null;
     const aptLamp = new T.PointLight(0xffe2b8, 0, 12, 1.2); scene.add(aptLamp);
     const walkSt = { x: 0, z: 0, y: 0, yaw: 0, pitch: -0.05, target: null, keys: {} };
-    function makeGhost(floor) {
-      const g = new T.Group();
-      const y = floorY(floor), H = houseH();
-      const below = new T.Mesh(new T.BoxGeometry(W, Math.max(0.1, y), D), new T.MeshStandardMaterial({ color: lin(0xe9e1d3), roughness: 0.9, transparent: true, opacity: 0.35, depthWrite: false }));
-      below.position.y = y / 2; g.add(below);
-      const plate = new T.Mesh(new T.BoxGeometry(W + 1.2, 0.24, D + 1.2), new T.MeshStandardMaterial({ color: lin(0x8f887c), roughness: 0.9, transparent: true, opacity: 0.55, depthWrite: false }));
-      plate.position.y = y; plate.receiveShadow = true; g.add(plate);
-      const outline = new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(W, H, D)), new T.LineBasicMaterial({ color: lin(0xf2c46a), transparent: true, opacity: 0.5 }));
-      outline.position.y = H / 2; g.add(outline);
+    function makeGhost(floor, bi) {
+      const g = new T.Group(), b = blocks[bi] || blocks[0];
+      const y = Math.max(0.1, floorY(floor)), ring = placedExp(b.raw, S.geom.footprintOf({ footprint: b.raw.footprint, setbacks: b.raw.setbacks }, floor));
+      const below = new T.Mesh(extrude(ring, 0, y), new T.MeshStandardMaterial({ color: lin(0xe9e1d3), roughness: 0.9, transparent: true, opacity: 0.35, depthWrite: false }));
+      g.add(below);
+      const plate = new T.Mesh(extrude(grow(placedRaw(b.raw, b.raw.footprint), 0.6), y - 0.12, 0.24), new T.MeshStandardMaterial({ color: lin(0x8f887c), roughness: 0.9, transparent: true, opacity: 0.55, depthWrite: false }));
+      plate.receiveShadow = true; g.add(plate);
+      const outline = new T.LineSegments(new T.EdgesGeometry(extrude(b.ring, 0, b.H), 25), new T.LineBasicMaterial({ color: lin(0xf2c46a), transparent: true, opacity: 0.5 }));
+      g.add(outline);
       return g;
     }
     function disposeTree(o) {
@@ -1190,8 +1310,8 @@
       const lamp = aptLamp; lamp.distance = Math.max(layout.w, layout.d) * 1.6;
       v.set(layout.w / 2, 2.45, layout.d / 2); built.inner.localToWorld(v); lamp.position.copy(v);
       inside = { i, id, built, grp, walls, rooms, lamp, y: grp.position.y, center: { x: cx, z: cz }, ry: p.ry, size: Math.max(layout.w, layout.d) };
-      tower.visible = false; selBand.visible = selEdges.visible = false;
-      ghost = makeGhost(a.floor); scene.add(ghost);
+      tower.visible = false; selBand.visible = false;
+      ghost = makeGhost(a.floor, a.block); scene.add(ghost);
       mode = 'inside'; autoRotate = false; LIM.distMin = 5; LIM.polMax = 1.45;
       flyTo({ tx: cx, tz: cz, ty: inside.y + 1.0, az: p.ry, pol: 0.58, dist: (inside.size * 1.5 + 5) * (portrait() ? 1.7 : 1) }, 1.1);
       handlers.mode(mode);
@@ -1205,7 +1325,7 @@
       const i = inside.i;
       inside = null; tower.visible = true; LIM.distMin = 20; LIM.polMax = 1.5;
       mode = 'house';
-      if (!silent) { selectedIdx = i; selBand.visible = selEdges.visible = true; flyToApartment(i); handlers.mode(mode); }
+      if (!silent) { selectedIdx = i; selectFloor(apartmentInst[i].floor, true, false, apartmentInst[i].block); flyToApartment(i); handlers.mode(mode); }
     }
     function roomFocus(k) {
       if (!inside || !inside.rooms[k]) return;
@@ -1346,15 +1466,20 @@
     }
     function pick(e) {
       setRay(e);
-      const hits = ray.intersectObjects([glass, pickBody], false);
+      const targets = parkingOn && spots ? [spots] : [glass].concat(pickMeshes);
+      const hits = ray.intersectObjects(targets, false);
       if (!hits.length) return null;
       const h = hits[0];
-      if (h.object === glass) return { apt: h.instanceId, point: h.point };
-      return { floor: floorAt(h.point.y), point: h.point };
+      if (h.object === glass) return winApt[h.instanceId] >= 0 ? { apt: winApt[h.instanceId], point: h.point } : null;
+      if (h.object === spots) return { apt: spotApt[h.instanceId], point: h.point };
+      const bi = h.object.userData.pick ? h.object.userData.pick.block : 0;
+      return { floor: floorAt(h.point.y, bi), block: bi, point: h.point };
     }
-    function floorAt(y) {
-      if (y < GROUND_H) return 0;
-      return Math.min(floorsCount, 1 + Math.floor((y - GROUND_H) / FLOOR_H));
+    function floorAt(y, bi) {
+      const b = blocks[bi] || blocks[0];
+      if (y < 0) return y < -3.2 ? -2 : -1;
+      for (let n = 1; n <= b.floors; n++) if (y < floorTop(n)) return n;
+      return b.floors;
     }
     function setHover(i) {
       if (i === hoverIdx) return;
@@ -1369,7 +1494,7 @@
       requestAnimationFrame(() => {
         hoverQueued = false; if (!lastHoverEv || pointers.size || mode !== 'house') return;
         const r = pick(lastHoverEv);
-        if (r && r.apt != null && apartmentInst[r.apt].id != null) {
+        if (r && r.apt != null && apartmentInst[r.apt] && apartmentInst[r.apt].id != null) {
           setHover(r.apt);
           const rect = el.getBoundingClientRect();
           handlers.hover(apartmentInst[r.apt].data, lastHoverEv.clientX - rect.left, lastHoverEv.clientY - rect.top);
@@ -1392,40 +1517,48 @@
       if (r.apt != null) {
         const a = apartmentInst[r.apt];
         if (focusApt && a.id != null) { selectApartment(a.id, true); handlers.select(a.data); return; }
-        selectFloor(a.floor, false, true);
+        selectFloor(a.floor, false, true, a.block);
         if (a.id != null) { selectedIdx = r.apt; handlers.select(a.data); }
       } else if (r.floor != null) {
-        selectFloor(r.floor, false, true);
+        selectFloor(r.floor, false, true, r.block);
       }
     }
-    function selectFloor(n, silent, fromClick) {
+    // The chosen floor of the chosen block: a glowing band around that floor's outline (the setback's on its floors).
+    function selectFloor(n, silent, fromClick, bi) {
       if (n == null) {
-        selBand.visible = selEdges.visible = false; selectedIdx = -1; defaultGoal(); if (!silent) handlers.floor(null); return;
+        selBand.visible = false; selectedIdx = -1; selBlock = -1; defaultGoal(); if (!silent) handlers.floor(null); return;
       }
-      selBand.visible = selEdges.visible = true;
-      const h = n === 0 ? GROUND_H : FLOOR_H;
-      selBand.scale.set(1, h / FLOOR_H, 1); selEdges.scale.set(1, h / FLOOR_H, 1);
-      selBand.position.y = selEdges.position.y = floorMid(n);
-      if (!focusApt) focusFloor(n);
-      if (selectedIdx >= 0 && apartmentInst[selectedIdx].floor !== n) selectedIdx = -1;
-      if (!silent) handlers.floor(n);
+      if (typeof bi === 'string') bi = blocks.findIndex((b) => b.code === bi);
+      selBlock = bi != null && bi >= 0 ? bi : selBlock >= 0 ? selBlock : 0;
+      const b = blocks[selBlock], fp = S.geom.footprintOf({ footprint: b.raw.footprint, setbacks: b.raw.setbacks }, Math.max(1, n));
+      selBand.geometry.dispose();
+      selBand.geometry = extrude(grow(placedRaw(b.raw, fp), 0.9), floorY(n), floorTop(n) - floorY(n));
+      selBand.visible = n >= 1 || parkingOn;
+      if (!focusApt) focusFloor(n, selBlock);
+      if (selectedIdx >= 0 && (apartmentInst[selectedIdx].floor !== n || apartmentInst[selectedIdx].block !== selBlock)) selectedIdx = -1;
+      if (!silent) handlers.floor(n, b.code);
     }
+    // flyThere: true — fly to its windows; false — only mark it (fresh data, the camera stays where the person put it);
+    // not given — fly in the full-screen mode (focusApt), stay in the catalog frame.
     function selectApartment(id, flyThere) {
       const i = aptMap[id];
       if (i == null) { selectedIdx = -1; return; }
-      selectedIdx = i; selectFloor(apartmentInst[i].floor, true);
-      if (flyThere || focusApt) { autoRotate = false; flyToApartment(i); }
+      selectedIdx = i; selectFloor(apartmentInst[i].floor, true, false, apartmentInst[i].block);
+      if (flyThere === true || (focusApt && flyThere !== false)) { autoRotate = false; flyToApartment(i); }
     }
-    function clearSelection() { selectedIdx = -1; selBand.visible = selEdges.visible = false; if (!focusApt) defaultGoal(); }
+    function clearSelection() { selectedIdx = -1; selBand.visible = false; if (!focusApt) defaultGoal(); }
 
     // ---------- speed: FPS and the automatic quality ----------
     // Below 30 frames a second for three seconds in a row the quality steps down (never back up in this visit):
     // 2 — everything; 1 — no shadows, at most 1.25 device pixels; 0 — 1 device pixel, no clouds, no outlines of the
-    // neighbour buildings.
+    // neighbour buildings. A step rebuilds the shaders of every material — on a weak phone (and on software WebGL) the
+    // scene stands still for seconds. So a step never comes during a camera flight or right after a touch (it waits for a
+    // calm moment), and below 12 frames a second it goes straight to 0 — one rebuild, not two.
     const stats = { fps: 0, quality: 2, frames: 0, t0: performance.now(), slow: 0, since: performance.now() };
+    const QUALITY_CALM_MS = 2500;
     function setQuality(q) {
       stats.quality = q;
-      if (q <= 1) { sun.castShadow = false; renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25)); }
+      if (q <= 1) { sun.castShadow = false; renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25)); dropEnv(); }
       if (q <= 0) { renderer.setPixelRatio(1); clouds.forEach((c) => { c.visible = false; }); contextGroup.children.forEach((c) => { if (c.userData.edges) c.visible = false; }); }
       resize();
     }
@@ -1433,10 +1566,11 @@
       stats.frames++;
       if (now - stats.t0 < 1000) return;
       stats.fps = Math.round(stats.frames * 1000 / (now - stats.t0)); stats.frames = 0; stats.t0 = now;
+      handlers.fps(stats.fps, stats.quality);
       // Not in the first 4 s after the loop (re)starts: the shaders compile and the shadows build then.
       if (opts.autoQuality === false || now - stats.since < 6000) return;
       stats.slow = stats.fps < 30 ? stats.slow + 1 : 0;
-      if (stats.slow >= 3 && stats.quality > 0) { stats.slow = 0; setQuality(stats.quality - 1); }
+      if (stats.slow >= 3 && stats.quality > 0 && !fly && now - lastInput > QUALITY_CALM_MS) { stats.slow = 0; setQuality(stats.fps < 12 ? 0 : stats.quality - 1); }
     }
 
     // ---------- loop ----------
@@ -1485,16 +1619,18 @@
           if (i < 0 || i >= apartmentInst.length) return;
           const c = colorFor(apartmentInst[i]).convertSRGBToLinear();
           tmpC.set(1, 0.95, 0.8);
-          c.lerp(tmpC, boost); glow.setColorAt(i, c); animIdx.add(i);
+          c.lerp(tmpC, boost); apartmentInst[i].windows.forEach((w) => glow.setColorAt(w, c)); animIdx.add(i);
         };
         let dirty = false;
-        for (const i of [...animIdx]) { if (i !== hoverIdx && i !== selectedIdx) { const c = colorFor(apartmentInst[i]).convertSRGBToLinear(); glow.setColorAt(i, c); animIdx.delete(i); dirty = true; } }
+        for (const i of [...animIdx]) { if (i !== hoverIdx && i !== selectedIdx) { const c = colorFor(apartmentInst[i]).convertSRGBToLinear(); apartmentInst[i].windows.forEach((w) => glow.setColorAt(w, c)); animIdx.delete(i); dirty = true; } }
         if (hoverIdx >= 0) { touch(hoverIdx, 0.55 + Math.sin(t * 6) * 0.1); dirty = true; }
         if (selectedIdx >= 0) { touch(selectedIdx, 0.62 + Math.sin(t * 4) * 0.3); dirty = true; }
         if (dirty) glow.instanceColor.needsUpdate = true;
       }
       if (selBand && selBand.visible) { selBand.material.opacity = 0.1 + Math.sin(t * 3) * 0.04; }
       if (roofLight) roofLight.visible = Math.sin(t * 3.2) > -0.2;
+      // Lift cabins ride between −2 and the top floor (not at the lowest quality).
+      if (xray && stats.quality > 0) cabins.forEach((c) => { const u = c.userData; c.position.y = u.y0 + (u.y1 - u.y0) * (0.5 + 0.5 * Math.sin(t * 0.22 + u.phase)); });
       driveCars(dt);
       clouds.forEach((c) => { c.position.x += c.userData.v * dt; if (c.position.x > 900) c.position.x = -900; });
       renderer.render(scene, camera);
@@ -1520,7 +1656,7 @@
     const io = new IntersectionObserver((en) => { visible = en[en.length - 1].isIntersecting; resume(); }, { threshold: 0.01 });
     io.observe(container);
 
-    build(opts.floors || 16);
+    build(+opts.floors || 16);
     setTime(opts.time || 'dusk', true);
     resize(); defaultGoal(); Object.assign(view, goal); view.dist *= 1.25; view.az = goal.az - 0.8;
     if (opts.view) Object.assign(view, goal);
@@ -1528,7 +1664,10 @@
     resume();
 
     const api = {
-      setData, selectFloor: (n) => selectFloor(n, true), selectApartment, clearSelection, resetView, setTime,
+      setData, selectFloor: (n, block) => selectFloor(n, true, false, block), selectApartment, clearSelection, resetView, setTime,
+      // The complex: a block (letter) or the whole complex (null); the parking mode; the cut-away with the lift shafts.
+      focusBlock, setParking, setXray: (v) => { setXray(v); }, get parking() { return parkingOn; },
+      get blocks() { return blocks.map((b) => ({ code: b.code, name: b.name, floors: b.floors, H: b.H })); },
       setOverlay(v) { overlay = !!v; applyApartments(); },
       get overlay() { return overlay; },
       setAutoRotate(v) { autoRotate = !!v; },
@@ -1552,8 +1691,14 @@
       addLabel, removeLabels,
       // Labels never go under the page's top bar (px from the top of the scene).
       setLabelInset(top) { labelInset.top = top || 0; },
+      // Boxes (px in the scene) labels must not cover — the page's panels and buttons: fn() → [{ x0, y0, x1, y1 }].
+      setLabelAvoid(fn) { labelAvoid = fn || null; },
+      // The page changed a label's text: measure again.
+      labelsChanged() { labels.forEach((l) => { l.w = 0; l.h = 0; }); },
+      // The list's row under the pointer lights its apartment's windows (null — none).
+      hoverApartment(id) { const i = id == null || aptMap[id] == null ? -1 : aptMap[id]; if (i === hoverIdx) return; hoverIdx = i; resume(); },
       // World points for the page's labels.
-      anchors() { return { top: [0, houseH() + 4, 0], H: houseH() }; },
+      anchors() { return { top: [0, houseH() + 4, 0], H: houseH(), blocks: blocks.map((b) => ({ code: b.code, top: [b.center.x, b.H + 6, b.center.z] })) }; },
       roomAnchors() { return inside ? inside.rooms.map((r) => [r.x, inside.y + 1.3, r.z]) : []; },
       setContext, clearContext, get hasContext() { return contextOn; },
       enterInside, leaveInside: () => leaveInside(false), roomFocus, startWalk, leaveWalk: () => leaveWalk(false),
@@ -1564,18 +1709,45 @@
       get floors() { return floorsCount; },
       get renderer() { return renderer; },
       get stats() { return { fps: stats.fps, quality: stats.quality }; },
-      // For the tests (window.__house3d) and the page: camera, mode, light.
+      // For the tests (window.__house3d) and the page: camera, mode, light, the complex.
+      // A window's world point and its apartment (the tests click real windows): instance → { id, block, x, y, z }.
+      windowPoints(n) {
+        const out = [], mtx = new T.Matrix4(), v = new T.Vector3();
+        const ids = winApt.map((a, w) => [a, w]).filter(([a]) => a >= 0 && apartmentInst[a].id != null);
+        for (let k = 0; k < Math.min(n || 10, ids.length); k++) {
+          const [a, w] = ids[Math.floor((k + 0.5) * ids.length / Math.min(n || 10, ids.length))];
+          glass.getMatrixAt(w, mtx); v.setFromMatrixPosition(mtx);
+          const p = v.clone().project(camera);
+          out.push({ id: apartmentInst[a].id, block: blocks[apartmentInst[a].block].code, x: (p.x + 1) / 2 * container.clientWidth, y: (1 - p.y) / 2 * container.clientHeight, visible: p.z < 1 && Math.abs(p.x) < 1 && Math.abs(p.y) < 1 });
+        }
+        return out;
+      },
+      // The screen point (px in the scene) of an apartment's first window, or null.
+      windowPoint(id) {
+        const i = aptMap[id]; if (i == null || !apartmentInst[i].windows.length) return null;
+        const mtx = new T.Matrix4(), v = new T.Vector3(); glass.getMatrixAt(apartmentInst[i].windows[0], mtx); v.setFromMatrixPosition(mtx).project(camera);
+        return { x: (v.x + 1) / 2 * container.clientWidth, y: (1 - v.y) / 2 * container.clientHeight, visible: v.z < 1 && Math.abs(v.x) < 1 && Math.abs(v.y) < 1, block: blocks[apartmentInst[i].block].code };
+      },
+      lookAtApartment(id) { const i = aptMap[id]; if (i != null) { stopFly(); const p = aptWorld(i); Object.assign(goal, { tx: p.x, tz: p.z, ty: p.y, az: Math.atan2(p.nx, p.nz), pol: 1.45, dist: 9 }); Object.assign(view, goal); placeCamera(); camera.updateMatrixWorld(); } },
       state() {
         return { mode, view: Object.assign({}, view), currentView, clock: clockH, sun: this.sun(), sunIntensity: sun.intensity, exposure: renderer.toneMappingExposure,
           selected: selectedIdx >= 0 ? apartmentInst[selectedIdx].id : null, fps: stats.fps, quality: stats.quality, camera: camera.position.toArray(), context: contextOn,
-          walk: mode === 'walk' ? { x: walkSt.x, z: walkSt.z, yaw: walkSt.yaw } : null, labels: labels.filter((l) => l.shown).length };
+          walk: mode === 'walk' ? { x: walkSt.x, z: walkSt.z, yaw: walkSt.yaw } : null, labels: labels.filter((l) => l.shown).length,
+          // The complex from the scene's own data (for the tests): blocks, the gaps between them, lifts, the yard, parking.
+          blocks: blocks.map((b) => ({ code: b.code, floors: b.floors, windows: b.windows, center: [b.center.x, b.center.z], setback: b.setback })),
+          gaps: dims.map((d) => ({ a: d.a, b: d.b, d: Math.round(d.d * 10) / 10 })),
+          elevators: blocks.map((b) => ({ block: b.code, shafts: shafts.filter((s) => s.block === b.code).length })),
+          amenities: yardZones.map((z) => z.kind),
+          parking: { on: parkingOn, levels: [...new Set(apartmentInst.filter((a) => a.kind === 'parking').map((a) => a.floor))].sort((x, y) => x - y), spots: spotApt.length },
+          xray, selectedBlock: selBlock >= 0 && blocks[selBlock] ? blocks[selBlock].code : null, focusBlock: focusCode, hover: hoverIdx >= 0 ? apartmentInst[hoverIdx].id : null,
+          drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles };
       },
       destroy() {
         running = false; cancelAnimationFrame(raf);
         document.removeEventListener('visibilitychange', resume);
         window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onKey);
         ro.disconnect(); io.disconnect(); clearTimeout(pmremTimer);
-        leaveInside(true); removeLabels(); labelLayer.remove();
+        leaveInside(true); removeLabels(); labelLayer.remove(); scene.remove(under);
         disposeTree(scene);
         if (envTex) envTex.dispose(); pm.dispose();
         renderer.dispose(); if (renderer.forceContextLoss) renderer.forceContextLoss();

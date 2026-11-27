@@ -19,6 +19,7 @@
     ['s7', [], ['li1', 'li2', 'li3', 'li4', 'li6', 'li5'], []],
     ['s8', ['p'], [], []],
     ['s9', ['p'], [], []],
+    ['s10', ['p1', 'p2'], [], []],
   ];
 
   // `code` → <code>, the contact address → a mailto link.

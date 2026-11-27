@@ -27,6 +27,8 @@ public class CabinetService(AppDbContext db, ICurrentUser currentUser) : ICabine
                 d.Apartment.Floor.Building.NameRu,
                 d.Apartment.Floor.Building.NameTg,
                 d.Apartment.Number,
+                d.Apartment.Kind,
+                d.Apartment.Floor.Building.BlockCode,
                 Floor = d.Apartment.Floor.Number,
                 d.Apartment.Rooms,
                 d.Apartment.Area,
@@ -63,7 +65,7 @@ public class CabinetService(AppDbContext db, ICurrentUser currentUser) : ICabine
             var remaining = Math.Max(0m, d.FinalPrice - d.Paid);
             var percent = d.FinalPrice > 0 ? (int)Math.Clamp(Math.Floor(d.Paid * 100m / d.FinalPrice), 0m, 100m) : 0;
             return new CabinetDealResponse(d.Id, d.BuildingId, tg && !string.IsNullOrWhiteSpace(d.NameTg) ? d.NameTg : d.NameRu, d.Number, d.Floor, d.Rooms, d.Area, d.Stage, d.FinalPrice, d.Currency,
-                d.Paid, remaining, percent, d.ManagerName, d.CreatedAt, reviews.FirstOrDefault(r => r.BuildingId == d.BuildingId));
+                d.Paid, remaining, percent, d.ManagerName, d.CreatedAt, reviews.FirstOrDefault(r => r.BuildingId == d.BuildingId), d.BlockCode, d.Kind);
         }).ToList();
 
         return new CabinetOverviewResponse(items.Count > 0, user.FullName, contacts, items);

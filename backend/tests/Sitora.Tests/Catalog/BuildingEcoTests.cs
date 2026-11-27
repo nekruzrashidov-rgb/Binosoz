@@ -15,7 +15,7 @@ public class BuildingEcoTests(SitoraApiFactory factory) : IClassFixture<SitoraAp
     {
         var list = await factory.CreateClient().GetFromJsonAsync<PagedResult<BuildingResponse>>(
             "/api/v1/buildings?organization=nekruz&pageSize=100", TestJson.Options);
-        return list!.Items.OrderBy(b => b.Name).First().Id;
+        return list!.Items.Where(b => b.BlockCode == null).OrderBy(b => b.Name).First().Id;
     }
 
     private static object FullPassport() => new

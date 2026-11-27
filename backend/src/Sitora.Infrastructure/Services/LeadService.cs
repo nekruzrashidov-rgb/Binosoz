@@ -139,7 +139,7 @@ public class LeadService(
     {
         var text = $"Новая заявка ({lead.Source}): {lead.Name}, {lead.Phone}";
         if (apartment is not null)
-            text += $". {apartment.Floor.Building.NameRu}, этаж {apartment.Floor.Number}, кв. №{apartment.Number}";
+            text += $". {apartment.Floor.Building.NameRu}, этаж {apartment.Floor.Number}, {UnitNames.Full(null, apartment.Kind, apartment.Number)}";
         if (lead.Comment is not null)
             text += $". Комментарий: {lead.Comment}";
         return text;

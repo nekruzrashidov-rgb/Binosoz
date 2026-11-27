@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Sitora.Domain.Common;
 using Sitora.Domain.DTOs.Catalog;
 using Sitora.Domain.DTOs.Common;
@@ -21,8 +22,14 @@ public class CatalogService(
     ICurrentUser currentUser,
     ApartmentImporter importer,
     ITariffService tariffs,
-    TimeProvider timeProvider) : ICatalogService
+    TimeProvider timeProvider,
+    IConfiguration configuration) : ICatalogService
 {
+    // Наименьший разрыв между блоками ЖК на участке, м (Catalog__MinBlockGapMeters; по умолчанию 20).
+    public const double DefaultMinBlockGap = 20;
+    private double MinBlockGap => configuration.GetValue("Catalog:MinBlockGapMeters", DefaultMinBlockGap);
+    // Номер помещения уже есть в этом доме (уникальность в пределах блока, своя серия у квартир, магазинов, машино-мест).
+    public const string NumberTakenInBuilding = "Этот номер уже занят в этом доме (блоке): ";
     private const string BuildingNotFound = "Дом не найден";
     private const string FloorNotFound = "Этаж не найден";
     private const string ApartmentNotFound = "Квартира не найдена";
@@ -49,10 +56,13 @@ public class CatalogService(
         {
             // Дома отключённой организации на сайте не показываются.
             var query = db.Buildings.AsNoTracking().Where(b => b.Organization.IsActive);
+            // Гость и покупатель видят только дома на сайте; сотрудники — все дома своей организации (скрытые с пометкой).
+            if (PublicOnly)
+                query = query.Where(b => b.IsPublished);
             if (slug is not null)
                 query = query.Where(b => b.Organization.Slug == slug);
             var total = await query.CountAsync(ct);
-            var items = await query.OrderBy(b => b.NameRu).ThenBy(b => b.Id)
+            var items = await query.OrderBy(b => b.SortOrder).ThenBy(b => b.NameRu).ThenBy(b => b.Id)
                 .Skip(p.Skip).Take(p.PageSize)
                 .Select(ToBuildingResponse(tg))
                 .ToListAsync(ct);
@@ -270,6 +280,155 @@ public class CatalogService(
         return await GetBuildingAsync(id, ct);
     }
 
+    // Блок ЖК: буква, порядок, контур, место на участке, уступы — целиком. Контур уже проверен валидатором (вершины,
+    // площадь, самопересечения); здесь — то, для чего нужна база: уступ внутри контура и не выше крыши, буква не занята,
+    // блоки организации на участке не пересекаются и стоят не ближе Catalog:MinBlockGapMeters. Ошибка — 400, AuditLog —
+    // в том же SaveChanges, кэш каталога сбрасывается.
+    public async Task<BuildingResponse> UpdateBuildingShapeAsync(Guid id, SaveBuildingShapeRequest request, CancellationToken ct = default)
+    {
+        var building = await db.Buildings.FirstOrDefaultAsync(b => b.Id == id, ct)
+            ?? throw new NotFoundException(BuildingNotFound);
+        var code = string.IsNullOrWhiteSpace(request.BlockCode) ? null : request.BlockCode.Trim().ToUpperInvariant();
+        var footprint = request.Footprint is { Count: > 0 } ? request.Footprint : null;
+        var setbacks = footprint is null ? null : request.Setbacks?.Where(s => s.Footprint.Count > 0).OrderBy(s => s.FromFloor).ToList();
+        var position = footprint is null ? null : request.SitePosition ?? new SitePlacement();
+
+        if (code is not null && await db.Buildings.AnyAsync(b => b.OrganizationId == building.OrganizationId && b.Id != id && b.BlockCode == code, ct))
+            throw new ConflictException("Блок с такой буквой уже есть");
+        if (footprint is not null)
+        {
+            var outline = PlanGeometry.Expand(footprint);
+            foreach (var s in setbacks ?? [])
+            {
+                if (s.FromFloor > building.FloorsCount)
+                    throw new BadRequestException("Уступ начинается выше последнего этажа");
+                if (!PlanGeometry.Inside(outline, PlanGeometry.Expand(s.Footprint), 0.05))
+                    throw new BadRequestException("Контур уступа выходит за контур блока");
+            }
+
+            var placed = Placed(footprint, position!);
+            var others = await db.Buildings.AsNoTracking()
+                .Where(b => b.OrganizationId == building.OrganizationId && b.Id != id && b.Footprint != null && b.SitePosition != null)
+                .Select(b => new { b.NameRu, b.Footprint, b.SitePosition })
+                .ToListAsync(ct);
+            foreach (var other in others)
+            {
+                var gap = PlanGeometry.Distance(placed, Placed(other.Footprint!, other.SitePosition!));
+                if (gap <= 1e-6)
+                    throw new BadRequestException("Блоки на участке пересекаются");
+                if (gap < MinBlockGap - 1e-6)
+                    throw new BadRequestException(string.Create(CultureInfo.InvariantCulture,
+                        $"Расстояние между блоками меньше допустимого: {gap:0.#} м, нужно не меньше {MinBlockGap:0.#} м"));
+            }
+        }
+
+        var before = ShapeSnapshot(building);
+        building.BlockCode = code;
+        building.SortOrder = request.SortOrder;
+        building.Footprint = footprint;
+        building.SitePosition = position;
+        building.Setbacks = setbacks is { Count: > 0 } ? setbacks : null;
+        audit.Record(nameof(Building), building.Id, "ShapeUpdated", before, ShapeSnapshot(building));
+        await SaveAsync("Блок с такой буквой уже есть", ct);
+        return await GetBuildingAsync(id, ct);
+
+        static IReadOnlyList<PlanGeometry.P> Placed(List<double[]> fp, SitePlacement p) =>
+            PlanGeometry.Place(PlanGeometry.Expand(fp), p.X, p.Y, p.RotationDeg);
+    }
+
+    // Правило цены блока целиком (руководители). Квартиры не меняются — для этого «Пересчитать цены» (ApplyPriceRuleAsync).
+    public async Task<BuildingResponse> UpdatePriceRuleAsync(Guid id, SavePriceRuleRequest request, CancellationToken ct = default)
+    {
+        var building = await db.Buildings.FirstOrDefaultAsync(b => b.Id == id, ct)
+            ?? throw new NotFoundException(BuildingNotFound);
+        var before = new { building.PriceCurrency, building.PriceSteps, building.PenthousePricePerM2, building.CommercialPricePerM2, building.ParkingSpotPrice };
+        building.PriceCurrency = request.Currency;
+        building.PriceSteps = request.Steps is { Count: > 0 } ? request.Steps.OrderBy(s => s.FromFloor).ToList() : null;
+        building.PenthousePricePerM2 = request.PenthousePricePerM2;
+        building.CommercialPricePerM2 = request.CommercialPricePerM2;
+        building.ParkingSpotPrice = request.ParkingSpotPrice;
+        audit.Record(nameof(Building), building.Id, "PriceRuleUpdated", before, new { building.PriceCurrency, building.PriceSteps, building.PenthousePricePerM2,
+            building.CommercialPricePerM2, building.ParkingSpotPrice });
+        await SaveAsync("Правило цены изменено другим пользователем", ct);
+        return await GetBuildingAsync(id, ct);
+    }
+
+    // «Пересчитать цены»: новая цена по правилу — только свободным квартирам блока (бронь, продажа и «под запрос» не
+    // трогаются). Каждое изменение цены — запись PriceChanged в AuditLog, всё одним SaveChanges (одна транзакция);
+    // кэш каталога сбрасывается. Последний этаж — пентхаусы (своя цена м²).
+    public async Task<ApplyPriceRuleResponse> ApplyPriceRuleAsync(Guid id, CancellationToken ct = default)
+    {
+        var building = await db.Buildings.FirstOrDefaultAsync(b => b.Id == id, ct)
+            ?? throw new NotFoundException(BuildingNotFound);
+        if (building.PriceSteps is not { Count: > 0 })
+            throw new BusinessRuleException("Сначала задайте цены по этажам");
+        var apartments = await db.Apartments.Include(a => a.Floor).Where(a => a.Floor.BuildingId == id).ToListAsync(ct);
+        int updated = 0, unchanged = 0, skipped = 0;
+        foreach (var a in apartments)
+        {
+            var (ppm, fixedPrice) = PriceRules.PriceOf(building, a, a.Floor.Number);
+            if (a.Status != ApartmentStatus.Free || (ppm is null && fixedPrice is null))
+            {
+                skipped++;
+                continue;
+            }
+            if (a.Currency == building.PriceCurrency && (fixedPrice is { } fp ? a.Price == fp : a.PricePerM2 == ppm))
+            {
+                unchanged++;
+                continue;
+            }
+            var before = new { a.PricePerM2, a.Price, a.Currency };
+            if (fixedPrice is { } spot)
+                a.SetFixedPrice(a.Area, spot, building.PriceCurrency);
+            else
+                a.SetPricing(a.Area, ppm!.Value, building.PriceCurrency);
+            audit.Record(nameof(Apartment), a.Id, "PriceChanged", before, new { a.PricePerM2, a.Price, a.Currency, Source = "PriceRule" });
+            updated++;
+        }
+        await SaveAsync("Квартира изменена другим пользователем", ct);
+        return new ApplyPriceRuleResponse(updated, unchanged, skipped);
+    }
+
+    // Гость, покупатель и создатель платформы вне организации — публичный каталог.
+    private bool PublicOnly => currentUser.OrganizationId is null || currentUser.IsInRole(RoleNames.Customer);
+
+    // Показать дом на сайте или скрыть (руководители): квартиры, брони, сделки, графики и платежи не меняются.
+    public async Task<BuildingResponse> SetPublishedAsync(Guid id, bool isPublished, CancellationToken ct = default)
+    {
+        var building = await db.Buildings.FirstOrDefaultAsync(b => b.Id == id, ct)
+            ?? throw new NotFoundException(BuildingNotFound);
+        if (building.IsPublished != isPublished)
+        {
+            audit.Record(nameof(Building), building.Id, isPublished ? "Published" : "Unpublished", new { building.IsPublished }, new { IsPublished = isPublished });
+            building.IsPublished = isPublished;
+            await SaveAsync("Дом изменён другим пользователем", ct);
+        }
+        return await GetBuildingAsync(id, ct);
+    }
+
+    private static object ShapeSnapshot(Building b) => new { b.BlockCode, b.SortOrder, b.Footprint, b.SitePosition, b.Setbacks };
+
+    public async Task<SitePlan?> GetSitePlanAsync(CancellationToken ct = default)
+    {
+        var organizationId = currentUser.OrganizationId ?? throw new NotFoundException("Организация не найдена");
+        return await db.Organizations.AsNoTracking().Where(o => o.Id == organizationId).Select(o => o.SitePlan).FirstOrDefaultAsync(ct);
+    }
+
+    // План участка своей организации целиком (руководители); пустой контур — плана нет. AuditLog, сброс кэша каталога.
+    public async Task<SitePlan?> UpdateSitePlanAsync(SaveSitePlanRequest request, CancellationToken ct = default)
+    {
+        var organizationId = currentUser.OrganizationId ?? throw new NotFoundException("Организация не найдена");
+        var organization = await db.Organizations.FirstAsync(o => o.Id == organizationId, ct);
+        var before = organization.SitePlan;
+        organization.SitePlan = request.Boundary is { Count: >= 3 }
+            ? new SitePlan { Boundary = request.Boundary, Zones = request.Zones ?? [] }
+            : null;
+        audit.Record(nameof(Organization), organization.Id, "SitePlanUpdated", before is null ? null : new { before.Boundary, before.Zones },
+            organization.SitePlan is null ? null : new { organization.SitePlan.Boundary, organization.SitePlan.Zones }, organization.Id);
+        await SaveAsync("План участка изменён другим пользователем", ct);
+        return organization.SitePlan;
+    }
+
     private static object EcoSnapshot(BuildingEcoInfo e) => new
     {
         e.EnergyClass, e.WallInsulationRu, e.WallInsulationTg, e.WindowsRu, e.WindowsTg, e.WallInsulationEn, e.WindowsEn, e.SolarPanelsKw,
@@ -306,13 +465,15 @@ public class CatalogService(
         if (!await db.Floors.AnyAsync(f => f.Id == request.FloorId, ct))
             throw new NotFoundException(FloorNotFound);
 
+        await EnsureNumberFreeAsync(request.FloorId, request.Number, ApartmentKind.Residential, null, ct);
         var apartment = new Apartment
         {
             FloorId = request.FloorId,
             Number = request.Number,
             Rooms = request.Rooms,
             PlanSlot = request.PlanSlot,
-            Model3dId = EmptyToNull(request.Model3dId)
+            Model3dId = EmptyToNull(request.Model3dId),
+            LayoutCode = EmptyToNull(request.LayoutCode)?.ToLowerInvariant()
         };
         apartment.SetPricing(request.Area, request.PricePerM2);
         db.Apartments.Add(apartment);
@@ -325,11 +486,13 @@ public class CatalogService(
     {
         var apartment = await FindApartmentAsync(id, ct);
 
+        await EnsureNumberFreeAsync(apartment.FloorId, request.Number, apartment.Kind, apartment.Id, ct);
         var before = Snapshot(apartment);
         apartment.Number = request.Number;
         apartment.Rooms = request.Rooms;
         apartment.PlanSlot = request.PlanSlot;
         apartment.Model3dId = EmptyToNull(request.Model3dId);
+        apartment.LayoutCode = EmptyToNull(request.LayoutCode)?.ToLowerInvariant();
         apartment.SetPricing(request.Area, request.PricePerM2);
         audit.Record(nameof(Apartment), apartment.Id, "Updated", before, Snapshot(apartment));
         await SaveApartmentAsync(request.Number, request.PlanSlot, ct);
@@ -378,6 +541,20 @@ public class CatalogService(
     }
 
     // У квартиры два уникальных правила на этаже: номер и позиция на плане.
+    // Номер уникален в доме (блоке) и в своей серии: квартиры и пентхаусы, магазины (Н-), машино-места (М-). Тот же
+    // номер на этом же этаже — прежняя ошибка этажа; индексы базы — страховка от гонки двух запросов.
+    private async Task EnsureNumberFreeAsync(Guid floorId, int number, ApartmentKind kind, Guid? exceptId, CancellationToken ct)
+    {
+        var buildingId = await db.Floors.Where(f => f.Id == floorId).Select(f => f.BuildingId).SingleAsync(ct);
+        var homes = kind is ApartmentKind.Residential or ApartmentKind.Penthouse;
+        var taken = await db.Apartments.AsNoTracking()
+            .Where(a => a.BuildingId == buildingId && a.Number == number && a.Id != exceptId
+                        && (homes ? a.Kind == ApartmentKind.Residential || a.Kind == ApartmentKind.Penthouse : a.Kind == kind))
+            .Select(a => (Guid?)a.FloorId).FirstOrDefaultAsync(ct);
+        if (taken is { } onFloor)
+            throw new ConflictException(onFloor == floorId ? $"Квартира №{number} уже есть на этом этаже" : NumberTakenInBuilding + number);
+    }
+
     private async Task SaveApartmentAsync(int number, int planSlot, CancellationToken ct)
     {
         try
@@ -386,18 +563,24 @@ public class CatalogService(
         }
         catch (DbUpdateException e) when (e.IsUniqueViolation())
         {
-            throw new ConflictException(e.ViolatedConstraint() == ApartmentConfiguration.PlanSlotIndex
+            var constraint = e.ViolatedConstraint();
+            throw new ConflictException(constraint == ApartmentConfiguration.PlanSlotIndex
                 ? $"Позиция {planSlot} на плане этого этажа уже занята другой квартирой"
-                : $"Квартира №{number} уже есть на этом этаже");
+                : constraint is ApartmentConfiguration.HomeNumberIndex or ApartmentConfiguration.ShopNumberIndex or ApartmentConfiguration.SpotNumberIndex
+                    ? NumberTakenInBuilding + number
+                    : $"Квартира №{number} уже есть на этом этаже");
         }
 
         await cache.InvalidateAsync(ct);
     }
 
+    // Подземные этажи паркинга — отрицательные (−1, −2…), 0 — прежний коммерческий этаж.
+    public const int MinFloorNumber = -5;
+
     private static void EnsureFloorNumber(Building building, int number)
     {
-        if (number < Floor.CommercialFloorNumber || number > building.FloorsCount)
-            throw new BusinessRuleException($"Номер этажа должен быть от 0 до {building.FloorsCount}");
+        if (number < MinFloorNumber || number > building.FloorsCount)
+            throw new BusinessRuleException($"Номер этажа должен быть от {MinFloorNumber} до {building.FloorsCount}");
     }
 
     private static void Apply(Building building, SaveBuildingRequest request)
@@ -421,7 +604,7 @@ public class CatalogService(
         new { b.NameRu, b.NameTg, b.NameEn, b.Address, b.FloorsCount, b.DescriptionRu, b.DescriptionTg, b.DescriptionEn, b.ModelUrl, b.CompletionYear, b.PlannedApartments };
 
     private static object Snapshot(Apartment a) =>
-        new { a.Number, a.Rooms, a.Area, a.PricePerM2, a.Price, a.Currency, a.Status, a.PlanSlot, a.Model3dId };
+        new { a.Number, a.Rooms, a.Area, a.PricePerM2, a.Price, a.Currency, a.Status, a.PlanSlot, a.Model3dId, a.LayoutCode };
 
     internal static Expression<Func<Building, BuildingResponse>> ToBuildingResponse(bool tg) => b => new BuildingResponse(
         b.Id,
@@ -434,8 +617,8 @@ public class CatalogService(
         b.DescriptionRu,
         b.DescriptionTg,
         b.ModelUrl,
-        b.Floors.SelectMany(f => f.Apartments).Count(),
-        b.Floors.SelectMany(f => f.Apartments).Count(a => a.Status == ApartmentStatus.Free),
+        b.Floors.SelectMany(f => f.Apartments).Count(a => a.Kind == ApartmentKind.Residential || a.Kind == ApartmentKind.Penthouse),
+        b.Floors.SelectMany(f => f.Apartments).Count(a => (a.Kind == ApartmentKind.Residential || a.Kind == ApartmentKind.Penthouse) && a.Status == ApartmentStatus.Free),
         b.CompletionYear,
         b.PlannedApartments,
         b.Eco == null ? null : new BuildingEcoResponse(
@@ -467,16 +650,31 @@ public class CatalogService(
         b.Longitude,
         b.FloorHeight,
         b.NameEn,
-        b.DescriptionEn);
+        b.DescriptionEn,
+        b.BlockCode,
+        b.SortOrder,
+        b.Footprint,
+        b.SitePosition,
+        b.Setbacks,
+        b.PriceSteps,
+        b.PenthousePricePerM2,
+        b.PriceCurrency,
+        b.CommercialPricePerM2,
+        b.ParkingSpotPrice,
+        b.ElevatorsCount,
+        b.Floors.SelectMany(f => f.Apartments).Count(a => a.Kind == ApartmentKind.Commercial),
+        b.Floors.SelectMany(f => f.Apartments).Count(a => a.Kind == ApartmentKind.Parking),
+        b.IsPublished);
 
     private static readonly Expression<Func<Floor, FloorResponse>> ToFloorResponse = f => new FloorResponse(
         f.Id,
         f.BuildingId,
         f.Number,
-        f.Number == Floor.CommercialFloorNumber,
+        f.Number == Floor.CommercialFloorNumber || (f.Apartments.Any() && f.Apartments.All(a => a.Kind == ApartmentKind.Commercial)),
         f.PlanImageUrl,
         f.Apartments.Count(),
-        f.Apartments.Count(a => a.Status == ApartmentStatus.Free));
+        f.Apartments.Count(a => a.Status == ApartmentStatus.Free),
+        f.Number < 0);
 
     private static readonly Expression<Func<Apartment, ApartmentResponse>> ToApartmentResponse = a => new ApartmentResponse(
         a.Id,
@@ -491,5 +689,9 @@ public class CatalogService(
         a.Currency,
         a.Status,
         a.PlanSlot,
-        a.Model3dId);
+        a.Model3dId,
+        a.Kind,
+        a.TerraceArea,
+        a.Floor.Building.BlockCode,
+        a.LayoutCode);
 }

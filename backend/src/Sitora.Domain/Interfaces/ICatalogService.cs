@@ -20,6 +20,12 @@ public interface ICatalogService
     Task<BuildingResponse> UpdateBuildingEcoAsync(Guid id, SaveBuildingEcoRequest request, CancellationToken ct = default);
     Task<BuildingResponse> UpdateBuildingAmenitiesAsync(Guid id, SaveBuildingAmenitiesRequest request, CancellationToken ct = default);
     Task<BuildingResponse> UpdateBuildingLocationAsync(Guid id, SaveBuildingLocationRequest request, CancellationToken ct = default);
+    Task<BuildingResponse> UpdateBuildingShapeAsync(Guid id, SaveBuildingShapeRequest request, CancellationToken ct = default);
+    Task<BuildingResponse> SetPublishedAsync(Guid id, bool isPublished, CancellationToken ct = default);
+    Task<BuildingResponse> UpdatePriceRuleAsync(Guid id, SavePriceRuleRequest request, CancellationToken ct = default);
+    Task<ApplyPriceRuleResponse> ApplyPriceRuleAsync(Guid id, CancellationToken ct = default);
+    Task<Sitora.Domain.Entities.SitePlan?> GetSitePlanAsync(CancellationToken ct = default);
+    Task<Sitora.Domain.Entities.SitePlan?> UpdateSitePlanAsync(SaveSitePlanRequest request, CancellationToken ct = default);
     Task<FloorResponse> CreateFloorAsync(CreateFloorRequest request, CancellationToken ct = default);
     Task<FloorResponse> UpdateFloorAsync(Guid id, UpdateFloorRequest request, CancellationToken ct = default);
     Task<ApartmentResponse> CreateApartmentAsync(CreateApartmentRequest request, CancellationToken ct = default);

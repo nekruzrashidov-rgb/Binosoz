@@ -29,4 +29,7 @@ public record DealResponse(
     Currency Currency,
     Guid? BookingId,
     DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    // Блок ЖК и вид помещения — номер для людей «Блок A, кв. 45» (UnitNames); у дома без блока BlockCode = null.
+    string? BlockCode = null,
+    ApartmentKind ApartmentKind = ApartmentKind.Residential);

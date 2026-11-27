@@ -60,7 +60,7 @@ public class ApartmentImportTests(SitoraApiFactory factory) : IClassFixture<Sito
             [1, 103, 1, 40, 9000, 0],
             [1, 104, 1, 40, 9000, 5],
             [1, 105, 1, 40, 9000, 5],
-            [1, 106, 1, 40, 9000, 9],
+            [1, 106, 1, 40, 9000, 100],
             [1, 102, 1, 40, 9000, 3]));
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
@@ -68,7 +68,7 @@ public class ApartmentImportTests(SitoraApiFactory factory) : IClassFixture<Sito
         Assert.Equal([2, 4, 5], result!.Errors.Select(e => e.Row));
         Assert.Contains("уже занята квартирой №101", result.Errors[0].Message);
         Assert.Contains("уже занята выше в файле", result.Errors[1].Message);
-        Assert.Contains("от 0 до 7", result.Errors[2].Message);
+        Assert.Contains("от 0 до 99", result.Errors[2].Message);
 
         // Квартира 102 переезжает на позицию 3, а её прежняя позиция 1 освобождается — это допустимо.
         var move = await client.PostAsync($"/api/v1/apartments/import?buildingId={buildingId}", Excel(

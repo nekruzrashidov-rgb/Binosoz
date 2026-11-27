@@ -134,6 +134,11 @@ public class ApartmentImporter(AppDbContext db, IAuditService audit)
             // база проверяет уникальность после каждой строки, а не в конце.
             throw new BusinessRuleException("Квартиры меняются позициями на плане. Загрузите изменение в два шага: сначала на свободные позиции");
         }
+        catch (DbUpdateException e) when (e.ViolatedConstraint() is ApartmentConfiguration.HomeNumberIndex or ApartmentConfiguration.ShopNumberIndex or ApartmentConfiguration.SpotNumberIndex)
+        {
+            // Номер уникален в пределах дома: тот же номер на другом этаже — ошибка файла.
+            throw new ConflictException(CatalogService.NumberTakenInBuilding + "номер повторяется на разных этажах");
+        }
 
         return new ImportResult(created, updated, []);
     }

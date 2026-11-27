@@ -92,4 +92,63 @@ public class BuildingsController(ICatalogService catalog) : ControllerBase
     [ProducesResponseType<BuildingResponse>(StatusCodes.Status200OK)]
     public Task<BuildingResponse> UpdateLocation(Guid id, SaveBuildingLocationRequest request, CancellationToken ct) =>
         catalog.UpdateBuildingLocationAsync(id, request, ct);
+
+    /// <summary>Блок ЖК (контент-менеджер и руководители): буква, порядок, контур в плане, место на участке, уступы —
+    /// целиком. Неверный контур (меньше 3 или больше 64 вершин, самопересечение, нулевая площадь), уступ вне контура,
+    /// пересечение с другим блоком или разрыв меньше Catalog:MinBlockGapMeters (20 м) — 400; буква занята — 409.
+    /// Изменение пишется в журнал, кэш каталога сбрасывается.</summary>
+    [HttpPut("{id:guid}/shape")]
+    [Authorize(Roles = Roles.CatalogEditors)]
+    [ProducesResponseType<BuildingResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public Task<BuildingResponse> UpdateShape(Guid id, SaveBuildingShapeRequest request, CancellationToken ct) =>
+        catalog.UpdateBuildingShapeAsync(id, request, ct);
+
+    /// <summary>Правило цены блока (владелец и руководитель объекта): валюта, ступени «этажи с–по → цена м²» (с ценой «до» —
+    /// ровно по этажам), цена м² пентхаусов последнего этажа. Квартиры не меняются. Журнал PriceRuleUpdated.</summary>
+    /// <summary>Показать дом на публичном сайте или скрыть (руководители). Скрытый дом не виден в каталоге, бренде, AI-помощнике
+    /// гостя и «Зелёном эффекте»; сотрудники видят его в CRM, покупатель — свою сделку. Журнал Published/Unpublished.</summary>
+    [HttpPut("{id:guid}/published")]
+    [Authorize(Roles = Roles.Leaders)]
+    [ProducesResponseType<BuildingResponse>(StatusCodes.Status200OK)]
+    public Task<BuildingResponse> SetPublished(Guid id, SetPublishedRequest request, CancellationToken ct) =>
+        catalog.SetPublishedAsync(id, request.IsPublished, ct);
+
+    [HttpPut("{id:guid}/price-rule")]
+    [Authorize(Roles = Roles.Leaders)]
+    [ProducesResponseType<BuildingResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    public Task<BuildingResponse> UpdatePriceRule(Guid id, SavePriceRuleRequest request, CancellationToken ct) =>
+        catalog.UpdatePriceRuleAsync(id, request, ct);
+
+    /// <summary>«Пересчитать цены»: новая цена по правилу всем свободным квартирам блока; брони, проданные и «под запрос» не
+    /// меняются. Каждое изменение — PriceChanged в журнале (в той же транзакции), кэш каталога сбрасывается.</summary>
+    [HttpPost("{id:guid}/price-rule/apply")]
+    [Authorize(Roles = Roles.Leaders)]
+    [ProducesResponseType<ApplyPriceRuleResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    public Task<ApplyPriceRuleResponse> ApplyPriceRule(Guid id, CancellationToken ct) =>
+        catalog.ApplyPriceRuleAsync(id, ct);
+}
+
+// План общего участка ЖК своей организации (руководители): контур и зоны двора. На сайте — в GET /public/brand (sitePlan).
+[ApiController]
+[Route("api/v1/owner/site-plan")]
+[Authorize(Roles = Roles.Leaders)]
+[Produces("application/json")]
+public class SitePlanController(ICatalogService catalog) : ControllerBase
+{
+    [HttpGet]
+    [ProducesResponseType<Sitora.Domain.Entities.SitePlan>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<ActionResult<Sitora.Domain.Entities.SitePlan>> Get(CancellationToken ct) =>
+        await catalog.GetSitePlanAsync(ct) is { } plan ? plan : NoContent();
+
+    [HttpPut]
+    [ProducesResponseType<Sitora.Domain.Entities.SitePlan>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<Sitora.Domain.Entities.SitePlan>> Put(SaveSitePlanRequest request, CancellationToken ct) =>
+        await catalog.UpdateSitePlanAsync(request, ct) is { } plan ? plan : NoContent();
 }

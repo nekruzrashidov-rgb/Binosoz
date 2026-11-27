@@ -1,3 +1,4 @@
+using Sitora.Domain.Common;
 using System.Globalization;
 using Sitora.Domain.Entities;
 using Sitora.Domain.Enums;
@@ -35,7 +36,7 @@ public static class BuyerTexts
 
     public static string Date(DateOnly date) => date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
 
-    public static string Apt(string lang, int number) => L(lang, $"кв. №{number}", $"хонаи №{number}", $"apt. {number}");
+    public static string Apt(string lang, UnitRef unit) => unit.InText(lang);
 
     // Заголовок напоминания (колокольчик, тема письма).
     public static string ReminderTitle(string lang, string evt) => evt switch
@@ -46,7 +47,7 @@ public static class BuyerTexts
     };
 
     // Сам текст напоминания (без разметки): колокольчик, письмо, основа сообщения в Telegram.
-    public static string ReminderText(string lang, string evt, decimal amount, Currency currency, int apartment, DateOnly due, int overdueDays)
+    public static string ReminderText(string lang, string evt, decimal amount, Currency currency, UnitRef apartment, DateOnly due, int overdueDays)
     {
         var money = Money(amount, currency);
         var apt = Apt(lang, apartment);
@@ -122,40 +123,40 @@ public static class BuyerTexts
     public static string TelegramReminder(string lang, string evt, string text, string? cabinetUrl) =>
         $"{ReminderIcon(evt)} *{ReminderTitle(lang, evt)}*\n{TelegramMessages.Escape(text)}{Link(lang, cabinetUrl)}";
 
-    public static string BookingCreated(string lang, int apartment, DateTime expiresAtDushanbe, string? url) =>
+    public static string BookingCreated(string lang, UnitRef apartment, DateTime expiresAtDushanbe, string? url) =>
         L(lang, "🏠 *Бронь создана*\n", "🏠 *Брон сохта шуд*\n", "🏠 *Booking created*\n")
         + L(lang, $"Бронь {Apt(lang, apartment)} действует до {expiresAtDushanbe:dd.MM.yyyy HH:mm} (Душанбе).",
             $"Брони {Apt(lang, apartment)} то {expiresAtDushanbe:dd.MM.yyyy HH:mm} (Душанбе) амал мекунад.",
             $"The booking of {Apt(lang, apartment)} lasts until {expiresAtDushanbe:dd.MM.yyyy HH:mm} (Dushanbe).") + Link(lang, url);
 
-    public static string BookingExpiring(string lang, int apartment, DateTime expiresAtDushanbe, string? url) =>
+    public static string BookingExpiring(string lang, UnitRef apartment, DateTime expiresAtDushanbe, string? url) =>
         L(lang, "⏳ *Бронь скоро закончится*\n", "⏳ *Брон ба зудӣ тамом мешавад*\n", "⏳ *Booking ends soon*\n")
         + L(lang, $"Бронь {Apt(lang, apartment)} закончится {expiresAtDushanbe:dd.MM.yyyy} в {expiresAtDushanbe:HH:mm} (Душанбе). Продлить — напишите менеджеру.",
             $"Брони {Apt(lang, apartment)} {expiresAtDushanbe:dd.MM.yyyy} соати {expiresAtDushanbe:HH:mm} (Душанбе) тамом мешавад. Барои дароз кардан ба менеҷер нависед.",
             $"The booking of {Apt(lang, apartment)} ends on {expiresAtDushanbe:dd.MM.yyyy} at {expiresAtDushanbe:HH:mm} (Dushanbe). To extend it, write to the manager.") + Link(lang, url);
 
-    public static string BookingReleased(string lang, int apartment, string? url) =>
+    public static string BookingReleased(string lang, UnitRef apartment, string? url) =>
         L(lang, "🔓 *Бронь снята*\n", "🔓 *Брон бекор шуд*\n", "🔓 *Booking released*\n")
         + L(lang, $"Бронь {Apt(lang, apartment)} больше не действует.", $"Брони {Apt(lang, apartment)} дигар амал намекунад.",
             $"The booking of {Apt(lang, apartment)} is no longer active.") + Link(lang, url);
 
-    public static string DealStageChanged(string lang, int apartment, DealStage stage, string? url) =>
+    public static string DealStageChanged(string lang, UnitRef apartment, DealStage stage, string? url) =>
         L(lang, "📋 *Сделка: новый этап*\n", "📋 *Аҳд: марҳилаи нав*\n", "📋 *Deal: new stage*\n")
         + L(lang, $"По {Apt(lang, apartment)}: {StageName(lang, stage)}.", $"Барои {Apt(lang, apartment)}: {StageName(lang, stage)}.",
             $"For {Apt(lang, apartment)}: {StageName(lang, stage)}.") + Link(lang, url);
 
-    public static string PaymentReceived(string lang, int apartment, decimal amount, Currency currency, DateOnly paidAt, string? url) =>
+    public static string PaymentReceived(string lang, UnitRef apartment, decimal amount, Currency currency, DateOnly paidAt, string? url) =>
         L(lang, "✅ *Платёж принят*\n", "✅ *Пардохт қабул шуд*\n", "✅ *Payment received*\n")
         + L(lang, $"{Money(amount, currency)} по {Apt(lang, apartment)}, {Date(paidAt)}. Спасибо!",
             $"{Money(amount, currency)} барои {Apt(lang, apartment)}, {Date(paidAt)}. Ташаккур!",
             $"{Money(amount, currency)} for {Apt(lang, apartment)}, {Date(paidAt)}. Thank you!") + Link(lang, url);
 
-    public static string DocumentAdded(string lang, int apartment, string? url) =>
+    public static string DocumentAdded(string lang, UnitRef apartment, string? url) =>
         L(lang, "📄 *Новый документ*\n", "📄 *Ҳуҷҷати нав*\n", "📄 *New document*\n")
         + L(lang, $"В кабинете новый документ по {Apt(lang, apartment)}.", $"Дар кабинет ҳуҷҷати нав барои {Apt(lang, apartment)}.",
             $"A new document for {Apt(lang, apartment)} is in your account.") + Link(lang, url);
 
-    public static string ChatMessage(string lang, int apartment, string? url) =>
+    public static string ChatMessage(string lang, UnitRef apartment, string? url) =>
         L(lang, "💬 *Новое сообщение*\n", "💬 *Паёми нав*\n", "💬 *New message*\n")
         + L(lang, $"Менеджер написал вам по {Apt(lang, apartment)}.", $"Менеҷер ба шумо оид ба {Apt(lang, apartment)} навишт.",
             $"The manager wrote to you about {Apt(lang, apartment)}.") + Link(lang, url);

@@ -14,6 +14,10 @@ namespace Sitora.Infrastructure.Integrations;
 
 public class QuestPdfGenerator : IPdfGenerator
 {
+    // «Объект»: дом без блока — «Некруз Резиденс, этаж 5, кв. №1201» (как раньше); блок ЖК — «Блок A, кв. 45, этаж 5».
+    private static string ObjectLine(string building, int floor, int number, string? block, ApartmentKind kind) =>
+        block is null ? $"{building}, этаж {floor}, {UnitNames.Full(null, kind, number)}" : $"{UnitNames.Full(block, kind, number)}, этаж {floor}";
+
     // Пробел как разделитель разрядов и запятая для копеек, как принято в документах.
     private static readonly NumberFormatInfo MoneyFormat = new() { NumberGroupSeparator = " ", NumberDecimalSeparator = "," };
 
@@ -49,7 +53,7 @@ public class QuestPdfGenerator : IPdfGenerator
                 column.Item().Text(t =>
                 {
                     t.Span("Объект: ").SemiBold();
-                    t.Span($"{data.BuildingName}, этаж {data.FloorNumber}, кв. №{data.ApartmentNumber}");
+                    t.Span(ObjectLine(data.BuildingName, data.FloorNumber, data.ApartmentNumber, data.BlockCode, data.ApartmentKind));
                 });
                 column.Item().Text(t => { t.Span("Сделка: ").SemiBold(); t.Span(data.DealId.ToString()); });
                 column.Item().Text(t => { t.Span("Валюта договора: ").SemiBold(); t.Span(data.Currency.ToString()); });
@@ -317,7 +321,7 @@ public class QuestPdfGenerator : IPdfGenerator
         column.Item().Text(t =>
         {
             t.Span("Объект: ").SemiBold();
-            t.Span($"{deal.BuildingName}, этаж {deal.FloorNumber}, кв. №{deal.ApartmentNumber}");
+            t.Span(ObjectLine(deal.BuildingName, deal.FloorNumber, deal.ApartmentNumber, deal.BlockCode, deal.ApartmentKind));
         });
         column.Item().Text(t => { t.Span("Сделка: ").SemiBold(); t.Span(deal.DealId.ToString()); });
         column.Item().Text(t => { t.Span("Валюта договора: ").SemiBold(); t.Span(currency.ToString()); });

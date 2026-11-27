@@ -6,6 +6,7 @@ public interface IBrandService
 {
     // Бренд по хосту сайта (поддомен платформы или свой домен) или по короткому имени; 404, если такого нет.
     Task<PublicBrandResponse> GetPublicAsync(string? host, string? slug, CancellationToken ct = default);
+    Task<BrandResponse> SetLocationAsync(SaveOrganizationLocationRequest request, CancellationToken ct = default);
 
     Task<LogoFile> OpenLogoAsync(Guid organizationId, CancellationToken ct = default);
 

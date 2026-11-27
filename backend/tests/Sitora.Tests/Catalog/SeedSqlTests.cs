@@ -18,7 +18,7 @@ public class SeedSqlTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
         await using var connection = new NpgsqlConnection(factory.ConnectionString);
         await connection.OpenAsync();
         await using var tx = await connection.BeginTransactionAsync();
-        await ExecAsync(connection, tx, "UPDATE \"Buildings\" SET \"NameRu\" = 'Некруз Резиденс (сидер)' WHERE \"NameRu\" = 'Некруз Резиденс'");
+        await ExecAsync(connection, tx, "UPDATE \"Buildings\" SET \"NameRu\" = 'Rich Tower (сидер)' WHERE \"NameRu\" = 'Rich Tower'");
 
         // Демо-сделки «Зелёного эффекта» добавляются, если их ещё нет; уже выданные настоящие PDF (акт сверки
         // демо-покупателя) этому не мешают — новые PDF считаются сверх них.
@@ -31,7 +31,7 @@ public class SeedSqlTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
         await ExecAsync(connection, tx, sql);
 
         var buildingId = await ScalarAsync<Guid>(connection, tx,
-            $"SELECT \"Id\" FROM \"Buildings\" WHERE \"NameRu\" = 'Некруз Резиденс' AND \"OrganizationId\" = '{Organization.DefaultId}'");
+            $"SELECT \"Id\" FROM \"Buildings\" WHERE \"NameRu\" = 'Rich Tower' AND \"OrganizationId\" = '{Organization.DefaultId}'");
         Assert.Equal(20, await ScalarAsync<int>(connection, tx, $"SELECT \"FloorsCount\" FROM \"Buildings\" WHERE \"Id\" = '{buildingId}'"));
         Assert.Equal(21L, await ScalarAsync<long>(connection, tx, $"SELECT count(*) FROM \"Floors\" WHERE \"BuildingId\" = '{buildingId}'"));
         // Описание — без непроверенных оценок («бизнес-класс») и с переводом на таджикский.
@@ -94,10 +94,24 @@ public class SeedSqlTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
         Assert.True(await ScalarAsync<bool>(connection, tx, $"SELECT bool_and(b.\"ExpiresAt\" <= now() + interval '48 hours') {demoBookings}"));
         Assert.True(await ScalarAsync<long>(connection, tx, "SELECT count(*) FROM \"AuditLog\" WHERE \"Action\" = 'DemoBookingsRenewed'") >= 1);
 
-        // R-01: старое имя организации «Sitora» меняется на «Некруз Резиденс»; имя, заданное владельцем, не трогается.
-        await ExecAsync(connection, tx, $"UPDATE \"Organizations\" SET \"Name\" = 'Sitora' WHERE \"Id\" = '{Organization.DefaultId}'");
+        // Прежние имена организации «Sitora» и «Некруз Резиденс» меняются на «Rich Tower» (AuditLog Renamed); имя, заданное
+        // владельцем, не трогается.
+        foreach (var old in new[] { "Sitora", "Некруз Резиденс" })
+        {
+            var renamedBefore = await ScalarAsync<long>(connection, tx, "SELECT count(*) FROM \"AuditLog\" WHERE \"Entity\" = 'Organization' AND \"Action\" = 'Renamed'");
+            await ExecAsync(connection, tx, $"UPDATE \"Organizations\" SET \"Name\" = '{old}' WHERE \"Id\" = '{Organization.DefaultId}'");
+            await ExecAsync(connection, tx, sql);
+            Assert.Equal("Rich Tower", await ScalarAsync<string>(connection, tx, $"SELECT \"Name\" FROM \"Organizations\" WHERE \"Id\" = '{Organization.DefaultId}'"));
+            Assert.Equal(renamedBefore + 1, await ScalarAsync<long>(connection, tx,
+                "SELECT count(*) FROM \"AuditLog\" WHERE \"Entity\" = 'Organization' AND \"Action\" = 'Renamed'"));
+        }
+        // Дом со старым названием «Некруз Резиденс» тоже становится «Rich Tower».
+        await ExecAsync(connection, tx, $"UPDATE \"Buildings\" SET \"NameRu\" = 'Некруз Резиденс', \"NameEn\" = 'Nekruz Residence' WHERE \"Id\" = '{buildingId}'");
         await ExecAsync(connection, tx, sql);
-        Assert.Equal("Некруз Резиденс", await ScalarAsync<string>(connection, tx, $"SELECT \"Name\" FROM \"Organizations\" WHERE \"Id\" = '{Organization.DefaultId}'"));
+        var renamed = await RowAsync(connection, tx, $"SELECT \"NameRu\", \"NameEn\" FROM \"Buildings\" WHERE \"Id\" = '{buildingId}'");
+        Assert.Equal(("Rich Tower", "Rich Tower"), ((string)renamed[0], (string)renamed[1]));
+        Assert.True(await ScalarAsync<long>(connection, tx,
+            $"SELECT count(*) FROM \"AuditLog\" WHERE \"Entity\" = 'Building' AND \"EntityId\" = '{buildingId}' AND \"Action\" = 'Renamed'") >= 1);
         await ExecAsync(connection, tx, $"UPDATE \"Organizations\" SET \"Name\" = 'ЖК Свой' WHERE \"Id\" = '{Organization.DefaultId}'");
         await ExecAsync(connection, tx, sql);
         Assert.Equal("ЖК Свой", await ScalarAsync<string>(connection, tx, $"SELECT \"Name\" FROM \"Organizations\" WHERE \"Id\" = '{Organization.DefaultId}'"));
@@ -107,7 +121,7 @@ public class SeedSqlTests(SitoraApiFactory factory) : IClassFixture<SitoraApiFac
         await ExecAsync(connection, tx, sql);
         Assert.Equal(issuedBefore, await ScalarAsync<long>(connection, tx, "SELECT count(*) FROM \"IssuedPdfs\""));
         Assert.Equal(1L, await ScalarAsync<long>(connection, tx,
-            $"SELECT count(*) FROM \"Buildings\" WHERE \"NameRu\" = 'Некруз Резиденс' AND \"OrganizationId\" = '{Organization.DefaultId}'"));
+            $"SELECT count(*) FROM \"Buildings\" WHERE \"NameRu\" = 'Rich Tower' AND \"OrganizationId\" = '{Organization.DefaultId}'"));
 
         await tx.RollbackAsync();
     }

@@ -3,7 +3,7 @@
    '/api/v1' — the API on the same address as the site; on Vercel API_BASE_BY_HOST below points to Render.
    (The old in-browser demo backend is no longer loaded: frontend/tools/namunavi-malumot-mock.js.)
    ORG_SLUG: short name of the developer whose buildings and USD rate the public site shows
-   ('nekruz' is the default organization, «Некруз Резиденс»). Empty — buildings of all developers on the platform. */
+   ('nekruz' is the short name of the default organization; the complex's name comes from the API). Empty — buildings of all developers on the platform. */
 window.SITORA_CONFIG = {
   // The site served by the API itself (Render, Docker, dotnet run) talks to its own /api/v1: its CSP (connect-src 'self')
   // allows nothing else. The static copy on Vercel has no API of its own — see API_BASE_BY_HOST below.

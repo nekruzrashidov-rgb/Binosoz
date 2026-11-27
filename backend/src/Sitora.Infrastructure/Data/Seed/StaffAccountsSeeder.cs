@@ -13,7 +13,7 @@ namespace Sitora.Infrastructure.Data.Seed;
 // Менеджер отсюда — полноценный (demo-manager@binosoz.tj из DemoAccountsSeeder — только чтение и чат).
 // Пара секретов <PREFIX>_EMAIL и <PREFIX>_PASSWORD (GitHub Secrets → Actions → «Seed prod», локально — user-secrets);
 // нет пары — роль не создаётся. Повторный запуск не дублирует, а пароль приводит к значению из секрета (SeedPasswords).
-// Руководитель дома получает доступ к дому «Некруз Резиденс»; нет дома — пропускается (сначала seed.sql).
+// Руководитель дома получает доступ к дому «Rich Tower»; нет дома — пропускается (сначала seed.sql).
 // Почта занята пользователем другой роли или другой организации — ошибка (остальные роли всё равно обрабатываются).
 public static class StaffAccountsSeeder
 {
@@ -79,7 +79,7 @@ public static class StaffAccountsSeeder
         if (account.Role == RoleNames.ObjectAdmin)
         {
             buildingId = await db.Buildings.IgnoreQueryFilters()
-                .Where(b => b.OrganizationId == Organization.DefaultId && b.NameRu == CatalogSeeder.BuildingName)
+                .Where(b => b.OrganizationId == Organization.DefaultId && CatalogSeeder.BuildingNames.Contains(b.NameRu))
                 .Select(b => (Guid?)b.Id).FirstOrDefaultAsync();
             if (buildingId is null)
             {

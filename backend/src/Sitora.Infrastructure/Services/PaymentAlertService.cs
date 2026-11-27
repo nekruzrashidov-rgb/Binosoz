@@ -25,10 +25,13 @@ public class PaymentAlertService(AppDbContext db, TelegramAlertService telegram,
     public const string NoCabinet = "У покупателя нет входа в кабинет: напоминание некуда отправить";
 
     private record OpenItem(Guid DealId, DateOnly DueDate, decimal Left, Currency Currency, int Apartment,
-        string Customer, Guid? CustomerUserId, Guid BuildingId, Guid OrganizationId);
+        string Customer, Guid? CustomerUserId, Guid BuildingId, Guid OrganizationId, string? Block, ApartmentKind Kind)
+    {
+        public UnitRef Unit => new(Apartment, Block, Kind);
+    }
 
     private static PaymentNotice Notice(OpenItem i, int overdueDays) =>
-        new(i.DealId, i.DueDate, i.Left, i.Currency, i.Apartment, i.CustomerUserId, i.OrganizationId, overdueDays);
+        new(i.DealId, i.DueDate, i.Left, i.Currency, i.Unit, i.CustomerUserId, i.OrganizationId, overdueDays);
 
     // Пункты со сроком раньше сегодняшнего дня, оплаченные не полностью, по действующим сделкам.
     public async Task<int> NotifyOverdueAsync(CancellationToken ct = default)
@@ -45,7 +48,7 @@ public class PaymentAlertService(AppDbContext db, TelegramAlertService telegram,
             foreach (var accountant in accountants.Where(a => a.OrganizationId == i.OrganizationId
                                                                && (a.Buildings.Count == 0 || a.Buildings.Contains(i.BuildingId))))
                 staff.Add((New(accountant.Id, Notification.KindOverdue, i, "Просрочка по сделке",
-                    $"{i.Customer}, кв. №{i.Apartment}: {money} просрочено {days} дн."), TelegramMessages.Overdue(i.Customer, i.Apartment, i.Left, i.Currency, days)));
+                    $"{i.Customer}, {i.Unit.InText()}: {money} просрочено {days} дн."), TelegramMessages.Overdue(i.Customer, i.Unit, i.Left, i.Currency, days)));
         }
         var count = await SaveNewAsync(staff, "о просрочке", ct);
 
@@ -130,7 +133,8 @@ public class PaymentAlertService(AppDbContext db, TelegramAlertService telegram,
                         && i.Plan.Deal.Stage != DealStage.Cancelled && i.Plan.Deal.Stage != DealStage.Completed)
             .Select(i => new OpenItem(i.Plan.DealId, i.DueDate, i.AmountDue - i.AmountPaid, i.Plan.Deal.Currency,
                 i.Plan.Deal.Apartment.Number, i.Plan.Deal.Customer.FullName, i.Plan.Deal.Customer.UserId,
-                i.Plan.Deal.Apartment.Floor.BuildingId, i.Plan.Deal.Apartment.Floor.Building.OrganizationId));
+                i.Plan.Deal.Apartment.Floor.BuildingId, i.Plan.Deal.Apartment.Floor.Building.OrganizationId,
+                i.Plan.Deal.Apartment.Floor.Building.BlockCode, i.Plan.Deal.Apartment.Kind));
 
     private record Accountant(Guid Id, Guid OrganizationId, List<Guid> Buildings);
 

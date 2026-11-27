@@ -47,9 +47,9 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public Task<HttpClient> CreateContentClientAsync() => CreateClientForAsync(ContentEmail, ContentPassword);
     public Task<HttpClient> CreateAccountantClientAsync() => CreateClientForAsync(AccountantEmail, AccountantPassword);
 
-    // Свободная квартира из сидера, на которую нет открытой сделки.
+    // Свободная квартира прежнего дома сидера (не блока ЖК), на которую нет открытой сделки.
     public Task<Guid> FindFreeApartmentAsync() => WithDbAsync(db => db.Apartments
-        .Where(a => a.Status == ApartmentStatus.Free
+        .Where(a => a.Status == ApartmentStatus.Free && a.Floor.Building.BlockCode == null
                     && !db.Deals.Any(d => d.ApartmentId == a.Id && d.Stage != DealStage.Cancelled))
         .OrderBy(a => a.Floor.Number).ThenBy(a => a.Number)
         .Select(a => a.Id)
@@ -146,7 +146,7 @@ public class SitoraApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Seed:GreenDemo", "false");
         builder.UseSetting("Auth:SmsLoginEnabled", SmsLoginEnabled ? "true" : "false");
         // Второй застройщик из сидера разработки не нужен: изоляцию проверяют тесты со своими организациями.
-        builder.UseSetting("Seed:RichTower", "false");
+        builder.UseSetting("Seed:SecondBuilder", "false");
         // Код 123456 для любой почты (Development) выключен: тесты проверяют настоящие коды; режим проверяет DevFixedCodeTests.
         builder.UseSetting("Auth:DevFixedCodeForAnyEmail", "false");
         // Бот Telegram «настроен»: сам Telegram подменён FakeTelegramNotifier, в сеть ничего не уходит.

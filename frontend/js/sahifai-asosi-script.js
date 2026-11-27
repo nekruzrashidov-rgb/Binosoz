@@ -155,7 +155,7 @@
     const col = (title, ...items) => h('div', { class: 'foot-col' }, h('h2', null, title), ...items);
     return h('footer', { class: 'footer lux-footer' }, h('div', { class: 'wrap' },
       h('div', { class: 'foot-grid' },
-        h('div', { class: 'foot-brand' }, h('a', { class: 'row', href: '/', style: { gap: '12px' } }, S.towerLogo(), h('b', null, t('brand.name'))), h('p', null, t('foot.tagline')),
+        h('div', { class: 'foot-brand' }, h('a', { class: 'row', href: '/', style: { gap: '12px' } }, S.towerLogo(), h('b', { 'data-brand': '' }, S.brandName())), h('p', null, t('foot.tagline')),
           h('div', { class: 'foot-social' },
             c.telegram ? h('a', { class: 'soc tg', href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener', 'aria-label': 'Telegram', title: 'Telegram' }, landIcon('send')) : null,
             c.phone ? h('a', { class: 'soc wa', href: 'https://wa.me/' + phoneDigits(c.phone), target: '_blank', rel: 'noopener', 'aria-label': 'WhatsApp', title: 'WhatsApp' }, landIcon('chat')) : null,
@@ -164,8 +164,8 @@
           h('div', { class: 'foot-qr' }, h('img', { src: '/img/qr-binosoz.svg', alt: t('qr.alt'), width: 88, height: 88, loading: 'lazy' }), h('span', null, t('qr.open')))),
         col(t('foot.apts'), h('a', { href: '/apartments' }, t('foot.catalog')), h('a', { href: '/apartments#calc' }, t('foot.calc')), h('a', { href: '/apartments' }, t('foot.3d'))),
         col(t('foot.info'), h('a', { href: '/#why' }, t('foot.why')), h('a', { href: '/#steps' }, t('foot.steps')), h('a', { href: '/login' }, t('foot.cabinet'))),
-        col(t('foot.contacts'), h('span', null, c.address || ''), c.phone ? h('a', { href: 'tel:+' + phoneDigits(c.phone) }, c.phone) : null, c.telegram ? h('a', { href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, c.telegram) : null, h('a', { href: '/contact' }, t('foot.write')))),
-      h('div', { class: 'foot-bottom' }, h('span', null, '© ' + new Date().getFullYear() + ' ' + t('brand.name') + '. ' + t('footer.rights') + ' · ' + t('footer.platform')),
+        col(t('foot.contacts'), h('span', null, c.address || ''), S.map ? S.map.footerLink() : null, c.phone ? h('a', { href: 'tel:+' + phoneDigits(c.phone) }, c.phone) : null, c.telegram ? h('a', { href: telegramUrl(c.telegram), target: '_blank', rel: 'noopener' }, c.telegram) : null, h('a', { href: '/contact' }, t('foot.write')))),
+      h('div', { class: 'foot-bottom' }, h('span', null, '© ' + new Date().getFullYear() + ' ' + S.brandName() + '. ' + t('footer.rights') + ' · ' + t('footer.platform')),
         h('a', { class: 'foot-privacy', href: '/privacy' }, t('privacy.link')),
         h('span', { class: 'foot-dev' }, t('foot.dev') + ' ', h('a', { href: '/register' }, t('foot.devLink')))),
       h('p', { class: 'foot-demo' }, t('foot.demo'), frontendVersion())));
@@ -197,7 +197,9 @@
      passport and the whole list with filters. Every number comes from the API. ---------- */
   S.views.apartments = function (root) {
     const cfg = window.SITORA_CONFIG || {};
-    const st = { building: null, floors: [], apts: [], rate: null, sel: null, floor: null, floorRooms: 'all', rooms: 'all', maxPrice: 0, priceCap: 0, sort: 'price', onlyFree: true, shown: 12, time: 'dusk', calcApt: null };
+    const st = { building: null, blocks: null, floorsAll: [], blockSel: null, blockFilter: '', site: null, floors: [], apts: [], units: [], kind: '', rate: null, sel: null, floor: null, floorRooms: 'all', rooms: 'all', maxPrice: 0, priceCap: 0, sort: 'price', onlyFree: true, shown: 12, time: 'dusk', calcApt: null };
+    // The catalogue's currency: the apartments' own (the blocks of Rich Tower — USD), TJS without data.
+    const cur = () => (st.apts[0] && st.apts[0].currency) || 'TJS';
     let house = null, alive = true, full = null, wantFull = location.hash === '#3d', pushedFull = false;
     const page = h('div', { class: 'page-in nr nr-cat' });
     root.appendChild(page);
@@ -221,6 +223,8 @@
     const tip = h('div', { class: 'tip', hidden: true });
     const loading = h('div', { class: 'nr-stage-loading' }, t('hero.loading'));
     const rail = h('div', { class: 'nr-rail', role: 'group', 'aria-label': t('hero.floors') });
+    // «Весь ЖК / Блок A / B / C» — only for a complex of several blocks.
+    const blockSeg = h('div', { class: 'nr-seg nr-blocks', role: 'group', 'aria-label': t('blk.switch'), hidden: true });
     const timeSeg = h('div', { class: 'nr-seg', role: 'group', 'aria-label': t('hero.time') }, ['day', 'dusk', 'night'].map((k) => h('button', { type: 'button', 'aria-pressed': String(st.time === k), 'data-k': k,
       onclick: () => { st.time = k; house && house.setTime(k); S.$$('button', timeSeg).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === k))); } }, t('time.' + k))));
     const tools = h('div', { class: 'nr-model-tools' },
@@ -233,9 +237,9 @@
     const panel = h('div', { class: 'nr-floorpanel', 'aria-live': 'polite' });
     const stage = h('section', { class: 'nr-sec nr-stage-sec', id: 'hero-top' }, h('div', { class: 'nr-wrap nr-stage-grid' },
       h('div', { class: 'nr-model' },
-        h('div', { class: 'nr-model-head' }, h('span', { class: 'nr-model-title' }, t('nr.cat.model')), h('div', { class: 'nr-model-acts' }, timeSeg, open3d)),
+        h('div', { class: 'nr-model-head' }, h('span', { class: 'nr-model-title' }, t('nr.cat.model')), h('div', { class: 'nr-model-acts' }, blockSeg, timeSeg, open3d)),
         h('div', { class: 'nr-stage' }, houseBox, tip, loading, rail, tools),
-        legend),
+        legend, h('p', { class: 'nr-concept-note' }, t('viz.concept'))),
       panel));
     page.appendChild(stage);
 
@@ -261,15 +265,31 @@
         const bs = await S.api.buildings();
         if (!alive) return;
         if (!bs.length) { showEmpty('empty'); return; }
-        st.building = bs.find((b) => String(b.id) === String(cfg.DEFAULT_BUILDING_ID)) || bs[0];
-        S.siteBuildingId = st.building.id;
-        const full = await S.api.building(st.building.id).catch(() => st.building);
-        st.building = Object.assign({}, st.building, full);
-        st.floors = await S.api.floors(st.building.id);
-        const [apts, rate] = await Promise.all([S.api.allApartments(st.floors), S.api.rate().catch(() => null)]);
+        // A complex of blocks (buildings with a letter): all of them, in their order; otherwise one building as before.
+        const blocks = bs.filter((b) => b.blockCode && b.footprint).sort((a, b) => a.sortOrder - b.sortOrder);
+        const chosen = blocks.length ? blocks : [bs.find((b) => String(b.id) === String(cfg.DEFAULT_BUILDING_ID)) || bs[0]];
+        const loaded = await Promise.all(chosen.map(async (b) => {
+          const full = Object.assign({}, b, await S.api.building(b.id).catch(() => b));
+          const floors = (await S.api.floors(b.id)).map((f) => Object.assign(f, { block: b.blockCode || null }));
+          const units = (await S.api.allApartments(floors)).map((a) => Object.assign(a, { block: b.blockCode || null, blockName: b.blockCode ? full.name : null }));
+          return { b: full, floors, units };
+        }));
+        const [rate, brand, real] = await Promise.all([S.api.rate().catch(() => null), blocks.length ? S.api.publicBrand().catch(() => null) : null, S.api.publicLayouts().catch(() => [])]);
+        if (S.plans && S.plans.setReal) S.plans.setReal((real || []).map((x) => ({ code: x.code, layout: x.layout })));
         if (!alive) return;
+        st.blocks = loaded.map((x) => x.b);
+        st.building = st.blocks[0];
+        S.siteBuildingId = st.building.id;
+        st.floorsAll = loaded.flatMap((x) => x.floors);
+        st.blockSel = st.blocks[0].blockCode || null;
+        st.floors = st.floorsAll.filter((f) => f.block === st.blockSel);
+        st.site = brand && brand.sitePlan ? brand.sitePlan : null;
+        const apts = loaded.flatMap((x) => x.units);
         if (!apts.length) { showEmpty('empty'); return; }
-        st.apts = apts; st.rate = rate && rate.rate ? rate : null;
+        // st.apts — homes (apartments, penthouses): the model, the stats, the layouts, the calculator; st.units — everything,
+        // with the shops of floors 1–2 and the parking spaces of −1/−2 (the floor panel and the list's «Коммерция»/«Паркинг»).
+        st.units = apts; st.apts = apts.filter(S.isHome); st.rate = rate && rate.rate ? rate : null;
+        if (!st.apts.length && !apts.length) { showEmpty('empty'); return; }
         // The slider's ends are multiples of its step: max rounded up, min down — the right end keeps the dearest apartments.
         st.maxPrice = Math.ceil(Math.max(...apts.map((a) => a.price), 0) / PRICE_STEP) * PRICE_STEP;
         st.priceCap = st.maxPrice;
@@ -280,8 +300,9 @@
       if (!alive) return;
       loading.remove();
       // The floor with free apartments, the highest first (the best views); without free ones — the top floor.
-      const residential = st.floors.filter((f) => !f.commercial).map((f) => f.number).sort((a, b) => b - a);
-      st.floor = residential.find((n) => st.apts.some((a) => a.floor === n && a.status === 'free')) || residential[0] || null;
+      const residential = st.floors.filter((f) => !f.commercial && !f.parking).map((f) => f.number).sort((a, b) => b - a);
+      const inBlock = (a) => !st.blockSel || a.block === st.blockSel;
+      st.floor = residential.find((n) => st.apts.some((a) => inBlock(a) && a.floor === n && a.status === 'free')) || residential[0] || null;
       st.sel = firstFree(st.floor);
       const askedRooms = new URLSearchParams(location.search).get('rooms');
       if (askedRooms && roomOptions(st.apts).some(([v]) => v !== 'all' && v === askedRooms)) st.rooms = askedRooms;
@@ -291,7 +312,7 @@
       // /apartments#calc from the landing: the calculator exists only now, after the data.
       if (location.hash === '#calc') setTimeout(() => scrollTo('calc'), 100);
     }
-    const firstFree = (n) => st.apts.filter((a) => a.floor === n).sort((a, b) => a.number - b.number).find((a) => a.status === 'free') || null;
+    const firstFree = (n) => (st.units || st.apts).filter((a) => a.floor === n && (!st.blockSel || a.block === st.blockSel)).sort((a, b) => a.number - b.number).find((a) => a.status === 'free') || null;
 
     function initHouse() {
       // The 3D engine is loaded now (once): when the stage comes near the screen.
@@ -318,11 +339,11 @@
           floors: Math.max(...st.floors.map((f) => f.number), 1), time: st.time,
           onReady: () => setTimeout(() => { housePoster.remove(); houseWait.remove(); }, 400),
           onSelectApartment: modelSelect,
-          onSelectFloor: (n) => { if (n === null) return; selectFloor(n, true); },
+          onSelectFloor: (n, block) => { if (n === null) return; selectFloor(n, true, block); },
           onHover: (a, x, y) => {
             if (!a) { tip.hidden = true; return; }
             const apt = st.apts.find((z) => z.id === a.id) || a;
-            tip.replaceChildren(h('b', null, '№ ' + apt.number), ' · ' + S.fmt.rooms(apt.rooms) + ' · ' + S.fmt.area(apt.area) + ' · ' + t('status.' + apt.status));
+            tip.replaceChildren(h('b', null, S.aptShort(apt)), ' · ' + S.fmt.rooms(apt.rooms) + ' · ' + S.fmt.area(apt.area) + ' · ' + t('status.' + apt.status));
             tip.style.left = Math.min(x, houseBox.clientWidth - 260) + 'px'; tip.style.top = y + 'px'; tip.hidden = false;
           },
         });
@@ -356,7 +377,7 @@
       if (push && location.hash !== '#3d') { history.pushState({ h3d: 1 }, '', location.pathname + location.search + '#3d'); pushedFull = true; }
       full = S.House3DMode.open({
         house, box: houseBox, st, building: st.building, rate: st.rate, phone: cc.phone, selected: st.sel,
-        apts: () => st.apts, matches: passes, roomOptions,
+        apts: () => st.apts, units: () => st.units, matches: passes, roomOptions,
         onFilter: () => { st.shown = 12; renderApartments(); },
         onPick: (a) => pickApt(a, true),
         onModelSelect: modelSelect,
@@ -374,16 +395,25 @@
     const onPop = () => { if (location.hash === '#3d') openFull(false); else closeFull(); };
     window.addEventListener('popstate', onPop);
     function modelSelect(a) { const apt = st.apts.find((x) => x.id === a.id); if (apt) pickApt(apt, true); }
+    // The complex for the 3D model: the blocks with their outlines, places and setbacks, the site plan; null — one building.
+    function complexModel() {
+      if (!st.blocks || !st.blocks.some((b) => b.blockCode && b.footprint)) return null;
+      return { site: st.site, blocks: st.blocks.map((b) => ({ id: b.id, code: b.blockCode, name: b.name, footprint: b.footprint, position: b.sitePosition || { x: 0, y: 0, rotationDeg: 0 },
+        setbacks: b.setbacks || [], floors: b.floorsCount, elevators: b.elevators, amenities: b.amenities || [] })) };
+    }
     function pushToHouse() {
       if (!house) return;
-      house.setData(st.apts.map((a) => ({ id: a.id, floor: a.floor, planSlot: a.planSlot, number: a.number, status: a.status, rooms: a.rooms, area: a.area, price: a.price })));
-      if (st.sel) house.selectApartment(st.sel.id); else if (st.floor !== null) house.selectFloor(st.floor);
+      house.setData(st.units.map((a) => ({ id: a.id, block: a.block, floor: a.floor, planSlot: a.planSlot, number: a.number, status: a.status, rooms: a.rooms, area: a.area, price: a.price, kind: a.kind })), complexModel());
+      // In the full-screen 3D fresh data (late floors, a booking) only repaints: the camera stays on the block or the view the
+      // person chose (on a slow phone the apartments arrive seconds after the scene).
+      if (full) { if (st.sel) house.selectApartment(st.sel.id, false); return; }
+      if (st.sel) house.selectApartment(st.sel.id); else if (st.floor !== null) house.selectFloor(st.floor, st.blockSel);
     }
 
     // ---------- render ----------
     // Each block on its own: an error in one (logged) must not leave the calculator, layouts and list empty.
     function renderAll() {
-      [renderTopStats, renderRail, renderPanel, renderCalc, renderPlans, renderEco, renderApartments].forEach((fn) => {
+      [renderBlocks, renderTopStats, renderRail, renderPanel, renderCalc, renderPlans, renderEco, renderApartments].forEach((fn) => {
         try { fn(); } catch (e) { console.error('Каталог: блок ' + fn.name + ' не отрисован', e); if (S.logError) S.logError(e); }
       });
     }
@@ -392,8 +422,9 @@
       const prices = (free.length ? free : st.apts).map((a) => a.price).filter((p) => p > 0);
       const stat = (v, l) => h('div', null, h('dt', null, l), h('dd', null, v));
       topStats.replaceChildren(stat(S.fmt.n(free.length), t('wow.cat.free')),
-        prices.length ? stat(S.fmt.money(Math.min(...prices), 'TJS'), t('wow.cat.from')) : null,
-        stat(S.fmt.n(st.building.floorsCount || st.floors.length), t('wow.cat.floors')));
+        prices.length ? stat(S.fmt.money(Math.min(...prices), cur()), t('wow.cat.from')) : null,
+        stat(S.fmt.n(Math.max(...(st.blocks || [st.building]).map((b) => b.floorsCount || 0)) || st.floors.length), t('wow.cat.floors')),
+        st.blocks && st.blocks.length > 1 ? stat(S.fmt.n(st.blocks.length), t('blk.blocksN')) : null);
     }
     function renderEco() {
       const card = S.eco ? S.eco.block(st.building.eco, { demo: st.building.isDemo }) : null;
@@ -403,23 +434,42 @@
 
     // Floors on the right of the model, the top floor first; the number of free apartments under each.
     function renderRail() {
-      const free = (n) => st.apts.filter((a) => a.floor === n && a.status === 'free').length;
+      const free = (n) => st.units.filter((a) => a.floor === n && (!st.blockSel || a.block === st.blockSel) && a.status === 'free').length;
       rail.replaceChildren(...st.floors.slice().sort((a, b) => b.number - a.number).map((f) => {
         const c = free(f.number);
         return h('button', { type: 'button', class: 'nr-rail-btn' + (c ? '' : ' zero'), 'aria-pressed': String(st.floor === f.number),
-          'aria-label': f.commercial ? t('floor.commercial') : t('floor.n', { n: f.number }) + ', ' + t('floor.free', { n: c }), onclick: () => selectFloor(f.number) },
-        h('span', null, f.commercial ? t('nr.cat.comShort') : f.number));
+          'aria-label': (f.commercial ? t('floor.commercialN', { n: f.number }) : S.floorName(f)) + ', ' + t('floor.free', { n: c }), onclick: () => selectFloor(f.number) },
+        h('span', null, f.number === 0 ? t('nr.cat.comShort') : f.parking ? S.floorNo(f.number) : f.commercial ? f.number + t('nr.cat.comShort') : f.number));
       }));
       const on = S.$('[aria-pressed="true"]', rail);
       if (on && on.scrollIntoView && rail.scrollHeight > rail.clientHeight) on.scrollIntoView({ block: 'nearest' });
     }
-    function selectFloor(n, fromModel) {
+    function blockName(code) { const b = (st.blocks || []).find((x) => x.blockCode === code); return b ? b.name : t('blk.block', { c: code }); }
+    // The chosen block: its floors on the rail; the camera flies to it (null — the whole complex).
+    function selectBlock(code, fly) {
+      if (!st.blocks || st.blocks.length < 2) return;
+      st.blockSel = code || st.blocks[0].blockCode;
+      st.floors = st.floorsAll.filter((f) => f.block === st.blockSel);
+      if (!st.floors.some((f) => f.number === st.floor)) st.floor = (st.floors.filter((f) => !f.commercial && !f.parking).map((f) => f.number).sort((a, b) => b - a)[0]) || null;
+      st.sel = st.floor != null ? firstFree(st.floor) : null;
+      if (house && fly !== false) { house.focusBlock(code); if (st.floor != null) house.selectFloor(st.floor, st.blockSel); }
+      renderBlocks(); renderRail(); renderPanel(); syncCalc();
+    }
+    function renderBlocks() {
+      if (!st.blocks || st.blocks.length < 2) { blockSeg.hidden = true; return; }
+      blockSeg.hidden = false;
+      blockSeg.replaceChildren(...[[null, t('blk.all')]].concat(st.blocks.map((b) => [b.blockCode, b.name])).map(([c, l]) =>
+        h('button', { type: 'button', 'data-block': c || 'all', 'aria-pressed': String(c ? st.blockSel === c && !st.wholeComplex : !!st.wholeComplex), onclick: () => { st.wholeComplex = !c; if (c) selectBlock(c); else { renderBlocks(); if (house) house.focusBlock(null); } } }, l)));
+    }
+    function selectFloor(n, fromModel, block) {
+      if (block && block !== st.blockSel) { st.blockSel = block; st.floors = st.floorsAll.filter((f) => f.block === block); st.wholeComplex = false; renderBlocks(); }
       st.floor = n; st.floorRooms = 'all';
       st.sel = firstFree(n);
-      if (house && !fromModel) { if (st.sel) house.selectApartment(st.sel.id); else house.selectFloor(n); }
+      if (house && !fromModel) { if (st.sel) house.selectApartment(st.sel.id); else house.selectFloor(n, st.blockSel); }
       renderRail(); renderPanel(); syncCalc();
     }
     function pickApt(a, fromModel) {
+      if (a.block && a.block !== st.blockSel) { st.blockSel = a.block; st.floors = st.floorsAll.filter((f) => f.block === a.block); st.wholeComplex = false; renderBlocks(); }
       st.sel = a; st.floor = a.floor;
       if (house && !fromModel) house.selectApartment(a.id);
       renderRail(); renderPanel(); syncCalc();
@@ -436,46 +486,64 @@
     function renderPanel() {
       const f = st.floor, fl = st.floors.find((x) => x.number === f);
       if (f === null || !fl) { panel.replaceChildren(h('p', { class: 'nr-panel-hint' }, t('nr.cat.pickHint'))); return; }
-      if (fl.commercial) {
+      // The old commercial floor 0 without premises in the catalogue: a request to the manager.
+      if (fl.commercial && !st.units.some((a) => a.floor === f)) {
         panel.replaceChildren(h('div', { class: 'nr-panel-head' }, h('div', null, h('div', { class: 'nr-kicker' }, t('nr.cat.selFloor')), h('h2', { class: 'nr-panel-floor' }, t('floor.commercial')))),
           h('p', { class: 'nr-lead' }, t('floor.commercialText')),
           h('button', { class: 'btn nr-btn nr-btn--primary', type: 'button', onclick: () => leadModal(t('lead.commercial')) }, t('lead.send')));
         return;
       }
-      const onFloor = st.apts.filter((a) => a.floor === f).sort((a, b) => a.number - b.number);
+      const onFloor = st.units.filter((a) => a.floor === f && (!st.blockSel || a.block === st.blockSel)).sort((a, b) => a.number - b.number);
       const free = onFloor.filter((a) => a.status === 'free').length;
       const match = (a) => S.roomsKind.match(a, st.floorRooms);
       const units = onFloor.filter(match);
-      const pills = h('div', { class: 'nr-pills', role: 'group', 'aria-label': t('filter.rooms') }, roomOptions(onFloor).map(([v, l]) =>
+      const homes = onFloor.every(S.isHome);
+      const blk = (st.blocks || []).find((b) => b.blockCode === st.blockSel);
+      let floorPlan = null;
+      if (blk && blk.footprint && f > 0 && onFloor.length) {
+        const cv = h('canvas', { class: 'nr-block-floor', width: 360, height: 220, role: 'img', 'aria-label': t('plans.blockFloor', { b: blk.name, n: f }) });
+        floorPlan = h('div', { class: 'nr-block-floor-box' }, cv, h('p', { class: 'nr-plan-note' }, t('plans.blockFloorNote')));
+        const byslot = onFloor.slice().sort((x, y) => (x.planSlot || 0) - (y.planSlot || 0));
+        requestAnimationFrame(() => {
+          const hit = drawBlockFloor(cv, blk, f, byslot, st.sel && st.sel.id);
+          if (hit) cv.addEventListener('click', (e) => { const r = cv.getBoundingClientRect(); const a = hit((e.clientX - r.left) * (360 / r.width), (e.clientY - r.top) * (220 / r.height)); if (a) pickApt(a); });
+        });
+      }
+      const pills = !homes ? null : h('div', { class: 'nr-pills', role: 'group', 'aria-label': t('filter.rooms') }, roomOptions(onFloor).map(([v, l]) =>
         h('button', { type: 'button', class: 'nr-pill', 'aria-pressed': String(st.floorRooms === v), onclick: () => { st.floorRooms = v; renderPanel(); } }, l)));
       const list = h('div', { class: 'nr-units' }, units.map((a) => h('button', { type: 'button', class: 'nr-unit st-' + a.status, 'aria-pressed': String(!!st.sel && st.sel.id === a.id), onclick: () => pickApt(a) },
-        h('span', { class: 'nr-unit-top' }, h('b', null, t('nr.cat.aptN', { n: a.number })), h('span', { class: 'nr-unit-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status))),
-        h('span', { class: 'nr-unit-type' }, S.roomsKind.label(a.rooms)),
+        h('span', { class: 'nr-unit-top' }, h('b', null, S.unitName(a)), h('span', { class: 'nr-unit-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status))),
+        h('span', { class: 'nr-unit-type' }, S.unitType(a)),
         h('span', { class: 'nr-unit-meta' }, S.fmt.area(a.area)),
-        h('span', { class: 'nr-unit-price' }, S.fmt.money(a.price, 'TJS')))));
+        h('span', { class: 'nr-unit-price' }, S.fmt.money(a.price, cur())))));
       panel.replaceChildren(
         h('div', { class: 'nr-panel-head' },
-          h('div', null, h('div', { class: 'nr-kicker' }, t('nr.cat.selFloor')), h('h2', { class: 'nr-panel-floor' }, t('floor.n', { n: f }))),
-          h('div', { class: 'nr-panel-free' }, t('nr.cat.freeOf', { n: S.fmt.n(free), m: S.fmt.n(onFloor.length) }))),
-        pills, units.length ? list : h('p', { class: 'nr-panel-hint' }, t('nr.cat.noUnits')),
+          h('div', null, h('div', { class: 'nr-kicker' }, (st.blockSel ? blockName(st.blockSel) + ' · ' : '') + (fl.parking ? t('floor.parking') : fl.commercial ? t('floor.commercial') : t('nr.cat.selFloor'))), h('h2', { class: 'nr-panel-floor' }, S.floorName(fl))),
+          h('div', { class: 'nr-panel-free' }, t('nr.cat.freeOf', { n: S.fmt.n(free), m: S.fmt.n(onFloor.length) }),
+            st.building.elevators ? h('small', { class: 'nr-panel-lifts' }, t('nr.cat.lifts', { n: st.building.elevators })) : null)),
+        floorPlan, pills, units.length ? list : h('p', { class: 'nr-panel-hint' }, t('nr.cat.noUnits')),
         st.sel && st.sel.floor === f ? detail(st.sel) : h('p', { class: 'nr-panel-hint' }, t('nr.cat.pickHint')));
     }
     // The chosen apartment: its plan, the facts, the price, «от … в месяц» by the developer's terms, booking.
     function detail(a) {
-      const plan = h('canvas', { class: 'nr-detail-plan', width: 300, height: 200, role: 'img', 'aria-label': S.roomsKind.label(a.rooms) });
-      drawFloorPlan(plan, S.roomsKind.group(a.rooms));
-      const eq = st.rate ? Math.round(a.price / st.rate.rate) : null;
+      const plan = S.isHome(a) ? h('canvas', { class: 'nr-detail-plan', width: 300, height: 200, role: 'img', 'aria-label': S.roomsKind.label(a.rooms) }) : null;
+      const lay = plan ? drawFloorPlan(plan, S.roomsKind.group(a.rooms), a.area, a.layoutCode, { areas: true }) : null;
+      const planNote = lay ? h('p', { class: 'nr-plan-note' }, (lay.exact ? '' : t('plans.inexact') + ' · ') + (lay.real ? t('plans.real') : t('viz.concept'))) : null;
+      const eq = S.priceEq(a.price, a.currency, st.rate);
       const m = cheapestMonthly(a.price);
       const badge = S.eco && S.eco.badge(st.building.eco);
-      return h('div', { class: 'nr-detail' }, h('div', { class: 'nr-detail-pic' }, plan),
+      return h('div', { class: 'nr-detail' + (plan ? '' : ' nr-detail--unit') }, plan ? h('div', { class: 'nr-detail-pic' }, plan, planNote) : null,
         h('div', { class: 'nr-detail-body' },
-          h('div', { class: 'nr-detail-kicker' }, t('nr.cat.aptN', { n: a.number }) + ' · ' + t('floor.n', { n: a.floor })),
-          h('h3', { class: 'nr-detail-type' }, S.roomsKind.label(a.rooms)),
-          h('dl', { class: 'nr-detail-facts' }, h('div', null, h('dt', null, t('nr.cat.area')), h('dd', null, S.fmt.area(a.area))), h('div', null, h('dt', null, t('nr.cat.sqm')), h('dd', null, S.fmt.money(sqmPrice(a), 'TJS')))),
+          h('div', { class: 'nr-detail-kicker' }, S.unitName(a) + ' · ' + S.floorName({ number: a.floor, parking: a.floor < 0 })),
+          h('h3', { class: 'nr-detail-type' }, S.unitType(a), a.kind === 'penthouse' ? h('span', { class: 'chip warn nr-badge-ph' }, t('kind.penthouseOne')) : null),
+          h('dl', { class: 'nr-detail-facts' }, h('div', null, h('dt', null, t('nr.cat.area')), h('dd', null, S.fmt.area(a.area))), a.kind === 'parking' ? null : h('div', null, h('dt', null, t('nr.cat.sqm')), h('dd', null, S.fmt.money(sqmPrice(a), cur()))),
+            a.terraceArea ? h('div', null, h('dt', null, t('unit.terrace')), h('dd', null, S.fmt.area(a.terraceArea))) : null,
+            a.kind === 'penthouse' ? h('div', null, h('dt', null, t('unit.ceiling')), h('dd', null, t('unit.ceilingEst', { h: String(S.PENTHOUSE_CEILING).replace('.', ',') }))) : null),
+          a.terraceArea ? h('p', { class: 'nr-detail-note' }, t('unit.terraceNote')) : null,
           h('div', { class: 'nr-detail-label' }, t('nr.cat.price')),
-          h('div', { class: 'nr-detail-price' }, S.fmt.money(a.price, 'TJS')),
-          eq ? h('div', { class: 'nr-detail-note' }, '≈ $' + S.fmt.n(eq) + ' · ' + t('price.estimate')) : null,
-          m ? h('div', { class: 'nr-detail-month' }, t('nr.cat.perMonth', { s: S.fmt.money(m.monthly, 'TJS') }), h('small', null, t('nr.cat.perMonthNote', { d: S.fmt.n(m.down), t: termText(m.months) }))) : null,
+          h('div', { class: 'nr-detail-price' }, S.fmt.money(a.price, cur())),
+          eq ? h('div', { class: 'nr-detail-note' }, eq + ' · ' + t('price.estimate')) : null,
+          m ? h('div', { class: 'nr-detail-month' }, t('nr.cat.perMonth', { s: S.fmt.money(m.monthly, cur()) }), h('small', null, t('nr.cat.perMonthNote', { d: S.fmt.n(m.down), t: termText(m.months) }))) : null,
           badge ? h('a', { href: '#eco', class: 'eco-badge-link', onclick: (e) => { e.preventDefault(); scrollTo('eco'); } }, badge) : null,
           a.status === 'free'
             ? h('button', { class: 'btn nr-btn nr-btn--primary block', type: 'button', onclick: () => bookModal(a) }, t('book.cta'))
@@ -492,7 +560,7 @@
       const form = h('form', { class: 'stack', novalidate: true }, S.field(t('f.name'), name), S.field(t('f.phone'), phone, t('f.phoneHint')), h('p', { class: 'hint' }, t('book.note')), S.privacyNote());
       const btn = h('button', { class: 'btn gold', type: 'submit' }, t('book.confirm'));
       form.id = 'bookform'; btn.setAttribute('form', 'bookform');
-      const md = S.modal({ title: t('book.title', { n: a.number }), body: [h('div', { class: 'card flat', style: { marginBottom: '14px' } }, h('div', { class: 'row between' }, h('b', null, t('apt.title', { n: a.number })), S.fmt.money(a.price, 'TJS')), h('div', { class: 'muted' }, t('floor.n', { n: a.floor }) + ' · ' + S.fmt.rooms(a.rooms) + ' · ' + S.fmt.area(a.area))), form], actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
+      const md = S.modal({ title: t('book.title', { n: a.number }), body: [h('div', { class: 'card flat', style: { marginBottom: '14px' } }, h('div', { class: 'row between' }, h('b', null, t('apt.title', { n: a.number })), S.fmt.money(a.price, cur())), h('div', { class: 'muted' }, t('floor.n', { n: a.floor }) + ' · ' + S.fmt.rooms(a.rooms) + ' · ' + S.fmt.area(a.area))), form], actions: [h('button', { class: 'btn ghost', type: 'button', onclick: () => md.close() }, t('common.cancel')), btn] });
       form.addEventListener('submit', async (e) => {
         e.preventDefault(); S.showErrors(form, null);
         if (!namePhoneOk(form, name, phone)) return;
@@ -505,7 +573,7 @@
         });
       });
     }
-    async function refreshApts() { try { st.apts = await S.api.allApartments(st.floors); pushToHouse(); renderPanel(); renderRail(); renderApartments(); renderTopStats(); if (full) full.refresh(); } catch (e) { /* ignore */ } }
+    async function refreshApts() { try { const byB = {}; (st.blocks || []).forEach((b) => { byB[b.blockCode] = b.name; }); st.units = (await S.api.allApartments(st.floorsAll.length ? st.floorsAll : st.floors)).map((a) => { const f = (st.floorsAll || []).find((x) => x.id === a.floorId); return Object.assign(a, { block: f ? f.block : null, blockName: f && f.block ? byB[f.block] : null }); }); st.apts = st.units.filter(S.isHome); pushToHouse(); renderPanel(); renderRail(); renderApartments(); renderTopStats(); if (full) full.refresh(); } catch (e) { /* ignore */ } }
 
     function leadModal(preset, aptId) {
       const name = S.input('name', { placeholder: t('f.namePh'), autocomplete: 'name' });
@@ -543,10 +611,10 @@
       function draw() {
         const down = Math.round(price * cs.down / 100), months = cs.years * 12;
         monthlyNow = Math.round((price - down) / months);
-        out.down.textContent = cs.down + '% · ' + S.fmt.money(down, 'TJS');
+        out.down.textContent = cs.down + '% · ' + S.fmt.money(down, cur());
         out.years.textContent = counted(cs.years, 'nr.yearsN');
-        out.monthly.textContent = S.fmt.money(monthlyNow, 'TJS');
-        out.note.textContent = (a ? t('nr.cat.calcFor', { n: a.number, p: S.fmt.money(price, 'TJS') }) + ' · ' : '') + (x && x.zero ? t('nr.cat.zero') : t('nr.calc.totalAsk'));
+        out.monthly.textContent = S.fmt.money(monthlyNow, cur());
+        out.note.textContent = (a ? t('nr.cat.calcFor', { n: a.number, p: S.fmt.money(price, cur()) }) + ' · ' : '') + (x && x.zero ? t('nr.cat.zero') : t('nr.calc.totalAsk'));
       }
       const utilHost = h('div', { class: 'util-host' });
       const send = h('button', { class: 'btn nr-btn nr-btn--primary', type: 'button', onclick: () => leadModal(t('lead.calc', { p: S.fmt.n(price), d: cs.down, m: cs.years * 12, mo: S.fmt.n(monthlyNow) }), a && a.id) }, t('calc.send'));
@@ -575,7 +643,7 @@
           h('div', { class: 'nr-layout-pic' }, canvas),
           h('div', { class: 'nr-layout-body' },
             h('div', { class: 'nr-layout-top' }, h('span', { class: 'nr-layout-type' }, typeLabel), h('span', { class: 'nr-layout-area' }, (lo === hi ? S.fmt.n(lo) : S.fmt.n(lo) + '–' + S.fmt.n(hi)) + ' ' + t('u.m2'))),
-            h('div', { class: 'nr-layout-bottom' }, prices.length ? h('span', { class: 'nr-layout-price' }, t('home.chip.from', { p: S.fmt.money(Math.min(...prices), 'TJS') })) : h('span'),
+            h('div', { class: 'nr-layout-bottom' }, prices.length ? h('span', { class: 'nr-layout-price' }, t('home.chip.from', { p: S.fmt.money(Math.min(...prices), cur()) })) : h('span'),
               h('span', { class: 'nr-layout-more' }, t('nr.look'), arrow()))));
       }).filter(Boolean);
       plansSection.hidden = !cards.length;
@@ -591,10 +659,12 @@
       return [['all', t('filter.all')]].concat(S.roomsKind.types.filter((g) => list.some((a) => S.roomsKind.group(a.rooms) === g)).map((g) => [String(g), S.roomsKind.pill(g)]));
     }
     function filtered() {
-      let l = st.apts.slice();
+      let l = (st.kind === 'commercial' ? st.units.filter((a) => a.kind === 'commercial') : st.kind === 'parking' ? st.units.filter((a) => a.kind === 'parking')
+        : st.kind === 'penthouse' ? st.apts.filter((a) => a.kind === 'penthouse') : st.apts).slice();
       if (st.onlyFree) l = l.filter((a) => a.status === 'free');
-      if (st.rooms !== 'all') l = l.filter((a) => S.roomsKind.match(a, st.rooms));
-      if (st.priceCap) l = l.filter((a) => a.price <= st.priceCap);
+      if (st.blockFilter) l = l.filter((a) => a.block === st.blockFilter);
+      if (st.rooms !== 'all' && (!st.kind || st.kind === 'penthouse')) l = l.filter((a) => S.roomsKind.match(a, st.rooms));
+      if (st.priceCap && (!st.kind || st.kind === 'penthouse')) l = l.filter((a) => a.price <= st.priceCap);
       const cls = st.building && st.building.eco && st.building.eco.energyClass;
       if (cls && st.minClass && st.minClass !== 'any' && S.eco.rank(cls) > S.eco.rank(st.minClass)) l = [];
       const s = { price: (a, b) => a.price - b.price, priceDesc: (a, b) => b.price - a.price, area: (a, b) => b.area - a.area, floor: (a, b) => b.floor - a.floor }[st.sort];
@@ -603,8 +673,8 @@
     function renderApartments() {
       const rooms = roomOptions(st.apts);
       const minP = Math.floor(Math.min(...st.apts.map((a) => a.price)) / PRICE_STEP) * PRICE_STEP;
-      const price = h('input', { type: 'range', id: 'f-price', min: minP, max: st.maxPrice, step: PRICE_STEP, value: st.priceCap, oninput: (e) => { st.priceCap = +e.target.value; priceVal.textContent = S.fmt.money(st.priceCap, 'TJS'); st.shown = 12; drawList(); } });
-      const priceVal = h('b', null, S.fmt.money(st.priceCap, 'TJS'));
+      const price = h('input', { type: 'range', id: 'f-price', min: minP, max: st.maxPrice, step: PRICE_STEP, value: st.priceCap, oninput: (e) => { st.priceCap = +e.target.value; priceVal.textContent = S.fmt.money(st.priceCap, cur()); st.shown = 12; drawList(); } });
+      const priceVal = h('b', null, S.fmt.money(st.priceCap, cur()));
       const sort = S.select('sort', [['price', t('sort.price')], ['priceDesc', t('sort.priceDesc')], ['area', t('sort.area')], ['floor', t('sort.floor')]], st.sort); sort.addEventListener('change', () => { st.sort = sort.value; drawList(); });
       const grid = h('div', { class: 'nr-unit-grid', id: 'apt-grid' });
       const more = h('div', { class: 'nr-more' });
@@ -616,7 +686,8 @@
       }
       aptSection.replaceChildren(h('div', { class: 'nr-wrap' },
         h('div', { class: 'nr-head-row' }, h('div', null, kicker(t('nr.cat.allKicker')), h('h2', { class: 'nr-h2' }, t('apts.title'))), count),
-        h('div', { class: 'nr-filters' },
+        kindPills(), blockPills(),
+        h('div', { class: 'nr-filters', hidden: !!st.kind && st.kind !== 'penthouse' },
           h('div', { class: 'nr-filter' }, h('span', { class: 'nr-filter-label', id: 'f-rooms' }, t('filter.rooms')), h('div', { class: 'nr-pills', role: 'group', 'aria-labelledby': 'f-rooms' }, rooms.map(([v, l]) => h('button', { type: 'button', class: 'nr-pill', 'aria-pressed': String(st.rooms === v), onclick: (e) => { st.rooms = v; st.shown = 12; S.$$('.nr-pill', e.currentTarget.parentNode).forEach((p) => p.setAttribute('aria-pressed', String(p === e.currentTarget))); drawList(); } }, l)))),
           h('div', { class: 'nr-filter nr-range' }, h('div', { class: 'nr-range-top' }, h('label', { for: 'f-price' }, t('filter.priceTo')), priceVal), price),
           h('div', { class: 'nr-filter' }, S.field(t('filter.sort'), sort)),
@@ -624,6 +695,20 @@
           h('label', { class: 'check nr-filter nr-check' }, h('input', { type: 'checkbox', checked: st.onlyFree, onchange: (e) => { st.onlyFree = e.target.checked; st.shown = 12; drawList(); } }), t('filter.onlyFree'))),
         grid, more));
       drawList();
+    }
+    // The list by block: «Все блоки / A / B / C» for a complex.
+    function blockPills() {
+      if (!st.blocks || st.blocks.length < 2) return null;
+      return h('div', { class: 'nr-pills nr-block-pills', role: 'group', 'aria-label': t('blk.filter') }, [['', t('blk.allBlocks')]].concat(st.blocks.map((b) => [b.blockCode, b.name])).map(([v, l]) =>
+        h('button', { type: 'button', class: 'nr-pill', 'aria-pressed': String((st.blockFilter || '') === v), 'data-block': v || 'all', onclick: () => { st.blockFilter = v; st.shown = 12; renderApartments(); } }, l)));
+    }
+    // Kinds of premises in the list: shown only when the API has shops or parking spaces.
+    function kindPills() {
+      const has = (k) => st.units.some((a) => a.kind === k);
+      if (!has('commercial') && !has('parking') && !has('penthouse')) return null;
+      const opts = [['', t('kind.homes')]].concat(has('penthouse') ? [['penthouse', t('kind.penthouse')]] : []).concat(has('commercial') ? [['commercial', t('kind.commercial')]] : []).concat(has('parking') ? [['parking', t('kind.parking')]] : []);
+      return h('div', { class: 'nr-pills nr-kinds', role: 'group', 'aria-label': t('kind.label') }, opts.map(([v, l]) =>
+        h('button', { type: 'button', class: 'nr-pill', 'aria-pressed': String((st.kind || '') === v), 'data-kind': v || 'homes', onclick: () => { st.kind = v; st.shown = 12; renderApartments(); } }, l)));
     }
     function ecoFilter() {
       const cls = st.building && st.building.eco && st.building.eco.energyClass;
@@ -635,14 +720,14 @@
     // A card of the list: the plan of its type, status and floor, number, type, area, price; it opens the apartment on the model.
     function renderCard(a) {
       const plan = h('canvas', { class: 'nr-unit-plan', width: 320, height: 180, 'aria-hidden': 'true' });
-      drawFloorPlan(plan, S.roomsKind.group(a.rooms));
+      if (S.isHome(a)) drawFloorPlan(plan, S.roomsKind.group(a.rooms));
       return h('button', { class: 'nr-unit-card', type: 'button', onclick: () => { pickApt(a); scrollTo('home'); } },
         h('span', { class: 'nr-unit-card-pic' }, plan),
         h('span', { class: 'nr-unit-card-body' },
-          h('span', { class: 'nr-unit-top' }, h('b', null, t('nr.cat.aptN', { n: a.number })), h('span', { class: 'nr-unit-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status))),
-          h('span', { class: 'nr-unit-type' }, S.roomsKind.label(a.rooms)),
-          h('span', { class: 'nr-unit-meta' }, t('floor.n', { n: a.floor }) + ' · ' + S.fmt.area(a.area) + ' · ' + S.fmt.n(sqmPrice(a)) + ' TJS / ' + t('u.m2')),
-          h('span', { class: 'nr-unit-price' }, S.fmt.money(a.price, 'TJS'))));
+          h('span', { class: 'nr-unit-top' }, h('b', null, S.unitName(a)), h('span', { class: 'nr-unit-st' }, h('i', { class: 'nr-dot ' + a.status }), t('status.' + a.status))),
+          h('span', { class: 'nr-unit-type' }, S.unitType(a), a.kind === 'penthouse' ? h('span', { class: 'chip warn nr-badge-ph' }, t('kind.penthouseOne')) : null),
+          h('span', { class: 'nr-unit-meta' }, (a.blockName ? a.blockName + ' · ' : '') + S.floorName({ number: a.floor, parking: a.floor < 0 }) + ' · ' + S.fmt.area(a.area) + (a.kind === 'parking' ? '' : ' · ' + S.fmt.money(sqmPrice(a), a.currency) + ' / ' + t('u.m2'))),
+          h('span', { class: 'nr-unit-price' }, S.fmt.money(a.price, cur()))));
     }
 
     function scrollTo(id) { const el = document.getElementById(id === 'home' ? 'hero-top' : id); if (el) el.scrollIntoView({ behavior: S.motionOk === false ? 'auto' : 'smooth', block: 'start' }); }
@@ -652,7 +737,7 @@
     return () => { alive = false; window.removeEventListener('popstate', onPop); if (full) { full.close(); full = null; } if (house) { house.destroy(); if (window.__house3d === house) delete window.__house3d; } };
   };
 
-  /* ---------- landing (design «Некруз Резиденс», docs/design/Main.dc.html) ----------
+  /* ---------- landing (design docs/design/Main.dc.html) ----------
      Everything that is a fact about the house comes from the API: name, floors, apartments, free ones, prices, year,
      description, amenities, eco passport, installment terms. Without the data a block is not shown; without a building —
      one honest card «Продажи скоро откроются». The pictures are renders of the site's 3D model, signed as such. */
@@ -694,6 +779,8 @@
     const c = contacts();
     // state: 'loading' → 'ready' (a building with apartments) | 'empty' (no building or no apartments yet) | 'error'.
     const d = { state: 'loading', b: null, apts: [], types: [] };
+    // Prices in the apartments' own currency (the blocks of Rich Tower — USD).
+    const lcur = () => (d.apts[0] && d.apts[0].currency) || 'TJS';
     let alive = true;
     const page = h('div', { class: 'page-in nr nr-home' });
     root.appendChild(page);
@@ -701,8 +788,13 @@
     // 1. Hero: the render of the 3D model on the whole width, the name, two actions and a band of live numbers.
     const heroKicker = h('div', { class: 'nr-kicker nr-kicker--light' });
     const heroTitle = fromShell('heroTitle') || h('h1', { class: 'nr-hero-title' });
+    heroTitle.setAttribute('data-brand', '');
     const heroSub = fromShell('heroSub') || h('p', { class: 'nr-hero-sub' });
     heroSub.textContent = t('nr.hero.sub');
+    // «Rich Tower — 3 блока» from the API (the brand's published blocks); hidden for one building.
+    const heroBlocks = h('p', { class: 'nr-hero-blocks', hidden: true });
+    const drawBlocksLine = () => { const l = S.blocksLine(); heroBlocks.hidden = !l; heroBlocks.textContent = l || ''; };
+    drawBlocksLine(); if (S.bus) S.bus.on('brand', drawBlocksLine);
     const heroStats = h('dl', { class: 'nr-hero-stats', hidden: true });
     // A demo building (isDemo): its numbers are marked as demo data right under the buttons (A-04).
     const heroDemo = h('p', { class: 'nr-hero-demo', hidden: true }, h('span', { class: 'demo-badge' }, t('demo.badge')), ' ', t('nr.hero.demoNote'));
@@ -711,7 +803,7 @@
         h('figcaption', { class: 'nr-render-note' }, t('nr.render'))),
       h('div', { class: 'nr-hero-shade', 'aria-hidden': 'true' }),
       h('div', { class: 'nr-wrap nr-hero-in' },
-        h('div', { class: 'nr-hero-text' }, heroKicker, heroTitle, heroSub,
+        h('div', { class: 'nr-hero-text' }, heroKicker, heroTitle, heroSub, heroBlocks,
           h('div', { class: 'nr-actions' },
             h('a', { class: 'btn nr-btn nr-btn--primary', href: '/apartments' }, t('wow.hero.pick'), arrow()),
             h('a', { class: 'btn nr-btn nr-btn--light', href: '/apartments#3d' }, t('wow.hero.3d'))), heroDemo),
@@ -771,7 +863,9 @@
     const soonHost = h('div', { class: 'nr-wrap nr-soon', hidden: true });
     // «Зелёный эффект Binosoz» — real counters from the API; hidden when there is nothing to show.
     const green = S.eco ? S.eco.impactSection() : null;
-    page.append(hero, soonHost, about, why, layouts, visuals, green, plan, steps, contactBand, siteFooter());
+    // «Как добраться» — before «Остались вопросы?»; hidden without an address and a point.
+    const mapSec = S.map ? h('section', { class: 'nr-sec nr-map-sec', id: 'map' }, h('div', { class: 'nr-wrap' }, kicker(t('map.kicker')), h('h2', { class: 'nr-h2' }, t('map.title')), S.map.block({ size: 'band' }))) : null;
+    page.append(hero, soonHost, about, why, layouts, visuals, green, plan, steps, mapSec, contactBand, siteFooter());
     renderData(); renderCall();
     const stopReveal = revealIn(page);
 
@@ -779,7 +873,7 @@
       const b = d.b, ready = d.state === 'ready';
       const year = b && b.completionYear;
       heroKicker.replaceChildren(h('span', { class: 'nr-kicker-line', 'aria-hidden': 'true' }), year ? t('nr.hero.kicker', { y: year }) : t('nr.hero.city'));
-      heroTitle.textContent = S.brandName(b && b.name);
+      heroTitle.textContent = S.brandName();
       // Live numbers: floors, apartments, free now, year of completion — each only when the API has it.
       const free = d.apts.filter((a) => a.status === 'free').length;
       const stat = (v, label) => h('div', { class: 'nr-stat' }, h('dt', null, label), h('dd', null, v));
@@ -835,7 +929,7 @@
       return h('a', { class: 'nr-layout', href: '/apartments?rooms=' + x.rooms }, h('div', { class: 'nr-layout-pic' }, planCanvas),
         h('div', { class: 'nr-layout-body' },
           h('div', { class: 'nr-layout-top' }, h('span', { class: 'nr-layout-type' }, x.label), h('span', { class: 'nr-layout-area' }, area + ' ' + t('u.m2'))),
-          h('div', { class: 'nr-layout-bottom' }, h('span', { class: 'nr-layout-price' }, t('home.chip.from', { p: S.fmt.money(x.priceFrom, 'TJS') })),
+          h('div', { class: 'nr-layout-bottom' }, h('span', { class: 'nr-layout-price' }, t('home.chip.from', { p: S.fmt.money(x.priceFrom, lcur()) })),
             h('span', { class: 'nr-layout-more' }, t('nr.look'), arrow()))));
     }
     // Installment: the terms on the left, on the right the calculator over the prices of the free apartments.
@@ -863,11 +957,11 @@
       };
       function draw() {
         const down = Math.round(st.price * st.down / 100), months = st.years * 12;
-        out.price.textContent = S.fmt.money(st.price, 'TJS');
-        out.down.textContent = st.down + '% · ' + S.fmt.money(down, 'TJS');
+        out.price.textContent = S.fmt.money(st.price, lcur());
+        out.down.textContent = st.down + '% · ' + S.fmt.money(down, lcur());
         out.years.textContent = counted(st.years, 'plan.years');
-        out.monthly.textContent = S.fmt.money(Math.round((st.price - down) / months), 'TJS');
-        out.total.textContent = terms.zero ? t('nr.calc.totalZero', { s: S.fmt.money(st.price, 'TJS') }) : t('nr.calc.totalAsk');
+        out.monthly.textContent = S.fmt.money(Math.round((st.price - down) / months), lcur());
+        out.total.textContent = terms.zero ? t('nr.calc.totalZero', { s: S.fmt.money(st.price, lcur()) }) : t('nr.calc.totalAsk');
       }
       const calc = h('div', { class: 'nr-calc', id: 'calc' }, h('div', { class: 'nr-calc-title' }, t('nr.calc.title')),
         range('nr-price', t('nr.calc.price'), lo, hi, step, 'price'),
@@ -957,11 +1051,7 @@
           ? h('div', { class: 'ct-card ct-hours' }, h('span', { class: 'ct-ic' }, landIcon('clock')), h('div', null, h('small', null, t('ct.hours')),
             h('dl', null, schedule.map(([day, time]) => [h('dt', null, t('day.' + day)), h('dd', { class: time ? '' : 'off' }, time || t('day.off'))]))))
           : null),
-      // A map card: the office address on a stylised city plan.
-      // Not role="img": the card holds a link (axe nested-interactive, A-18); the address is read as text, the pin is decoration.
-      h('div', { class: 'ct-map' },
-        h('div', { class: 'ct-map-pin', 'aria-hidden': 'true' }, landIcon('pin')), h('b', null, t('ct.city') + ', ' + (c.address || '').replace(/^(г\.\s*|ш\.\s*)?Душанбе,\s*/, '').replace(/,\s*Dushanbe$/, '')),
-        h('a', { class: 'btn nr-btn nr-btn--primary', href: 'https://www.openstreetmap.org/search?query=' + encodeURIComponent(c.address || ''), target: '_blank', rel: 'noopener' }, t('ct.route'), arrow())));
+      null);
 
     // Above the form — straight to the messengers; under it — why it is safe to write.
     const formHost = h('div');
@@ -998,7 +1088,9 @@
     const faq = h('section', { class: 'nr-sec nr-band', id: 'faq' }, h('div', { class: 'nr-wrap nr-faq-wrap' },
       kicker(t('nr.faq.kicker')), h('h2', { class: 'nr-h2' }, t('faq.title')), faqList,
       h('p', { class: 'nr-note' }, t('faq.sub'))));
-    page.append(head, h('section', { class: 'nr-sec nr-ct' }, h('div', { class: 'nr-wrap ct-split' }, left, right)), faq, siteFooter());
+    // The map of the complex: the address and the point from the API (S.map), loaded from Google only after a click.
+    const mapSec = S.map ? h('section', { class: 'nr-sec nr-map-sec', id: 'map' }, h('div', { class: 'nr-wrap' }, S.map.block({ size: 'large' }))) : null;
+    page.append(head, h('section', { class: 'nr-sec nr-ct' }, h('div', { class: 'nr-wrap ct-split' }, left, right)), mapSec, faq, siteFooter());
 
     // Floating labels: the label sits in the field and moves up when the field has focus or a value.
     const fl = (field, label, req) => h('label', { class: 'fl' }, field, h('span', null, label + (req ? ' *' : '')), h('em', { class: 'fl-err' }));
@@ -1194,52 +1286,111 @@
   // The price of a square metre the buyer actually pays: price / area, rounded to a somoni (A-27). The stored price per m²
   // can differ from it when the total price was rounded; without an area or a price — the stored one.
   const sqmPrice = (a) => (a.area > 0 && a.price > 0 ? Math.round(a.price / a.area) : a.pricePerSqm);
-  // An architect's plan as in the design: walls in the ink colour on the paper of the card, windows and the balcony in copper,
-  // doors as gaps with a thin swing, room names in the middle. The rooms, doors and windows come from S.plans
-  // (planirovki-data.js) — the same layout the 3D model builds inside; with the area the plan is scaled to it.
+  // An architect's plan as in the design: walls in the ink colour on the paper of the card (outer thicker than the ones
+  // between rooms), windows and the balcony in copper, doors as gaps with a thin swing, room names (and m²) in the middle.
+  // The rooms are polygons from S.plans (planirovki-data.js) — the same layout the 3D model builds inside; a concept layout is
+  // scaled to the area; a real one with rooms off the API's area by more than 3 % shows no m² («уточняйте у менеджера»).
   // Colours come from the page tokens, so the plan follows the light and the dark theme; sharp on high-density screens.
-  function drawFloorPlan(canvas, type, area) {
-    const W = +canvas.getAttribute('width'), H = +canvas.getAttribute('height'), dpr = Math.min(window.devicePixelRatio || 1, 2);
+  function drawFloorPlan(canvas, type, area, code, o) {
+    o = o || {};
+    // The size in CSS px is kept in data-w/h: canvas.width grows with the pixel ratio, a redraw must not grow it again.
+    if (!canvas.dataset.w) { canvas.dataset.w = canvas.getAttribute('width'); canvas.dataset.h = canvas.getAttribute('height'); }
+    const W = +canvas.dataset.w, H = +canvas.dataset.h, dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = W * dpr; canvas.height = H * dpr;
-    const g = canvas.getContext('2d'); if (!g || !S.plans) return;
+    const g = canvas.getContext('2d'); if (!g || !S.plans) return null;
     g.scale(dpr, dpr);
     const css = getComputedStyle(canvas.isConnected ? canvas : document.documentElement);
     const tok = (n, f) => (css.getPropertyValue(n) || '').trim() || f;
-    const paper = tok('--surface', '#fbf8f2'), room = tok('--bg', '#f4efe7'), ink = tok('--ink', '#1b1815'), copper = tok('--accent-text', '#8a4e2a');
+    const paper = tok('--surface', '#fbf8f2'), room = tok('--bg', '#f4efe7'), ink = tok('--ink', '#1b1815'), copper = tok('--accent-text', '#8a4e2a'), muted = tok('--muted', '#6b6258');
     g.fillStyle = paper; g.fillRect(0, 0, W, H);
-    const lay = S.plans.layout(type, area);
-    const top = lay.balcony.y, spanY = lay.d - top, pad = 12;
-    const s = Math.min((W - pad * 2) / lay.w, (H - pad * 2) / spanY);
-    const ox = (W - lay.w * s) / 2, oy = (H - spanY * s) / 2 - top * s;
+    const lay = S.plans.layout(type, area, code);
+    const all = lay.outline.concat(lay.balcony ? lay.balcony.poly : []);
+    const xs = all.map((p) => p.x), ys = all.map((p) => p.y), x0 = Math.min(...xs), y0 = Math.min(...ys), spanX = Math.max(...xs) - x0, spanY = Math.max(...ys) - y0, pad = 12;
+    const s = Math.min((W - pad * 2) / spanX, (H - pad * 2) / spanY);
+    const ox = (W - spanX * s) / 2 - x0 * s, oy = (H - spanY * s) / 2 - y0 * s;
     const X = (x) => ox + x * s, Y = (y) => oy + y * s;
-    g.font = '600 10.5px Manrope, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    lay.rooms.forEach((r) => { g.fillStyle = room; g.fillRect(X(r.x), Y(r.y), r.w * s, r.h * s); });
-    // The balcony: a dashed copper outline, as in the design.
-    const b = lay.balcony;
-    g.setLineDash([5, 4]); g.strokeStyle = copper; g.lineWidth = 1.5; g.strokeRect(X(b.x) + 1, Y(b.y) + 1, b.w * s - 2, b.h * s - 1); g.setLineDash([]);
-    g.strokeStyle = ink; g.lineWidth = 2.5; g.lineCap = 'square';
-    S.plans.walls(lay).forEach(([x1, y1, x2, y2]) => { g.beginPath(); g.moveTo(X(x1), Y(y1)); g.lineTo(X(x2), Y(y2)); g.stroke(); });
+    const path = (poly) => { g.beginPath(); poly.forEach((p, i) => (i ? g.lineTo(X(p.x), Y(p.y)) : g.moveTo(X(p.x), Y(p.y)))); g.closePath(); };
+    lay.rooms.forEach((r) => { path(r.poly); g.fillStyle = room; g.fill(); });
+    // The balcony / loggia / terrace: a dashed copper outline.
+    if (lay.balcony) { path(lay.balcony.poly); g.setLineDash([5, 4]); g.strokeStyle = copper; g.lineWidth = 1.5; g.stroke(); g.setLineDash([]); }
+    // Walls with their thickness: outer 0.4 m, between apartments 0.2 m, between rooms 0.12 m (not thinner than a hairline).
+    g.strokeStyle = ink; g.lineCap = 'square';
+    S.plans.walls(lay).forEach(([x1, y1, x2, y2, , kind]) => {
+      g.lineWidth = Math.max(kind === 'inner' ? 1.2 : 2, S.plans.THICK[kind] * s);
+      g.beginPath(); g.moveTo(X(x1), Y(y1)); g.lineTo(X(x2), Y(y2)); g.stroke();
+    });
     // Door swings: a quarter circle from one side of the opening.
     g.lineWidth = 0.8; g.lineCap = 'butt';
     lay.doors.forEach((d) => {
       if (d.open) return;
-      const r = (d.to - d.from) * s;
-      g.beginPath();
-      if (d.axis === 'x') { g.moveTo(X(d.from), Y(d.at)); g.arc(X(d.from), Y(d.at), r, 0, d.entrance ? -Math.PI / 2 : Math.PI / 2, d.entrance); }
-      else { g.moveTo(X(d.at), Y(d.from)); g.arc(X(d.at), Y(d.from), r, Math.PI / 2, 0, true); }
-      g.stroke();
+      const r = Math.hypot(d.b.x - d.a.x, d.b.y - d.a.y) * s, a0 = Math.atan2(d.b.y - d.a.y, d.b.x - d.a.x);
+      g.beginPath(); g.moveTo(X(d.a.x), Y(d.a.y)); g.arc(X(d.a.x), Y(d.a.y), r, a0, a0 + (d.entrance ? -Math.PI / 2 : Math.PI / 2), !!d.entrance); g.stroke();
     });
     // Windows: thick copper strokes on the facade.
     g.strokeStyle = copper; g.lineWidth = 4;
-    lay.windows.forEach((w) => { g.beginPath(); g.moveTo(X(w.from), Y(0)); g.lineTo(X(w.to), Y(0)); g.stroke(); });
+    lay.windows.forEach((w) => { g.beginPath(); g.moveTo(X(w.a.x), Y(w.a.y)); g.lineTo(X(w.b.x), Y(w.b.y)); g.stroke(); });
     const fit = (label, ww) => (label.length * 6 > ww - 6 ? label.slice(0, Math.max(3, Math.floor((ww - 6) / 6) - 1)) + '.' : label);
+    g.font = '600 10.5px Manrope, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     lay.rooms.forEach((r) => {
-      if (r.part) return;
       const ww = r.w * s, hh = r.h * s;
-      g.fillStyle = ink;
-      if (ww > 30 && hh > 18) g.fillText(fit(t('plans.room.' + r.key), ww), X(r.x) + ww / 2, Y(r.y) + hh / 2);
+      if (ww < 30 || hh < 18) return;
+      g.fillStyle = ink; g.fillText(fit(t('plans.room.' + r.key), ww), X(r.label.x), Y(r.label.y) - (o.areas && lay.exact ? 6 : 0));
+      if (o.areas && lay.exact && hh > 30) { g.fillStyle = muted; g.fillText(S.fmt.n(Math.round(r.area * 10) / 10) + ' ' + t('u.m2'), X(r.label.x), Y(r.label.y) + 7); }
     });
-    if (b.w * s > 36 && b.h * s > 12) { g.fillStyle = copper; g.fillText(fit(t('plans.room.balcony'), b.w * s), X(b.x) + b.w * s / 2, Y(b.y) + b.h * s / 2); }
+    if (lay.balcony && lay.balcony.w * s > 36 && lay.balcony.h * s > 12) {
+      const b = lay.balcony; g.fillStyle = copper; g.fillText(fit(t('plans.room.' + (b.kind === 'terrace' ? 'terrace' : b.kind === 'loggia' ? 'loggia' : 'balcony')), b.w * s), X(b.x + b.w / 2), Y(b.y + b.h / 2));
+    }
+    canvas.dataset.vertices = String(Math.max(...lay.rooms.map((r) => r.poly.length)));
+    canvas.dataset.exact = String(lay.exact);
+    return lay;
+  }
+
+  // The floor of a block: the outline, the apartments (or shops) laid along the facade — each a polygon coloured by its
+  // status, the chosen one outlined —, the corridor and the lift core with its lifts. The same split as the 3D windows
+  // (S.geom.floor). Returns the hit test (x, y in CSS px → the unit) for clicks.
+  function drawBlockFloor(canvas, block, n, units, selId) {
+    if (!S.geom || !block || !block.footprint) return null;
+    // The size in CSS px is kept in data-w/h: canvas.width grows with the pixel ratio, a redraw must not grow it again.
+    if (!canvas.dataset.w) { canvas.dataset.w = canvas.getAttribute('width'); canvas.dataset.h = canvas.getAttribute('height'); }
+    const W = +canvas.dataset.w, H = +canvas.dataset.h, dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    const g = canvas.getContext('2d'); if (!g) return null;
+    g.scale(dpr, dpr);
+    const css = getComputedStyle(canvas.isConnected ? canvas : document.documentElement);
+    const tok = (k, f) => (css.getPropertyValue(k) || '').trim() || f;
+    const col = { free: tok('--good', '#2e7d5b'), booked: tok('--warn', '#b7791f'), sold: tok('--muted', '#6b6258'), onrequest: tok('--info', '#3b6ea8') };
+    g.fillStyle = tok('--surface', '#fbf8f2'); g.fillRect(0, 0, W, H);
+    const fp = S.geom.footprintOf(block, n);
+    let depth = 7; (block.setbacks || []).forEach((s) => { if (n >= s.fromFloor && s.planDepth) depth = s.planDepth; });
+    const plan = S.geom.floor(fp, units.map((u) => u.area || 1), { depth, lifts: block.elevators || 0 });
+    const outline = S.geom.expand(fp), b = S.geom.bounds(outline), pad = 10;
+    const s = Math.min((W - pad * 2) / (b.x1 - b.x0), (H - pad * 2) / (b.y1 - b.y0));
+    const ox = (W - (b.x1 - b.x0) * s) / 2 - b.x0 * s, oy = (H - (b.y1 - b.y0) * s) / 2 - b.y0 * s;
+    const X = (x) => ox + x * s, Y = (y) => oy + y * s;
+    const path = (poly) => { g.beginPath(); poly.forEach((p, i) => (i ? g.lineTo(X(p.x), Y(p.y)) : g.moveTo(X(p.x), Y(p.y)))); g.closePath(); };
+    path(plan.corridor); g.fillStyle = tok('--surface-2', '#efe8dc'); g.fill();
+    plan.units.forEach((u, k) => {
+      const a = units[k]; path(u.poly);
+      g.globalAlpha = 0.32; g.fillStyle = col[a && a.status] || col.free; g.fill(); g.globalAlpha = 1;
+      g.lineWidth = a && a.id === selId ? 3 : 1.2; g.strokeStyle = a && a.id === selId ? tok('--accent-text', '#8a4e2a') : tok('--ink', '#1b1815'); g.stroke();
+      if (a) {
+        const c = u.poly.reduce((acc, p) => ({ x: acc.x + p.x / u.poly.length, y: acc.y + p.y / u.poly.length }), { x: 0, y: 0 });
+        g.fillStyle = tok('--ink', '#1b1815'); g.font = '700 11px Manrope, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText(String(a.number), X(c.x), Y(c.y));
+      }
+    });
+    path(outline); g.lineWidth = 2.4; g.strokeStyle = tok('--ink', '#1b1815'); g.stroke();
+    // The lift core: the shafts and the stairs.
+    path(plan.core.poly); g.fillStyle = tok('--muted', '#6b6258'); g.fill();
+    plan.core.lifts.forEach((r) => { path(r); g.fillStyle = tok('--surface', '#fbf8f2'); g.fill(); });
+    canvas.dataset.units = String(plan.units.length);
+    canvas.dataset.vertices = String(Math.max(...plan.units.map((u) => u.poly.length)));
+    canvas.dataset.lifts = String(plan.core.lifts.length);
+    return (px, py) => {
+      const p = { x: (px - ox) / s, y: (py - oy) / s };
+      const k = plan.units.findIndex((u) => S.geom.contains(u.poly, p));
+      return k >= 0 ? units[k] : null;
+    };
   }
 
   // For the other public pages (about.js, gallery.js): the same footer, reveal on scroll, icons and headings.
@@ -1249,7 +1400,7 @@
     const page = document.body && document.body.dataset.page;
     if (!['home', 'apartments', 'about', 'gallery', 'contact'].includes(page) || document.querySelector('script[type="application/ld+json"]')) return;
     const c = contacts();
-    const name = t('brand.name');
+    const name = S.brandName();
     const address = c.address ? { '@type': 'PostalAddress', streetAddress: c.address, addressLocality: 'Душанбе', addressCountry: 'TJ' } : undefined;
     const data = { '@context': 'https://schema.org', '@graph': [
       { '@type': 'Organization', '@id': location.origin + '/#org', name, url: location.origin + '/', logo: location.origin + '/favicon.svg', telephone: c.phone || undefined, address },
@@ -1258,5 +1409,5 @@
     const el = document.createElement('script'); el.type = 'application/ld+json'; el.textContent = JSON.stringify(data);
     document.head.appendChild(el);
   })();
-  S.site = { footer: siteFooter, reveal: revealIn, icon: landIcon, accentFirst, contacts, drawFloorPlan, building: siteBuilding, galleryPhotos: GALLERY_PHOTOS, galleryImg, galleryCredit, renderImg, kicker: (x) => kicker(x), arrow: () => arrow(), amenIcon: (k) => AMEN_ICON[k] || 'check' };
+  S.site = { footer: siteFooter, reveal: revealIn, icon: landIcon, accentFirst, contacts, drawFloorPlan, drawBlockFloor, building: siteBuilding, galleryPhotos: GALLERY_PHOTOS, galleryImg, galleryCredit, renderImg, kicker: (x) => kicker(x), arrow: () => arrow(), amenIcon: (k) => AMEN_ICON[k] || 'check' };
 })();

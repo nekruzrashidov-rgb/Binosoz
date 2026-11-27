@@ -14,7 +14,7 @@ public class StatementService(AppDbContext db, IPdfGenerator pdf, TimeProvider t
         db.Deals.AsNoTracking()
             .Where(d => d.Id == dealId)
             .Select(d => new DealHeader(d.Id, d.Apartment.Floor.Building.NameRu, d.Apartment.Floor.Number,
-                d.Apartment.Number, d.Customer.FullName))
+                d.Apartment.Number, d.Customer.FullName, d.Apartment.Floor.Building.BlockCode, d.Apartment.Kind))
             .SingleAsync(ct);
 
     public async Task<StatementData> BuildAsync(Guid dealId, DateOnly asOf, CancellationToken ct)
@@ -49,7 +49,9 @@ public class StatementService(AppDbContext db, IPdfGenerator pdf, TimeProvider t
             paid,
             Math.Max(accrued - paid, 0),
             plan.Total - paid,
-            payments);
+            payments,
+            deal.BlockCode,
+            deal.ApartmentKind);
     }
 
     public byte[] Render(StatementData data) => pdf.RenderStatement(data);

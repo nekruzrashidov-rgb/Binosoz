@@ -10,6 +10,7 @@ public static class BuildingAmenities
         "guest_parking",       // гостевая парковка
         "closed_yard",         // закрытый двор без машин
         "playground",          // детская площадка
+        "football_field",      // мини-футбольное поле во дворе
         "sports_ground",       // спортивная площадка
         "security",            // охрана
         "cctv",                // видеонаблюдение
@@ -17,6 +18,7 @@ public static class BuildingAmenities
         "elevators",           // лифты
         "landscaping",         // озеленение двора
         "commercial_floor",    // коммерческий первый этаж (магазины, кафе)
+        "commercial",          // коммерческие помещения (магазины) на нижних этажах
         "storage_rooms",       // кладовые
         "barrier_free",        // безбарьерная среда
         "fitness",             // фитнес-зал

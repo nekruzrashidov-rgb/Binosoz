@@ -163,6 +163,9 @@ namespace Sitora.Infrastructure.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<Guid>("BuildingId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -173,6 +176,17 @@ namespace Sitora.Infrastructure.Data.Migrations
 
                     b.Property<Guid>("FloorId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Residential");
+
+                    b.Property<string>("LayoutCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<string>("Model3dId")
                         .HasMaxLength(100)
@@ -200,6 +214,10 @@ namespace Sitora.Infrastructure.Data.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<decimal?>("TerraceArea")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -214,9 +232,21 @@ namespace Sitora.Infrastructure.Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("IX_Apartments_FloorId_PlanSlot");
 
+                    b.HasIndex(new[] { "BuildingId", "Number" }, "IX_Apartments_BuildingId_Number_Commercial")
+                        .IsUnique()
+                        .HasFilter("\"Kind\" = 'Commercial'");
+
+                    b.HasIndex(new[] { "BuildingId", "Number" }, "IX_Apartments_BuildingId_Number_Home")
+                        .IsUnique()
+                        .HasFilter("\"Kind\" IN ('Residential', 'Penthouse')");
+
+                    b.HasIndex(new[] { "BuildingId", "Number" }, "IX_Apartments_BuildingId_Number_Parking")
+                        .IsUnique()
+                        .HasFilter("\"Kind\" = 'Parking'");
+
                     b.ToTable("Apartments", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Apartments_PlanSlot", "\"PlanSlot\" BETWEEN 0 AND 7");
+                            t.HasCheckConstraint("CK_Apartments_PlanSlot", "\"PlanSlot\" BETWEEN 0 AND 99");
                         });
                 });
 
@@ -463,6 +493,14 @@ namespace Sitora.Infrastructure.Data.Migrations
                         .HasColumnType("text[]")
                         .HasDefaultValueSql("'{}'::text[]");
 
+                    b.Property<string>("BlockCode")
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)");
+
+                    b.Property<decimal?>("CommercialPricePerM2")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<int?>("CompletionYear")
                         .HasColumnType("integer");
 
@@ -481,12 +519,23 @@ namespace Sitora.Infrastructure.Data.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
+                    b.Property<int?>("ElevatorsCount")
+                        .HasColumnType("integer");
+
                     b.Property<decimal?>("FloorHeight")
                         .HasPrecision(4, 2)
                         .HasColumnType("numeric(4,2)");
 
                     b.Property<int>("FloorsCount")
                         .HasColumnType("integer");
+
+                    b.Property<string>("Footprint")
+                        .HasColumnType("jsonb");
+
+                    b.Property<bool>("IsPublished")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<decimal?>("Latitude")
                         .HasPrecision(9, 6)
@@ -517,8 +566,37 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("ParkingSpotPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("PenthousePricePerM2")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<int?>("PlannedApartments")
                         .HasColumnType("integer");
+
+                    b.Property<string>("PriceCurrency")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasDefaultValue("TJS");
+
+                    b.Property<string>("PriceSteps")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Setbacks")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("SitePosition")
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("SortOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1223,6 +1301,43 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.ToTable("IssuedPdfs", (string)null);
                 });
 
+            modelBuilder.Entity("Sitora.Domain.Entities.Layout", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Json")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId", "Code")
+                        .IsUnique();
+
+                    b.ToTable("Layouts", (string)null);
+                });
+
             modelBuilder.Entity("Sitora.Domain.Entities.Lead", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1527,6 +1642,10 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<decimal?>("Latitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)");
+
                     b.Property<string>("LogoContentType")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -1538,6 +1657,10 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Property<string>("LogoUrl")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<decimal?>("Longitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -1551,6 +1674,9 @@ namespace Sitora.Infrastructure.Data.Migrations
                     b.Property<string>("PrimaryColor")
                         .HasMaxLength(7)
                         .HasColumnType("character varying(7)");
+
+                    b.Property<string>("SitePlan")
+                        .HasColumnType("jsonb");
 
                     b.Property<string>("Slug")
                         .IsRequired()
@@ -2507,6 +2633,17 @@ namespace Sitora.Infrastructure.Data.Migrations
                         .HasForeignKey("DealId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Sitora.Domain.Entities.Layout", b =>
+                {
+                    b.HasOne("Sitora.Domain.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Organization");
                 });
 
             modelBuilder.Entity("Sitora.Domain.Entities.Lead", b =>

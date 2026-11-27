@@ -60,6 +60,8 @@ public static class DependencyInjection
             .BindConfiguration(ClaudeOptions.SectionName);
         services.AddOptions<BrandOptions>()
             .BindConfiguration(BrandOptions.SectionName);
+        services.AddOptions<MapsOptions>()
+            .BindConfiguration(MapsOptions.SectionName);
         services.AddOptions<BookingOptions>()
             .BindConfiguration(BookingOptions.SectionName);
         services.AddOptions<EmailOptions>()
@@ -105,6 +107,7 @@ public static class DependencyInjection
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<ApartmentImporter>();
         services.AddScoped<ICatalogService, CatalogService>();
+        services.AddScoped<LayoutService>();
         services.AddScoped<IGreenService, GreenService>();
         services.AddScoped<IInstallmentService, InstallmentService>();
         services.AddScoped<PdfIssueRecorder>();

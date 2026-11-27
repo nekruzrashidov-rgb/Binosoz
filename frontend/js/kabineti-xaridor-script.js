@@ -11,7 +11,7 @@
   const enter = (r) => { S.toast(t('login.welcome'), 'ok'); S.go(S.homeFor(r.user)); };
 
   // The login pages have no site header: the logo above the card leads back to the site.
-  const loginBrand = () => h('a', { class: 'login-brand', href: '/', 'aria-label': t('brand.name') }, S.logo(), h('span', null, t('brand.name')));
+  const loginBrand = () => h('a', { class: 'login-brand', href: '/', 'aria-label': S.brandName() }, S.logo(), h('span', null, S.brandName()));
 
   // A password with a show/hide button (👁); the label still points at the input itself.
   function passwordField(label, name, autocomplete, hint) {
@@ -389,7 +389,7 @@
       const src = (w) => '/img/renders/tower-night-tall-' + w + '.webp';
       const pic = h('figure', { class: 'lg-pic', 'aria-hidden': 'true' },
         h('img', { src: src(1600), srcset: [800, 1600, 2400].map((w) => src(w) + ' ' + w + 'w').join(', '), sizes: '(max-width: 768px) 100vw, 55vw', width: 2400, height: 3000, alt: '', decoding: 'async' }));
-      const words = t('brand.name').split(/\s+/);
+      const words = S.brandName().split(/\s+/);
       const lang = h('div', { class: 'seg lg-lang', role: 'group', 'aria-label': 'Language' }, S.LANGS.map(([k, l]) => h('button', { type: 'button', class: S.lang === k ? 'on' : '', 'aria-pressed': String(S.lang === k), onclick: () => { if (S.lang !== k) S.setLang(k); } }, l)));
       // The theme switch, as in the header of the other pages.
       const theme = h('button', { type: 'button', class: 'lg-theme' });
@@ -516,7 +516,7 @@
           h('div', null, h('h1', { class: 'cab-welcome-name' }, t('cab.hi', { name: firstName(ov.customerName) })), h('p', { class: 'cab-welcome-sub' }, aptTitle(deal))),
           picker()),
         h('div', { class: 'cab-welcome-stats' },
-          stat(h('div', { class: 'cab-stat-val' }, '№ ' + deal.apartmentNumber), t('wow.cab.apt')),
+          stat(h('div', { class: 'cab-stat-val' }, S.aptShort(deal)), t('wow.cab.apt')),
           stat(h('div', { class: 'cab-stat-val' }, deal.paidPercent + '%'), t('wow.cab.paid')),
           stat(next, t('wow.cab.next'))),
         progress(deal.paidPercent, true));
@@ -587,7 +587,7 @@
         } catch (er) { S.err(er); }
       }) }, '📋 ' + t('cab.contractPdf'));
       return h('div', { class: 'card cab-apt' },
-        h('div', { class: 'row between' }, h('h2', null, '🏠 ' + d.buildingName + ', ' + t('cab.aptNo', { n: d.apartmentNumber })), S.stageChip(d.stage)),
+        h('div', { class: 'row between' }, h('h2', null, '🏠 ' + (d.blockCode ? S.unitName(d) : d.buildingName + ', ' + t('cab.aptNo', { n: d.apartmentNumber }))), S.stageChip(d.stage)),
         h('div', { class: 'cab-meta' }, h('span', null, t('cab.area') + ': ' + S.fmt.area(d.area)), h('span', null, S.fmt.rooms(d.rooms)), h('span', null, t('cab.floor') + ': ' + d.floor)),
         h('dl', { class: 'cab-money' },
           h('div', null, h('dt', null, t('cab.price')), h('dd', null, S.fmt.money(d.finalPrice, d.currency))),
@@ -609,9 +609,9 @@
       const pdf = h('button', { class: 'ptrack-pdf', type: 'button', onclick: (e) => { e.stopPropagation(); S.busy(e.currentTarget, () => S.api.openDoc('/deals/' + deal.dealId + '/statement.pdf', { date: S.today() }, t('cab.pdfAct')).catch(S.err)); } }, '⬇ ' + t('pcard.pdf'));
       const front = h('div', { class: 'ptrack-front' },
         h('span', { class: 'ptrack-ornament', 'aria-hidden': 'true' }),
-        h('div', { class: 'ptrack-head' }, h('div', { class: 'ptrack-brand' }, '💎 ' + t('brand.name').toUpperCase()), pdf),
+        h('div', { class: 'ptrack-head' }, h('div', { class: 'ptrack-brand' }, '💎 ' + S.brandName().toUpperCase()), pdf),
         h('div', { class: 'ptrack-name' }, ov.customerName || ''),
-        h('div', { class: 'ptrack-apt' }, t('cab.aptNo', { n: deal.apartmentNumber }) + ' · ' + t('pcard.floor', { n: deal.floor })),
+        h('div', { class: 'ptrack-apt' }, (deal.blockCode ? S.unitName(deal) : t('cab.aptNo', { n: deal.apartmentNumber })) + ' · ' + t('pcard.floor', { n: deal.floor })),
         h('div', { class: 'ptrack-bar-track' }, bar),
         h('div', { class: 'ptrack-pct' }, t('pcard.paidPct', { n: pct })),
         h('dl', { class: 'ptrack-sums' },
@@ -871,7 +871,7 @@
       const x = new Date(d); if (Number.isNaN(x.getTime())) return d || '';
       return x.getDate() + ' ' + t('cab.month.' + x.getMonth()) + ' ' + x.getFullYear();
     }
-    function aptTitle(d) { return d.buildingName + ' — ' + t('cab.aptNo', { n: d.apartmentNumber }) + ', ' + S.fmt.rooms(d.rooms); }
+    function aptTitle(d) { return (d.blockCode ? S.unitName(d) : d.buildingName + ' — ' + t('cab.aptNo', { n: d.apartmentNumber })) + ', ' + S.fmt.rooms(d.rooms); }
     // In the CRM the name is often written surname first, so the whole name is safer than a guessed "first name".
     function firstName(n) { return n || (S.api.user && S.api.user.name) || ''; }
     return () => { stopped = true; fab.remove(); };

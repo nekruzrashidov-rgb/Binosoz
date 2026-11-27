@@ -70,6 +70,9 @@
     phone: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
     pin: '<path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/>',
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    car: '<path d="M5 16V11l2-5h10l2 5v5M3 16h18M7 16v2M17 16v2M5 11h14"/><circle cx="8" cy="13.5" r="0.6"/><circle cx="16" cy="13.5" r="0.6"/>',
+    layers: '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>',
+    expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
   };
   S.icon = (n, cls) => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('width', 18); s.setAttribute('height', 18); s.setAttribute('fill', 'none'); s.setAttribute('stroke', 'currentColor'); s.setAttribute('stroke-width', 1.8); s.setAttribute('stroke-linecap', 'round'); s.setAttribute('stroke-linejoin', 'round'); s.style.flex = 'none'; if (cls) s.setAttribute('class', cls); s.setAttribute('aria-hidden', 'true'); s.innerHTML = ICONS[n] || ''; return s; };
   // Each copy of the logo gets its own gradient id (lg1, lg2…): the same id twice on a page is invalid HTML, and Safari
@@ -83,13 +86,27 @@
     return s;
   };
   S.logo = () => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); const id = 'lg' + (++logoN); s.setAttribute('viewBox', '0 0 32 32'); s.setAttribute('width', 28); s.setAttribute('height', 28); s.setAttribute('aria-hidden', 'true'); s.innerHTML = '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e0874a"/><stop offset="1" stop-color="#9a4f1c"/></linearGradient></defs><path d="M16 1.5l4 9.3 10 1.2-7.4 6.9 2 10L16 23.7 7.4 28.9l2-10L2 12l10-1.2z" fill="url(#' + id + ')"/><path d="M16 1.5l4 9.3 10 1.2-7.4 6.9 2 10L16 23.7z" fill="#f0c89a" opacity=".92"/>'; return s; };
-  // The complex's name and address in the page language. The API and config.js hold them in Russian; the default
-  // complex («Некруз Резиденс», пр. Борбад, 15) is shown from i18n (brand.name, contact.address), any other as it is.
-  const RU_NAME = /^Некр[уӯ]з\s+Резиденс$/i, RU_ADDRESS = 'г. Душанбе, пр. Борбад, 15';
+  // The complex's name comes from the API (the organization's name, GET /public/brand → S.brandInfo); until it answers
+  // and without the API — «Rich Tower» (brand.name). The address of config.js is shown in the page language
+  // (contact.address), any other as it is.
+  const RU_ADDRESS = 'г. Душанбе, пр. Борбад, 15';
   // «Отправляя, вы соглашаетесь с политикой конфиденциальности» — под формами заявки и регистрации.
   S.privacyNote = () => S.h('p', { class: 'consent-note' }, S.t('privacy.consent') + ' ', S.h('a', { href: '/privacy' }, S.t('privacy.consentLink')), '.');
-  S.brandName = (name) => { const v = String(name || '').trim(); return !v || RU_NAME.test(v) || v === 'Nekruz Residence' ? S.t('brand.name') : v; };
+  // «Rich Tower — 3 блока»: the published blocks of the complex from the same answer; one building — null.
+  S.blocksLine = () => {
+    const n = ((S.brandInfo && S.brandInfo.buildings) || []).filter((b) => b.blockCode).length;
+    return n > 1 ? S.t('nr.blocksLine', { b: S.brandName(), n, w: S.plural(n, 'nr.blocksN') }) : null;
+  };
+  S.brandName = () => { const v = String((S.brandInfo && S.brandInfo.name) || '').trim(); return v || S.t('brand.name'); };
   S.brandAddress = (address) => { const v = String(address || '').trim().replace(/\s+/g, ' '); return v === RU_ADDRESS ? S.t('contact.address') : v; };
+
+  // The price in the other currency by the NBT rate (rate — TJS for 1 USD): a USD catalogue shows «≈ … TJS по курсу НБТ»,
+  // a TJS one «≈ $…». Always an estimate (the caller adds «оценочно по курсу»); no rate — null.
+  S.priceEq = (price, cur, rate) => {
+    const r = rate && +rate.rate;
+    if (!r || !(price > 0)) return null;
+    return String(cur || 'TJS').toUpperCase() === 'USD' ? S.t('price.eqTjs', { s: S.fmt.n(Math.round(price * r)) }) : '≈ $' + S.fmt.n(Math.round(price / r));
+  };
 
   // ---------- formatting ----------
   const nf = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
@@ -115,6 +132,28 @@
   };
   // Apartment types by rooms — one rule for the catalog, the layouts, the gallery and the 3D card, so the labels agree:
   // groups 0 (studio), 1, 2, 3, 4 (four rooms and more); the label names the real number of rooms.
+  // Kinds of premises: an apartment (and a penthouse) is a home; a shop and a parking space have their own names.
+  S.isHome = (a) => !a || !a.kind || a.kind === 'residential' || a.kind === 'penthouse';
+  // Numbers (from the API): in a block of the complex homes go 1…N, shops Н-1…, parking spaces М-1…; the block letter comes
+  // with the number — «Блок A, кв. 45», short «A-45». The older building without blocks keeps its plain numbers.
+  // unitOf() reads both a catalog unit ({ number, block, kind }) and a deal/booking/report row ({ apartmentNumber, blockCode, apartmentKind }).
+  S.unitOf = (x) => ({ block: (x && (x.block || x.blockCode)) || null, kind: String((x && (x.apartmentKind || x.kind)) || 'residential').toLowerCase(), number: x ? (x.apartmentNumber != null ? x.apartmentNumber : x.number) : '' });
+  S.unitCode = (kind, n) => (kind === 'commercial' ? 'Н-' : kind === 'parking' ? 'М-' : '') + n;
+  // The number for a table cell or a title: «A-45» in a block, «№ 1201» elsewhere (aptNum — without «№»).
+  S.aptNum = (x) => { const u = S.unitOf(x); return (u.block ? u.block + '-' : '') + S.unitCode(u.kind, u.number); };
+  S.aptShort = (x) => { const u = S.unitOf(x); return u.block ? S.aptNum(u) : '№ ' + S.unitCode(u.kind, u.number); };
+  S.unitName = (x) => {
+    const a = S.unitOf(x); const code = S.unitCode(a.kind, a.number);
+    if (a.block) return S.t('unit.inBlock', { b: a.block, u: S.t(a.kind === 'commercial' ? 'unit.shopIn' : a.kind === 'parking' ? 'unit.spotIn' : a.kind === 'penthouse' ? 'unit.penthouseIn' : 'unit.aptIn', { n: code }) });
+    return a.kind === 'commercial' ? S.t('unit.shop', { n: code }) : a.kind === 'parking' ? S.t('unit.spot', { n: code }) : a.kind === 'penthouse' ? S.t('unit.penthouse', { n: code }) : S.t('nr.cat.aptN', { n: code });
+  };
+  S.unitType = (a) => (a && a.kind === 'commercial' ? S.t('unit.shopType') : a && a.kind === 'parking' ? S.t('unit.spotType') : a && a.kind === 'penthouse' ? S.t('unit.penthouseType', { n: a.rooms }) : S.roomsKind.label(a.rooms));
+  // The penthouses' ceiling: not in the API yet — 3,6 m marked «оценка» (an estimate).
+  S.PENTHOUSE_CEILING = 3.6;
+  // Floor numbers as the plan writes them: −2, −1, 1, 2… (a real minus sign).
+  S.floorNo = (n) => (+n < 0 ? '−' + Math.abs(+n) : String(n));
+  S.floorName = (f) => (f.parking ? S.t('floor.parkingN', { n: S.floorNo(f.number) }) : S.t('floor.n', { n: f.number }));
+
   S.roomsKind = {
     types: [0, 1, 2, 3, 4],
     group: (n) => Math.max(0, Math.min(4, Math.floor(+n || 0))),
@@ -312,7 +351,7 @@
     },
     entity(x) {
       const kind = t('audit.ent.' + x.entity, null, x.entity);
-      const parts = [x.apartmentNumber != null ? t('audit.apt', { n: x.apartmentNumber }) : null, x.entityName || null].filter(Boolean);
+      const parts = [x.apartmentNumber != null ? t('audit.apt', { n: x.apartmentCode || x.apartmentNumber }) : null, x.entityName || null].filter(Boolean);
       if (parts.length) return kind + ' · ' + parts.join(' · ');
       const id = typeof x.entityId === 'string' && x.entityId.length > 12 ? x.entityId.replace(/-/g, '').slice(-8).toUpperCase() : '';
       return id && !/^0+$/.test(id) ? kind + ' #' + id : kind;
