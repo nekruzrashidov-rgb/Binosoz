@@ -71,6 +71,28 @@ test.describe('3D of the whole complex', () => {
   });
 
 
+  // A chosen block is the person's camera: a later resize of the scene (the window, the list, a rotated phone) only fits the
+  // frame and never sends the camera back to the whole complex (it used to: ResizeObserver reset it while lastInput was 0).
+  test('after a block is chosen, a resize of the scene keeps the camera at that block', async ({ page }) => {
+    const errors = await openComplex(page);
+    const c = (await state(page)).blocks.find((b) => b.code === 'C').center;
+    const toC = async () => { const v = (await state(page)).view; return Math.hypot(v.tx - c[0], v.tz - c[1]); };
+    // No apartment chosen (as when the chosen one is not bound yet on a slow device): nothing else holds the camera.
+    if (await page.locator('.h3d-card').isVisible()) await page.locator('.h3d-card-x').click();
+    await expect.poll(async () => (await state(page)).selected).toBeNull();
+    await page.locator('.h3d-blocks [data-block="C"]').click();
+    await expect.poll(toC, { timeout: 20000 }).toBeLessThan(8);
+    const size = page.viewportSize();
+    for (const s of [{ width: size.width - 120, height: size.height - 60 }, size]) {
+      await page.setViewportSize(s);
+      // A few frames after the resize (the observer runs on the next frame).
+      await page.waitForTimeout(2500);
+      expect(await toC()).toBeLessThan(8);
+    }
+    expect((await state(page)).focusBlock).toBe('C');
+    expect(errors).toEqual([]);
+  });
+
   test('catalog: «Весь ЖК / A / B / C» over the model, the rail of the chosen block, the list by block, the block in the card', async ({ page }) => {
     await mockComplex(page);
     await page.goto('/apartments');
