@@ -2,6 +2,8 @@ using System.Net;
 using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Sitora.Domain.Exceptions;
 using Sitora.Domain.Interfaces;
@@ -34,6 +36,33 @@ public class S3StorageOptions
     public string Region { get; set; } = "us-east-1";
     // MinIO и B2 адресуют бакет путём (http://host/bucket/key), а не поддоменом.
     public bool ForcePathStyle { get; set; } = true;
+
+    // Storage__S3__UnsignedPayload: тело PutObject без подписи SigV4 (UNSIGNED-PAYLOAD) и без контрольной суммы SDK.
+    // Cloudflare R2 не понимает потоковую подпись SDK v4 (aws-chunked, STREAMING-…-PAYLOAD-TRAILER) — без этого запись
+    // в R2 падает. Пусто — авто: да для своего https-эндпоинта (R2, B2), нет для AWS S3 (пустой Endpoint). По http
+    // всегда нет: SDK запрещает unsigned payload без TLS (MinIO в docker compose и тестах). Целостность при «да» — TLS.
+    public bool? UnsignedPayload { get; set; }
+
+    // Storage__S3__ChecksumWhenRequired: контрольные суммы (CRC32 и др.) — только там, где их требует операция
+    // (WHEN_REQUIRED), а не всегда (WHEN_SUPPORTED — умолчание SDK v4). Пусто — авто: да для любого своего эндпоинта
+    // (S3-совместимые сервисы отстают от новых заголовков AWS), нет для AWS S3.
+    public bool? ChecksumWhenRequired { get; set; }
+
+    // Storage__S3__ConditionalWrites: запрет перезаписи заголовком If-None-Match: * (R2, AWS S3, MinIO его поддерживают).
+    // false — без заголовка: ключи файлов и так уникальны (Guid). Ответ 501 NotImplemented отключает заголовок сам.
+    public bool ConditionalWrites { get; set; } = true;
+
+    public bool HasCustomEndpoint => !string.IsNullOrWhiteSpace(Endpoint);
+
+    public bool IsHttpsEndpoint =>
+        HasCustomEndpoint && Uri.TryCreate(Endpoint, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps;
+
+    // Без своего эндпоинта (AWS S3) соединение тоже https: явное UnsignedPayload=true там допустимо.
+    public bool EffectiveUnsignedPayload => HasCustomEndpoint
+        ? IsHttpsEndpoint && (UnsignedPayload ?? true)
+        : UnsignedPayload ?? false;
+
+    public bool EffectiveChecksumWhenRequired => ChecksumWhenRequired ?? HasCustomEndpoint;
 }
 
 // Файлы в S3-совместимом хранилище. Подписанные ссылки /api/v1/files?token=… работают как с диском:
@@ -42,23 +71,62 @@ public sealed class S3FileStorage : IFileStorage, IDisposable
 {
     private readonly AmazonS3Client _client;
     private readonly string _bucket;
+    private readonly bool _unsignedPayload;
+    private readonly ILogger _logger;
+    private volatile bool _conditionalWrites;
 
-    public S3FileStorage(IOptions<StorageOptions> options)
+    public S3FileStorage(IOptions<StorageOptions> options, ILogger<S3FileStorage>? logger = null)
     {
         var o = options.Value.S3;
         if (string.IsNullOrWhiteSpace(o.Bucket) || string.IsNullOrWhiteSpace(o.AccessKey) || string.IsNullOrWhiteSpace(o.SecretKey))
             throw new InvalidOperationException("Для Storage__Provider=S3 задайте Storage__S3__Bucket, Storage__S3__AccessKey и Storage__S3__SecretKey");
 
+        _client = new AmazonS3Client(new BasicAWSCredentials(o.AccessKey, o.SecretKey), CreateClientConfig(o));
+        _bucket = o.Bucket;
+        _unsignedPayload = o.EffectiveUnsignedPayload;
+        _conditionalWrites = o.ConditionalWrites;
+        _logger = logger ?? NullLogger<S3FileStorage>.Instance;
+    }
+
+    public bool ConditionalWritesEnabled => _conditionalWrites;
+
+    public static AmazonS3Config CreateClientConfig(S3StorageOptions o)
+    {
         var config = new AmazonS3Config { ForcePathStyle = o.ForcePathStyle };
-        if (string.IsNullOrWhiteSpace(o.Endpoint))
-            config.RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(o.Region);
-        else
+        if (o.HasCustomEndpoint)
         {
             config.ServiceURL = o.Endpoint;
             config.AuthenticationRegion = o.Region;
         }
-        _client = new AmazonS3Client(new BasicAWSCredentials(o.AccessKey, o.SecretKey), config);
-        _bucket = o.Bucket;
+        else
+            config.RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(o.Region);
+
+        if (o.EffectiveChecksumWhenRequired)
+        {
+            config.RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED;
+            config.ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED;
+        }
+        return config;
+    }
+
+    public PutObjectRequest CreatePutRequest(string key, Stream body, bool conditional)
+    {
+        var request = new PutObjectRequest
+        {
+            BucketName = _bucket,
+            Key = Normalize(key),
+            InputStream = body,
+            AutoCloseStream = false
+        };
+        // Как FileMode.CreateNew у диска: существующий объект не перезаписывается.
+        if (conditional)
+            request.IfNoneMatch = "*";
+        if (_unsignedPayload)
+        {
+            request.DisablePayloadSigning = true;
+            request.DisableDefaultChecksumValidation = true;
+        }
+        return request;
     }
 
     public async Task SaveAsync(string key, Stream content, CancellationToken ct = default)
@@ -74,15 +142,20 @@ public sealed class S3FileStorage : IFileStorage, IDisposable
             body = buffer;
         }
 
-        await _client.PutObjectAsync(new PutObjectRequest
+        var conditional = _conditionalWrites;
+        var start = body.Position;
+        try
         {
-            BucketName = _bucket,
-            Key = Normalize(key),
-            InputStream = body,
-            AutoCloseStream = false,
-            // Как FileMode.CreateNew у диска: существующий объект не перезаписывается.
-            IfNoneMatch = "*"
-        }, ct);
+            await _client.PutObjectAsync(CreatePutRequest(key, body, conditional), ct);
+        }
+        catch (AmazonS3Exception e) when (conditional && e.StatusCode == HttpStatusCode.NotImplemented)
+        {
+            // Сервис не умеет условную запись: дальше без If-None-Match (ключи файлов уникальны — Guid).
+            _conditionalWrites = false;
+            _logger.LogWarning("Хранилище S3 не поддерживает If-None-Match ({ErrorCode}): запись без запрета перезаписи", e.ErrorCode);
+            body.Position = start;
+            await _client.PutObjectAsync(CreatePutRequest(key, body, conditional: false), ct);
+        }
     }
 
     public async Task<Stream> OpenReadAsync(string key, CancellationToken ct = default)

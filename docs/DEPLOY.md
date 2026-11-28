@@ -193,6 +193,12 @@ WEBAPI_IMAGE=ghcr.io/nekruzrashidov-rgb/binosoz-api:<полный sha преды
 Диск Render временный: после каждого деплоя загруженные договоры и фото пропадают. API при старте в Production с `Storage__Provider=Local` без `Storage__RootPath` пишет в лог ошибку уровня Critical, а `/health/ready` отвечает `Degraded`. Варианты:
 
 1. **S3-совместимое хранилище** (Cloudflare R2, Backblaze B2, AWS S3, свой MinIO). Создать бакет и ключ доступа только к нему, затем в панели Render: `Storage__Provider=S3`, `Storage__S3__Endpoint` (для R2 — `https://<account>.r2.cloudflarestorage.com`, для AWS — пусто), `Storage__S3__Bucket`, `Storage__S3__AccessKey`, `Storage__S3__SecretKey`, `Storage__S3__Region` (R2 — `auto`).
+   Для R2 больше ничего не нужно. Со своим https-эндпоинтом API само отправляет тело без потоковой подписи SDK v4 (`aws-chunked`, `STREAMING-…-PAYLOAD-TRAILER`), которую R2 не поддерживает, и считает контрольные суммы только там, где их требует операция. Эти настройки можно переопределить:
+   - `Storage__S3__UnsignedPayload` — по http всегда выключено;
+   - `Storage__S3__ChecksumWhenRequired` — для AWS S3 по умолчанию выключено;
+   - `Storage__S3__ConditionalWrites=false` — отключает запрет перезаписи (`If-None-Match: *`) для сервисов, которые его не поддерживают. При ответе 501 API отключает его само.
+
+   Если проверка `storage` — `Unhealthy`, причина записана в логе: «Проверка хранилища: <шаг> не удалась — <тип> <код S3> HTTP <статус>».
 2. **Render Disk** (платный тариф): подключить диск, например, в `/var/data` и задать `Storage__RootPath=/var/data/storage`.
 
 После смены — `/health/ready` (с `X-Health-Key`) показывает `Healthy` у проверки `storage`: она пишет, читает и удаляет пробный файл.
